@@ -117,6 +117,16 @@ void PowerSupply::SetSoftStartEnabled(int /*chan*/, bool /*enable*/)
 {
 }
 
+int64_t PowerSupply::GetSoftStartRampTime(int /*chan*/)
+{
+	return 0;
+}
+
+void PowerSupply::SetSoftStartRampTime(int /*chan*/, int64_t /*time*/)
+{
+
+}
+
 /**
 	@brief Pulls data from hardware and updates our measurements
  */
@@ -186,7 +196,7 @@ void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 		{
 			YAML::Node ss;
 			ss["enable"] = IsSoftStartEnabled(i);
-			//TODO: soft start ramp rate etc
+			ss["ramptime"] = GetSoftStartRampTime(i);
 			channelNode["softStart"] = ss;
 		}
 		channelNode["enabled"] = GetPowerChannelActive(i);
@@ -311,8 +321,21 @@ void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, I
 		if(SupportsSoftStart())
 		{
 			YAML::Node ss = channelNode["softStart"];
-			//todo: ramp rates etc
-			SetSoftStartEnabled(i, ss["enable"].as<bool>());
+
+			if(ss["ramptime"])
+			{
+				//Do not change ramp time if not strictly necessary to avoid output interruption
+				//R&S HMC804x will shut down the output when changing ramp time if the output is currently on!
+				auto ramptime = ss["ramptime"].as<int64_t>();
+				if(ramptime != GetSoftStartRampTime(i))
+					SetSoftStartRampTime(i, ramptime);
+			}
+
+			//Do not change ramp enable if not strictly necessary to avoid output interruption
+			//R&S HMC804x will shut down the output when changing ramp time if the output is currently on!
+			auto rampen = ss["enable"].as<bool>();
+			if(IsSoftStartEnabled(i) != rampen)
+				SetSoftStartEnabled(i, rampen);
 		}
 
 		auto en = channelNode["enabled"].as<bool>();

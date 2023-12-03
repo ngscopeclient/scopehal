@@ -175,6 +175,23 @@ void RohdeSchwarzHMC804xPowerSupply::SetSoftStartEnabled(int chan, bool enable)
 		m_transport->SendCommandQueued("volt:ramp off");
 }
 
+int64_t RohdeSchwarzHMC804xPowerSupply::GetSoftStartRampTime(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("volt:ramp:dur?");
+	return atof(ret.c_str()) * FS_PER_SECOND;
+}
+
+void RohdeSchwarzHMC804xPowerSupply::SetSoftStartRampTime(int chan, int64_t time)
+{
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	SelectChannel(chan);
+	m_transport->SendCommandQueued(string("volt:ramp:dur ") + to_string(SECONDS_PER_FS * time));
+}
+
 void RohdeSchwarzHMC804xPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool enable)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());

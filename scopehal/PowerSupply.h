@@ -109,6 +109,23 @@ public:
 	virtual bool IsSoftStartEnabled(int chan);
 	virtual void SetSoftStartEnabled(int chan, bool enable);
 
+	/**
+		@brief Gets the ramp time for use with soft-start mode
+
+		@param chan	Channel index
+
+		@return	Ramp time, in femtoseconds
+	 */
+	virtual int64_t GetSoftStartRampTime(int chan);
+
+	/**
+		@brief Sets the ramp time for use with soft-start mode
+
+		@param chan	Channel index
+		@param time	Ramp time, in femtoseconds
+	 */
+	virtual void SetSoftStartRampTime(int chan, int64_t time);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Serialization
 

@@ -72,6 +72,8 @@ public:
 
 	bool IsSoftStartEnabled(int chan) override;
 	void SetSoftStartEnabled(int chan, bool enable) override;
+	virtual int64_t GetSoftStartRampTime(int chan) override;
+	virtual void SetSoftStartRampTime(int chan, int64_t time) override;
 
 protected:
 	int GetStatusRegister(int chan);
