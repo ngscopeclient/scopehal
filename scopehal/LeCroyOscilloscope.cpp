@@ -5139,6 +5139,7 @@ void LeCroyOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 	PushCondition("app.Acquisition.Trigger.Runt.Condition", trig->GetCondition());
 	PushFloat("app.Acquisition.Trigger.Runt.TimeHigh", trig->GetUpperInterval() * SECONDS_PER_FS);
 	PushFloat("app.Acquisition.Trigger.Runt.TimeLow", trig->GetLowerInterval() * SECONDS_PER_FS);
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Runt.Mode = \"Absolute\"");
 	PushFloat("app.Acquisition.Trigger.Runt.UpperLevel", trig->GetUpperBound());
 	PushFloat("app.Acquisition.Trigger.Runt.LowerLevel", trig->GetLowerBound());
 
@@ -5156,6 +5157,7 @@ void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 	PushCondition("app.Acquisition.Trigger.SlewRate.Condition", trig->GetCondition());
 	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperInterval() * SECONDS_PER_FS);
 	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerInterval() * SECONDS_PER_FS);
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.SlewRate.Mode = \"Absolute\"");
 	PushFloat("app.Acquisition.Trigger.SlewRate.UpperLevel", trig->GetUpperBound());
 	PushFloat("app.Acquisition.Trigger.SlewRate.LowerLevel", trig->GetLowerBound());
 
@@ -5266,6 +5268,7 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
  */
 void LeCroyOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Window.Mode = \"Absolute\"");
 	PushFloat("app.Acquisition.Trigger.Window.LowerLevel", trig->GetLowerBound());
 	PushFloat("app.Acquisition.Trigger.Window.UpperLevel", trig->GetUpperBound());
 }
