@@ -1,5 +1,5 @@
-include_directories(SYSTEM ${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
-link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
+include_directories(SYSTEM ${CAIROMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
+link_directories(${CAIROMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 find_library(LXI_LIB lxi)
 find_library(TIRPC_LIB tirpc)
@@ -202,7 +202,7 @@ if(WIN32)
 # https://github.com/KhronosGroup/glslang.git (tags/sdk-1.3.224.1) static lib (SPIRV* glslang OGLCompiler GenericCodeGen MachineIndependent OSDependent)
 target_link_libraries(scopehal
 	${SIGCXX_LIBRARIES}
-	${GTKMM_LIBRARIES}
+	${CAIROMM_LIBRARIES}
 	xptools
 	log
 	${YAML_LIBRARIES}
@@ -227,7 +227,7 @@ target_link_libraries(scopehal
 elseif(APPLE_SILICON)
 target_link_libraries(scopehal
 	${SIGCXX_LIBRARIES}
-	${GTKMM_LIBRARIES}
+	${CAIROMM_LIBRARIES}
 	xptools
 	log
 	${YAML_LIBRARIES}
@@ -246,7 +246,7 @@ target_link_libraries(scopehal
 else()
 target_link_libraries(scopehal
 	${SIGCXX_LIBRARIES}
-	${GTKMM_LIBRARIES}
+	${CAIROMM_LIBRARIES}
 	xptools
 	log
 	${YAML_LIBRARIES}
