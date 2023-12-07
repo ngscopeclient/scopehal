@@ -105,7 +105,7 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	}
 	*/
 
-	//Set initial memory configuration to highest supported
+	//Set initial memory configuration to smallest depth / fastest rate supported
 	auto rates = GetSampleRatesNonInterleaved();
 	SetSampleRate(rates[0]);
 
