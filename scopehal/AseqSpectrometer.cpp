@@ -44,6 +44,8 @@ using namespace std;
 AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
+	, m_triggerArmed(false)
+	, m_triggerOneShot(false)
 {
 	//Create the channel
 	auto chan = new OscilloscopeChannel(
@@ -83,6 +85,14 @@ AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 	PushTrigger();
 	SetTriggerOffset(10 * 1000L * 1000L);
 	*/
+
+	//Figure out the set of wavelengths the spectrometer supports
+	//This is going to be inverted, highest wavelength at the lowest pixel index
+	int npoints = stoi(m_transport->SendCommandQueuedWithReply("POINTS?"));
+	auto wavelengths = explode(m_transport->SendCommandQueuedWithReply("WAVELENGTHS?"), ',');
+
+	for(int i=0; i<npoints; i++)
+		m_wavelengths.push_back(stof(wavelengths[i]) * 1e3);
 }
 
 AseqSpectrometer::~AseqSpectrometer()
@@ -124,7 +134,7 @@ uint64_t AseqSpectrometer::GetSampleRate()
 
 uint64_t AseqSpectrometer::GetSampleDepth()
 {
-	return 3653;
+	return m_wavelengths.size();
 }
 
 void AseqSpectrometer::SetSampleDepth(uint64_t /*depth*/)
@@ -137,18 +147,37 @@ void AseqSpectrometer::SetSampleRate(uint64_t /*rate*/)
 
 void AseqSpectrometer::Start()
 {
+	m_transport->SendCommandQueued("START");
+	m_transport->FlushCommandQueue();
+
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
 }
 
 void AseqSpectrometer::StartSingleTrigger()
 {
+	m_transport->SendCommandQueued("SINGLE");
+	m_transport->FlushCommandQueue();
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 void AseqSpectrometer::Stop()
 {
+	m_transport->SendCommandQueued("STOP");
+	m_transport->FlushCommandQueue();
+
+	m_triggerArmed = false;
 }
 
 void AseqSpectrometer::ForceTrigger()
 {
+	m_transport->SendCommandQueued("FORCE");
+	m_transport->FlushCommandQueue();
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 string AseqSpectrometer::GetDriverNameInternal()
@@ -184,235 +213,51 @@ Oscilloscope::TriggerMode AseqSpectrometer::PollTrigger()
 
 bool AseqSpectrometer::AcquireData()
 {
-	/*
-	#pragma pack(push, 1)
-	struct
-	{
-		//Number of channels in the current waveform
-		uint16_t numChannels;
+	//Read the blob
+	size_t npoints = m_wavelengths.size();
+	float* buf = new float[npoints];
 
-		//Sample interval.
-		//May be different from m_srate if we changed the rate after the trigger was armed
-		int64_t fs_per_sample;
-	} wfmhdrs;
-	#pragma pack(pop)
-
-	//Read global waveform settings (independent of each channel)
-	if(!m_transport->ReadRawData(sizeof(wfmhdrs), (uint8_t*)&wfmhdrs))
+	//Pull the data from the server
+	if(!m_transport->ReadRawData(npoints * sizeof(float), (uint8_t*)buf))
 		return false;
-	uint16_t numChannels = wfmhdrs.numChannels;
-	int64_t fs_per_sample = wfmhdrs.fs_per_sample;
 
-	//Acquire data for each channel
-	size_t chnum;
-	size_t memdepth;
-	float config[3];
-	SequenceSet s;
+	//Flip the samples around so the lowest wavelength is at the left, then display as a sparse waveform
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
+	auto cap = new SparseAnalogWaveform;
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 0;
+	cap->m_startTimestamp = floor(t);
+	cap->m_startFemtoseconds = fs;
+	cap->Resize(npoints);
 
-	//Analog channels get processed separately
-	vector<UniformAnalogWaveform*> awfms;
-	vector<size_t> achans;
-	vector<float> scales;
-	vector<float> offsets;
-
-	for(size_t i=0; i<numChannels; i++)
+	size_t last = npoints-1;
+	for(size_t i=0; i<npoints; i++)
 	{
-		size_t tmp[2];
+		cap->m_offsets[i] = m_wavelengths[last - i];
 
-		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(tmp), (uint8_t*)&tmp))
-			return false;
-		chnum = tmp[0];
-		memdepth = tmp[1];
-
-		//Analog channels
-		if(chnum < m_analogChannelCount)
-		{
-			auto& abuf = m_analogRawWaveformBuffers[chnum];
-			abuf->resize(memdepth);
-			abuf->PrepareForCpuAccess();
-			achans.push_back(chnum);
-
-			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
-				return false;
-			float scale = config[0];
-			float offset = config[1];
-			float trigphase = -config[2] * fs_per_sample;
-			scale *= GetChannelAttenuation(chnum);
-			offset *= GetChannelAttenuation(chnum);
-
-			//TODO: stream timestamp from the server
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(abuf->GetCpuPointer())))
-				return false;
-
-			abuf->MarkModifiedFromCpu();
-
-			//Create our waveform
-			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname());
-			cap->m_timescale = fs_per_sample;
-			cap->m_triggerPhase = trigphase;
-			cap->m_startTimestamp = time(NULL);
-			cap->m_startFemtoseconds = fs;
-			cap->Resize(memdepth);
-			awfms.push_back(cap);
-			scales.push_back(scale);
-			offsets.push_back(offset);
-
-			s[GetOscilloscopeChannel(chnum)] = cap;
-		}
-
-		//Digital pod
+		if(i+1 < npoints)
+			cap->m_durations[i] = m_wavelengths[last - (i+1)] - m_wavelengths[last - i];
 		else
-		{
-			int16_t* buf = new int16_t[memdepth];
+			cap->m_durations[i] = 0;
 
-			float trigphase;
-			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
-				return false;
-			trigphase = -trigphase * fs_per_sample;
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
-				return false;
-
-			size_t podnum = chnum - m_analogChannelCount;
-			if(podnum > 2)
-			{
-				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
-						 chnum);
-				return false;
-			}
-
-			//Create buffers for output waveforms
-			SparseDigitalWaveform* caps[8];
-			for(size_t j=0; j<8; j++)
-			{
-				auto nchan = m_digitalChannelBase + 8*podnum + j;
-				caps[j] = AllocateDigitalWaveform(m_nickname + "." + GetOscilloscopeChannel(nchan)->GetHwname());
-				s[GetOscilloscopeChannel(nchan) ] = caps[j];
-			}
-
-			//Now that we have the waveform data, unpack it into individual channels
-			#pragma omp parallel for
-			for(size_t j=0; j<8; j++)
-			{
-				//Bitmask for this digital channel
-				int16_t mask = (1 << j);
-
-				//Create the waveform
-				auto cap = caps[j];
-				cap->m_timescale = fs_per_sample;
-				cap->m_triggerPhase = trigphase;
-				cap->m_startTimestamp = time(NULL);
-				cap->m_startFemtoseconds = fs;
-
-				//Preallocate memory assuming no deduplication possible
-				cap->Resize(memdepth);
-				cap->PrepareForCpuAccess();
-
-				//First sample never gets deduplicated
-				bool last = (buf[0] & mask) ? true : false;
-				size_t k = 0;
-				cap->m_offsets[0] = 0;
-				cap->m_durations[0] = 1;
-				cap->m_samples[0] = last;
-
-				//Read and de-duplicate the other samples
-				//TODO: can we vectorize this somehow?
-				for(size_t m=1; m<memdepth; m++)
-				{
-					bool sample = (buf[m] & mask) ? true : false;
-
-					//Deduplicate consecutive samples with same value
-					//FIXME: temporary workaround for rendering bugs
-					//if(last == sample)
-					if( (last == sample) && ((m+3) < memdepth) )
-						cap->m_durations[k] ++;
-
-					//Nope, it toggled - store the new value
-					else
-					{
-						k++;
-						cap->m_offsets[k] = m;
-						cap->m_durations[k] = 1;
-						cap->m_samples[k] = sample;
-						last = sample;
-					}
-				}
-
-				//Free space reclaimed by deduplication
-				cap->Resize(k);
-				cap->m_offsets.shrink_to_fit();
-				cap->m_durations.shrink_to_fit();
-				cap->m_samples.shrink_to_fit();
-				cap->MarkSamplesModifiedFromCpu();
-				cap->MarkTimestampsModifiedFromCpu();
-			}
-
-			delete[] buf;
-		}
+		cap->m_samples[i] = buf[last - i];
 	}
-
-	//If we have GPU support for int16, we can do the conversion on the card
-	//But only do this if we also have push-descriptor support, because doing N separate dispatches is likely
-	//to be slower than a parallel CPU-side conversion
-	//Note also that a strict benchmarking here may be slower than the CPU version due to transfer latency,
-	//but having the waveform on the GPU now means we don't have to do *that* later.
-	if(g_hasShaderInt16 && g_hasPushDescriptor)
-	{
-		m_cmdBuf->begin({});
-
-		m_conversionPipeline->Bind(*m_cmdBuf);
-
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-
-			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
-
-			ConvertRawSamplesShaderArgs args;
-			args.size = cap->size();
-			args.gain = scales[i];
-			args.offset = -offsets[i];
-
-			m_conversionPipeline->DispatchNoRebind(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
-
-			cap->MarkModifiedFromGpu();
-		}
-
-		m_cmdBuf->end();
-		m_queue->SubmitAndBlock(*m_cmdBuf);
-	}
-	else
-	{
-		//Fallback path
-		//Process analog captures in parallel
-		#pragma omp parallel for
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-			cap->PrepareForCpuAccess();
-			Convert16BitSamples(
-				cap->m_samples.GetCpuPointer(),
-				m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				-offsets[i],
-				cap->size());
-
-			cap->MarkSamplesModifiedFromCpu();
-		}
-	}
+	cap->MarkModifiedFromCpu();
 
 	//Save the waveforms to our queue
+	SequenceSet s;
+	s[GetOscilloscopeChannel(0)] = cap;
 	m_pendingWaveformsMutex.lock();
 	m_pendingWaveforms.push_back(s);
 	m_pendingWaveformsMutex.unlock();
 
+	//Done, clean up
+	delete[] buf;
+
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)
 		m_triggerArmed = false;
-	*/
+
 	return true;
 }

@@ -73,6 +73,10 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
 
 protected:
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
+
+	std::vector<float> m_wavelengths;
 
 public:
 	static std::string GetDriverNameInternal();
