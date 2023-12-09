@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -90,7 +90,7 @@ void ImportFilter::Refresh()
 bool ImportFilter::TryNormalizeTimebase(SparseWaveformBase* wfm)
 {
 	//Find the min, max, and mean sample interval
-	Unit fs(Unit::UNIT_FS);
+	Unit xunit(GetXAxisUnits());
 	uint64_t interval_sum = 0;
 	uint64_t interval_count = wfm->size();
 	uint64_t interval_min = std::numeric_limits<uint64_t>::max();
@@ -106,9 +106,11 @@ bool ImportFilter::TryNormalizeTimebase(SparseWaveformBase* wfm)
 		interval_max = max(interval_max, dur);
 	}
 	uint64_t avg = interval_sum / interval_count;
-	LogTrace("Min sample interval:     %s\n", fs.PrettyPrint(interval_min).c_str());
-	LogTrace("Average sample interval: %s\n", fs.PrettyPrint(avg).c_str());
-	LogTrace("Max sample interval:     %s\n", fs.PrettyPrint(interval_max).c_str());
+	LogTrace("Min sample interval:     %s\n", xunit.PrettyPrint(interval_min).c_str());
+	LogTrace("Average sample interval: %s\n", xunit.PrettyPrint(avg).c_str());
+	LogTrace("Max sample interval:     %s\n", xunit.PrettyPrint(interval_max).c_str());
+	if(avg == 0)
+		return false;
 
 	//Find the standard deviation of sample intervals
 	uint64_t stdev_sum = 0;
@@ -118,7 +120,7 @@ bool ImportFilter::TryNormalizeTimebase(SparseWaveformBase* wfm)
 		stdev_sum += delta*delta;
 	}
 	uint64_t stdev = sqrt(stdev_sum / interval_count);
-	LogTrace("Stdev of intervals:      %s\n", fs.PrettyPrint(stdev).c_str());
+	LogTrace("Stdev of intervals:      %s\n", xunit.PrettyPrint(stdev).c_str());
 
 	//If the standard deviation is more than 2% of the average sample period, assume the data is sampled irregularly.
 	if( (stdev * 50) > avg)

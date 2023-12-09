@@ -67,6 +67,7 @@ FilterParameter FilterParameter::UnitSelector()
 {
 	FilterParameter ret(TYPE_ENUM, Unit::UNIT_COUNTS);
 	ret.AddEnumValue("S", Unit::UNIT_FS);	//pretty-printed as seconds even though internally scaled to fs
+	ret.AddEnumValue("m", Unit::UNIT_PM);	//pretty-printed as meters even though internally scaled to pm
 	ret.AddEnumValue("Hz", Unit::UNIT_HZ);
 	ret.AddEnumValue("V", Unit::UNIT_VOLTS);
 	ret.AddEnumValue("A", Unit::UNIT_AMPS);

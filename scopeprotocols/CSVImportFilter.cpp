@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,12 +37,22 @@ using namespace std;
 
 CSVImportFilter::CSVImportFilter(const string& color)
 	: ImportFilter(color)
+	, m_xunit("X Axis Unit")
+	, m_yunit0("Y Axis Unit 0")
 {
 	m_fpname = "CSV File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.csv";
 	m_parameters[m_fpname].m_fileFilterName = "Comma Separated Value files (*.csv)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
+
+	m_parameters[m_xunit] = FilterParameter::UnitSelector();
+	m_parameters[m_xunit].SetIntVal(Unit::UNIT_FS);
+	m_parameters[m_xunit].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
+
+	m_parameters[m_yunit0] = FilterParameter::UnitSelector();;
+	m_parameters[m_yunit0].SetIntVal(Unit::UNIT_VOLTS);
+	m_parameters[m_yunit0].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +71,9 @@ void CSVImportFilter::OnFileNameChanged()
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
 		return;
+
+	//Set unit
+	SetXAxisUnits(Unit(static_cast<Unit::UnitType>(m_parameters[m_xunit].GetIntVal())));
 
 	//Set waveform timestamp to file timestamp
 	time_t timestamp = 0;
@@ -174,21 +187,25 @@ void CSVImportFilter::OnFileNameChanged()
 					fields.push_back(tmp);
 				}
 
-				//Assume the timestamp is in seconds for now
-				//TODO: support importing other X axis units
+				//Load timestamp
 				else if(!foundTimestamp)
 				{
 					foundTimestamp = true;
 
-					//Parse time to a float, assuming it's in seconds
-					double timeSec;
-					if(tmp.find("e") == string::npos)
-						sscanf(tmp.c_str(), "%lf", &timeSec);
-					else
-						sscanf(tmp.c_str(), "%le", &timeSec);
+					//Parse time to a float and convert to fs
+					if(m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS)
+					{
+						double timeSec;
+						if(tmp.find("e") == string::npos)
+							sscanf(tmp.c_str(), "%lf", &timeSec);
+						else
+							sscanf(tmp.c_str(), "%le", &timeSec);
+						timestamps.push_back(FS_PER_SECOND * timeSec);
+					}
 
-					//but actually store in fs
-					timestamps.push_back(FS_PER_SECOND * timeSec);
+					//other units are as-is
+					else
+						timestamps.push_back(stoll(tmp));
 				}
 
 				//Data field. Save it
@@ -277,7 +294,11 @@ void CSVImportFilter::OnFileNameChanged()
 		}
 		else
 		{
-			AddStream(Unit(Unit::UNIT_VOLTS), names[i], Stream::STREAM_TYPE_ANALOG);
+			//TODO: support arbitrarily many y axis unit fields, for now use unit 0 for everything
+			AddStream(
+				Unit(static_cast<Unit::UnitType>(m_parameters[m_yunit0].GetIntVal())),
+				names[i],
+				Stream::STREAM_TYPE_ANALOG);
 
 			auto wfm = new SparseAnalogWaveform;
 			wfm->m_timescale = 1;
@@ -330,6 +351,10 @@ void CSVImportFilter::OnFileNameChanged()
 			}
 			else
 				wfm->MarkModifiedFromCpu();
+
+			//If we end up with zero length samples due to invalid configuration, nuke the channel
+			if(wfm->m_durations[0] == 0)
+				SetData(nullptr, i);
 		}
 
 		//Analog data
@@ -368,6 +393,10 @@ void CSVImportFilter::OnFileNameChanged()
 			}
 			else
 				wfm->MarkModifiedFromCpu();
+
+			//If we end up with zero length samples due to invalid configuration, nuke the channel
+			if(wfm->m_durations[0] == 0)
+				SetData(nullptr, i);
 		}
 	}
 }
