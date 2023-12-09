@@ -69,6 +69,8 @@
 
 #include "SiglentLoad.h"
 
+#include "AseqSpectrometer.h"
+
 #include "CopperMountainVNA.h"
 #include "PicoVNA.h"
 
@@ -230,6 +232,8 @@ void DriverStaticInit()
 	AddPowerSupplyDriverClass(SiglentPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
+
+	AddSpectrometerDriverClass(AseqSpectrometer);
 
 	AddVNADriverClass(CopperMountainVNA);
 	AddVNADriverClass(PicoVNA);
