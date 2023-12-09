@@ -101,6 +101,7 @@
 #include "Ethernet1000BaseXDecoder.h"
 #include "Ethernet10GBaseRDecoder.h"
 #include "Ethernet64b66bDecoder.h"
+#include "ExponentialMovingAverageFilter.h"
 #include "EyeBitRateMeasurement.h"
 #include "EyePattern.h"
 #include "EyeHeightMeasurement.h"

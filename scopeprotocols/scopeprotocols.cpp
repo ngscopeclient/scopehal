@@ -101,6 +101,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EthernetAutonegotiationPageDecoder);
 	AddDecoderClass(EthernetBaseXAutonegotiationDecoder);
+	AddDecoderClass(ExponentialMovingAverageFilter);
 	AddDecoderClass(EyeBitRateMeasurement);
 	AddDecoderClass(EyePattern);
 	AddDecoderClass(EyeHeightMeasurement);

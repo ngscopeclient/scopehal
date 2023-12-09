@@ -64,6 +64,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetRMIIDecoder.cpp
 	EthernetSGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
+	ExponentialMovingAverageFilter.cpp
 	ExportFilter.cpp
 	EyeBitRateMeasurement.cpp
 	EyePattern.cpp
