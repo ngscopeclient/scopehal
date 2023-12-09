@@ -51,7 +51,7 @@ AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 	auto chan = new OscilloscopeChannel(
 		this,
 		"Spectrum",
-		"#4040ff",
+		"#e040e0",
 		Unit(Unit::UNIT_PM),
 		Unit(Unit::UNIT_COUNTS),
 		Stream::STREAM_TYPE_ANALOG,
