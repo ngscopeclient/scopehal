@@ -72,11 +72,16 @@ public:
 	virtual void SetSampleRate(uint64_t rate) override;
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
 
+	virtual int64_t GetIntegrationTime() override;
+	virtual void SetIntegrationTime(int64_t t) override;
+
 protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
 	std::vector<float> m_wavelengths;
+
+	int64_t m_integrationTime;
 
 public:
 	static std::string GetDriverNameInternal();

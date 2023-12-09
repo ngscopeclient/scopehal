@@ -93,6 +93,9 @@ AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 
 	for(int i=0; i<npoints; i++)
 		m_wavelengths.push_back(stof(wavelengths[i]) * 1e3);
+
+	//Default to 125ms exposure
+	SetIntegrationTime(FS_PER_SECOND * 125e-3);
 }
 
 AseqSpectrometer::~AseqSpectrometer()
@@ -114,6 +117,17 @@ uint32_t AseqSpectrometer::GetInstrumentTypesForChannel(size_t /*i*/) const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Device interface functions
+
+int64_t AseqSpectrometer::GetIntegrationTime()
+{
+	return m_integrationTime;
+}
+
+void AseqSpectrometer::SetIntegrationTime(int64_t t)
+{
+	m_integrationTime = t;
+	m_transport->SendCommandQueued(string("EXPOSURE ") + to_string(t));
+}
 
 vector<uint64_t> AseqSpectrometer::GetSampleDepthsNonInterleaved()
 {
@@ -206,6 +220,8 @@ bool AseqSpectrometer::IsTriggerArmed()
 
 Oscilloscope::TriggerMode AseqSpectrometer::PollTrigger()
 {
+	m_transport->FlushCommandQueue();
+
 	//Always report "triggered" so we can block on AcquireData() in ScopeThread
 	//TODO: peek function of some sort?
 	return TRIGGER_MODE_TRIGGERED;

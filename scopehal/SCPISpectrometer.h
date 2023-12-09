@@ -79,6 +79,10 @@ public:
 	virtual bool HasFrequencyControls() override;
 	virtual bool HasTimebaseControls() override;
 
+	//Detector controls
+	virtual int64_t GetIntegrationTime() =0;
+	virtual void SetIntegrationTime(int64_t t) =0;
+
 protected:
 	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
 	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
