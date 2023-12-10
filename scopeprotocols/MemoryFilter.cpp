@@ -103,6 +103,13 @@ bool MemoryFilter::PerformAction(const string& id)
 void MemoryFilter::Update()
 {
 	auto sin = GetInput(0);
+
+	//Copy units even if no data
+	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
+	SetVoltageRange(sin.GetVoltageRange(), 0);
+	SetOffset(sin.GetOffset(), 0);
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+
 	auto data = sin.GetData();
 	auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
 	auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
@@ -124,11 +131,4 @@ void MemoryFilter::Update()
 	//TODO: digital path
 	else
 		SetData(nullptr, 0);
-
-	//Copy units and scale from input
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-
-	SetVoltageRange(sin.GetVoltageRange(), 0);
-	SetOffset(sin.GetOffset(), 0);
 }

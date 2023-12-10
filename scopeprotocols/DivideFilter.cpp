@@ -188,15 +188,16 @@ void DivideFilter::RefreshScalarVector(size_t iScalar, size_t iVector)
 
 void DivideFilter::DoRefreshVectorVector()
 {
+	//Output units track the input (even if we don't have a valid second output)
+	if(GetInput(0))
+		SetXAxisUnits(GetInput(0).GetXAxisUnits());
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
 		SetData(nullptr, 0);
 		return;
 	}
-
-	//Output units track the input
-	SetXAxisUnits(GetInput(0).GetXAxisUnits());
 
 	//Get the input data
 	auto a = GetInputWaveform(0);
