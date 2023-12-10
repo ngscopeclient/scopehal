@@ -69,7 +69,7 @@ public:
 		AssertTypeIsAnalogWaveform(cap);
 
 		size_t nouts = cap->size();
-		if(max_peaks == 0)
+		if( (max_peaks == 0) || (nouts < 2) )
 			m_peaks.clear();
 		else
 		{
@@ -77,17 +77,19 @@ public:
 			cap->PrepareForCpuAccess();
 
 			//Get peak search width in bins
-			int64_t search_bins = ceil(search_hz / cap->m_timescale);
+			//(assume bins are equal size, this should get us close)
+			int64_t binsize = GetOffsetScaled(cap, 1) - GetOffsetScaled(cap, 0);
+			int64_t search_bins = ceil(search_hz / binsize);
 			int64_t search_rad = search_bins/2;
 			search_rad = std::max(search_rad, (int64_t)1);
 
 			float baseline = Filter::GetMinVoltage(cap);
 
 			//Find peaks (TODO: can we vectorize/multithread this?)
-			//Start at index 1 so we don't waste a marker on the DC peak
 			std::vector<Peak> peaks;
 			ssize_t nend = nouts-1;
 			size_t minpeak = 10;		//Skip this many bins at left to avoid false positives on the DC peak
+										//(TODO: this only makes sense for FFT)
 			for(ssize_t i=minpeak; i<(ssize_t)nouts; i++)
 			{
 				//Locate the peak
