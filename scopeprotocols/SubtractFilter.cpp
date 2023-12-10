@@ -78,6 +78,13 @@ string SubtractFilter::GetProtocolName()
 
 void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	//Set units as early as possible so we can spawn in the same plot as our parent signal when creating a filter
+	if(GetInput(0))
+	{
+		m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
+		SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	}
+
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
@@ -121,8 +128,6 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Set up units and complain if they're inconsistent
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
 		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
