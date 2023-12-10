@@ -191,17 +191,19 @@ void DivideFilter::DoRefreshVectorVector()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
+	//Output units track the input
+	SetXAxisUnits(GetInput(0).GetXAxisUnits());
+
 	//Get the input data
-	//For now, only implement uniform analog
-	auto a = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto b = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	auto a = GetInputWaveform(0);
+	auto b = GetInputWaveform(1);
 	if(!a || !b)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 	auto len = min(a->size(), b->size());
@@ -209,15 +211,49 @@ void DivideFilter::DoRefreshVectorVector()
 	a->PrepareForCpuAccess();
 	b->PrepareForCpuAccess();
 
-	//Set up the output waveform
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(a, 0);
-	cap->Resize(len);
-	cap->PrepareForCpuAccess();
+	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
+	auto sb = dynamic_cast<SparseAnalogWaveform*>(b);
+	auto ua = dynamic_cast<UniformAnalogWaveform*>(a);
+	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
 
-	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
-	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
-	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	//Uniform / uniform path
+	float* fa = nullptr;
+	float* fb = nullptr;
+	float* fdst = nullptr;
+	if(ua && ub)
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(ua, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+		cap->MarkModifiedFromCpu();
 
+		fa = (float*)__builtin_assume_aligned(&ua->m_samples[0], 16);
+		fb = (float*)__builtin_assume_aligned(&ub->m_samples[0], 16);
+		fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	}
+
+	//Sparse / sparse path
+	else if(sa && sb)
+	{
+		//Set up the output waveform and copy timestamps
+		auto cap = SetupSparseOutputWaveform(sa, 0, 0, 0);
+		cap->PrepareForCpuAccess();
+		cap->MarkModifiedFromCpu();
+
+		fa = (float*)__builtin_assume_aligned(&sa->m_samples[0], 16);
+		fb = (float*)__builtin_assume_aligned(&sb->m_samples[0], 16);
+		fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	}
+
+	else
+	{
+		LogWarning("[DivideFilter] Mixed sparse and uniform inputs not supported\n");
+		SetData(nullptr, 0);
+		return;
+	}
+
+	//Do the actual filter operation
 	size_t i=0;
 	switch(m_parameters[m_formatName].GetIntVal())
 	{
@@ -244,6 +280,4 @@ void DivideFilter::DoRefreshVectorVector()
 			break;
 
 	}
-
-	cap->MarkModifiedFromCpu();
 }
