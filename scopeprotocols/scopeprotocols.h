@@ -153,6 +153,7 @@
 #include "PCIeLinkTrainingDecoder.h"
 #include "PCIeTransportDecoder.h"
 #include "PeakHoldFilter.h"
+#include "PeaksFilter.h"
 #include "PeriodMeasurement.h"
 #include "PhaseMeasurement.h"
 #include "PhaseNonlinearityFilter.h"

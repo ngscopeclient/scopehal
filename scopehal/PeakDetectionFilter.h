@@ -38,9 +38,10 @@
 class Peak
 {
 public:
-	Peak(int64_t x, float y)
+	Peak(int64_t x, float y, float fwhm)
 		: m_x(x)
 		, m_y(y)
+		, m_fwhm(fwhm)
 	{}
 
 	bool operator<(const Peak& rhs) const
@@ -48,6 +49,7 @@ public:
 
 	int64_t m_x;
 	float m_y;
+	float m_fwhm;
 };
 
 class PeakDetector
@@ -78,6 +80,8 @@ public:
 			int64_t search_bins = ceil(search_hz / cap->m_timescale);
 			int64_t search_rad = search_bins/2;
 			search_rad = std::max(search_rad, (int64_t)1);
+
+			float baseline = Filter::GetMinVoltage(cap);
 
 			//Find peaks (TODO: can we vectorize/multithread this?)
 			//Start at index 1 so we don't waste a marker on the DC peak
@@ -126,7 +130,31 @@ public:
 				ssize_t peak_location = round(total / count);
 				//LogDebug("Moved peak from %zu to %zd\n", (size_t)cap->m_offsets[i], peak_location);
 
-				peaks.push_back(Peak(peak_location, target));
+				//Move left and right from the peak until we get half magnitude
+				float hmtarget = (target - baseline)/2 + baseline;
+				ssize_t hmleft = target;
+				ssize_t hmright = target;
+				for(ssize_t j=i; j >= 0; j--)
+				{
+					//TODO: interpolate
+					if(cap->m_samples[j] <= hmtarget)
+					{
+						 hmleft = j;
+						 break;
+					}
+				}
+				for(ssize_t j=i; j < (ssize_t)nouts; j++)
+				{
+					//TODO: interpolate
+					if(cap->m_samples[j] <= hmtarget)
+					{
+						 hmright = j;
+						 break;
+					}
+				}
+				float fwhm = GetOffsetScaled(cap, hmright) - GetOffsetScaled(cap, hmleft);
+
+				peaks.push_back(Peak(peak_location, target, fwhm));
 
 				//We know we're the highest point until at least i+search_rad.
 				//Don't bother searching those points.

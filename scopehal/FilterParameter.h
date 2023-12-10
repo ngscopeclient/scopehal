@@ -152,6 +152,12 @@ public:
 	Unit GetUnit() const
 	{ return m_unit; }
 
+	/**
+		@brief Change the units of the parameter
+	 */
+	void SetUnit(Unit u)
+	{ m_unit = u; }
+
 	//File filters for TYPE_FILENAME (otherwise ignored)
 	std::string m_fileFilterMask;
 	std::string m_fileFilterName;
