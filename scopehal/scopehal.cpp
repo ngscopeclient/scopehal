@@ -418,9 +418,8 @@ void InitializePlugins()
 				else
 				{
 					LogWarning("Warning: Found plugin %s, but has no init symbol\n", fileNameCStr);
+					FreeLibrary(module);
 				}
-
-				FreeLibrary(module);
 			}
 			else
 			{
