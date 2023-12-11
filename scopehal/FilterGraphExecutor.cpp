@@ -232,6 +232,10 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		if(m_terminating)
 			break;
 
+		//If we're already done, nothing to do
+		if(m_allWorkersComplete)
+			continue;
+
 		//Evaluate nodes as they become available, then stop when there's nothing left to do
 		FlowGraphNode* f;
 		while( (f = GetNextRunnableNode()) != nullptr)
@@ -281,7 +285,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 				m_allWorkersComplete = true;
 			}
 
-			m_completionCvar.notify_one();
+			m_completionCvar.notify_all();
 		}
 	}
 }

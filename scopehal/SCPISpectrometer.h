@@ -89,7 +89,7 @@ public:
 
 protected:
 	/**
-		@brief Serializes this multimeter's configuration to a YAML node.
+		@brief Serializes this spectrometer's configuration to a YAML node.
 	 */
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 
