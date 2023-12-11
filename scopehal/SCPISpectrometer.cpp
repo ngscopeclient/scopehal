@@ -39,6 +39,9 @@ SCPISpectrometer::SpectrometerCreateMapType SCPISpectrometer::m_spectrometercrea
 
 SCPISpectrometer::SCPISpectrometer()
 {
+	m_serializers.push_back(sigc::mem_fun(this, &SCPISpectrometer::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &SCPISpectrometer::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(this, &SCPISpectrometer::DoPreLoadConfiguration));
 }
 
 SCPISpectrometer::~SCPISpectrometer()
@@ -229,3 +232,26 @@ void SCPISpectrometer::SetChannelOffset(size_t i, size_t stream, float offset)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void SCPISpectrometer::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+	node["integration"] = GetIntegrationTime();
+}
+
+void SCPISpectrometer::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+{
+	if(node["integration"])
+		SetIntegrationTime(node["integration"].as<int64_t>());
+}
+
+void SCPISpectrometer::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& idmap,
+	ConfigWarningList& list)
+{
+}
+

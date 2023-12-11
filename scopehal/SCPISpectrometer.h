@@ -83,6 +83,26 @@ public:
 	virtual int64_t GetIntegrationTime() =0;
 	virtual void SetIntegrationTime(int64_t t) =0;
 
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Configuration storage
+
+protected:
+	/**
+		@brief Serializes this multimeter's configuration to a YAML node.
+	 */
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+
+	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+
+	/**
+		@brief Validate instrument and channel configuration from a save file
+	 */
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
+
 protected:
 	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
 	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
