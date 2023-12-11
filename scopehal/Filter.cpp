@@ -846,6 +846,7 @@ YAML::Node Filter::SerializeConfiguration(IDTable& table)
 	filter["color"] = m_displaycolor;
 	filter["nick"] = m_displayname;
 	filter["name"] = GetHwname();
+	filter["xunit"] = GetXAxisUnits().ToString();
 
 	//Save gain and offset (not applicable to all filters, but save it just in case)
 	for(size_t i=0; i<GetStreamCount(); i++)
@@ -863,6 +864,7 @@ YAML::Node Filter::SerializeConfiguration(IDTable& table)
 				streamNode["index"] = i;
 				streamNode["vrange"] = GetVoltageRange(i);
 				streamNode["offset"] = GetOffset(i);
+				streamNode["yunit"] = GetYAxisUnits(i).ToString();
 				filter["streams"]["stream" + to_string(i)] = streamNode;
 				break;
 		}
@@ -884,6 +886,8 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 		SetVoltageRange(node["vrange"].as<float>(), 0);
 	if(node["offset"])
 		SetOffset(node["offset"].as<float>(), 0);
+	if(node["xunit"])
+		SetXAxisUnits(Unit(node["xunit"].as<string>()));
 
 	//Load stream configuration
 	auto streams = node["streams"];
@@ -899,6 +903,8 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 				SetVoltageRange(snode["vrange"].as<float>(), index);
 			if(snode["offset"])
 				SetOffset(snode["offset"].as<float>(), index);
+			if(snode["yunit"])
+				SetYAxisUnits(Unit(snode["yunit"].as<string>()), index);
 		}
 	}
 }
