@@ -47,20 +47,28 @@ AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-	//Create the channel
-	auto chan = new OscilloscopeChannel(
+	//Create the output channel
+	auto chan = new AseqSpectrometerChannel(
 		this,
 		"Spectrum",
 		"#e040e0",
-		Unit(Unit::UNIT_PM),
-		Unit(Unit::UNIT_COUNTS),
-		Stream::STREAM_TYPE_ANALOG,
-		0);
+		CHAN_SPECTRUM);
 	m_channels.push_back(chan);
 
 	//default to reasonable full scale range
 	chan->SetVoltageRange(30000, 0);
 	chan->SetOffset(-15000, 0);
+
+	chan->SetVoltageRange(30000, 1);
+	chan->SetOffset(-15000, 1);
+
+	//Dark frame input
+	m_darkframe = new SpectrometerDarkFrameChannel(
+		this,
+		"Dark Frame",
+		"#808080",
+		CHAN_DARKFRAME);
+	m_channels.push_back(m_darkframe);
 
 	/*
 	//Add the external trigger input
@@ -88,11 +96,19 @@ AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 
 	//Figure out the set of wavelengths the spectrometer supports
 	//This is going to be inverted, highest wavelength at the lowest pixel index
-	int npoints = stoi(m_transport->SendCommandQueuedWithReply("POINTS?"));
+	size_t npoints = stoi(m_transport->SendCommandQueuedWithReply("POINTS?"));
 	auto wavelengths = explode(m_transport->SendCommandQueuedWithReply("WAVELENGTHS?"), ',');
-
-	for(int i=0; i<npoints; i++)
+	if(wavelengths.size() < npoints)
+		LogFatal("not enough wavelength data\n");
+	for(size_t i=0; i<npoints; i++)
 		m_wavelengths.push_back(stof(wavelengths[i]) * 1e3);
+
+	//Flatness calibration data
+	auto flatcal = explode(m_transport->SendCommandQueuedWithReply("FLATCAL?"), ',');
+	if(flatcal.size() < npoints)
+		LogFatal("not enough flatcal data\n");
+	for(size_t i=0; i<npoints; i++)
+		m_flatcal.push_back(stof(flatcal[i]));
 
 	//Default to 125ms exposure
 	SetIntegrationTime(FS_PER_SECOND * 125e-3);
@@ -214,8 +230,7 @@ void AseqSpectrometer::PullTrigger()
 
 bool AseqSpectrometer::IsTriggerArmed()
 {
-	//temp: always on
-	return true;
+	return m_triggerArmed;
 }
 
 Oscilloscope::TriggerMode AseqSpectrometer::PollTrigger()
@@ -240,30 +255,59 @@ bool AseqSpectrometer::AcquireData()
 	//Flip the samples around so the lowest wavelength is at the left, then display as a sparse waveform
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
-	auto cap = new SparseAnalogWaveform;
-	cap->m_timescale = 1;
-	cap->m_triggerPhase = 0;
-	cap->m_startTimestamp = floor(t);
-	cap->m_startFemtoseconds = fs;
-	cap->Resize(npoints);
+	auto rawcap = new SparseAnalogWaveform;
+	rawcap->m_timescale = 1;
+	rawcap->m_triggerPhase = 0;
+	rawcap->m_startTimestamp = floor(t);
+	rawcap->m_startFemtoseconds = fs;
+	rawcap->Resize(npoints);
 
 	size_t last = npoints-1;
 	for(size_t i=0; i<npoints; i++)
 	{
-		cap->m_offsets[i] = m_wavelengths[last - i];
+		rawcap->m_offsets[i] = m_wavelengths[last - i];
 
 		if(i+1 < npoints)
-			cap->m_durations[i] = m_wavelengths[last - (i+1)] - m_wavelengths[last - i];
+			rawcap->m_durations[i] = m_wavelengths[last - (i+1)] - m_wavelengths[last - i];
 		else
-			cap->m_durations[i] = 0;
+			rawcap->m_durations[i] = 0;
 
-		cap->m_samples[i] = buf[last - i];
+		rawcap->m_samples[i] = buf[last - i];
 	}
-	cap->MarkModifiedFromCpu();
+	rawcap->MarkModifiedFromCpu();
+
+	//We always have raw count data
+	SequenceSet s;
+	s[StreamDescriptor(GetOscilloscopeChannel(CHAN_SPECTRUM),
+		AseqSpectrometerChannel::STREAM_RAW_COUNTS)] = rawcap;
+
+	//Given raw counts, apply dark frame correction and flatness correction coefficients
+	//(make sure to invert the ordering as well)
+	auto darkframe = m_darkframe->GetInput(0);
+	auto darkcap = dynamic_cast<SparseAnalogWaveform*>(darkframe.GetData());
+	if(darkcap)
+	{
+		auto flatcap = new SparseAnalogWaveform;
+		flatcap->m_timescale = 1;
+		flatcap->m_triggerPhase = 0;
+		flatcap->m_startTimestamp = rawcap->m_startTimestamp;
+		flatcap->m_startFemtoseconds = fs;
+		flatcap->Resize(npoints);
+
+		for(size_t i=0; i<npoints; i++)
+		{
+			flatcap->m_samples[i] = (rawcap->m_samples[i] - darkcap->m_samples[i]) / m_flatcal[last - i];
+
+			flatcap->m_durations[i] = rawcap->m_durations[i];
+			flatcap->m_offsets[i] = rawcap->m_offsets[i];
+		}
+		flatcap->MarkModifiedFromCpu();
+
+		s[StreamDescriptor(GetOscilloscopeChannel(CHAN_SPECTRUM),
+			AseqSpectrometerChannel::STREAM_FLATTENED_COUNTS)] = flatcap;
+	}
 
 	//Save the waveforms to our queue
-	SequenceSet s;
-	s[GetOscilloscopeChannel(0)] = cap;
 	m_pendingWaveformsMutex.lock();
 	m_pendingWaveforms.push_back(s);
 	m_pendingWaveformsMutex.unlock();

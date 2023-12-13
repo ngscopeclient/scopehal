@@ -138,6 +138,7 @@ extern bool g_hasPushDescriptor;
 #include "SCPIOscilloscope.h"
 #include "SCPIPowerSupply.h"
 #include "SCPIRFSignalGenerator.h"
+#include "SpectrometerDarkFrameChannel.h"
 #include "SCPISpectrometer.h"
 #include "SCPIVNA.h"
 

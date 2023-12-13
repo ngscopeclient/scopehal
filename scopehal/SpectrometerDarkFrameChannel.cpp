@@ -27,102 +27,57 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef AseqSpectrometer_h
-#define AseqSpectrometer_h
+#include "scopehal.h"
 
-class EdgeTrigger;
+using namespace std;
 
-#include "RemoteBridgeOscilloscope.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-/**
-	@brief Helper class for creating output streams
- */
-class AseqSpectrometerChannel : public OscilloscopeChannel
+SpectrometerDarkFrameChannel::SpectrometerDarkFrameChannel(
+	SCPISpectrometer* spec,
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+	, m_spec(spec)
 {
-public:
-	AseqSpectrometerChannel(
-		Oscilloscope* scope,
-		const std::string& hwname,
-		const std::string& color,
-		size_t index)
-		: OscilloscopeChannel(scope, hwname, color, Unit(Unit::UNIT_PM), index)
-	{
-		ClearStreams();
+	ClearStreams();
 
-		AddStream(Unit::UNIT_COUNTS, "RawCounts", Stream::STREAM_TYPE_ANALOG);
-		AddStream(Unit::UNIT_COUNTS, "FlattenedCounts", Stream::STREAM_TYPE_ANALOG);
-		AddStream(Unit::UNIT_W_M2_NM, "AbsoluteIrradiance", Stream::STREAM_TYPE_ANALOG);
-	}
+	CreateInput("frame");
+}
 
-	enum StreamIndex
-	{
-		STREAM_RAW_COUNTS,
-		STREAM_FLATTENED_COUNTS,
-		STREAM_ABSOLUTE_IRRADIANCE
-	};
-};
-
-/**
-	@brief AseqSpectrometer - driver for talking to the scopehal-aseq-bridge server
- */
-class AseqSpectrometer 	: public virtual SCPISpectrometer
+SpectrometerDarkFrameChannel::~SpectrometerDarkFrameChannel()
 {
-public:
-	AseqSpectrometer(SCPITransport* transport);
-	virtual ~AseqSpectrometer();
+}
 
-	//not copyable or assignable
-	AseqSpectrometer(const AseqSpectrometer& rhs) =delete;
-	AseqSpectrometer& operator=(const AseqSpectrometer& rhs) =delete;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input processing
 
-public:
+InstrumentChannel::PhysicalConnector SpectrometerDarkFrameChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_SMA;
+}
 
-	virtual unsigned int GetInstrumentTypes() const override;
-	uint32_t GetInstrumentTypesForChannel(size_t i) const override;
+bool SpectrometerDarkFrameChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
 
-	virtual void FlushConfigCache() override;
+	if(i >= 1)
+		return false;
 
-	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger() override;
-	virtual bool AcquireData() override;
-	virtual bool IsTriggerArmed() override;
-	virtual void PushTrigger() override;
-	virtual void PullTrigger() override;
+	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
+		return false;
 
-	virtual void Start() override;
-	virtual void StartSingleTrigger() override;
-	virtual void Stop() override;
-	virtual void ForceTrigger() override;
-	virtual OscilloscopeChannel* GetExternalTrigger() override;
-	virtual uint64_t GetSampleRate() override;
-	virtual uint64_t GetSampleDepth() override;
-	virtual void SetSampleDepth(uint64_t depth) override;
-	virtual void SetSampleRate(uint64_t rate) override;
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	if(stream.GetXAxisUnits() != Unit(Unit::UNIT_PM))
+		return false;
 
-	virtual int64_t GetIntegrationTime() override;
-	virtual void SetIntegrationTime(int64_t t) override;
+	return true;
+}
 
-protected:
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 
-	std::vector<float> m_wavelengths;
-	std::vector<float> m_flatcal;
-
-	enum channelids
-	{
-		CHAN_SPECTRUM,
-		CHAN_DARKFRAME
-	};
-
-	SpectrometerDarkFrameChannel* m_darkframe;
-
-	int64_t m_integrationTime;
-
-public:
-	static std::string GetDriverNameInternal();
-	SPECTROMETER_INITPROC(AseqSpectrometer)
-};
-
-#endif
+void SpectrometerDarkFrameChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	//nothing to do, instrument handles this in AcquireData()
+}

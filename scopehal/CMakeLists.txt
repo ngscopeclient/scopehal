@@ -129,6 +129,7 @@ set(SCOPEHAL_SOURCES
 	SCPIRFSignalGenerator.cpp
 	SCPISpectrometer.cpp
 	SCPIVNA.cpp
+	SpectrometerDarkFrameChannel.cpp
 	RemoteBridgeOscilloscope.cpp
 
 	AgilentOscilloscope.cpp

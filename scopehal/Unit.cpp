@@ -95,6 +95,10 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_HEXNUM;
 	else if(rhs == "B")
 		m_type = UNIT_BYTES;
+	else if(rhs == "W/m²/nm")
+		m_type = UNIT_W_M2_NM;
+	else if(rhs == "W/m²")
+		m_type = UNIT_W_M2;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
 }
@@ -183,6 +187,12 @@ string Unit::ToString() const
 
 		case UNIT_BYTES:
 			return "B";
+
+		case UNIT_W_M2_NM:
+			return "W/m²/nm";
+
+		case UNIT_W_M2:
+			return "W/m²";
 
 		default:
 			return "unknown";
