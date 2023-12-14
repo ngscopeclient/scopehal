@@ -110,6 +110,14 @@ AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 	for(size_t i=0; i<npoints; i++)
 		m_flatcal.push_back(stof(flatcal[i]));
 
+	//Absolute irradiance cal
+	m_irrcoeff = stof(m_transport->SendCommandQueuedWithReply("IRRCOEFF?"));
+	auto irrcal = explode(m_transport->SendCommandQueuedWithReply("IRRCAL?"), ',');
+	if(irrcal.size() < npoints)
+		LogFatal("not enough irrcal data\n");
+	for(size_t i=0; i<npoints; i++)
+		m_irrcal.push_back(stof(irrcal[i]));
+
 	//Default to 125ms exposure
 	SetIntegrationTime(FS_PER_SECOND * 125e-3);
 }
@@ -305,7 +313,37 @@ bool AseqSpectrometer::AcquireData()
 
 		s[StreamDescriptor(GetOscilloscopeChannel(CHAN_SPECTRUM),
 			AseqSpectrometerChannel::STREAM_FLATTENED_COUNTS)] = flatcap;
+
+		//Apply absolute irradiance calibration
+		//TODO: only if spectrometer has this data
+		auto irrcap = new SparseAnalogWaveform;
+		irrcap->m_timescale = 1;
+		irrcap->m_triggerPhase = 0;
+		irrcap->m_startTimestamp = rawcap->m_startTimestamp;
+		irrcap->m_startFemtoseconds = fs;
+		irrcap->Resize(npoints);
+		for(size_t i=0; i<npoints; i++)
+		{
+			//Relative irradiance
+			float relirr = flatcap->m_samples[i] * m_irrcal[last - i];
+
+			//Absolute irradiance
+			float exposureMicroseconds = GetIntegrationTime() / FS_PER_MICROSECOND;
+			float absirr = relirr / (exposureMicroseconds * 10 * m_irrcoeff);
+
+			irrcap->m_samples[i] = absirr;
+
+			irrcap->m_durations[i] = rawcap->m_durations[i];
+			irrcap->m_offsets[i] = rawcap->m_offsets[i];
+		}
+		irrcap->MarkModifiedFromCpu();
+
+		s[StreamDescriptor(GetOscilloscopeChannel(CHAN_SPECTRUM),
+			AseqSpectrometerChannel::STREAM_ABSOLUTE_IRRADIANCE)] = irrcap;
+
 	}
+
+	m_channels[0]->SetYAxisUnits(Unit::UNIT_W_M2_NM, AseqSpectrometerChannel::STREAM_ABSOLUTE_IRRADIANCE);
 
 	//Save the waveforms to our queue
 	m_pendingWaveformsMutex.lock();

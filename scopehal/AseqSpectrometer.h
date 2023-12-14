@@ -109,6 +109,8 @@ protected:
 
 	std::vector<float> m_wavelengths;
 	std::vector<float> m_flatcal;
+	std::vector<float> m_irrcal;
+	float m_irrcoeff;
 
 	enum channelids
 	{
