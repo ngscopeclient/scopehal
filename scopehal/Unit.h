@@ -87,6 +87,8 @@ public:
 		UNIT_W_M2,			//absolute irradiance
 							//(scale by 100 to get uW/cm^2)
 
+		UNIT_MICROAMPS,		//Another hack for current in the X axis
+
 		//TODO: more here
 	};
 

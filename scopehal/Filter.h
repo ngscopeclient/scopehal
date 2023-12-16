@@ -100,6 +100,7 @@ public:
 		CAT_RF,				//Frequency domain analysis (FFT etc) and other RF stuff
 		CAT_GENERATION,		//Waveform generation and synthesis
 		CAT_EXPORT,			//Waveform export
+		CAT_OPTICAL			//Optics
 	};
 
 	Filter(

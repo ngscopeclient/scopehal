@@ -115,9 +115,18 @@ void XYSweepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr
 	SetData(cap, 0);
 
 	//Copy units from input and set up config
-	SetXAxisUnits(wx.GetYAxisUnits());
 	SetYAxisUnits(wy.GetYAxisUnits(), 0);
 	cap->m_revision ++;
+
+	//Rescale: if X axis units don't work directly
+	auto xuin = wx.GetYAxisUnits();
+	if(xuin == Unit::UNIT_AMPS)
+	{
+		SetXAxisUnits(Unit::UNIT_MICROAMPS);
+		x *= 1e6;
+	}
+	else
+		SetXAxisUnits(xuin);
 
 	//If X axis value is greater than the previous, or if we have no samples yet, append
 	cap->PrepareForCpuAccess();

@@ -99,6 +99,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_W_M2_NM;
 	else if(rhs == "W/m²")
 		m_type = UNIT_W_M2;
+	else if(rhs == "μA")
+		m_type = UNIT_MICROAMPS;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
 }
@@ -178,6 +180,9 @@ string Unit::ToString() const
 
 		case UNIT_MILLIVOLTS:
 			return "mV";
+
+		case UNIT_MICROAMPS:
+			return "μA";
 
 		case UNIT_VOLT_SEC:
 			return "Vs";
@@ -334,6 +339,38 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 				scaleFactor = 1;
 				prefix = "p";
 			}
+			break;
+
+		//uA is not a SI base unit either
+		case UNIT_MICROAMPS:
+			suffix = "A";
+
+			if(fabs(num) >= 1e12)
+			{
+				scaleFactor = 1e-12;
+				prefix = "M";
+			}
+			else if(fabs(num) >= 1e9)
+			{
+				scaleFactor = 1e-9;
+				prefix = "k";
+			}
+			else if(fabs(num) >= 1e6)
+			{
+				scaleFactor = 1e-6;
+				prefix = "";
+			}
+			else if(fabs(num) >= 1e3)
+			{
+				scaleFactor = 1e-3;
+				prefix = "m";
+			}
+			else
+			{
+				scaleFactor = 1;
+				prefix = "μ";
+			}
+
 			break;
 
 		case UNIT_HZ:
