@@ -1420,7 +1420,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 
 int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround)
 {
-	char packetSizeSequence[17];
+	char packetSizeSequence[17] = {0};
 	uint32_t getLength;
 
 	// Get size of this sequence
@@ -1454,7 +1454,7 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 
 	else
 	{
-		LogError("ReadWaveformBlock: invalid length format\n");
+		LogError("ReadWaveformBlock: invalid length format \"%s\"\n", packetSizeSequence);
 		return 0;
 	}
 
