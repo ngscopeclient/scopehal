@@ -1420,47 +1420,30 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 
 int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround)
 {
-	char packetSizeSequence[17] = {0};
-	uint32_t getLength;
-
-	// Get size of this sequence
-	m_transport->ReadRawData(7, (unsigned char*)packetSizeSequence);
-
-	// This is an aweful cludge, but the response can be in different formats depending on
-	// if this was a direct trigger or a forced trigger. This is the report format for a direct trigger
-	if((!strncmp(packetSizeSequence, "DESC,#9", 7)) || (!strncmp(packetSizeSequence, "DAT2,#9", 7)))
+	//Read and discard data until we see the '#'
+	uint8_t tmp;
+	for(int i=0; i<20; i++)
 	{
-		m_transport->ReadRawData(9, (unsigned char*)packetSizeSequence);
+		m_transport->ReadRawData(1, &tmp);
+		if(tmp == '#')
+			break;
+
+		//shouldn't ever get here
+		if(i == 19)
+		{
+			LogError("ReadWaveformBlock: threw away 20 bytes of data and never saw a '#'\n");
+			return 0;
+		}
 	}
 
-	// This is the report format for a forced trigger
-	else if(!strncmp(&packetSizeSequence[2], ":WF D", 5))
-	{
-		// Read the front end junk, then the actually number we're looking for
-		m_transport->ReadRawData(6, (unsigned char*)packetSizeSequence);
-		m_transport->ReadRawData(9, (unsigned char*)packetSizeSequence);
-	}
+	//Read length of the length field
+	m_transport->ReadRawData(1, &tmp);
+	int lengthOfLength = tmp - '0';
 
-	//Some scopes (observed on SDS2000X HD running firmware 1.1.7.0)
-	//have no prefix at all and just have the #9... directly.
-	else if(!strncmp(packetSizeSequence, "#9", 2))
-	{
-		//Trim off the #9
-		memmove(packetSizeSequence, packetSizeSequence+2, 5);
-
-		//Read the last 4 bytes of the length
-		m_transport->ReadRawData(4, (unsigned char*)packetSizeSequence+5);
-	}
-
-	else
-	{
-		LogError("ReadWaveformBlock: invalid length format \"%s\"\n", packetSizeSequence);
-		return 0;
-	}
-
-	packetSizeSequence[9] = 0;
-	LogTrace("INITIAL PACKET [%s]\n", packetSizeSequence);
-	getLength = atoi(packetSizeSequence);
+	//Read the actual length field
+	char textlen[10] = {0};
+	m_transport->ReadRawData(lengthOfLength, (unsigned char*)textlen);
+	uint32_t getLength = atoi(textlen);
 
 	uint32_t len = getLength;
 	if(hdSizeWorkaround)
