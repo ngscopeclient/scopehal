@@ -6,6 +6,18 @@ find_library(TIRPC_LIB tirpc)
 find_library(LINUXGPIB_LIB gpib)
 find_package(glfw3 REQUIRED)
 
+#Set up versioning (with a dummy string for now if Git isn't present)
+if(Git_FOUND)
+	execute_process(
+		COMMAND ${GIT_EXECUTABLE} describe --always --tags
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		OUTPUT_VARIABLE SCOPEHAL_VERSION
+		OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+	set(SCOPEHAL_VERSION "unknown")
+endif()
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+configure_file(scopehal-version.h.in scopehal-version.h)
 
 # Additional Windows/Linux libraries
 if(WIN32)

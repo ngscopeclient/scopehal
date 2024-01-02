@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -33,6 +33,7 @@
 	@brief Implementation of global functions
  */
 #include "scopehal.h"
+#include "scopehal-version.h"
 #include <libgen.h>
 
 #include "AgilentOscilloscope.h"
@@ -946,4 +947,12 @@ uint32_t CRC32(const uint8_t* bytes, size_t start, size_t end)
 uint32_t CRC32(const vector<uint8_t>& bytes)
 {
 	return CRC32(&bytes[0], 0, bytes.size()-1);
+}
+
+/**
+	@brief Returns the library version string (Semantic Version formatted)
+ */
+const char* ScopehalGetVersion()
+{
+	return SCOPEHAL_VERSION;
 }
