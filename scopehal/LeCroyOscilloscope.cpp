@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -3810,6 +3810,11 @@ LeCroyOscilloscope::SamplingMode LeCroyOscilloscope::GetSamplingMode()
 
 void LeCroyOscilloscope::SetSamplingMode(SamplingMode mode)
 {
+	//Get the old sampling mode
+	//Only apply if different
+	if(GetSamplingMode() == mode)
+		return;
+
 	//Send the command to the scope
 	{
 		switch(mode)

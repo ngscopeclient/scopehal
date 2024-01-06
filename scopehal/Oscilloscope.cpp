@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -495,6 +495,12 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 			SetSamplingMode(EQUIVALENT_TIME);
 		else
 			SetSamplingMode(REAL_TIME);
+
+		//Set rate and depth again after setting sampling mode since this sometimes causes them to change
+		if(node["rate"])
+			SetSampleRate(node["rate"].as<unsigned long>());
+		if(node["depth"])
+			SetSampleDepth(node["depth"].as<unsigned long>());
 	}
 	if(node["triggerpos"])
 		SetTriggerOffset(node["triggerpos"].as<int64_t>());
