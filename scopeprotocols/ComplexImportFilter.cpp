@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,7 +52,7 @@ ComplexImportFilter::ComplexImportFilter(const string& color)
 	m_parameters[m_formatname].AddEnumValue("Integer (16 bit signed)", FORMAT_SIGNED_INT16);
 	m_parameters[m_formatname].AddEnumValue("Floating point (32 bit single precision)", FORMAT_FLOAT32);
 	m_parameters[m_formatname].AddEnumValue("Floating point (64 bit double precision)", FORMAT_FLOAT64);
-	m_parameters[m_formatname].SetIntVal(FORMAT_SIGNED_INT8);
+	m_parameters[m_formatname].SetIntVal(FORMAT_FLOAT32);
 	m_parameters[m_formatname].signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
 
 	m_parameters[m_sratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
@@ -155,6 +155,7 @@ void ComplexImportFilter::Reload()
 	}
 	size_t nsamples = len_bytes / (bytes_per_sample * 2);
 	iwfm->Resize(nsamples);
+	qwfm->Resize(nsamples);
 
 	//Actual output processing
 	//TODO: vectorize this?
