@@ -99,11 +99,6 @@ public:
 	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
 	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
 
-#ifdef __x86_64__
-	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
-	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
-#endif
-
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 	void SetWindowFunction(WindowFunction f)
@@ -111,9 +106,7 @@ public:
 
 protected:
 	void NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2FMA(AcceleratorBuffer<float>& data, size_t nouts, float scale);
 	void NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AcceleratorBuffer<float>& data, size_t nouts, float scale);
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
