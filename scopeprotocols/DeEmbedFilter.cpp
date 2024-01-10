@@ -29,9 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "DeEmbedFilter.h"
-#ifdef __x86_64__
-#include <immintrin.h>
-#endif
 
 using namespace std;
 
@@ -384,12 +381,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 		ffts_execute(m_forwardPlan, m_forwardInBuf.GetCpuPointer(), m_forwardOutBuf.GetCpuPointer());
 
 		//Apply the interpolated S-parameters
-		#ifdef __x86_64__
-		if(g_hasAvx2)
-			MainLoopAVX2(nouts);
-		else
-		#endif
-			MainLoop(nouts);
+		MainLoop(nouts);
 
 		//Calculate the inverse FFT
 		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
@@ -512,80 +504,3 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 		m_forwardOutBuf[i*2 + 1] = real_orig*sinval + imag_orig*cosval;
 	}
 }
-
-#ifdef __x86_64__
-__attribute__((target("avx2")))
-void DeEmbedFilter::MainLoopAVX2(size_t nouts)
-{
-	unsigned int end = nouts - (nouts % 8);
-
-	//Vectorized loop doing 8 elements at once
-	for(size_t i=0; i<end; i += 8)
-	{
-		//Load S-parameters
-		//Precomputed sin/cos vector scaled by amplitude already
-		__m256 sinval = _mm256_load_ps(&m_resampledSparamSines[i]);
-		__m256 cosval = _mm256_load_ps(&m_resampledSparamCosines[i]);
-
-		//Load uncorrected complex values (interleaved real/imag real/imag)
-		__m256 din0 = _mm256_load_ps(&m_forwardOutBuf[i*2]);
-		__m256 din1 = _mm256_load_ps(&m_forwardOutBuf[i*2 + 8]);
-
-		//Original state of each block is riririri.
-		//Shuffle them around to get all the reals and imaginaries together.
-
-		//Step 1: Shuffle 32-bit values within 128-bit lanes to get rriirrii rriirrii.
-		din0 = _mm256_permute_ps(din0, 0xd8);
-		din1 = _mm256_permute_ps(din1, 0xd8);
-
-		//Step 2: Shuffle 64-bit values to get rrrriiii rrrriiii.
-		__m256i block0 = _mm256_permute4x64_epi64(_mm256_castps_si256(din0), 0xd8);
-		__m256i block1 = _mm256_permute4x64_epi64(_mm256_castps_si256(din1), 0xd8);
-
-		//Step 3: Shuffle 128-bit values to get rrrrrrrr iiiiiiii.
-		__m256 real = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x20));
-		__m256 imag = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x31));
-
-		//Create the sin/cos matrix
-		__m256 real_sin = _mm256_mul_ps(real, sinval);
-		__m256 real_cos = _mm256_mul_ps(real, cosval);
-		__m256 imag_sin = _mm256_mul_ps(imag, sinval);
-		__m256 imag_cos = _mm256_mul_ps(imag, cosval);
-
-		//Do the phase correction
-		real = _mm256_sub_ps(real_cos, imag_sin);
-		imag = _mm256_add_ps(real_sin, imag_cos);
-
-		//Math is done, now we need to shuffle them back
-		//Shuffle 128-bit values to get rrrriiii rrrriiii.
-		block0 = _mm256_permute2x128_si256(_mm256_castps_si256(real), _mm256_castps_si256(imag), 0x20);
-		block1 = _mm256_permute2x128_si256(_mm256_castps_si256(real), _mm256_castps_si256(imag), 0x31);
-
-		//Shuffle 64-bit values to get rriirrii
-		block0 = _mm256_permute4x64_epi64(block0, 0xd8);
-		block1 = _mm256_permute4x64_epi64(block1, 0xd8);
-
-		//Shuffle 32-bit values to get the final value ready for writeback
-		din0 =_mm256_permute_ps(_mm256_castsi256_ps(block0), 0xd8);
-		din1 =_mm256_permute_ps(_mm256_castsi256_ps(block1), 0xd8);
-
-		//Write back output
-		_mm256_store_ps(&m_forwardOutBuf[i*2], din0);
-		_mm256_store_ps(&m_forwardOutBuf[i*2] + 8, din1);
-	}
-
-	//Do any leftovers
-	for(size_t i=end; i<nouts; i++)
-	{
-		//Fetch inputs
-		float cosval = m_resampledSparamCosines[i];
-		float sinval = m_resampledSparamSines[i];
-		float real_orig = m_forwardOutBuf[i*2 + 0];
-		float imag_orig = m_forwardOutBuf[i*2 + 1];
-
-		//Do the actual phase correction
-		m_forwardOutBuf[i*2 + 0] = real_orig*cosval - imag_orig*sinval;
-		m_forwardOutBuf[i*2 + 1] = real_orig*sinval + imag_orig*cosval;
-	}
-}
-#endif /* __x86_64__ */

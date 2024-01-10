@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -92,9 +92,6 @@ protected:
 	AcceleratorBuffer<float> m_reverseOutBuf;
 
 	void MainLoop(size_t nouts);
-#ifdef __x86_64__
-	void MainLoopAVX2(size_t nouts);
-#endif
 
 	WaveformCacheKey m_magKey;
 	WaveformCacheKey m_angleKey;
