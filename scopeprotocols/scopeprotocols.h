@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -141,7 +141,6 @@
 #include "MovingAverageFilter.h"
 #include "MultiplyFilter.h"
 #include "NoiseFilter.h"
-#include "OFDMDemodulator.h"
 #include "OneWireDecoder.h"
 #include "OvershootMeasurement.h"
 #include "ParallelBus.h"
@@ -188,7 +187,6 @@
 #include "TappedDelayLineFilter.h"
 #include "TCPDecoder.h"
 #include "TDRFilter.h"
-#include "TDRStepDeEmbedFilter.h"
 #include "ThermalDiodeFilter.h"
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"

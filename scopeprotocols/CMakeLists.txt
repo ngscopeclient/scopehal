@@ -105,7 +105,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
 	NoiseFilter.cpp
-	OFDMDemodulator.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
 	PAM4DemodulatorFilter.cpp
@@ -153,7 +152,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	TappedDelayLineFilter.cpp
 	TCPDecoder.cpp
 	TDRFilter.cpp
-	TDRStepDeEmbedFilter.cpp
 	ThermalDiodeFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
