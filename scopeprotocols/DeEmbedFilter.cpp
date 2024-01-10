@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,13 +62,10 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedBinSize = 0;
 
-#ifndef _APPLE_SILICON
-	m_forwardPlan = NULL;
-	m_reversePlan = NULL;
-#endif
-
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
+	m_cachedOutLen = 0;
+	m_cachedIstart = 0;
 
 	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_forwardInBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -83,15 +80,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 DeEmbedFilter::~DeEmbedFilter()
 {
-#ifndef _APPLE_SILICON
-	if(m_forwardPlan)
-		ffts_free(m_forwardPlan);
-	if(m_reversePlan)
-		ffts_free(m_reversePlan);
-
-	m_forwardPlan = NULL;
-	m_reversePlan = NULL;
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,48 +179,19 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
-	#ifndef _APPLE_SILICON
-		//Delete old FFTS plan objects
-		if(m_forwardPlan)
-		{
-			ffts_free(m_forwardPlan);
-			m_forwardPlan = nullptr;
-		}
-		if(m_reversePlan)
-		{
-			ffts_free(m_reversePlan);
-			m_reversePlan = nullptr;
-		}
-	#endif
-
 		m_forwardInBuf.resize(npoints);
 		m_forwardOutBuf.resize(2 * nouts);
 		m_reverseOutBuf.resize(npoints);
 
 		m_cachedNumPoints = npoints;
 		sizechange = true;
-
-		//Make new plans
-		//(save time, don't make FFTS plans if using vkFFT)
-		if(!g_gpuFilterEnabled)
-		{
-		#ifdef _APPLE_SILICON
-			LogFatal("DeEmbedFilter CPU fallback not available on Apple Silicon");
-		#else
-			m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-			m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
-		#endif
-		}
 	}
 
 	//Set up new FFT plans
-	if(g_gpuFilterEnabled)
-	{
-		if(!m_vkForwardPlan)
-			m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
-		if(!m_vkReversePlan)
-			m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
-	}
+	if(!m_vkForwardPlan)
+		m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+	if(!m_vkReversePlan)
+		m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 
 	//Calculate size of each bin
 	double fs = din->m_timescale;
@@ -300,6 +259,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 		iend -= groupdelay_samples;
 	else
 		istart += groupdelay_samples;
+	m_cachedIstart = istart;
 	cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 
 	//Apply phase shift for the group delay so we draw the waveform in the right place
@@ -310,89 +270,55 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 	float scale = 1.0f / npoints;
 	size_t outlen = iend - istart;
 	cap->Resize(outlen);
+	m_cachedOutLen = outlen;
 
-	if(g_gpuFilterEnabled)
-	{
-		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
-		cmdBuf.begin({});
+	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+	cmdBuf.begin({});
 
-		//Copy and zero-pad the input as needed
-		WindowFunctionArgs args;
-		args.numActualSamples = npoints_raw;
-		args.npoints = npoints;
-		args.scale = 0;
-		args.alpha0 = 0;
-		args.alpha1 = 0;
-		args.offsetIn = 0;
-		args.offsetOut = 0;
-		m_rectangularComputePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_rectangularComputePipeline.BindBufferNonblocking(1, m_forwardInBuf, cmdBuf, true);
-		m_rectangularComputePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
-		m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-		m_forwardInBuf.MarkModifiedFromGpu();
+	//Copy and zero-pad the input as needed
+	WindowFunctionArgs args;
+	args.numActualSamples = npoints_raw;
+	args.npoints = npoints;
+	args.scale = 0;
+	args.alpha0 = 0;
+	args.alpha1 = 0;
+	args.offsetIn = 0;
+	args.offsetOut = 0;
+	m_rectangularComputePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_rectangularComputePipeline.BindBufferNonblocking(1, m_forwardInBuf, cmdBuf, true);
+	m_rectangularComputePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	m_forwardInBuf.MarkModifiedFromGpu();
 
-		//Do the actual FFT operation
-		m_vkForwardPlan->AppendForward(m_forwardInBuf, m_forwardOutBuf, cmdBuf);
+	//Do the actual FFT operation
+	m_vkForwardPlan->AppendForward(m_forwardInBuf, m_forwardOutBuf, cmdBuf);
 
-		//Apply the interpolated S-parameters
-		m_deEmbedComputePipeline.BindBufferNonblocking(0, m_forwardOutBuf, cmdBuf);
-		m_deEmbedComputePipeline.BindBufferNonblocking(1, m_resampledSparamSines, cmdBuf);
-		m_deEmbedComputePipeline.BindBufferNonblocking(2, m_resampledSparamCosines, cmdBuf);
-		m_deEmbedComputePipeline.Dispatch(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
-		m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-		m_forwardOutBuf.MarkModifiedFromGpu();
+	//Apply the interpolated S-parameters
+	m_deEmbedComputePipeline.BindBufferNonblocking(0, m_forwardOutBuf, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(1, m_resampledSparamSines, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(2, m_resampledSparamCosines, cmdBuf);
+	m_deEmbedComputePipeline.Dispatch(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	m_forwardOutBuf.MarkModifiedFromGpu();
 
-		//Do the actual FFT operation
-		m_vkReversePlan->AppendReverse(m_forwardOutBuf, m_reverseOutBuf, cmdBuf);
+	//Do the actual FFT operation
+	m_vkReversePlan->AppendReverse(m_forwardOutBuf, m_reverseOutBuf, cmdBuf);
 
-		//Copy and normalize output
-		//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
-		DeEmbedNormalizationArgs nargs;
-		nargs.outlen = outlen;
-		nargs.istart = istart;
-		nargs.scale = scale;
-		m_normalizeComputePipeline.BindBufferNonblocking(0, m_reverseOutBuf, cmdBuf);
-		m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-		m_normalizeComputePipeline.Dispatch(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
-		m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	//Copy and normalize output
+	//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
+	DeEmbedNormalizationArgs nargs;
+	nargs.outlen = outlen;
+	nargs.istart = istart;
+	nargs.scale = scale;
+	m_normalizeComputePipeline.BindBufferNonblocking(0, m_reverseOutBuf, cmdBuf);
+	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+	m_normalizeComputePipeline.Dispatch(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
+	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
-		//Done, block until the compute operations finish
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-		cap->MarkModifiedFromGpu();
-	}
-	else
-	#ifdef _APPLE_SILICON
-		LogFatal("DeEmbedFilter CPU fallback not available on Apple Silicon");
-	#else
-	{
-		din->PrepareForCpuAccess();
-		m_forwardInBuf.PrepareForCpuAccess();
-		m_forwardOutBuf.PrepareForCpuAccess();
-		m_reverseOutBuf.PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		//Copy the input, then fill any extra space with zeroes
-		memcpy(m_forwardInBuf.GetCpuPointer(), din->m_samples.GetCpuPointer(), npoints_raw*sizeof(float));
-		for(size_t i=npoints_raw; i<npoints; i++)
-			m_forwardInBuf[i] = 0;
-
-		//Do the forward FFT
-		ffts_execute(m_forwardPlan, m_forwardInBuf.GetCpuPointer(), m_forwardOutBuf.GetCpuPointer());
-
-		//Apply the interpolated S-parameters
-		MainLoop(nouts);
-
-		//Calculate the inverse FFT
-		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
-
-		//Copy waveform data after rescaling
-		for(size_t i=0; i<outlen; i++)
-			cap->m_samples[i] = m_reverseOutBuf[i+istart] * scale;
-
-		cap->MarkModifiedFromCpu();
-	}
-	#endif
+	//Done, block until the compute operations finish
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+	cap->MarkModifiedFromGpu();
 }
 
 /**
@@ -486,21 +412,4 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 
 	m_resampledSparamSines.MarkModifiedFromCpu();
 	m_resampledSparamCosines.MarkModifiedFromCpu();
-}
-
-void DeEmbedFilter::MainLoop(size_t nouts)
-{
-	for(size_t i=0; i<nouts; i++)
-	{
-		float sinval = m_resampledSparamSines[i];
-		float cosval = m_resampledSparamCosines[i];
-
-		//Uncorrected complex value
-		float real_orig = m_forwardOutBuf[i*2 + 0];
-		float imag_orig = m_forwardOutBuf[i*2 + 1];
-
-		//Amplitude correction
-		m_forwardOutBuf[i*2 + 0] = real_orig*cosval - imag_orig*sinval;
-		m_forwardOutBuf[i*2 + 1] = real_orig*sinval + imag_orig*cosval;
-	}
 }

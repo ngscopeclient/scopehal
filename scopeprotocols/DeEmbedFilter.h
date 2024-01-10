@@ -60,6 +60,26 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(DeEmbedFilter)
 
+	//Accessors for internal values only used by unit tests
+	//TODO: refactor this into a friend class or something?
+	size_t test_GetNumPoints()
+	{ return m_cachedNumPoints; }
+
+	size_t test_GetOutLen()
+	{ return m_cachedOutLen; }
+
+	AcceleratorBuffer<float>& test_GetCachedInputBuffer()
+	{ return m_forwardInBuf; }
+
+	AcceleratorBuffer<float>& test_GetResampledSines()
+	{ return m_resampledSparamSines; }
+
+	AcceleratorBuffer<float>& test_GetResampledCosines()
+	{ return m_resampledSparamCosines; }
+
+	size_t test_GetIstart()
+	{ return m_cachedIstart; }
+
 protected:
 	virtual int64_t GetGroupDelay();
 	void DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
@@ -81,17 +101,13 @@ protected:
 	AcceleratorBuffer<float> m_resampledSparamSines;
 	AcceleratorBuffer<float> m_resampledSparamCosines;
 
-#ifndef _APPLE_SILICON
-	ffts_plan_t* m_forwardPlan;
-	ffts_plan_t* m_reversePlan;
-#endif
 	size_t m_cachedNumPoints;
+	size_t m_cachedOutLen;
+	size_t m_cachedIstart;
 
 	AcceleratorBuffer<float> m_forwardInBuf;
 	AcceleratorBuffer<float> m_forwardOutBuf;
 	AcceleratorBuffer<float> m_reverseOutBuf;
-
-	void MainLoop(size_t nouts);
 
 	WaveformCacheKey m_magKey;
 	WaveformCacheKey m_angleKey;
