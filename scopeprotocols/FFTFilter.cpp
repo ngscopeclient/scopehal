@@ -54,9 +54,7 @@ FFTFilter::FFTFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedNumPointsFFT = 0;
-#ifndef _APPLE_SILICON
-	m_plan = NULL;
-#endif
+	m_cachedNumOuts = 0;
 
 	//Default config
 	m_range = 70;
@@ -73,16 +71,10 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_roundingName].AddEnumValue("Down (Truncate)", ROUND_TRUNCATE);
 	m_parameters[m_roundingName].AddEnumValue("Up (Zero Pad)", ROUND_ZERO_PAD);
 	m_parameters[m_roundingName].SetIntVal(ROUND_TRUNCATE);
-
-	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
 
 FFTFilter::~FFTFilter()
 {
-#ifndef _APPLE_SILICON
-	if(m_plan)
-		ffts_free(m_plan);
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,54 +133,24 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 	m_cachedNumPoints = npoints_raw;
 
 	if(m_cachedNumPointsFFT != npoints)
-	{
 		m_cachedNumPointsFFT = npoints;
 
-	#ifndef _APPLE_SILICON
-		if(g_gpuFilterEnabled)
-			m_plan = nullptr;
-
-		//CPU fallback
-		else
-		{
-			if(m_plan)
-				ffts_free(m_plan);
-			m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-
-			m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-			m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
-			m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-			m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
-		}
-	#else
-		if(!g_gpuFilterEnabled)
-			LogFatal("FFTFilter cpu fallback not available on Apple Silicon (yet?)");
-	#endif
-	}
-
 	//Update our FFT plan if it's out of date
-	if(!g_gpuFilterEnabled)
-		m_vkPlan = nullptr;
-	else
-	{
-		m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
-		m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-		m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
-		m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-		if(m_vkPlan)
-		{
-			if(m_vkPlan->size() != npoints)
-				m_vkPlan = nullptr;
-		}
-		if(!m_vkPlan)
-			m_vkPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+	if(m_vkPlan)
+	{
+		if(m_vkPlan->size() != npoints)
+			m_vkPlan = nullptr;
 	}
+	if(!m_vkPlan)
+		m_vkPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
 
 	m_rdinbuf.resize(npoints);
 	m_rdoutbuf.resize(2*nouts);
-
-	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
 
 void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
@@ -212,7 +174,8 @@ void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 
 	//Reallocate buffers if size has changed
 	const size_t nouts = npoints/2 + 1;
-	if( (m_cachedNumPoints != npoints_raw) || (m_cachedGpuFilterEnabled != g_gpuFilterEnabled) )
+	m_cachedNumOuts = nouts;
+	if(m_cachedNumPoints != npoints_raw)
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
@@ -267,219 +230,82 @@ void FFTFilter::DoRefresh(
 			break;
 	}
 
-	if(g_gpuFilterEnabled)
+	//Configure the window
+	WindowFunctionArgs args;
+	args.numActualSamples = numActualSamples;
+	args.npoints = npoints;
+	args.scale = 2 * M_PI / numActualSamples;
+	args.offsetIn = 0;
+	args.offsetOut = 0;
+	switch(window)
 	{
-		//Configure the window
-		WindowFunctionArgs args;
-		args.numActualSamples = numActualSamples;
-		args.npoints = npoints;
-		args.scale = 2 * M_PI / numActualSamples;
-		args.offsetIn = 0;
-		args.offsetOut = 0;
-		switch(window)
-		{
-			case WINDOW_HANN:
-				args.alpha0 = 0.5;
-				break;
-
-			case WINDOW_HAMMING:
-				args.alpha0 = 25.0f / 46;
-				break;
-
-			default:
-				args.alpha0 = 0;
-				break;
-		}
-		args.alpha1 = 1 - args.alpha0;
-
-		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
-		cmdBuf.begin({});
-
-		//Apply the window function
-		ComputePipeline* wpipe = nullptr;
-		switch(window)
-		{
-			case WINDOW_BLACKMAN_HARRIS:
-				wpipe = &m_blackmanHarrisComputePipeline;
-				break;
-
-			case WINDOW_HANN:
-			case WINDOW_HAMMING:
-				wpipe = &m_cosineSumComputePipeline;
-				break;
-
-			default:
-			case WINDOW_RECTANGULAR:
-				wpipe = &m_rectangularComputePipeline;
-				break;
-		}
-		wpipe->BindBufferNonblocking(0, data, cmdBuf);
-		wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
-		wpipe->Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
-		wpipe->AddComputeMemoryBarrier(cmdBuf);
-		m_rdinbuf.MarkModifiedFromGpu();
-
-		//Do the actual FFT operation
-		m_vkPlan->AppendForward(m_rdinbuf, m_rdoutbuf, cmdBuf);
-
-		//Convert complex to real
-		ComputePipeline& pipe = log_output ?
-			m_complexToLogMagnitudeComputePipeline : m_complexToMagnitudeComputePipeline;
-		ComplexToMagnitudeArgs cargs;
-		cargs.npoints = nouts;
-		if(log_output)
-		{
-			const float impedance = 50;
-			cargs.scale = scale * scale / impedance;
-		}
-		else
-			cargs.scale = scale;
-		pipe.BindBuffer(0, m_rdoutbuf);
-		pipe.BindBuffer(1, cap->m_samples);
-		pipe.AddComputeMemoryBarrier(cmdBuf);
-		pipe.Dispatch(cmdBuf, cargs, GetComputeBlockCount(nouts, 64));
-
-		//Done, block until the compute operations finish
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-
-		cap->MarkModifiedFromGpu();
-	}
-	else
-	#ifdef _APPLE_SILICON
-		LogFatal("FFTFilter cpu fallback not available on Apple Silicon (yet?)");
-	#else
-	{
-		data.PrepareForCpuAccess();
-		m_rdinbuf.PrepareForCpuAccess();
-		m_rdoutbuf.PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		//Copy the input with windowing, then zero pad to the desired input length if needed
-		ApplyWindow(
-			(float*)&data[0],
-			numActualSamples,
-			&m_rdinbuf[0],
-			window);
-		if(npoints > m_cachedNumPoints)
-			memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
-
-		//Calculate the FFT
-		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
-
-		//Normalize magnitudes
-		if(log_output)
-			NormalizeOutputLog(cap->m_samples, nouts, scale);
-		else
-			NormalizeOutputLinear(cap->m_samples, nouts, scale);
-
-		cap->MarkModifiedFromCpu();
-	}
-	#endif
-
-	//Peak search
-	FindPeaks(cap);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Normalization
-
-/**
-	@brief Normalize FFT output and convert to dBm (unoptimized C++ implementation)
- */
-void FFTFilter::NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale)
-{
-	//assume constant 50 ohms for now
-	const float impedance = 50;
-	const float sscale = scale*scale / impedance;
-	for(size_t i=0; i<nouts; i++)
-	{
-		float real = m_rdoutbuf[i*2];
-		float imag = m_rdoutbuf[i*2 + 1];
-
-		float vsq = real*real + imag*imag;
-
-		//Convert to dBm
-		data[i] = (10 * log10(vsq * sscale) + 30);
-	}
-}
-
-/**
-	@brief Normalize FFT output and output in native Y-axis units (unoptimized C++ implementation)
- */
-void FFTFilter::NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale)
-{
-	for(size_t i=0; i<nouts; i++)
-	{
-		float real = m_rdoutbuf[i*2];
-		float imag = m_rdoutbuf[i*2 + 1];
-
-		data[i] = sqrtf(real*real + imag*imag) * scale;
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Window functions
-
-void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFunction func)
-{
-	switch(func)
-	{
-		case WINDOW_BLACKMAN_HARRIS:
-			return BlackmanHarrisWindow(data, len, out);
-
 		case WINDOW_HANN:
-			return HannWindow(data, len, out);
+			args.alpha0 = 0.5;
+			break;
 
 		case WINDOW_HAMMING:
-			return HammingWindow(data, len, out);
+			args.alpha0 = 25.0f / 46;
+			break;
 
-		case WINDOW_RECTANGULAR:
 		default:
-			memcpy(out, data, len * sizeof(float));
+			args.alpha0 = 0;
+			break;
 	}
-}
+	args.alpha1 = 1 - args.alpha0;
 
-void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float alpha0)
-{
-	float alpha1 = 1 - alpha0;
-	float scale = 2.0f * (float)M_PI / len;
+	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+	cmdBuf.begin({});
 
-	float* aligned_data = (float*)__builtin_assume_aligned(data, 32);
-	float* aligned_out = (float*)__builtin_assume_aligned(out, 32);
-	for(size_t i=0; i<len; i++)
+	//Apply the window function
+	ComputePipeline* wpipe = nullptr;
+	switch(window)
 	{
-		float w = alpha0 - alpha1*cosf(i*scale);
-		aligned_out[i] = w * aligned_data[i];
+		case WINDOW_BLACKMAN_HARRIS:
+			wpipe = &m_blackmanHarrisComputePipeline;
+			break;
+
+		case WINDOW_HANN:
+		case WINDOW_HAMMING:
+			wpipe = &m_cosineSumComputePipeline;
+			break;
+
+		default:
+		case WINDOW_RECTANGULAR:
+			wpipe = &m_rectangularComputePipeline;
+			break;
 	}
-}
+	wpipe->BindBufferNonblocking(0, data, cmdBuf);
+	wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
+	wpipe->Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+	wpipe->AddComputeMemoryBarrier(cmdBuf);
+	m_rdinbuf.MarkModifiedFromGpu();
 
-void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
-{
-	float alpha0 = 0.35875;
-	float alpha1 = 0.48829;
-	float alpha2 = 0.14128;
-	float alpha3 = 0.01168;
-	float scale = 2 *(float)M_PI / len;
+	//Do the actual FFT operation
+	m_vkPlan->AppendForward(m_rdinbuf, m_rdoutbuf, cmdBuf);
 
-	for(size_t i=0; i<len; i++)
+	//Convert complex to real
+	ComputePipeline& pipe = log_output ?
+		m_complexToLogMagnitudeComputePipeline : m_complexToMagnitudeComputePipeline;
+	ComplexToMagnitudeArgs cargs;
+	cargs.npoints = nouts;
+	if(log_output)
 	{
-		float num = i * scale;
-		float w =
-			alpha0 -
-			alpha1 * cosf(num) +
-			alpha2 * cosf(2*num) -
-			alpha3 * cosf(6*num);
-		out[i] = w * data[i];
+		const float impedance = 50;
+		cargs.scale = scale * scale / impedance;
 	}
-}
+	else
+		cargs.scale = scale;
+	pipe.BindBuffer(0, m_rdoutbuf);
+	pipe.BindBuffer(1, cap->m_samples);
+	pipe.AddComputeMemoryBarrier(cmdBuf);
+	pipe.Dispatch(cmdBuf, cargs, GetComputeBlockCount(nouts, 64));
 
-void FFTFilter::HannWindow(const float* data, size_t len, float* out)
-{
-	CosineSumWindow(data, len, out, 0.5);
-}
+	//Done, block until the compute operations finish
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
-void FFTFilter::HammingWindow(const float* data, size_t len, float* out)
-{
-	CosineSumWindow(data, len, out, 25.0f / 46);
+	cap->MarkModifiedFromGpu();
+
+	//Peak search (for now this runs on the CPU)
+	FindPeaks(cap);
 }

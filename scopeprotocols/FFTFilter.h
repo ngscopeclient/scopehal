@@ -35,10 +35,6 @@
 #ifndef FFTFilter_h
 #define FFTFilter_h
 
-#ifndef _APPLE_SILICON
-#include <ffts.h>
-#endif
-
 #include "VulkanFFTPlan.h"
 
 class QueueHandle;
@@ -92,21 +88,20 @@ public:
 		ROUND_ZERO_PAD
 	};
 
-	//Window function helpers
-	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
-	static void HannWindow(const float* data, size_t len, float* out);
-	static void HammingWindow(const float* data, size_t len, float* out);
-	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
-	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
-
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 	void SetWindowFunction(WindowFunction f)
 	{ m_parameters[m_windowName].SetIntVal(f); }
 
+	//Accessors for internal values only used by unit tests
+	//TODO: refactor this into a friend class or something?
+	size_t test_GetNumPoints()
+	{ return m_cachedNumPointsFFT; }
+
+	size_t test_GetNumOuts()
+	{ return m_cachedNumOuts; }
+
 protected:
-	void NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale);
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
@@ -123,11 +118,9 @@ protected:
 
 	size_t m_cachedNumPoints;
 	size_t m_cachedNumPointsFFT;
+	size_t m_cachedNumOuts;
 	AcceleratorBuffer<float> m_rdinbuf;
 	AcceleratorBuffer<float> m_rdoutbuf;
-#ifndef _APPLE_SILICON
-	ffts_plan_t* m_plan;
-#endif
 
 	float m_range;
 	float m_offset;
@@ -142,8 +135,6 @@ protected:
 	ComputePipeline m_cosineSumComputePipeline;
 	ComputePipeline m_complexToMagnitudeComputePipeline;
 	ComputePipeline m_complexToLogMagnitudeComputePipeline;
-
-	bool m_cachedGpuFilterEnabled;
 };
 
 #endif
