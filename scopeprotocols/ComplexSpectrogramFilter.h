@@ -30,90 +30,34 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SpectrogramFilter
+	@brief Declaration of ComplexSpectrogramFilter
  */
-#ifndef SpectrogramFilter_h
-#define SpectrogramFilter_h
+#ifndef ComplexSpectrogramFilter_h
+#define ComplexSpectrogramFilter_h
 
 #include "VulkanFFTPlan.h"
 
 #include "../scopehal/DensityFunctionWaveform.h"
+#include "SpectrogramFilter.h"
 
-struct SpectrogramPostprocessArgs
-{
-	uint32_t nblocks;
-	uint32_t nouts;
-	float logscale;
-	float impscale;
-	float minscale;
-	float irange;
-};
-
-class SpectrogramWaveform : public DensityFunctionWaveform
+class ComplexSpectrogramFilter : public SpectrogramFilter
 {
 public:
-	SpectrogramWaveform(size_t width, size_t height, double binsize, double bottomEdgeFrequency);
-	virtual ~SpectrogramWaveform();
-
-	//not copyable or assignable
-	SpectrogramWaveform(const SpectrogramWaveform&) =delete;
-	SpectrogramWaveform& operator=(const SpectrogramWaveform&) =delete;
-
-	double GetBinSize()
-	{ return m_binsize; }
-
-	double GetBottomEdgeFrequency()
-	{ return m_bottomEdgeFrequency; }
-
-protected:
-	double m_binsize;
-	double m_bottomEdgeFrequency;
-};
-
-class SpectrogramFilter : public Filter
-{
-public:
-	SpectrogramFilter(const std::string& color);
-	virtual ~SpectrogramFilter();
+	ComplexSpectrogramFilter(const std::string& color);
+	virtual ~ComplexSpectrogramFilter();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
-	static std::string GetProtocolName();
-	virtual DataLocation GetInputLocation() override;
-
-	virtual float GetVoltageRange(size_t stream) override;
-	virtual float GetOffset(size_t stream) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual void SetVoltageRange(float range, size_t stream) override;
-	virtual void SetOffset(float offset, size_t stream) override;
+	static std::string GetProtocolName();
 
-	PROTOCOL_DECODER_INITPROC(SpectrogramFilter)
+	PROTOCOL_DECODER_INITPROC(ComplexSpectrogramFilter)
 
 protected:
-	virtual void ReallocateBuffers(size_t fftlen, size_t nblocks);
 
-	AcceleratorBuffer<float> m_rdinbuf;
-	AcceleratorBuffer<float> m_rdoutbuf;
+	virtual void ReallocateBuffers(size_t fftlen, size_t nblocks) override;
 
-	size_t m_cachedFFTLength;
-	size_t m_cachedFFTNumBlocks;
-
-	float m_range;
-	float m_offset;
-
-	std::string m_windowName;
-	std::string m_fftLengthName;
-	std::string m_rangeMinName;
-	std::string m_rangeMaxName;
-
-	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
-
-	ComputePipeline m_blackmanHarrisComputePipeline;
-	ComputePipeline m_rectangularComputePipeline;
-	ComputePipeline m_cosineSumComputePipeline;
-
-	ComputePipeline m_postprocessComputePipeline;
+	std::string m_centerFreqName;
 };
 
 #endif

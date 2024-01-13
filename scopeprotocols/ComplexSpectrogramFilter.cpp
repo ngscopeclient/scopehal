@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,7 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "../scopehal/AlignedAllocator.h"
-#include "SpectrogramFilter.h"
+#include "ComplexSpectrogramFilter.h"
 #include "FFTFilter.h"
 
 using namespace std;
@@ -37,84 +37,45 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SpectrogramWaveform::SpectrogramWaveform(size_t width, size_t height, double binsize, double bottomEdgeFrequency)
-	: DensityFunctionWaveform(width, height)
-	, m_binsize(binsize)
-	, m_bottomEdgeFrequency(bottomEdgeFrequency)
+ComplexSpectrogramFilter::ComplexSpectrogramFilter(const string& color)
+	: SpectrogramFilter(color)
+	, m_centerFreqName("Center Frequency")
 {
-
-}
-
-SpectrogramWaveform::~SpectrogramWaveform()
-{
-
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SpectrogramFilter::SpectrogramFilter(const string& color)
-	: Filter(color, CAT_RF)
-	, m_windowName("Window")
-	, m_fftLengthName("FFT length")
-	, m_rangeMinName("Range Min")
-	, m_rangeMaxName("Range Max")
-	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
-	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
-	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
-	, m_postprocessComputePipeline("shaders/SpectrogramPostprocess.spv", 2, sizeof(SpectrogramPostprocessArgs))
-{
-	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_SPECTROGRAM);
+	//remove base class ports
+	m_signalNames.clear();
+	m_inputs.clear();
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput("I");
+	CreateInput("Q");
 
-	//Default config
-	m_range = 1e9;
-	m_offset = -5e8;
-	m_cachedFFTLength = 0;
-	m_cachedFFTNumBlocks = 0;
+	m_blackmanHarrisComputePipeline.Reinitialize(
+		"shaders/ComplexBlackmanHarrisWindow.spv", 3, sizeof(WindowFunctionArgs));
+	m_rectangularComputePipeline.Reinitialize(
+		"shaders/ComplexRectangularWindow.spv", 3, sizeof(WindowFunctionArgs));
+	m_cosineSumComputePipeline.Reinitialize(
+		"shaders/CosineSumWindow.spv", 3, sizeof(WindowFunctionArgs));
 
-	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
-	m_parameters[m_windowName].AddEnumValue("Hamming", FFTFilter::FFTFilter::WINDOW_HAMMING);
-	m_parameters[m_windowName].AddEnumValue("Hann", FFTFilter::FFTFilter::WINDOW_HANN);
-	m_parameters[m_windowName].AddEnumValue("Rectangular", FFTFilter::FFTFilter::WINDOW_RECTANGULAR);
-	m_parameters[m_windowName].SetIntVal(FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
+	m_postprocessComputePipeline.Reinitialize(
+		"shaders/ComplexSpectrogramPostprocess.spv", 2, sizeof(SpectrogramPostprocessArgs));
 
-	m_parameters[m_fftLengthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_fftLengthName].AddEnumValue("64", 64);
-	m_parameters[m_fftLengthName].AddEnumValue("128", 128);
-	m_parameters[m_fftLengthName].AddEnumValue("256", 256);
-	m_parameters[m_fftLengthName].AddEnumValue("512", 512);
-	m_parameters[m_fftLengthName].AddEnumValue("1024", 1024);
-	m_parameters[m_fftLengthName].AddEnumValue("2048", 2048);
-	m_parameters[m_fftLengthName].AddEnumValue("4096", 4096);
-	m_parameters[m_fftLengthName].AddEnumValue("8192", 8192);
-	m_parameters[m_fftLengthName].AddEnumValue("16384", 16384);
-	m_parameters[m_fftLengthName].AddEnumValue("32768", 32768);
-	m_parameters[m_fftLengthName].SetIntVal(512);
-
-	m_parameters[m_rangeMaxName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
-	m_parameters[m_rangeMaxName].SetFloatVal(-10);
-
-	m_parameters[m_rangeMinName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
-	m_parameters[m_rangeMinName].SetFloatVal(-50);
+	m_parameters[m_centerFreqName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_centerFreqName].SetIntVal(0);
 }
 
-SpectrogramFilter::~SpectrogramFilter()
+ComplexSpectrogramFilter::~ComplexSpectrogramFilter()
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool ComplexSpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;
@@ -123,47 +84,30 @@ bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float SpectrogramFilter::GetOffset(size_t /*stream*/)
+string ComplexSpectrogramFilter::GetProtocolName()
 {
-	return m_offset;
-}
-
-float SpectrogramFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-void SpectrogramFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void SpectrogramFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
-
-string SpectrogramFilter::GetProtocolName()
-{
-	return "Spectrogram";
+	return "Complex Spectrogram";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
+void ComplexSpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 {
 	m_cachedFFTLength = fftlen;
 	m_cachedFFTNumBlocks = nblocks;
 
-	size_t nouts = fftlen/2 + 1;
+	size_t nouts = fftlen;
 	if(m_vkPlan)
 	{
 		if(m_vkPlan->size() != fftlen)
 			m_vkPlan = nullptr;
 	}
 	if(!m_vkPlan)
-		m_vkPlan = make_unique<VulkanFFTPlan>(fftlen, nouts, VulkanFFTPlan::DIRECTION_FORWARD, nblocks);
+	{
+		m_vkPlan = make_unique<VulkanFFTPlan>(
+			fftlen, nouts, VulkanFFTPlan::DIRECTION_FORWARD, nblocks, VulkanFFTPlan::TYPE_COMPLEX);
+	}
 
 	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -171,12 +115,7 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
-FlowGraphNode::DataLocation SpectrogramFilter::GetInputLocation()
-{
-	return LOC_DONTCARE;
-}
-
-void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -184,11 +123,12 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
 
 	//Figure out how many FFTs to do
 	//For now, consecutive blocks and not a sliding window
-	size_t inlen = din->size();
+	size_t inlen = min(din_i->size(), din_q->size());
 	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
 	size_t nblocks = floor(inlen * 1.0 / fftlen);
 
@@ -196,29 +136,34 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		ReallocateBuffers(fftlen, nblocks);
 
 	//Figure out range of the FFTs
-	double fs_per_sample = din->m_timescale;
+	double fs_per_sample = din_i->m_timescale;
 	float scale = 2.0 / fftlen;
 	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((sample_ghz * 1e9f) / fftlen);
 	double fmax = bin_hz * fftlen;
 
 	Unit hz(Unit::UNIT_HZ);
-	LogTrace("SpectrogramFilter: %zu input points, %zu %zu-point FFTs\n", inlen, nblocks, fftlen);
+	LogTrace("ComplexSpectrogramFilter: %zu input points, %zu %zu-point FFTs\n", inlen, nblocks, fftlen);
 	LogIndenter li;
 	LogTrace("FFT range is DC to %s\n", hz.PrettyPrint(fmax).c_str());
 	LogTrace("%s per bin\n", hz.PrettyPrint(bin_hz).c_str());
 
+	//Base frequency is center frequency minus half the FFT range
+	auto centerFrequency = m_parameters[m_centerFreqName].GetIntVal();
+	int64_t baseFrequency = centerFrequency - bin_hz * (fftlen/2);
+
 	//Create the output
 	//TODO: reuse existing buffer if available and same size
-	size_t nouts = fftlen/2 + 1;
+	size_t nouts = fftlen;
 	auto cap = new SpectrogramWaveform(
 		nblocks,
 		nouts,
 		bin_hz,
-		0);
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
+		baseFrequency
+		);
+	cap->m_startTimestamp = din_i->m_startTimestamp;
+	cap->m_startFemtoseconds = din_i->m_startFemtoseconds;
+	cap->m_triggerPhase = din_i->m_triggerPhase;
 	cap->m_timescale = fs_per_sample * fftlen;
 	cap->PrepareForGpuAccess();
 	SetData(cap, 0);
@@ -286,7 +231,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	}
 
 	//Make sure our temporary buffers are big enough
-	m_rdinbuf.resize(nblocks * fftlen);
+	m_rdinbuf.resize(nblocks * fftlen * 2);
 	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
@@ -298,8 +243,9 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	cmdBuf.begin({});
 
 	//Grab the input and apply the window function
-	wpipe->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	wpipe->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
 	wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
+	wpipe->BindBufferNonblocking(2, din_q->m_samples, cmdBuf);
 	for(size_t block=0; block<nblocks; block++)
 	{
 		args.offsetIn = block*fftlen;
@@ -318,7 +264,11 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		m_rdoutbuf,
 		cmdBuf);
 
+	//TODO: Handle center frequency offset (we're going to complex data)
+
 	//Postprocess the output
+	//TODO: really deep waveforms might generate a lot of blocks here (enough to exceed the max block count in Y)
+	//so do multiple dispatches in that case?
 	const float impedance = 50;
 	SpectrogramPostprocessArgs postargs;
 	postargs.nblocks = nblocks;

@@ -18,6 +18,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClipFilter.cpp
 	ClockRecoveryFilter.cpp
 	ComplexImportFilter.cpp
+	ComplexSpectrogramFilter.cpp
 	ConstantFilter.cpp
 	CSVExportFilter.cpp
 	CSVImportFilter.cpp

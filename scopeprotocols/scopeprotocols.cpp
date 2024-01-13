@@ -56,6 +56,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ClipFilter);
 	AddDecoderClass(ClockRecoveryFilter);
 	AddDecoderClass(ComplexImportFilter);
+	AddDecoderClass(ComplexSpectrogramFilter);
 	AddDecoderClass(ConstantFilter);
 	AddDecoderClass(CSVExportFilter);
 	AddDecoderClass(CSVImportFilter);

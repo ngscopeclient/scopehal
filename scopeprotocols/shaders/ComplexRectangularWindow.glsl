@@ -27,93 +27,60 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SpectrogramFilter
- */
-#ifndef SpectrogramFilter_h
-#define SpectrogramFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-#include "VulkanFFTPlan.h"
-
-#include "../scopehal/DensityFunctionWaveform.h"
-
-struct SpectrogramPostprocessArgs
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	uint32_t nblocks;
-	uint32_t nouts;
-	float logscale;
-	float impscale;
-	float minscale;
-	float irange;
+	float dinI[];
 };
 
-class SpectrogramWaveform : public DensityFunctionWaveform
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	SpectrogramWaveform(size_t width, size_t height, double binsize, double bottomEdgeFrequency);
-	virtual ~SpectrogramWaveform();
-
-	//not copyable or assignable
-	SpectrogramWaveform(const SpectrogramWaveform&) =delete;
-	SpectrogramWaveform& operator=(const SpectrogramWaveform&) =delete;
-
-	double GetBinSize()
-	{ return m_binsize; }
-
-	double GetBottomEdgeFrequency()
-	{ return m_bottomEdgeFrequency; }
-
-protected:
-	double m_binsize;
-	double m_bottomEdgeFrequency;
+	float dout[];
 };
 
-class SpectrogramFilter : public Filter
+//bound at 2 rather than 1 to keep commonality with real valued window functions
+layout(std430, binding=2) restrict readonly buffer buf_din_Q
 {
-public:
-	SpectrogramFilter(const std::string& color);
-	virtual ~SpectrogramFilter();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
-	static std::string GetProtocolName();
-	virtual DataLocation GetInputLocation() override;
-
-	virtual float GetVoltageRange(size_t stream) override;
-	virtual float GetOffset(size_t stream) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	virtual void SetVoltageRange(float range, size_t stream) override;
-	virtual void SetOffset(float offset, size_t stream) override;
-
-	PROTOCOL_DECODER_INITPROC(SpectrogramFilter)
-
-protected:
-	virtual void ReallocateBuffers(size_t fftlen, size_t nblocks);
-
-	AcceleratorBuffer<float> m_rdinbuf;
-	AcceleratorBuffer<float> m_rdoutbuf;
-
-	size_t m_cachedFFTLength;
-	size_t m_cachedFFTNumBlocks;
-
-	float m_range;
-	float m_offset;
-
-	std::string m_windowName;
-	std::string m_fftLengthName;
-	std::string m_rangeMinName;
-	std::string m_rangeMaxName;
-
-	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
-
-	ComputePipeline m_blackmanHarrisComputePipeline;
-	ComputePipeline m_rectangularComputePipeline;
-	ComputePipeline m_cosineSumComputePipeline;
-
-	ComputePipeline m_postprocessComputePipeline;
+	float dinQ[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint numActualSamples;
+	uint npoints;
+	uint offsetIn;
+	uint offsetOut;
+
+	//not used in rectangular window, only for interface compatibility
+	float scale;
+	float alpha0;
+	float alpha1;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint inbase = gl_GlobalInvocationID.x + offsetIn;
+	uint outbase = gl_GlobalInvocationID.x + offsetOut;
+
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= npoints)
+		return;
+
+	//If off end of input, zero fill
+	else if(gl_GlobalInvocationID.x >= numActualSamples)
+	{
+		dout[outbase*2 + 0] = 0;
+		dout[outbase*2 + 1] = 0;
+	}
+
+	//Nope, copy it
+	else
+	{
+		dout[outbase*2 + 0] = dinI[inbase];
+		dout[outbase*2 + 1] = dinQ[inbase];
+	}
+}

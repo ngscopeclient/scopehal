@@ -31,6 +31,10 @@ add_compute_shaders(
 	SOURCES
 		AddFilter.glsl
 		BlackmanHarrisWindow.glsl
+		ComplexBlackmanHarrisWindow.glsl
+		ComplexCosineSumWindow.glsl
+		ComplexRectangularWindow.glsl
+		ComplexSpectrogramPostprocess.glsl
 		ComplexToLogMagnitude.glsl
 		ComplexToMagnitude.glsl
 		CosineSumWindow.glsl
