@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -51,6 +51,33 @@ ComputePipeline::ComputePipeline(
 	m_bufferInfo.resize(numSSBOs);
 	m_storageImageInfo.resize(numStorageImages);
 	m_sampledImageInfo.resize(numSampledImages);
+}
+
+void ComputePipeline::Reinitialize(
+	const string& shaderPath,
+	size_t numSSBOs,
+	size_t pushConstantSize,
+	size_t numStorageImages,
+	size_t numSampledImages)
+{
+	//Copy paths
+	m_shaderPath = shaderPath;
+	m_numSSBOs = numSSBOs;
+	m_numStorageImages = numStorageImages;
+	m_numSampledImages = numSampledImages;
+	m_pushConstantSize = pushConstantSize;
+
+	//Resize arrays
+	m_writeDescriptors.resize(numSSBOs + numStorageImages + numSampledImages);
+	m_bufferInfo.resize(numSSBOs);
+	m_storageImageInfo.resize(numStorageImages);
+	m_sampledImageInfo.resize(numSampledImages);
+
+	//Clear all of our deferred state
+	m_computePipeline = nullptr;
+	m_descriptorSetLayout = nullptr;
+	m_pipelineLayout = nullptr;
+	m_shaderModule = nullptr;
 }
 
 ComputePipeline::~ComputePipeline()
