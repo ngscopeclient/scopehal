@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,12 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t numBatches)
+VulkanFFTPlan::VulkanFFTPlan(
+	size_t npoints,
+	size_t nouts,
+	VulkanFFTPlanDirection dir,
+	size_t numBatches,
+	VulkanFFTDataType timeDomainType)
 	: m_size(npoints)
 	, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 {
@@ -73,14 +78,24 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_bsize = 2 * nouts * sizeof(float) * numBatches;
 		m_tsize = m_bsize;
 
-		//input is real buffer of full size
+		//input is real or complex buffer of full size
 		m_isize = npoints * sizeof(float) * numBatches;
+		if(timeDomainType == TYPE_COMPLEX)
+			m_isize *= 2;
 
 		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
-		m_config.inputBufferStride[0] = npoints;
+		if(timeDomainType == TYPE_COMPLEX)
+		{}//	m_config.inputBufferStride[0] = npoints;
+		else
+			m_config.inputBufferStride[0] = npoints;
 
-		cacheKey = string("VkFFT_FWD_V7_") + to_string(npoints) + "_" + to_string(numBatches);
+		cacheKey = string("VkFFT_FWD_V8_");
+		if(timeDomainType == TYPE_REAL)
+			cacheKey += "R2C_";
+		else
+			cacheKey += "C2C_";
+		cacheKey += to_string(npoints) + "_" + to_string(numBatches);
 	}
 	else
 	{
@@ -90,14 +105,21 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_isize = 2 * nouts * sizeof(float) * numBatches;
 		m_tsize = m_isize;
 
-		//output is real buffer of full size
+		//output is real or complex  buffer of full size
 		m_bsize = npoints * sizeof(float) * numBatches;
+		if(timeDomainType == TYPE_COMPLEX)
+			m_bsize *= 2;
 
 		m_config.bufferSize = &m_isize;
 		m_config.inputBufferSize = &m_bsize;	//note that input and output buffers are swapped for reverse transform
 		m_config.inverseReturnToInputBuffer = 1;
 
-		cacheKey = string("VkFFT_INV_V7_") + to_string(npoints);
+		cacheKey = string("VkFFT_INV_V8_");
+		if(timeDomainType == TYPE_REAL)
+			cacheKey += "C2R_";
+		else
+			cacheKey += "C2C_";
+		cacheKey += to_string(npoints);
 	}
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
@@ -133,7 +155,10 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	//We have "C" locale all the time internally, so no need to setlocale() in the library
 	m_config.disableSetLocale = 1;
 
-	m_config.performR2C = 1;				//real time domain / complex frequency domain points
+	if(timeDomainType == TYPE_REAL)
+		m_config.performR2C = 1;				//real time domain / complex frequency domain points
+	else
+		m_config.performR2C = 0;				//complex for both input and output
 
 	//Load from cache
 	auto cacheBlob = g_pipelineCacheMgr->LookupRaw(cacheKey);

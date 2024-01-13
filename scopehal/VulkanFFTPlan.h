@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,7 +62,18 @@ public:
 		DIRECTION_REVERSE
 	};
 
-	VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t numBatches = 1);
+	enum VulkanFFTDataType
+	{
+		TYPE_REAL,
+		TYPE_COMPLEX
+	};
+
+	VulkanFFTPlan(
+		size_t npoints,
+		size_t nouts,
+		VulkanFFTPlanDirection dir,
+		size_t numBatches = 1,
+		VulkanFFTDataType timeDomainType = VulkanFFTPlan::TYPE_REAL);
 	~VulkanFFTPlan();
 
 	void AppendForward(
