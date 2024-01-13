@@ -327,10 +327,17 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	postargs.impscale = scale*scale / impedance;
 	postargs.minscale = minscale;
 	postargs.irange = 1.0 / range;
+	postargs.ygrid = min(g_maxComputeGroupCount[2], nblocks);
 	m_postprocessComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	m_postprocessComputePipeline.BindBufferNonblocking(0, m_rdoutbuf, cmdBuf);
 	m_postprocessComputePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf, true);
-	m_postprocessComputePipeline.Dispatch(cmdBuf, postargs, GetComputeBlockCount(nouts, 64), nblocks);
+	m_postprocessComputePipeline.Dispatch(
+		cmdBuf,
+		postargs,
+		GetComputeBlockCount(nouts, 64),
+		ceil(nblocks * 1.0 / postargs.ygrid),
+		postargs.ygrid
+		);
 
 	//Done, block until the compute operations finish
 	cmdBuf.end();

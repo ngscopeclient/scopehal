@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,6 +44,7 @@ layout(std430, push_constant) uniform constants
 {
 	uint nblocks;
 	uint nouts;
+	uint ygrid;
 	float logscale;
 	float impscale;
 	float minscale;
@@ -60,10 +61,14 @@ void main()
 	//If off end of array, stop
 	if(gl_GlobalInvocationID.x >= nouts)
 		return;
-	//Y axis grid size must exactly equal nblocks, so don't validate
 
-	uint nin = (nouts*gl_GlobalInvocationID.y + gl_GlobalInvocationID.x)*2;
-	uint nout = gl_GlobalInvocationID.x*nblocks + gl_GlobalInvocationID.y;
+	//Find real Y coordinate
+	uint realy = gl_GlobalInvocationID.y*ygrid + gl_GlobalInvocationID.z;
+	if(realy >= nblocks)
+		return;
+
+	uint nin = (nouts*realy + gl_GlobalInvocationID.x)*2;
+	uint nout = gl_GlobalInvocationID.x*nblocks + realy;
 
 	float real = din[nin];
 	float imag = din[nin + 1];

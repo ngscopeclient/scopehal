@@ -264,8 +264,6 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		m_rdoutbuf,
 		cmdBuf);
 
-	//TODO: Handle center frequency offset (we're going to complex data)
-
 	//Postprocess the output
 	//TODO: really deep waveforms might generate a lot of blocks here (enough to exceed the max block count in Y)
 	//so do multiple dispatches in that case?
@@ -277,10 +275,17 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	postargs.impscale = scale*scale / impedance;
 	postargs.minscale = minscale;
 	postargs.irange = 1.0 / range;
+	postargs.ygrid = min(g_maxComputeGroupCount[2], nblocks);
 	m_postprocessComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	m_postprocessComputePipeline.BindBufferNonblocking(0, m_rdoutbuf, cmdBuf);
 	m_postprocessComputePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf, true);
-	m_postprocessComputePipeline.Dispatch(cmdBuf, postargs, GetComputeBlockCount(nouts, 64), nblocks);
+	m_postprocessComputePipeline.Dispatch(
+		cmdBuf,
+		postargs,
+		GetComputeBlockCount(nouts, 64),
+		ceil(nblocks * 1.0 / postargs.ygrid),
+		postargs.ygrid
+		);
 
 	//Done, block until the compute operations finish
 	cmdBuf.end();

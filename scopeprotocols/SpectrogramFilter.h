@@ -43,6 +43,7 @@ struct SpectrogramPostprocessArgs
 {
 	uint32_t nblocks;
 	uint32_t nouts;
+	uint32_t ygrid;
 	float logscale;
 	float impscale;
 	float minscale;

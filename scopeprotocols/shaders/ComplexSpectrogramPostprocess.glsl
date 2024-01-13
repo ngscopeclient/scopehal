@@ -44,6 +44,7 @@ layout(std430, push_constant) uniform constants
 {
 	uint nblocks;
 	uint nouts;
+	uint ygrid;
 	float logscale;
 	float impscale;
 	float minscale;
@@ -60,16 +61,20 @@ void main()
 	//If off end of array, stop
 	if(gl_GlobalInvocationID.x >= nouts)
 		return;
-	//Y axis grid size must exactly equal nblocks, so don't validate
 
-	//Rotate spectrogram by half the block size
+	//Find real Y coordinate
+	uint realy = gl_GlobalInvocationID.y*ygrid + gl_GlobalInvocationID.z;
+	if(realy >= nblocks)
+		return;
+
+	//Rotate spectrogram by half the block size so center frequency is in the middle
 	//TODO: why is this needed?
 	uint isample = gl_GlobalInvocationID.x + (nouts/2);
 	if(isample >= nouts)
 		isample -= nouts;
 
-	uint nin = (nouts*gl_GlobalInvocationID.y + isample)*2;
-	uint nout = gl_GlobalInvocationID.x*nblocks + gl_GlobalInvocationID.y;
+	uint nin = (nouts*realy + isample)*2;
+	uint nout = gl_GlobalInvocationID.x*nblocks + realy;
 
 	float real = din[nin];
 	float imag = din[nin + 1];

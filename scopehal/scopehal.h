@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -86,6 +86,8 @@ extern bool g_hasShaderAtomicFloat;
 extern bool g_hasDebugUtils;
 extern bool g_hasMemoryBudget;
 extern bool g_hasPushDescriptor;
+
+extern size_t g_maxComputeGroupCount[3];
 
 #include "Unit.h"
 #include "Bijection.h"

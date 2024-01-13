@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -148,6 +148,9 @@ bool g_hasShaderAtomicFloat = false;
 bool g_hasDebugUtils = false;
 bool g_hasMemoryBudget = false;
 bool g_hasPushDescriptor = false;
+
+//Max compute group count in each direction
+size_t g_maxComputeGroupCount[3] = {0};
 
 //Feature flags indicating specific drivers, for bug workarounds
 bool g_vulkanDeviceIsIntelMesa = false;
@@ -423,6 +426,8 @@ bool VulkanInit(bool skipGLFW)
 					limits.maxComputeWorkGroupCount[0],
 					limits.maxComputeWorkGroupCount[1],
 					limits.maxComputeWorkGroupCount[2]);
+				for(int j=0; j<3; j++)
+					g_maxComputeGroupCount[j] = limits.maxComputeWorkGroupCount[j];
 				LogDebug("Max compute invocs:     %u\n", limits.maxComputeWorkGroupInvocations);
 				LogDebug("Max compute grp size:   %u x %u x %u\n",
 					limits.maxComputeWorkGroupSize[0],
