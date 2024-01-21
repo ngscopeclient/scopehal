@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -81,9 +81,6 @@ protected:
 
 	uint64_t m_srate;
 	uint64_t m_mdepth;
-
-	//Mutexing for thread safety
-	std::recursive_mutex m_cacheMutex;
 
 	std::map<int, bool> m_channelsEnabled;
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
