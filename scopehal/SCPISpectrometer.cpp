@@ -236,7 +236,7 @@ void SCPISpectrometer::SetChannelOffset(size_t i, size_t stream, float offset)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void SCPISpectrometer::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+void SCPISpectrometer::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
 {
 	node["integration"] = GetIntegrationTime();
 }
@@ -249,9 +249,9 @@ void SCPISpectrometer::DoLoadConfiguration(int /*version*/, const YAML::Node& no
 
 void SCPISpectrometer::DoPreLoadConfiguration(
 	int /*version*/,
-	const YAML::Node& node,
-	IDTable& idmap,
-	ConfigWarningList& list)
+	const YAML::Node& /*node*/,
+	IDTable& /*idmap*/,
+	ConfigWarningList& /*list*/)
 {
 }
 
