@@ -72,6 +72,8 @@
 
 #include "AseqSpectrometer.h"
 
+#include "UHDBridgeSDR.h"
+
 #include "CopperMountainVNA.h"
 #include "PicoVNA.h"
 
@@ -235,6 +237,8 @@ void DriverStaticInit()
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
 	AddSpectrometerDriverClass(AseqSpectrometer);
+
+	AddSDRDriverClass(UHDBridgeSDR);
 
 	AddVNADriverClass(CopperMountainVNA);
 	AddVNADriverClass(PicoVNA);

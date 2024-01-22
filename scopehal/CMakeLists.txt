@@ -139,6 +139,7 @@ set(SCOPEHAL_SOURCES
 	SCPIOscilloscope.cpp
 	SCPIPowerSupply.cpp
 	SCPIRFSignalGenerator.cpp
+	SCPISDR.cpp
 	SCPISpectrometer.cpp
 	SCPIVNA.cpp
 	SpectrometerDarkFrameChannel.cpp
@@ -164,17 +165,18 @@ set(SCOPEHAL_SOURCES
 	PicoVNA.cpp
 	RigolFunctionGenerator.cpp
 	RigolOscilloscope.cpp
+	RigolDP8xxPowerSupply.cpp
+	RohdeSchwarzOscilloscope.cpp
+	RSRTO6Oscilloscope.cpp
+	RohdeSchwarzHMC8012Multimeter.cpp
+	RohdeSchwarzHMC804xPowerSupply.cpp
 	SiglentLoad.cpp
 	SiglentPowerSupply.cpp
 	SiglentSCPIOscilloscope.cpp
 	SiglentVectorSignalGenerator.cpp
 	TektronixOscilloscope.cpp
 	ThunderScopeOscilloscope.cpp
-	RigolDP8xxPowerSupply.cpp
-	RohdeSchwarzOscilloscope.cpp
-	RSRTO6Oscilloscope.cpp
-	RohdeSchwarzHMC8012Multimeter.cpp
-	RohdeSchwarzHMC804xPowerSupply.cpp
+	UHDBridgeSDR.cpp
 
 	StandardColors.cpp
 	Filter.cpp

@@ -218,6 +218,9 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	else
 		node["samplemode"] = "equivalent";
 
+	if(HasFrequencyControls())
+		node["span"] = GetSpan();
+
 	//Save channels
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
@@ -253,6 +256,9 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 					channelNode["adcmode"] = GetADCMode(i);
 				if(chan->CanInvert())
 					channelNode["invert"] = IsInverted(i);
+
+				if(HasFrequencyControls())
+					channelNode["centerfreq"] = GetCenterFrequency(i);
 				break;
 			case Stream::STREAM_TYPE_DIGITAL:
 				channelNode["type"] = "digital";
@@ -299,6 +305,9 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 					break;
 				case OscilloscopeChannel::COUPLE_DC_50:
 					channelNode["coupling"] = "dc_50";
+					break;
+				case OscilloscopeChannel::COUPLE_AC_50:
+					channelNode["coupling"] = "ac_50";
 					break;
 				case OscilloscopeChannel::COUPLE_GND:
 					channelNode["coupling"] = "gnd";
@@ -442,6 +451,9 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 			case Stream::STREAM_TYPE_ANALOG:
 				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
 
+				if(HasFrequencyControls() && cnode["centerfreq"])
+					SetCenterFrequency(chan->GetIndex(), cnode["centerfreq"].as<int64_t>());
+
 				if(cnode["xunit"])
 					chan->SetXAxisUnits(cnode["xunit"].as<string>());
 
@@ -450,6 +462,8 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 					string coupling = cnode["coupling"].as<string>();
 					if(coupling == "dc_50")
 						chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
+					else if(coupling == "ac_50")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_50);
 					else if(coupling == "dc_1M")
 						chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
 					else if(coupling == "ac_1M")
@@ -504,6 +518,9 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 	}
 	if(node["triggerpos"])
 		SetTriggerOffset(node["triggerpos"].as<int64_t>());
+
+	if(HasFrequencyControls() && node["span"])
+		SetSpan(node["span"].as<int64_t>());
 
 	auto tnode = node["trigger"];
 	if(tnode)
@@ -831,6 +848,12 @@ int64_t Oscilloscope::GetResolutionBandwidth()
 bool Oscilloscope::HasFrequencyControls()
 {
 	return false;
+}
+
+bool Oscilloscope::HasResolutionBandwidth()
+{
+	//by default anything with frequency domain controls is assumed to be a specan which has RBW setting
+	return true;
 }
 
 bool Oscilloscope::HasTimebaseControls()

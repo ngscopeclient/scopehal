@@ -141,6 +141,7 @@ extern size_t g_maxComputeGroupCount[3];
 #include "SCPIPowerSupply.h"
 #include "SCPIRFSignalGenerator.h"
 #include "SpectrometerDarkFrameChannel.h"
+#include "SCPISDR.h"
 #include "SCPISpectrometer.h"
 #include "SCPIVNA.h"
 

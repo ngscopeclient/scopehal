@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -799,6 +799,15 @@ public:
 		@brief Returns true if the instrument has at least one frequency-domain channel
 	 */
 	virtual bool HasFrequencyControls();
+
+	/**
+		@brief Returns true if the instrument has a resolution bandwidth setting.
+
+		Only valid if HasFrequencyControls() returns tre.
+
+		If false, GetResolutionBandwidth() always returns 1 and SetResolutionBandwidth() does nothing.
+	 */
+	virtual bool HasResolutionBandwidth();
 
 	/**
 		@brief Returns true if the instrument has at least one time-domain channel
