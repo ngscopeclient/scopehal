@@ -211,11 +211,29 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	//Create the output
 	//TODO: reuse existing buffer if available and same size
 	size_t nouts = fftlen/2 + 1;
-	auto cap = new SpectrogramWaveform(
-		nblocks,
-		nouts,
-		bin_hz,
-		0);
+	SpectrogramWaveform* cap = dynamic_cast<SpectrogramWaveform*>(GetData(0));
+	if(cap)
+	{
+		if( (cap->GetBinSize() == bin_hz) &&
+			(cap->GetWidth() == nblocks) &&
+			(cap->GetHeight() == nouts) )
+		{
+			//same config, we can reuse it
+		}
+
+		//no, ignore it
+		else
+			cap = nullptr;
+	}
+	if(!cap)
+	{
+		cap = new SpectrogramWaveform(
+			nblocks,
+			nouts,
+			bin_hz,
+			0
+			);
+	}
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = din->m_triggerPhase;
