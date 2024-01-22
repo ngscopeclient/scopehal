@@ -64,6 +64,9 @@ UHDBridgeSDR::UHDBridgeSDR(SCPITransport* transport)
 	m_channels.push_back(chan);
 	chan->SetDefaultDisplayName();
 
+	//For now, hard code refclk until we implement a UI for that
+	m_transport->SendCommandQueued("REFCLK internal");
+
 	//Default to full scale range
 	SetChannelOffset(0, 0, 0);
 	SetChannelOffset(0, 1, 0);
@@ -341,80 +344,69 @@ Oscilloscope::TriggerMode UHDBridgeSDR::PollTrigger()
 
 bool UHDBridgeSDR::AcquireData()
 {
-	/*
-	//Read the number of channels in the current waveform
-	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
-		return false;
-
-	//Get the sample interval.
-	//May be different from m_srate if we changed the rate after the trigger was armed
-	int64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
-		return false;
-
-	//Acquire data for each channel
-	size_t chnum;
-	size_t memdepth;
-	float trigphase;
 	SequenceSet s;
-	double t = GetTime();
-	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
+	double now = GetTime();
+
+	//For now hard code single channel until we support more
+	size_t numChannels = 1;
 
 	if(numChannels == 0)
 		return false;
 
-	//Analog channels get processed separately
-	vector<double*> abufs;
-	vector<UniformAnalogWaveform*> awfms;
+	//Acquire data for each channel
 	for(size_t i=0; i<numChannels; i++)
 	{
-		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		//Read the number of samples in the buffer (may be different from current depth if we just changed it)
+		uint64_t depth;
+		if(!m_transport->ReadRawData(sizeof(depth), (uint8_t*)&depth))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
-			return false;
-		double* buf = new double[memdepth];
 
-		//Analog channels
-		if(chnum < m_analogChannelCount)
+		//Get the sample rate
+		int64_t sample_hz;
+		if(!m_transport->ReadRawData(sizeof(sample_hz), (uint8_t*)&sample_hz))
+			return false;
+		int64_t fs_per_sample = FS_PER_SECOND / sample_hz;
+
+		//Allocate the samples
+		float* buf = new float[depth*2];
+
+		//TODO: stream timestamp from the server
+
+		if(!m_transport->ReadRawData(depth * sizeof(float) * 2, (uint8_t*)buf))
+			return false;
+
+		//Create our waveforms
+		auto icap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname() + ".i");
+		icap->m_timescale = fs_per_sample;
+		icap->m_triggerPhase = 0;
+		icap->m_startTimestamp = floor(now);
+		icap->m_startFemtoseconds = now - floor(now);
+		icap->Resize(depth);
+
+		auto qcap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname() + ".q");
+		qcap->m_timescale = fs_per_sample;
+		qcap->m_triggerPhase = 0;
+		qcap->m_startTimestamp = floor(now);
+		qcap->m_startFemtoseconds = now - floor(now);
+		qcap->Resize(depth);
+
+		//De-interleave the I and Q samples
+		//TODO: do this in a shader
+		icap->PrepareForCpuAccess();
+		qcap->PrepareForCpuAccess();
+		for(size_t j=0; j<depth; j++)
 		{
-			abufs.push_back(buf);
-
-			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
-				return false;
-
-			//TODO: stream timestamp from the server
-
-			if(!m_transport->ReadRawData(memdepth * sizeof(double), (uint8_t*)buf))
-				return false;
-
-			//Create our waveform
-			auto cap = new UniformAnalogWaveform;
-			cap->m_timescale = fs_per_sample;
-			cap->m_triggerPhase = trigphase;
-			cap->m_startTimestamp = time(NULL);
-			cap->m_startFemtoseconds = fs;
-			cap->Resize(memdepth);
-			awfms.push_back(cap);
-
-			s[GetOscilloscopeChannel(chnum)] = cap;
+			icap->m_samples[j] = buf[j*2];
+			qcap->m_samples[j] = buf[j*2 + 1];
 		}
-	}
+		icap->MarkSamplesModifiedFromCpu();
+		qcap->MarkSamplesModifiedFromCpu();
 
-	//Process analog captures in parallel
-	#pragma omp parallel for
-	for(size_t i=0; i<awfms.size(); i++)
-	{
-		auto cap = awfms[i];
+		s[StreamDescriptor(GetChannel(i), 0)] = icap;
+		s[StreamDescriptor(GetChannel(i), 1)] = qcap;
 
-		double* buf = abufs[i];
-		cap->PrepareForCpuAccess();
-		for(size_t j=0; j<memdepth; j++)
-			cap->m_samples[j] = buf[j];
-		cap->MarkSamplesModifiedFromCpu();
-
-		delete[] abufs[i];
+		//Clean up
+		delete[] buf;
 	}
 
 	//Save the waveforms to our queue
@@ -425,7 +417,7 @@ bool UHDBridgeSDR::AcquireData()
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)
 		m_triggerArmed = false;
-	*/
+
 	return true;
 }
 
