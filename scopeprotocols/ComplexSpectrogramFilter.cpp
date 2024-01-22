@@ -153,14 +153,32 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	int64_t baseFrequency = centerFrequency - bin_hz * (fftlen/2);
 
 	//Create the output
-	//TODO: reuse existing buffer if available and same size
+	//Reuse existing buffer if available and same size
 	size_t nouts = fftlen;
-	auto cap = new SpectrogramWaveform(
-		nblocks,
-		nouts,
-		bin_hz,
-		baseFrequency
-		);
+	SpectrogramWaveform* cap = dynamic_cast<SpectrogramWaveform*>(GetData(0));
+	if(cap)
+	{
+		if( (cap->GetBinSize() == bin_hz) &&
+			(cap->GetBottomEdgeFrequency() == baseFrequency) &&
+			(cap->GetWidth() == nblocks) &&
+			(cap->GetHeight() == nouts) )
+		{
+			//same config, we can reuse it
+		}
+
+		//no, ignore it
+		else
+			cap = nullptr;
+	}
+	if(!cap)
+	{
+		cap = new SpectrogramWaveform(
+			nblocks,
+			nouts,
+			bin_hz,
+			baseFrequency
+			);
+	}
 	cap->m_startTimestamp = din_i->m_startTimestamp;
 	cap->m_startFemtoseconds = din_i->m_startFemtoseconds;
 	cap->m_triggerPhase = din_i->m_triggerPhase;
