@@ -380,14 +380,14 @@ bool UHDBridgeSDR::AcquireData()
 		icap->m_timescale = fs_per_sample;
 		icap->m_triggerPhase = 0;
 		icap->m_startTimestamp = floor(now);
-		icap->m_startFemtoseconds = now - floor(now);
+		icap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
 		icap->Resize(depth);
 
 		auto qcap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname() + ".q");
 		qcap->m_timescale = fs_per_sample;
 		qcap->m_triggerPhase = 0;
 		qcap->m_startTimestamp = floor(now);
-		qcap->m_startFemtoseconds = now - floor(now);
+		qcap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
 		qcap->Resize(depth);
 
 		//De-interleave the I and Q samples
