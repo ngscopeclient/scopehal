@@ -51,6 +51,7 @@
 #include "BINImportFilter.h"
 #include "BurstWidthMeasurement.h"
 #include "CANDecoder.h"
+#include "CandumpImportFilter.h"
 #include "ChannelEmulationFilter.h"
 #include "ClipFilter.h"
 #include "ClockRecoveryFilter.h"

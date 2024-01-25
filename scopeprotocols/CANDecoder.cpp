@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,7 +45,6 @@ CANDecoder::CANDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 	, m_baudrateName("Bit Rate")
 {
-	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_PROTOCOL);
 	CreateInput("CANH");
 
 	m_parameters[m_baudrateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
@@ -520,6 +519,8 @@ void CANDecoder::Refresh()
 						cap->m_offsets.push_back(tblockstart);
 						cap->m_durations.push_back(end - tblockstart);
 						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_EOF, current_field));
+
+						pack->m_len = pack->m_offset - (end * din->m_timescale);
 
 						state = STATE_IDLE;
 					}
