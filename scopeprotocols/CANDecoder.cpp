@@ -318,7 +318,12 @@ void CANDecoder::Refresh()
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, frame_is_rtr));
 
 					if(frame_is_rtr)
+					{
 						pack->m_headers["Type"] = "RTR";
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+					}
+					else
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 
 					if(extended_id)
 						state = STATE_FD;
