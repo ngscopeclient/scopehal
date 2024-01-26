@@ -50,6 +50,7 @@
 #include "BaseMeasurement.h"
 #include "BINImportFilter.h"
 #include "BurstWidthMeasurement.h"
+#include "BusHeatmapFilter.h"
 #include "CANDecoder.h"
 #include "CandumpImportFilter.h"
 #include "ChannelEmulationFilter.h"
