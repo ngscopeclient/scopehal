@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -61,6 +61,7 @@ public:
 		, m_triggerPhase(0)
 		, m_flags(0)
 		, m_revision(0)
+		, m_cachedColorRevision(0)
 	{
 	}
 
@@ -143,6 +144,9 @@ public:
 		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
 
+	virtual uint32_t GetColorCached(size_t i)
+	{ return m_protocolColors[i]; }
+
 	virtual void PrepareForCpuAccess() =0;
 	virtual void PrepareForGpuAccess() =0;
 	virtual void MarkSamplesModifiedFromCpu() =0;
@@ -150,6 +154,16 @@ public:
 
 	virtual void MarkModifiedFromCpu() =0;
 	virtual void MarkModifiedFromGpu() =0;
+
+	virtual void CacheColors();
+
+protected:
+
+	///@brief Protocol decode colors
+	AcceleratorBuffer<uint32_t> m_protocolColors;
+
+	///@brief Revision we last cached colors of
+	uint64_t m_cachedColorRevision;
 };
 
 template<class S> class SparseWaveform;

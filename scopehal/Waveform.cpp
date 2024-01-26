@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -32,6 +32,8 @@
 #include "Filter.h"
 
 using namespace std;
+
+uint32_t ColorFromString(const string& str, unsigned int alpha);
 
 template<class T>
 size_t BinarySearchForGequal(T* buf, size_t len, T value)
@@ -238,4 +240,77 @@ optional<string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs)
 	}
 
 	return waveform->GetText(index);
+}
+
+//from imgui but we don't want to depend on it here
+#define IM_COL32_R_SHIFT    0
+#define IM_COL32_G_SHIFT    8
+#define IM_COL32_B_SHIFT    16
+#define IM_COL32_A_SHIFT    24
+#define IM_COL32_A_MASK     0xFF000000
+
+/**
+	@brief Converts a hex color code plus externally supplied default alpha value into a packed RGBA color
+
+	Supported formats:
+		#RRGGBB
+		#RRGGBBAA
+		#RRRRGGGGBBBB
+ */
+uint32_t ColorFromString(const string& str, unsigned int alpha)
+{
+	if(str[0] != '#')
+	{
+		LogWarning("Malformed color string \"%s\"\n", str.c_str());
+		return 0xffffffff;
+	}
+
+	unsigned int r = 0;
+	unsigned int g = 0;
+	unsigned int b = 0;
+
+	//Normal HTML color code
+	if(str.length() == 7)
+		sscanf(str.c_str(), "#%02x%02x%02x", &r, &g, &b);
+
+	//HTML color code plus alpha
+	else if(str.length() == 9)
+		sscanf(str.c_str(), "#%02x%02x%02x%02x", &r, &g, &b, &alpha);
+
+	//legacy GTK 16 bit format
+	else if(str.length() == 13)
+	{
+		sscanf(str.c_str(), "#%04x%04x%04x", &r, &g, &b);
+		r >>= 8;
+		g >>= 8;
+		b >>= 8;
+	}
+	else
+	{
+		LogWarning("Malformed color string \"%s\"\n", str.c_str());
+		return 0xffffffff;
+	}
+
+	return (b << IM_COL32_B_SHIFT) | (g << IM_COL32_G_SHIFT) | (r << IM_COL32_R_SHIFT) | (alpha << IM_COL32_A_SHIFT);
+}
+
+/**
+	@brief Updates the cache of packed colors to avoid string parsing every frame
+ */
+void WaveformBase::CacheColors()
+{
+	//no update needed
+	if(!m_protocolColors.empty() && (m_cachedColorRevision == m_revision) )
+		return;
+
+	m_cachedColorRevision = m_revision;
+
+	auto s = size();
+	m_protocolColors.resize(s);
+	m_protocolColors.PrepareForCpuAccess();
+
+	for(size_t i=0; i<s; i++)
+		m_protocolColors[i] = ColorFromString(GetColor(i), 0xff);
+
+	m_protocolColors.MarkModifiedFromCpu();
 }
