@@ -33,8 +33,6 @@
 
 using namespace std;
 
-uint32_t ColorFromString(const string& str, unsigned int alpha);
-
 template<class T>
 size_t BinarySearchForGequal(T* buf, size_t len, T value)
 {
