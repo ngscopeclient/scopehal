@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -637,54 +637,45 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 		return string(tmp1);
 	}
 
-	//Do the actual float to ascii conversion
-	snprintf(tmp1, sizeof(tmp1), "%.5f", valueMinRescaled);
-	snprintf(tmp2, sizeof(tmp2), "%.5f", valueMaxRescaled);
-
+	//Special case for hex values
 	string out;
-
-	//Special case: if zero is somewhere in the pixel, just print zero
-	if( (valueMinRescaled <= 0) && (valueMaxRescaled >= 0) )
-		out = "0";
-
-	else
+	if(m_type == Unit::UNIT_HEXNUM)
 	{
-		size_t i = 0;
+		//Do the actual float to ascii conversion
+		snprintf(tmp1, sizeof(tmp1), "%lx", (int64_t)valueMinRescaled);
+		snprintf(tmp2, sizeof(tmp2), "%lx", (int64_t)valueMaxRescaled);
 
-		//Minus sign just gets echoed as-is
-		//(we know both sides are negative if we get here, no need to check max value)
-		if(valueMinRescaled < 0)
-		{
-			out += "-";
-			i = 1;
-		}
+		//Special case: if zero is somewhere in the pixel, just print zero
+		if( (valueMinRescaled <= 0) && (valueMaxRescaled >= 0) )
+			out = "0";
 
-		//Pick out only the significant digits (tmp2 is always the larger magnitude)
-		bool foundDecimal = false;
-		for(; i<buflen; i++)
+		else
 		{
-			//If both digits are the same, echo to the output
-			if(tmp1[i] == tmp2[i])
+			size_t i = 0;
+
+			//Minus sign just gets echoed as-is
+			//(we know both sides are negative if we get here, no need to check max value)
+			if(valueMinRescaled < 0)
 			{
-				out += tmp1[i];
-				if(!isdigit(tmp1[i]))
-					foundDecimal = true;
+				out += "-";
+				i = 1;
 			}
 
-			//If either string ends, stop
-			else if( (tmp1[i] == '\0') || (tmp2[i] == '\0') )
-				break;
-
-			//Mismatch! Figure out how to handle it
-			else
+			//Pick out only the significant digits (tmp2 is always the larger magnitude)
+			for(; i<buflen; i++)
 			{
-				//Mismatched significant digit after decimal (10.3, 10.4): just print the bigger digit and stop
-				if(foundDecimal)
-					out += tmp2[i];
+				//If both digits are the same, echo to the output
+				if(tmp1[i] == tmp2[i])
+					out += tmp1[i];
 
-				//Mismatched significant digit before decimal (125, 133): print bigger digit then zeroes
+				//If either string ends, stop
+				else if( (tmp1[i] == '\0') || (tmp2[i] == '\0') )
+					break;
+
+				//Mismatch! Figure out how to handle it
 				else
 				{
+					//Mismatched significant digit? Print bigger digit then zeroes
 					out += tmp2[i];
 					i++;
 
@@ -695,9 +686,75 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 							break;
 						out += '0';
 					}
+					break;
+				}
+			}
+		}
+	}
+
+	//Decimal path
+	else
+	{
+		//Do the actual float to ascii conversion
+		snprintf(tmp1, sizeof(tmp1), "%.5f", valueMinRescaled);
+		snprintf(tmp2, sizeof(tmp2), "%.5f", valueMaxRescaled);
+
+		//Special case: if zero is somewhere in the pixel, just print zero
+		if( (valueMinRescaled <= 0) && (valueMaxRescaled >= 0) )
+			out = "0";
+
+		else
+		{
+			size_t i = 0;
+
+			//Minus sign just gets echoed as-is
+			//(we know both sides are negative if we get here, no need to check max value)
+			if(valueMinRescaled < 0)
+			{
+				out += "-";
+				i = 1;
+			}
+
+			//Pick out only the significant digits (tmp2 is always the larger magnitude)
+			bool foundDecimal = false;
+			for(; i<buflen; i++)
+			{
+				//If both digits are the same, echo to the output
+				if(tmp1[i] == tmp2[i])
+				{
+					out += tmp1[i];
+					if(!isdigit(tmp1[i]))
+						foundDecimal = true;
 				}
 
-				break;
+				//If either string ends, stop
+				else if( (tmp1[i] == '\0') || (tmp2[i] == '\0') )
+					break;
+
+				//Mismatch! Figure out how to handle it
+				else
+				{
+					//Mismatched significant digit after decimal (10.3, 10.4): just print the bigger digit and stop
+					if(foundDecimal)
+						out += tmp2[i];
+
+					//Mismatched significant digit before decimal (125, 133): print bigger digit then zeroes
+					else
+					{
+						out += tmp2[i];
+						i++;
+
+						//Pad with zeroes until we hit a decimal separator or the end of the number
+						for(; i<buflen; i++)
+						{
+							if(!isdigit(tmp2[i]))
+								break;
+							out += '0';
+						}
+					}
+
+					break;
+				}
 			}
 		}
 	}
@@ -709,7 +766,7 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 	//Final formatting
 	if(m_type != Unit::UNIT_UI)
 		out += " ";
-	out += prefix;
+	out = prefix + out;
 	out += suffix;
 
 	SetDefaultLocale();
