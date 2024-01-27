@@ -108,7 +108,7 @@ void CandumpImportFilter::OnFileNameChanged()
 	//Read the file and process line by line
 	bool first = true;
 	double timestamp;
-	char interface[128];
+	char sinterface[128];
 	unsigned int id;
 	unsigned int dbytes[8];
 	double tstart = 0;
@@ -124,7 +124,7 @@ void CandumpImportFilter::OnFileNameChanged()
 			line,
 			"(%lf) %127s %x#%02x%02x%02x%02x%02x%02x%02x%02x",
 			&timestamp,
-			interface,
+			sinterface,
 			&id,
 			dbytes + 0,
 			dbytes + 1,
