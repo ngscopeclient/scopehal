@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,6 +59,22 @@ public:
 
 	//Background color of the packet
 	std::string m_displayBackgroundColor;
+
+	//Packed colors
+	uint32_t m_displayForegroundColorPacked;
+	uint32_t m_displayBackgroundColorPacked;
+
+	bool m_packedColorsValid;
+
+	void RefreshColors()
+	{
+		if(m_packedColorsValid)
+			return;
+		m_packedColorsValid = true;
+
+		m_displayForegroundColorPacked = ColorFromString(m_displayForegroundColor);
+		m_displayBackgroundColorPacked = ColorFromString(m_displayBackgroundColor);
+	}
 };
 
 /**

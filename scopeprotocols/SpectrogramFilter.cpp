@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -209,7 +209,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	LogTrace("%s per bin\n", hz.PrettyPrint(bin_hz).c_str());
 
 	//Create the output
-	//TODO: reuse existing buffer if available and same size
+	//Reuse existing buffer if available and same size
 	size_t nouts = fftlen/2 + 1;
 	SpectrogramWaveform* cap = dynamic_cast<SpectrogramWaveform*>(GetData(0));
 	if(cap)

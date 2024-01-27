@@ -249,6 +249,8 @@ void CreateDirectory(const std::string& path);
 uint32_t CRC32(const uint8_t* bytes, size_t start, size_t end);
 uint32_t CRC32(const std::vector<uint8_t>& bytes);
 
+uint32_t ColorFromString(const std::string& str, unsigned int alpha = 255);
+
 const char* ScopehalGetVersion();
 
 #endif

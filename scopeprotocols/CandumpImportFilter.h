@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,98 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "PacketDecoder.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of CandumpImportFilter
+ */
+#ifndef CandumpImportFilter_h
+#define CandumpImportFilter_h
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Color schemes
-
-std::string PacketDecoder::m_backgroundColors[PROTO_STANDARD_COLOR_COUNT] =
+class CandumpImportFilter : public PacketDecoder
 {
-	"#101010",		//PROTO_COLOR_DEFAULT
-	"#800000",		//PROTO_COLOR_ERROR
-	"#000080",		//PROTO_COLOR_STATUS
-	"#808000",		//PROTO_COLOR_CONTROL
-	"#336699",		//PROTO_COLOR_DATA_READ
-	"#339966",		//PROTO_COLOR_DATA_WRITE
-	"#600050",		//PROTO_COLOR_COMMAND
+public:
+	CandumpImportFilter(const std::string& color);
+
+	std::vector<std::string> GetHeaders() override;
+	virtual void SetDefaultName() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	static std::string GetProtocolName();
+
+	PROTOCOL_DECODER_INITPROC(CandumpImportFilter)
+
+protected:
+	std::string m_fpname;
+
+	void OnFileNameChanged();
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Packet
-
-Packet::Packet()
-	: m_offset(0)
-	, m_len(0)
-	, m_displayForegroundColor("#ffffff")
-	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::PROTO_COLOR_DEFAULT])
-	, m_packedColorsValid(false)
-{
-}
-
-Packet::~Packet()
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PacketDecoder::PacketDecoder(const std::string& color, Category cat)
-	: Filter(color, cat, Unit(Unit::UNIT_FS))
-{
-	AddProtocolStream("data");
-}
-
-PacketDecoder::~PacketDecoder()
-{
-	ClearPackets();
-}
-
-/**
-	@brief Destroys all currently attached packets
- */
-void PacketDecoder::ClearPackets()
-{
-	for(auto p : m_packets)
-		delete p;
-	m_packets.clear();
-}
-
-bool PacketDecoder::GetShowDataColumn()
-{
-	return true;
-}
-
-bool PacketDecoder::GetShowImageColumn()
-{
-	return false;
-}
-
-/**
-	@brief Checks if multiple packets can be merged under a single heading in the protocol analyzer view.
-
-	This can be used to collapse polling loops, acknowledgements, etc in order to minimize clutter in the view.
-
-	The default implementation in PacketDecoder always returns false so packets are not merged.
-
-	@param first		The first packet in the merge group
-	@param cur			The most recently merged packet
-	@param next			The candidate packet to be merged
-
-	@return true if packets can be merged, false otherwise
- */
-bool PacketDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)
-{
-	return false;
-}
-
-/**
-	@brief Creates a summary packet for one or more merged packets
-
-	@param pack		The first packet in the merge string
-	@param i		Index of pack within m_packets
- */
-Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
-{
-	return NULL;
-}
+#endif

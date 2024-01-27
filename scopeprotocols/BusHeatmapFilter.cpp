@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,98 +27,148 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "PacketDecoder.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/AlignedAllocator.h"
+#include "BusHeatmapFilter.h"
+#include "CANDecoder.h"
+#include "SpectrogramFilter.h"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Color schemes
-
-std::string PacketDecoder::m_backgroundColors[PROTO_STANDARD_COLOR_COUNT] =
-{
-	"#101010",		//PROTO_COLOR_DEFAULT
-	"#800000",		//PROTO_COLOR_ERROR
-	"#000080",		//PROTO_COLOR_STATUS
-	"#808000",		//PROTO_COLOR_CONTROL
-	"#336699",		//PROTO_COLOR_DATA_READ
-	"#339966",		//PROTO_COLOR_DATA_WRITE
-	"#600050",		//PROTO_COLOR_COMMAND
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Packet
-
-Packet::Packet()
-	: m_offset(0)
-	, m_len(0)
-	, m_displayForegroundColor("#ffffff")
-	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::PROTO_COLOR_DEFAULT])
-	, m_packedColorsValid(false)
-{
-}
-
-Packet::~Packet()
-{
-}
+using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PacketDecoder::PacketDecoder(const std::string& color, Category cat)
-	: Filter(color, cat, Unit(Unit::UNIT_FS))
+BusHeatmapFilter::BusHeatmapFilter(const string& color)
+	: Filter(color, CAT_BUS)
 {
-	AddProtocolStream("data");
+	AddStream(Unit(Unit::UNIT_HEXNUM), "data", Stream::STREAM_TYPE_SPECTROGRAM);
+
+	//Set up channels
+	CreateInput("din");
 }
 
-PacketDecoder::~PacketDecoder()
+BusHeatmapFilter::~BusHeatmapFilter()
 {
-	ClearPackets();
 }
 
-/**
-	@brief Destroys all currently attached packets
- */
-void PacketDecoder::ClearPackets()
-{
-	for(auto p : m_packets)
-		delete p;
-	m_packets.clear();
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-bool PacketDecoder::GetShowDataColumn()
+bool BusHeatmapFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	return true;
-}
+	if(stream.m_channel == NULL)
+		return false;
 
-bool PacketDecoder::GetShowImageColumn()
-{
+	//for now only support canbus
+	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+		return true;
+
 	return false;
 }
 
-/**
-	@brief Checks if multiple packets can be merged under a single heading in the protocol analyzer view.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	This can be used to collapse polling loops, acknowledgements, etc in order to minimize clutter in the view.
-
-	The default implementation in PacketDecoder always returns false so packets are not merged.
-
-	@param first		The first packet in the merge group
-	@param cur			The most recently merged packet
-	@param next			The candidate packet to be merged
-
-	@return true if packets can be merged, false otherwise
- */
-bool PacketDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)
+string BusHeatmapFilter::GetProtocolName()
 {
-	return false;
+	return "Bus Heatmap";
 }
 
-/**
-	@brief Creates a summary packet for one or more merged packets
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
 
-	@param pack		The first packet in the merge string
-	@param i		Index of pack within m_packets
- */
-Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
+FlowGraphNode::DataLocation BusHeatmapFilter::GetInputLocation()
 {
-	return NULL;
+	return LOC_DONTCARE;
+}
+
+void BusHeatmapFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	auto din = dynamic_cast<CANWaveform*>(GetInputWaveform(0));
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+
+	//Temporarily hard code stuff
+	int64_t xscale = 1000LL * 1000LL * 1000LL * 1000LL * 50;	//50ms
+	int64_t yscale = 1;	//1 bin per CAN ID, for 11 bit IDs that's 2048 pixels high
+
+	int64_t maxy = 2047;			//TODO depends on if extended frame format
+	size_t ysize = (maxy + 1) / yscale;
+
+	auto nlast = din->m_offsets.size() - 1;
+	size_t nblocks = ( din->m_offsets[nlast] * din->m_timescale ) / xscale;
+
+	//Create the output
+	SpectrogramWaveform* cap = dynamic_cast<SpectrogramWaveform*>(GetData(0));
+	if(cap)
+	{
+		if( (cap->GetBinSize() == yscale) &&
+			(cap->GetWidth() == nblocks) &&
+			(cap->GetHeight() == ysize) )
+		{
+			//same config, we can reuse it
+		}
+
+		//no, ignore it
+		else
+			cap = nullptr;
+	}
+	if(!cap)
+	{
+		cap = new SpectrogramWaveform(
+			nblocks,
+			ysize,
+			yscale,
+			0
+			);
+	}
+
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
+	cap->m_timescale = xscale;
+	cap->PrepareForCpuAccess();
+	SetData(cap, 0);
+
+	//Fill the buffer with zeroes
+	size_t len = ysize * nblocks;
+	auto& buf = cap->GetOutData();
+	auto p = buf.GetCpuPointer();
+	memset(p, 0, len*sizeof(float));
+
+	//Integrate packets
+	auto nin = din->m_offsets.size();
+	float nmax = 0;
+	for(size_t i=0; i<nin; i++)
+	{
+		//Only look at CAN ID packets, ignore anything else
+		auto s = din->m_samples[i];
+		if(s.m_stype != CANSymbol::TYPE_ID)
+			continue;
+
+		//Get X/Y histogram bins
+		auto xbin = din->m_offsets[i] * din->m_timescale / xscale;
+		auto ybin = s.m_data / yscale;
+
+		//Increment the bin
+		auto f = p[ybin*nblocks + xbin] ++;
+		nmax = max(nmax, f);
+	}
+
+	//Normalize
+	float norm = 1.0 / nmax;
+	for(size_t i=0; i<len; i++)
+		p[i] *= norm;
+
+	//Done
+	cap->MarkModifiedFromCpu();
 }
