@@ -37,6 +37,7 @@
 #include <libgen.h>
 
 #include "AgilentOscilloscope.h"
+#include "HP662xAPowerSupply.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
 #include "DemoOscilloscope.h"
@@ -233,6 +234,7 @@ void DriverStaticInit()
 	AddPowerSupplyDriverClass(RigolDP8xxPowerSupply);
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 	AddPowerSupplyDriverClass(SiglentPowerSupply);
+	AddPowerSupplyDriverClass(HP662xAPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
