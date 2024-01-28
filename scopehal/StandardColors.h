@@ -29,6 +29,7 @@
 
 #ifndef StandardColors_h
 #define StandardColors_h
+#include <string>
 
 namespace StandardColors
 {

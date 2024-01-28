@@ -32,7 +32,8 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of global utility functions
  */
- #include "ScopehalUtil.h"
+#include "ScopehalUtil.h"
+#include <time.h>
 
 double GetTime()
 {
