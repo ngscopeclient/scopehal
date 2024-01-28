@@ -2460,7 +2460,6 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
 			ret = {10 * 1000,
 				20 * 1000,
 				50 * 1000,
@@ -2477,6 +2476,30 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 				200 * 1000 * 1000,
 				500 * 1000 * 1000,
 				1 * 1000 * 1000 * 1000};
+			break;
+
+		case MODEL_SIGLENT_SDS5000X:
+			ret = {500,
+				1250,
+				2500,
+				5000,
+				12500,
+				25 * 1000,
+				50 * 1000,
+				125 * 1000,
+				250 * 1000,
+				500 * 1000,
+				1250 * 1000,
+				2500 * 1000,
+				5 * 1000 * 1000,
+				12500 * 1000,
+				25 * 1000 * 1000,
+				50 * 1000 * 1000,
+				125 * 1000 * 1000,
+				250 * 1000 * 1000,
+				500 * 1000 * 1000,
+				1250 * 1000 * 1000L,
+				2500 * 1000 * 1000L};
 			break;
 
 		case MODEL_SIGLENT_SDS6000A:
@@ -2537,8 +2560,35 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
 			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
+			break;
+
+		case MODEL_SIGLENT_SDS5000X:
+			ret = {
+					5,
+					12, //Should be 12.5 
+					25,
+					50,
+					125,
+					250,
+					500,
+					1250,
+					2500,
+					5 * 1000,
+					12500,
+					25 * 1000,
+					50 * 1000,
+					125 * 1000,
+					250 * 1000,
+					500 * 1000,
+					1250 * 1000,
+					2500 * 1000,
+					5 * 1000 * 1000,
+					12500 * 1000,
+					25 * 1000 * 1000,
+					50 * 1000 * 1000,
+					125 * 1000 * 1000
+				  };
 			break;
 
 		case MODEL_SIGLENT_SDS6000A:
@@ -2758,8 +2808,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-
+		
 			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
 
@@ -2800,6 +2849,98 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				case 200000000:
 				//	sendOnly("ACQUIRE:MDEPTH 200M");
 				//	break;
+				default:
+					LogError("Invalid memory depth for channel: %lu\n", depth);
+			}
+
+			if(IsTriggerArmed())
+			{
+				// restart trigger
+				sendOnly("TRIG_MODE SINGLE");
+			}
+			else
+			{
+				// change to stop mode
+				sendOnly("TRIG_MODE STOP");
+			}
+			break;
+
+		case MODEL_SIGLENT_SDS5000X:
+
+			// we can not change memory size in Run/Stop mode
+			sendOnly("TRIG_MODE AUTO");
+
+			switch(depth)
+			{
+				case 5:
+					sendOnly("ACQUIRE:MDEPTH 5");
+					break;
+				case 12:
+					sendOnly("ACQUIRE:MDEPTH 12.5");
+					break;
+				case 25:
+					sendOnly("ACQUIRE:MDEPTH 25");
+					break;
+				case 50:
+					sendOnly("ACQUIRE:MDEPTH 50");
+					break;
+				case 125:
+					sendOnly("ACQUIRE:MDEPTH 125");
+					break;
+				case 250:
+					sendOnly("ACQUIRE:MDEPTH 250");
+					break;
+				case 500:
+					sendOnly("ACQUIRE:MDEPTH 500");
+					break;
+				case 1250:
+					sendOnly("ACQUIRE:MDEPTH 1.25k");
+					break;
+				case 2500:
+					sendOnly("ACQUIRE:MDEPTH 2.5k");
+					break;
+				case 5000:
+					sendOnly("ACQUIRE:MDEPTH 5k");
+					break;
+				case 12500:
+					sendOnly("ACQUIRE:MDEPTH 12.5k");
+					break;
+				case 25000:
+					sendOnly("ACQUIRE:MDEPTH 25k");
+					break;
+				case 50000:
+					sendOnly("ACQUIRE:MDEPTH 50k");
+					break;
+				case 125000:
+					sendOnly("ACQUIRE:MDEPTH 125k");
+					break;
+				case 250000:
+					sendOnly("ACQUIRE:MDEPTH 250k");
+					break;
+				case 500000:
+					sendOnly("ACQUIRE:MDEPTH 500k");
+					break;
+				case 1250000:
+					sendOnly("ACQUIRE:MDEPTH 1.25M");
+					break;
+				case 2500000:
+					sendOnly("ACQUIRE:MDEPTH 2.5M");
+					break;
+				case 5000000:
+					sendOnly("ACQUIRE:MDEPTH 5M");
+					break;
+				case 12500000:
+					sendOnly("ACQUIRE:MDEPTH 12.5M");
+					break;
+				case 25000000:
+					sendOnly("ACQUIRE:MDEPTH 25M");
+					break;
+				case 50000000:
+					sendOnly("ACQUIRE:MDEPTH 50M");
+					break;
+				case 125000000:
+					sendOnly("ACQUIRE:MDEPTH 125M");
+					break;
 				default:
 					LogError("Invalid memory depth for channel: %lu\n", depth);
 			}
@@ -2928,11 +3069,11 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
 			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
 			break;
 
 		//Timebase must be multiples of 1-2-5 so truncate any fractional component
+		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
 			{
 				char tmp[128];
