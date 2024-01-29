@@ -36,6 +36,15 @@
 #ifndef Unit_h
 #define Unit_h
 
+#ifndef _WIN32
+#include <locale.h>
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <xlocale.h>
+#endif
+
+#endif
+
 /**
 	@brief A unit of measurement, plus conversion to pretty-printed output
 
