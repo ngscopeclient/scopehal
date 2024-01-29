@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -32,7 +32,8 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of SParameterCascadeFilter
  */
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "SParameterCascadeFilter.h"
 
 using namespace std;
 
