@@ -53,6 +53,9 @@ public:
 	PROTOCOL_DECODER_INITPROC(BusHeatmapFilter)
 
 protected:
+	std::string m_maxAddress;
+	std::string m_yBinSize;
+	std::string m_xBinSize;
 };
 
 #endif

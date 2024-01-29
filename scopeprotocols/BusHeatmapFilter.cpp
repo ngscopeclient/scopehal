@@ -40,11 +40,23 @@ using namespace std;
 
 BusHeatmapFilter::BusHeatmapFilter(const string& color)
 	: Filter(color, CAT_BUS)
+	, m_maxAddress("Max Address")
+	, m_yBinSize("Y Bin Size")
+	, m_xBinSize("X Bin Size")
 {
 	AddStream(Unit(Unit::UNIT_HEXNUM), "data", Stream::STREAM_TYPE_SPECTROGRAM);
 
 	//Set up channels
 	CreateInput("din");
+
+	m_parameters[m_maxAddress] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_parameters[m_maxAddress].SetIntVal(2047);
+
+	m_parameters[m_yBinSize] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_parameters[m_yBinSize].SetIntVal(1);
+
+	m_parameters[m_xBinSize] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_xBinSize].SetIntVal(1000LL * 1000LL * 1000LL * 1000LL * 50); //50 ms
 }
 
 BusHeatmapFilter::~BusHeatmapFilter()
@@ -97,11 +109,10 @@ void BusHeatmapFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Q
 		return;
 	}
 
-	//Temporarily hard code stuff
-	int64_t xscale = 1000LL * 1000LL * 1000LL * 1000LL * 50;	//50ms
-	int64_t yscale = 1;	//1 bin per CAN ID, for 11 bit IDs that's 2048 pixels high
-
-	int64_t maxy = 2047;			//TODO depends on if extended frame format
+	//Extract parameters for density scaling
+	int64_t xscale = m_parameters[m_xBinSize].GetIntVal();
+	int64_t yscale = m_parameters[m_yBinSize].GetIntVal();
+	int64_t maxy = m_parameters[m_maxAddress].GetIntVal();
 	size_t ysize = (maxy + 1) / yscale;
 
 	auto nlast = din->m_offsets.size() - 1;
