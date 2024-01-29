@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -74,7 +74,6 @@ vector<string> I2CDecoder::GetHeaders()
 	ret.push_back("Op");
 	ret.push_back("Address");
 	ret.push_back("Len");
-	ret.push_back("ASCII");
 	return ret;
 }
 
@@ -232,15 +231,7 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_DATA, current_byte));
 
 						if(pack)
-						{
 							pack->m_data.push_back(current_byte);
-							if(isspace(current_byte))
-								pack->m_headers["ASCII"] += ' ';
-							else if(isprint(current_byte))
-								pack->m_headers["ASCII"] += current_byte;
-							else
-								pack->m_headers["ASCII"] += '.';
-						}
 					}
 
 					cap->m_offsets.push_back(tstart);
