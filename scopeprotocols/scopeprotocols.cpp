@@ -148,6 +148,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(OvershootMeasurement);
 	AddDecoderClass(PAM4DemodulatorFilter);
 	AddDecoderClass(ParallelBus);
+	AddDecoderClass(PcapngImportFilter);
 	AddDecoderClass(PCIe128b130bDecoder);
 	AddDecoderClass(PCIeDataLinkDecoder);
 	AddDecoderClass(PCIeGen2LogicalDecoder);

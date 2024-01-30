@@ -112,6 +112,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OvershootMeasurement.cpp
 	PAM4DemodulatorFilter.cpp
 	ParallelBus.cpp
+	PcapngImportFilter.cpp
 	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
