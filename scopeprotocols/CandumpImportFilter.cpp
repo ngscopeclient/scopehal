@@ -159,6 +159,8 @@ void CandumpImportFilter::OnFileNameChanged()
 		if(trel < tend)
 			trel = tend;
 
+		bool ext = (id > 2047);
+
 		//Add timeline samples (fake durations assuming 500 Kbps for now)
 		//TODO make this configurable
 		int64_t ui = 2 * 1000LL * 1000LL * 1000LL;
@@ -210,6 +212,7 @@ void CandumpImportFilter::OnFileNameChanged()
 		else
 			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 		pack->m_headers["ID"] = to_string_hex(id);
+		pack->m_headers["Format"] = ext ? "EXT" : "BASE";
 		pack->m_headers["Mode"] = "CAN";
 		pack->m_headers["Len"] = to_string(nbytes);
 		for(int i=0; i<nbytes; i++)
