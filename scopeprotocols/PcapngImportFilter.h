@@ -51,12 +51,16 @@ public:
 
 protected:
 	std::string m_fpname;
+	std::string m_datarate;
 
 	void OnFileNameChanged();
 
 	bool ValidateSHB(FILE* fp);
 	bool ReadIDB(FILE* fp);
 	std::string ReadFixedLengthString(uint16_t len, FILE* fp);
+
+	bool LoadLinuxCooked(FILE* fp);
+	bool LoadCANLinuxCooked(FILE* fp);
 
 	enum LinkType
 	{
@@ -66,6 +70,8 @@ protected:
 		LINK_TYPE_LINUX_COOKED,
 		LINK_TYPE_UNKNOWN
 	} m_linkType;
+
+	int64_t m_timestampScale;
 };
 
 #endif

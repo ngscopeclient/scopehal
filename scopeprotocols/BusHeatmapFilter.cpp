@@ -57,6 +57,8 @@ BusHeatmapFilter::BusHeatmapFilter(const string& color)
 
 	m_parameters[m_xBinSize] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_xBinSize].SetIntVal(1000LL * 1000LL * 1000LL * 1000LL * 50); //50 ms
+
+	SetVoltageRange(128, 0);
 }
 
 BusHeatmapFilter::~BusHeatmapFilter()
