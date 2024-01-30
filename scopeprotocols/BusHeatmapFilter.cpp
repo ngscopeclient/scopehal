@@ -170,7 +170,11 @@ void BusHeatmapFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Q
 
 		//Get X/Y histogram bins
 		auto xbin = din->m_offsets[i] * din->m_timescale / xscale;
-		auto ybin = s.m_data / yscale;
+		size_t ybin = s.m_data / yscale;
+
+		//Discard any off scale pixels
+		if(ybin >= ysize)
+			continue;
 
 		//Increment the bin
 		auto f = p[ybin*nblocks + xbin] ++;
