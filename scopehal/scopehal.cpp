@@ -556,11 +556,12 @@ string to_string_hex(uint64_t n, bool zeropad, int len)
  */
 uint64_t next_pow2(uint64_t v)
 {
+//TODO add __lzcnt64 intrinsic for MSVC, handle other platforms if needed
 #ifdef __GNUC__
 	if(v == 1)
 		return 1;
 	else
-		return 1 << (64 - __builtin_clzl(v-1));
+		return 1 << (64 - __builtin_clzll(v-1));
 #else
 	v--;
 	v |= v >> 1;
