@@ -265,8 +265,10 @@ void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix) c
 
 	Note that this function may modify the SI scale factor and prefix
  */
-void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string& prefix, string& suffix) const
+void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string& prefix, string& numprefix, string& suffix) const
 {
+	numprefix = "";
+
 	switch(type)
 	{
 		//Special handling needed around prefixes, since it's not a SI base unit
@@ -439,7 +441,8 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 		//No rescaling for pointers
 		case UNIT_HEXNUM:
 			suffix = "";
-			prefix = "0x";
+			prefix = "";
+			numprefix = "0x";
 			scaleFactor = 1;
 			break;
 
@@ -513,9 +516,10 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	//Figure out scaling, prefix, and suffix
 	double scaleFactor;
 	string prefix;
+	string numprefix;
 	string suffix;
 	GetSIScalingFactor(value, scaleFactor, prefix);
-	GetUnitSuffix(m_type, value, scaleFactor, prefix, suffix);
+	GetUnitSuffix(m_type, value, scaleFactor, prefix, numprefix, suffix);
 
 	double value_rescaled = value * scaleFactor;
 	bool space_after_number = (m_type != Unit::UNIT_UI);
@@ -582,7 +586,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	}
 
 	SetDefaultLocale();
-	return string(tmp);
+	return numprefix + string(tmp);
 }
 
 /**
@@ -608,10 +612,11 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 	//Figure out the scale factor to use. Use the full-scale range to select the factor even if we're small here
 	double scaleFactor;
 	string prefix;
+	string numprefix;
 	string suffix;
 	double extremeValue = max(fabs(rangeMin), fabs(rangeMax));
 	GetSIScalingFactor(extremeValue, scaleFactor, prefix);
-	GetUnitSuffix(m_type, extremeValue, scaleFactor, prefix, suffix);
+	GetUnitSuffix(m_type, extremeValue, scaleFactor, prefix, numprefix, suffix);
 
 	//Swap values if they're reversed
 	if(fabs(pixelMin) > fabs(pixelMax))
@@ -766,7 +771,8 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 	//Final formatting
 	if(m_type != Unit::UNIT_UI)
 		out += " ";
-	out = prefix + out;
+	out = numprefix + out;
+	out += prefix;
 	out += suffix;
 
 	SetDefaultLocale();

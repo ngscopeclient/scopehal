@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -135,7 +135,7 @@ protected:
 	UnitType m_type;
 
 	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix) const;
-	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix) const;
+	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& numprefix, std::string& suffix) const;
 
 #ifdef _WIN32
 	/**
