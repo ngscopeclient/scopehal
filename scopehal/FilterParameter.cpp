@@ -133,6 +133,7 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 		case TYPE_INT:
 			//If there's a decimal point parse it as a float
 			//so e.g. "1.5M" parses correctly
+			//TODO: instead, multiply by an integer scaling factor and strip the decimal
 			if(str.find(".") != string::npos)
 			{
 				m_floatval = m_unit.ParseString(str, useDisplayLocale);
