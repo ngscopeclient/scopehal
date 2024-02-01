@@ -115,6 +115,11 @@ void BusHeatmapFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Q
 	int64_t xscale = m_parameters[m_xBinSize].GetIntVal();
 	int64_t yscale = m_parameters[m_yBinSize].GetIntVal();
 	int64_t maxy = m_parameters[m_maxAddress].GetIntVal();
+	if( (xscale == 0) || (yscale == 0) )
+	{
+		SetData(nullptr, 0);
+		return;
+	}
 	size_t ysize = (maxy + 1) / yscale;
 
 	auto nlast = din->m_offsets.size() - 1;
