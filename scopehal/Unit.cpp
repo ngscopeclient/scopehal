@@ -539,7 +539,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 		//TODO: separate pretty printing functions? We don't have enough sig figs to properly show large integers
 		//with an intermediate conversion to double.
 		case UNIT_HEXNUM:
-			snprintf(tmp, sizeof(tmp), "0x%x", static_cast<uint32_t>(value));
+			snprintf(tmp, sizeof(tmp), "%x", static_cast<uint32_t>(value));
 			break;
 
 		default:
