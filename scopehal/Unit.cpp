@@ -499,7 +499,6 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 	}
 }
 
-
 /**
 	@brief Prints a value with SI scaling factors
 
@@ -536,8 +535,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 			snprintf(tmp, sizeof(tmp), "%.2e", value);
 			break;
 
-		//TODO: separate pretty printing functions? We don't have enough sig figs to properly show large integers
-		//with an intermediate conversion to double.
+		//NOTE: only works for 32 bit values or smaller
 		case UNIT_HEXNUM:
 			snprintf(tmp, sizeof(tmp), "%x", static_cast<uint32_t>(value));
 			break;
@@ -588,6 +586,66 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	SetDefaultLocale();
 	return numprefix + string(tmp);
 }
+
+/**
+	@brief Prints a value with SI scaling factors
+
+	@param value				The value
+	@param digits				Number of significant digits to display
+	@param useDisplayLocale		True if the string is formatted for display (user's locale)
+								False if the string is formatted for serialization ("C" locale regardless of user pref)
+ */
+string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLocale) const
+{
+	if(useDisplayLocale)
+		SetPrintingLocale();
+
+	//Figure out scaling, prefix, and suffix
+	double scaleFactor;
+	string prefix;
+	string numprefix;
+	string suffix;
+	GetSIScalingFactor(value, scaleFactor, prefix);
+	GetUnitSuffix(m_type, value, scaleFactor, prefix, numprefix, suffix);
+
+	//Apply the rescaling in the integer domain
+	int64_t mulFactor = scaleFactor;
+	int64_t divFactor = 1.0 / scaleFactor;
+
+	int64_t value_rescaled;
+	if(scaleFactor > 1)
+		value_rescaled = value * mulFactor;
+	else
+		value_rescaled = value / divFactor;
+
+	bool space_after_number = (m_type != Unit::UNIT_UI);
+
+	char tmp[128];
+	switch(m_type)
+	{
+		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
+			snprintf(tmp, sizeof(tmp), "%.2e", pow(10, value_rescaled));
+			//snprintf(tmp, sizeof(tmp), "1e%.2f", value);
+			break;
+
+		case UNIT_RATIO_SCI:
+			snprintf(tmp, sizeof(tmp), "%.2e", (float)value_rescaled);
+			break;
+
+		case UNIT_HEXNUM:
+			snprintf(tmp, sizeof(tmp), "%" PRIx64, value_rescaled);
+			break;
+
+		default:
+			snprintf(tmp, sizeof(tmp), "%" PRId64, value_rescaled);
+			//TODO: trim unnecessary significant digits??
+			break;
+	}
+
+	SetDefaultLocale();
+	return numprefix + string(tmp) + (space_after_number ? " " : "") + prefix + suffix;
+}
+
 
 /**
 	@brief Prints a value with SI scaling factors and unnecessarily significant sub-pixel digits removed
@@ -857,6 +915,93 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 	}
 
 	SetDefaultLocale();
+	return ret;
+}
+
+/**
+	@brief Parses a string based on the supplied unit
+
+	@param str					The string to parse
+	@param useDisplayLocale		True if the string is formatted for display (user's locale)
+								False if the string is formatted for serialization ("C" locale regardless of user pref)
+ */
+int64_t Unit::ParseStringInt64(const string& str, bool useDisplayLocale)
+{
+	if(useDisplayLocale)
+		SetPrintingLocale();
+
+	int64_t ret;
+
+	if(m_type == UNIT_HEXNUM)
+	{
+		uint64_t temp = 0;
+		sscanf(str.c_str(), "0x%" SCNx64, &temp);
+		ret = temp;
+	}
+
+	else
+	{
+		//Apply unit-specific scaling factor first
+		int64_t mulscale = 1;
+		int64_t divscale = 1;
+
+		//Apply a unit-specific scaling factor
+		switch(m_type)
+		{
+			case Unit::UNIT_FS:
+				mulscale = 1e15;
+				break;
+
+			case Unit::UNIT_PM:
+				mulscale = 1e12;
+				break;
+
+			case Unit::UNIT_PERCENT:
+				divscale *= 100;
+				break;
+
+			default:
+				break;
+		}
+
+
+		//Find the first non-numeric character in the strnig
+		for(size_t i=0; i<str.size(); i++)
+		{
+			char c = str[i];
+			if(isspace(c) || isdigit(c) || (c == '.') || (c == ',') || (c == '-') )
+				continue;
+
+			if(c == 'T')
+				mulscale *= 1e12;
+			else if(c == 'G')
+				mulscale *= 1e9;
+			else if(c == 'M')
+				mulscale *= 1e6;
+			else if(c == 'K' || c == 'k')
+				mulscale *= 1e3;
+			else if(c == 'm')
+				divscale *= 1e3;
+			else if( (c == 'u') || (str.find("μ", i) == i) )
+				divscale = 1e6;
+			else if(c == 'n')
+				divscale *= 1e9;
+			else if(c == 'p')
+				divscale *= 1e12;
+			else if(c == 'f')
+				divscale *= 1e15;
+
+			break;
+		}
+
+		//Parse the base value
+		sscanf(str.c_str(), "%" SCNd64, &ret);
+		ret *= mulscale;
+		ret /= divscale;
+	}
+
+	SetDefaultLocale();
+
 	return ret;
 }
 

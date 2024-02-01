@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -126,12 +126,23 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 			m_floatval = m_intval;
 			break;
 
-		//Parse both int and float as float
-		//so e.g. 1.5M parses correctly
 		case TYPE_FLOAT:
-		case TYPE_INT:
 			m_floatval = m_unit.ParseString(str, useDisplayLocale);
 			m_intval = m_floatval;
+
+		case TYPE_INT:
+			//If there's a decimal point parse it as a float
+			//so e.g. "1.5M" parses correctly
+			if(str.find(".") != string::npos)
+			{
+				m_floatval = m_unit.ParseString(str, useDisplayLocale);
+				m_intval = m_floatval;
+			}
+			else
+			{
+				m_intval = m_unit.ParseStringInt64(str, useDisplayLocale);
+				m_floatval = m_intval;
+			}
 			break;
 
 		case TYPE_FILENAME:
@@ -218,7 +229,7 @@ string FilterParameter::ToString(bool useDisplayLocale) const
 
 		case TYPE_BOOL:
 		case TYPE_INT:
-			return m_unit.PrettyPrint(m_intval, -1, useDisplayLocale);
+			return m_unit.PrettyPrintInt64(m_intval, -1, useDisplayLocale);
 
 		case TYPE_FILENAME:
 		case TYPE_STRING:

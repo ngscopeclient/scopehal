@@ -109,10 +109,12 @@ public:
 	std::string ToString() const;
 
 	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true) const;
+	std::string PrettyPrintInt64(int64_t value, int sigfigs = -1, bool useDisplayLocale = true) const;
 
 	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax) const;
 
 	double ParseString(const std::string& str, bool useDisplayLocale = true);
+	int64_t ParseStringInt64(const std::string& str, bool useDisplayLocale = true);
 
 	UnitType GetType()
 	{ return m_type; }
