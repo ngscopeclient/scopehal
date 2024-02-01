@@ -637,8 +637,32 @@ string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLoc
 			break;
 
 		default:
-			snprintf(tmp, sizeof(tmp), "%" PRId64, value_rescaled);
-			//TODO: trim unnecessary significant digits??
+			//Default to 4 sig figs for now
+			{
+				int64_t value1 = value * 10000;
+				if(scaleFactor > 1)
+					value1 *= mulFactor;
+				else
+					value1 /= divFactor;
+				int64_t value2 = value1 % 10000;
+				value1 /= 10000;
+
+				snprintf(tmp, sizeof(tmp), "%" PRId64 ".%04" PRId64, value1, value2);
+
+				//Trim zeroes at right
+				ssize_t n = strlen(tmp) - 1;
+				for(; n > 0; n--)
+				{
+					if(tmp[n] == '0')
+						tmp[n] = '\0';
+					else
+						break;
+				}
+
+				//Trim trailing decimal point
+				if(tmp[n] == '.')
+					tmp[n] = '\0';
+			}
 			break;
 	}
 
