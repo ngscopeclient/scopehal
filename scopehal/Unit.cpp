@@ -521,7 +521,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	GetUnitSuffix(m_type, value, scaleFactor, prefix, numprefix, suffix);
 
 	double value_rescaled = value * scaleFactor;
-	bool space_after_number = (m_type != Unit::UNIT_UI);
+	bool space_after_number = (m_type != Unit::UNIT_UI) && (m_type != Unit::UNIT_HEXNUM);
 
 	char tmp[128];
 	switch(m_type)
@@ -618,7 +618,7 @@ string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLoc
 	else
 		value_rescaled = value / divFactor;
 
-	bool space_after_number = (m_type != Unit::UNIT_UI);
+	bool space_after_number = (m_type != Unit::UNIT_UI) && (m_type != Unit::UNIT_HEXNUM);
 
 	char tmp[128];
 	switch(m_type)
