@@ -34,9 +34,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // StreamDescriptor
 
-string StreamDescriptor::GetName()
+string StreamDescriptor::GetName() const
 {
-	if(m_channel == NULL)
+	if(m_channel == nullptr)
 		return "NULL";
 
 	string name = m_channel->GetDisplayName();
