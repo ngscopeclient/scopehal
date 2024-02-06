@@ -63,7 +63,7 @@ public:
 	operator bool() const
 	{ return (m_channel != NULL); }
 
-	std::string GetName();
+	std::string GetName() const;
 
 	InstrumentChannel* m_channel;
 	size_t m_stream;
