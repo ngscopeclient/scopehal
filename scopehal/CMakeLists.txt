@@ -88,6 +88,7 @@ set(SCOPEHAL_SOURCES
 	SCPILinuxGPIBTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
+	SCPISocketCANTransport.cpp
 	SCPIUARTTransport.cpp
 	SCPIDevice.cpp
 
@@ -142,6 +143,7 @@ set(SCOPEHAL_SOURCES
 	SCPISDR.cpp
 	SCPISpectrometer.cpp
 	SCPIVNA.cpp
+	SocketCANAnalyzer.cpp
 	SpectrometerDarkFrameChannel.cpp
 	RemoteBridgeOscilloscope.cpp
 

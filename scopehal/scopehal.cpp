@@ -58,6 +58,7 @@
 #include "MultiLaneBERT.h"
 
 #include "CSVStreamInstrument.h"
+#include "SocketCANAnalyzer.h"
 
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
@@ -143,6 +144,11 @@ void TransportStaticInit()
 	AddTransportClass(SCPINullTransport);
 	AddTransportClass(VICPSocketTransport);
 
+	//SocketCAN is a Linux-specific feature
+#ifdef __linux
+	AddTransportClass(SCPISocketCANTransport);
+#endif
+
 #ifdef HAS_LXI
 	AddTransportClass(SCPILxiTransport);
 #endif
@@ -219,6 +225,7 @@ void DriverStaticInit()
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 	AddDriverClass(ThunderScopeOscilloscope);
+	AddDriverClass(SocketCANAnalyzer);
 
 	AddFunctionGeneratorDriverClass(RigolFunctionGenerator);
 

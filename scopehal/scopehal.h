@@ -105,6 +105,9 @@ extern size_t g_maxComputeGroupCount[3];
 #include "SCPIUARTTransport.h"
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
+#ifdef __linux
+#include "SCPISocketCANTransport.h"
+#endif
 
 #if !defined(_WIN32) && !defined(__APPLE__)
 // TMC is only supported on Linux for now
