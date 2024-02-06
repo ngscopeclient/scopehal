@@ -66,7 +66,6 @@ protected:
 	int m_socket;
 
 	std::string m_devname;
-	unsigned int m_baudrate;
 };
 
 #endif

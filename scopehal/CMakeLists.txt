@@ -119,6 +119,7 @@ set(SCOPEHAL_SOURCES
 	BERT.cpp
 	BERTInputChannel.cpp
 	BERTOutputChannel.cpp
+	CANChannel.cpp
 	FunctionGenerator.cpp
 	FunctionGeneratorChannel.cpp
 	Load.cpp

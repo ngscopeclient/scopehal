@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,52 +37,6 @@
 #define CANDecoder_h
 
 #include "PacketDecoder.h"
-
-class CANSymbol
-{
-public:
-	enum stype
-	{
-		TYPE_SOF,
-		TYPE_ID,
-		TYPE_RTR,
-		TYPE_R0,
-		TYPE_FD,
-		TYPE_DLC,
-		TYPE_DATA,
-		TYPE_CRC_OK,
-		TYPE_CRC_BAD,
-		TYPE_CRC_DELIM,
-		TYPE_ACK,
-		TYPE_ACK_DELIM,
-		TYPE_EOF
-	};
-
-	CANSymbol()
-	{}
-
-	CANSymbol(stype t, uint32_t data)
-	 : m_stype(t)
-	 , m_data(data)
-	{
-	}
-
-	stype m_stype;
-	uint32_t m_data;
-
-	bool operator== (const CANSymbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
-	}
-};
-
-class CANWaveform : public SparseWaveform<CANSymbol>
-{
-public:
-	CANWaveform () : SparseWaveform<CANSymbol>() {};
-	virtual std::string GetText(size_t) override;
-	virtual std::string GetColor(size_t) override;
-};
 
 class CANDecoder : public PacketDecoder
 {

@@ -30,6 +30,8 @@
 #ifndef SocketCANAnalyzer_h
 #define SocketCANAnalyzer_h
 
+#ifdef __linux
+
 class EdgeTrigger;
 
 class SocketCANAnalyzer
@@ -107,51 +109,16 @@ public:
 	virtual bool SetInterleaving(bool combine) override;
 
 protected:
-	/*
-	OscilloscopeChannel* m_extTrigChannel;
-
-	//hardware analog channel count, independent of LA option etc
-	unsigned int m_analogChannelCount;
-	unsigned int m_digitalChannelBase;
-	unsigned int m_digitalChannelCount;
-	bool m_hasAFG;
-	unsigned int m_firstAFGIndex;
-
-	const static std::map<const std::string, const WaveShape> m_waveShapeNames;
-
-	bool IsAnalog(size_t index)
-	{ return index < m_analogChannelCount; }
-
-	int HWDigitalNumber(size_t index)
-	{ return index - m_digitalChannelBase; }
-
-	template <typename T> size_t AcquireHeader(T* cap, std::string chname);
-
-	//config cache
-	std::map<size_t, float> m_channelOffsets;
-	std::map<size_t, float> m_channelVoltageRanges;
-	std::map<int, bool> m_channelsEnabled;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
-	std::map<size_t, int> m_channelBandwidthLimits;
-	std::map<size_t, double> m_channelAttenuations;
-
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	bool m_sampleRateValid;
-	uint64_t m_sampleRate;
-	bool m_sampleDepthValid;
-	uint64_t m_sampleDepth;
-	bool m_triggerOffsetValid;
-	uint64_t m_triggerOffset;
-
-	void PullEdgeTrigger();
-	void PushEdgeTrigger(EdgeTrigger* trig);
-	*/
+	//uint64_t m_sampleDepth;
 
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(SocketCANAnalyzer)
 };
+
+#endif
 
 #endif

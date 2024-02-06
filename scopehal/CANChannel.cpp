@@ -27,122 +27,144 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Implementation of SCPISocketCANTransport
- */
-
 #include "scopehal.h"
-
-#ifdef __linux
-
-#include <net/if.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-
-#include <linux/can.h>
-#include <linux/can/raw.h>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPISocketCANTransport::SCPISocketCANTransport(const string& args)
-	: m_devname(args)
+CANChannel::CANChannel(
+	Oscilloscope* scope,
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: OscilloscopeChannel(scope, hwname, color, Unit(Unit::UNIT_FS), index)
 {
-	m_socket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-	if(m_socket < 0)
-	{
-		perror("failed to open socket\n");
-		LogError("Failed to open CAN interface\n");
-		return;
-	}
-
-	ifreq ifr;
-	strncpy(ifr.ifr_name, args.c_str(), sizeof(ifr.ifr_name - 1));
-	if(0 != ioctl(m_socket, SIOCGIFINDEX, &ifr))
-	{
-		perror("SIOCGIFINDEX failed\n");
-		LogError("Failed to open CAN interface\n");
-		return;
-	}
-	LogTrace("Found CAN interface %s at index %d\n", args.c_str(), ifr.ifr_ifindex);
-
-	sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
-	if(0 != bind(m_socket, (sockaddr*)&addr, sizeof(addr)))
-	{
-		perror("bind failed\n");
-		LogError("Failed to open CAN interface\n");
-		return;
-	}
-
-	//set 1ms timeout if no packets
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 1000;
-	if(0 != setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)))
-	{
-		perror("setsockopt SO_RCVTIMEO\n");
-		LogError("Failed to open set RX timeout\n");
-		return;
-	}
+	ClearStreams();
+	AddStream(Unit(Unit::UNIT_COUNTS), "canbus", Stream::STREAM_TYPE_PROTOCOL);
 }
 
-SCPISocketCANTransport::~SCPISocketCANTransport()
+CANChannel::~CANChannel()
 {
-	close(m_socket);
-}
-
-bool SCPISocketCANTransport::IsConnected()
-{
-	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
+// CANWaveform
 
-string SCPISocketCANTransport::GetTransportName()
+string CANWaveform::GetColor(size_t i)
 {
-	return "socketcan";
+	const CANSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
+	{
+		case CANSymbol::TYPE_SOF:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+
+		case CANSymbol::TYPE_R0:
+			if(!s.m_data)
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+			else
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
+
+		case CANSymbol::TYPE_ID:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+
+		case CANSymbol::TYPE_RTR:
+		case CANSymbol::TYPE_FD:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
+
+		case CANSymbol::TYPE_DLC:
+			if(s.m_data > 8)
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
+			else
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+
+		case CANSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
+
+		case CANSymbol::TYPE_CRC_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+
+		case CANSymbol::TYPE_CRC_DELIM:
+		case CANSymbol::TYPE_ACK_DELIM:
+		case CANSymbol::TYPE_EOF:
+			if(s.m_data)
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+			else
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
+
+		case CANSymbol::TYPE_ACK:
+			if(!s.m_data)
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+			else
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
+
+		case CANSymbol::TYPE_CRC_BAD:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
+	}
 }
 
-string SCPISocketCANTransport::GetConnectionString()
+string CANWaveform::GetText(size_t i)
 {
-	return m_devname;
-}
+	const CANSymbol& s = m_samples[i];
 
-bool SCPISocketCANTransport::SendCommand(const string& /*cmd*/)
-{
-	//read only
-	return false;
-}
+	char tmp[32];
+	switch(s.m_stype)
+	{
+		case CANSymbol::TYPE_SOF:
+			return "SOF";
 
-string SCPISocketCANTransport::ReadReply(bool /*endOnSemicolon*/)
-{
-	return "";
-}
+		case CANSymbol::TYPE_ID:
+			snprintf(tmp, sizeof(tmp), "ID %03x", s.m_data);
+			break;
 
-void SCPISocketCANTransport::FlushRXBuffer(void)
-{
-}
+		case CANSymbol::TYPE_FD:
+			if(s.m_data)
+				return "FD";
+			else
+				return "STD";
 
-void SCPISocketCANTransport::SendRawData(size_t /*len*/, const unsigned char* /*buf*/)
-{
-}
+		case CANSymbol::TYPE_RTR:
+			if(s.m_data)
+				return "REQ";
+			else
+				return "DATA";
 
-size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf)
-{
-	return read(m_socket, buf, len);
-}
+		case CANSymbol::TYPE_R0:
+			return "RSVD";
 
-bool SCPISocketCANTransport::IsCommandBatchingSupported()
-{
-	return true;
-}
+		case CANSymbol::TYPE_DLC:
+			snprintf(tmp, sizeof(tmp), "Len %u", s.m_data);
+			break;
 
-#endif
+		case CANSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
+
+		case CANSymbol::TYPE_CRC_OK:
+		case CANSymbol::TYPE_CRC_BAD:
+			snprintf(tmp, sizeof(tmp), "CRC: %04x", s.m_data);
+			break;
+
+		case CANSymbol::TYPE_CRC_DELIM:
+			return "CRC DELIM";
+
+		case CANSymbol::TYPE_ACK:
+			if(!s.m_data)
+				return "ACK";
+			else
+				return "NAK";
+
+		case CANSymbol::TYPE_ACK_DELIM:
+			return "ACK DELIM";
+
+		case CANSymbol::TYPE_EOF:
+			return "EOF";
+
+		default:
+			return "ERROR";
+	}
+	return string(tmp);
+}

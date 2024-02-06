@@ -27,122 +27,69 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef CANChannel_h
+#define CANChannel_h
+
+class CANSymbol
+{
+public:
+	enum stype
+	{
+		TYPE_SOF,
+		TYPE_ID,
+		TYPE_RTR,
+		TYPE_R0,
+		TYPE_FD,
+		TYPE_DLC,
+		TYPE_DATA,
+		TYPE_CRC_OK,
+		TYPE_CRC_BAD,
+		TYPE_CRC_DELIM,
+		TYPE_ACK,
+		TYPE_ACK_DELIM,
+		TYPE_EOF
+	};
+
+	CANSymbol()
+	{}
+
+	CANSymbol(stype t, uint32_t data)
+	 : m_stype(t)
+	 , m_data(data)
+	{
+	}
+
+	stype m_stype;
+	uint32_t m_data;
+
+	bool operator== (const CANSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+class CANWaveform : public SparseWaveform<CANSymbol>
+{
+public:
+	CANWaveform () : SparseWaveform<CANSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
+};
+
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Implementation of SCPISocketCANTransport
+	@brief A single channel of a CAN bus interface
  */
-
-#include "scopehal.h"
-
-#ifdef __linux
-
-#include <net/if.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-
-#include <linux/can.h>
-#include <linux/can/raw.h>
-
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SCPISocketCANTransport::SCPISocketCANTransport(const string& args)
-	: m_devname(args)
+class CANChannel : public OscilloscopeChannel
 {
-	m_socket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-	if(m_socket < 0)
-	{
-		perror("failed to open socket\n");
-		LogError("Failed to open CAN interface\n");
-		return;
-	}
+public:
 
-	ifreq ifr;
-	strncpy(ifr.ifr_name, args.c_str(), sizeof(ifr.ifr_name - 1));
-	if(0 != ioctl(m_socket, SIOCGIFINDEX, &ifr))
-	{
-		perror("SIOCGIFINDEX failed\n");
-		LogError("Failed to open CAN interface\n");
-		return;
-	}
-	LogTrace("Found CAN interface %s at index %d\n", args.c_str(), ifr.ifr_ifindex);
+	CANChannel(
+		Oscilloscope* scope,
+		const std::string& hwname,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-	sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
-	if(0 != bind(m_socket, (sockaddr*)&addr, sizeof(addr)))
-	{
-		perror("bind failed\n");
-		LogError("Failed to open CAN interface\n");
-		return;
-	}
-
-	//set 1ms timeout if no packets
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 1000;
-	if(0 != setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)))
-	{
-		perror("setsockopt SO_RCVTIMEO\n");
-		LogError("Failed to open set RX timeout\n");
-		return;
-	}
-}
-
-SCPISocketCANTransport::~SCPISocketCANTransport()
-{
-	close(m_socket);
-}
-
-bool SCPISocketCANTransport::IsConnected()
-{
-	return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
-
-string SCPISocketCANTransport::GetTransportName()
-{
-	return "socketcan";
-}
-
-string SCPISocketCANTransport::GetConnectionString()
-{
-	return m_devname;
-}
-
-bool SCPISocketCANTransport::SendCommand(const string& /*cmd*/)
-{
-	//read only
-	return false;
-}
-
-string SCPISocketCANTransport::ReadReply(bool /*endOnSemicolon*/)
-{
-	return "";
-}
-
-void SCPISocketCANTransport::FlushRXBuffer(void)
-{
-}
-
-void SCPISocketCANTransport::SendRawData(size_t /*len*/, const unsigned char* /*buf*/)
-{
-}
-
-size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf)
-{
-	return read(m_socket, buf, len);
-}
-
-bool SCPISocketCANTransport::IsCommandBatchingSupported()
-{
-	return true;
-}
+	virtual ~CANChannel();
+};
 
 #endif

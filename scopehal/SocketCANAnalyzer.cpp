@@ -31,166 +31,24 @@
 #include "SocketCANAnalyzer.h"
 #include "EdgeTrigger.h"
 
+#ifdef __linux
+
+#include <linux/can.h>
+#include <linux/can/raw.h>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 SocketCANAnalyzer::SocketCANAnalyzer(SCPITransport* transport)
-	: SCPIDevice(transport)
-	, SCPIInstrument(transport)/*
-	, m_hasAFG(false)
+	: SCPIDevice(transport, false)
+	, SCPIInstrument(transport, false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
-	, m_sampleRateValid(false)
-	, m_sampleDepthValid(false)
-	, m_triggerOffsetValid(false)*/
 {
-	/*
-	LogDebug("m_model: %s\n", m_model.c_str());
-	if (m_model != "RTO6")
-	{
-		LogFatal("rs.rto6 driver only appropriate for RTO6");
-	}
-
-	SCPISocketTransport* sockettransport = NULL;
-
-	if (!(sockettransport = dynamic_cast<SCPISocketTransport*>(transport)))
-	{
-		LogFatal("rs.rto6 driver requires 'lan' transport");
-	}
-
-	// RTO6 always has four analog channels
-	m_analogChannelCount = 4;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		//Hardware name of the channel
-		string chname = string("CHAN1");
-		chname[4] += i;
-
-		//Color the channels based on R&S's standard color sequence (yellow-green-orange-bluegray)
-		string color = "#ffffff";
-		switch(i)
-		{
-			case 0:
-				color = "#ffff00";
-				break;
-
-			case 1:
-				color = "#00ff00";
-				break;
-
-			case 2:
-				color = "#ff8000";
-				break;
-
-			case 3:
-				color = "#8080ff";
-				break;
-		}
-
-		//Create the channel
-		auto chan = new OscilloscopeChannel(
-			this,
-			chname,
-			color,
-			Unit(Unit::UNIT_FS),
-			Unit(Unit::UNIT_VOLTS),
-			Stream::STREAM_TYPE_ANALOG,
-			i);
-		m_channels.push_back(chan);
-		chan->SetDefaultDisplayName();
-	}
-
-	// All RTO6 have external trigger; only edge is supported
-	m_extTrigChannel = new OscilloscopeChannel(
-		this,
-		"EXT",
-		"",
-		Unit(Unit::UNIT_FS),
-		Unit(Unit::UNIT_VOLTS),
-		Stream::STREAM_TYPE_TRIGGER,
-		m_channels.size());
-	m_channels.push_back(m_extTrigChannel);
-
-	m_digitalChannelBase = m_channels.size();
-	m_digitalChannelCount = 0;
-
-	string reply = m_transport->SendCommandQueuedWithReply("*OPT?", false);
-	vector<string> opts;
-	stringstream s_stream(reply);
-	while(s_stream.good()) {
-		string substr;
-		getline(s_stream, substr, ',');
-		opts.push_back(substr);
-	}
-
-	for (auto app : opts)
-	{
-		if (app == "B1")
-		{
-			LogVerbose(" * RTO6 has logic analyzer/MSO option\n");
-			m_digitalChannelCount = 16; // Always 16 (2x8 probe "pods") to my understanding
-		}
-		else if (app == "B6")
-		{
-			LogVerbose(" * RTO6 has func gen option\n");
-			m_hasAFG = true;
-		}
-		else
-		{
-			LogDebug("(* Also has option '%s' (ignored))\n", app.c_str());
-		}
-	}
-
-	// Set up digital channels (if any)
-	for(unsigned int i=0; i<m_digitalChannelCount; i++)
-	{
-		//Hardware name of the channel
-		string chname = string("D0");
-		chname[1] += i;
-
-		//Create the channel
-		auto chan = new OscilloscopeChannel(
-			this,
-			chname,
-			"#555555",
-			Unit(Unit::UNIT_FS),
-			Unit(Unit::UNIT_COUNTS),
-			Stream::STREAM_TYPE_DIGITAL,
-			m_channels.size());
-		m_channels.push_back(chan);
-		chan->SetDefaultDisplayName();
-	}
-
-	if (m_digitalChannelCount)
-		m_transport->SendCommandQueued("DIG1:THCoupling OFF"); //Allow different threshold per-bank
-
-	if (m_hasAFG)
-	{
-		m_transport->SendCommandQueued("WGEN1:SOURCE FUNCGEN"); //Don't currently support modulation or other modes
-		m_transport->SendCommandQueued("WGEN2:SOURCE FUNCGEN");
-
-		for (int i = 0; i < 2; i++)
-		{
-			m_firstAFGIndex = m_channels.size();
-			auto ch = new FunctionGeneratorChannel(this, "WGEN" + to_string(i + 1), "#808080", m_channels.size());
-			m_channels.push_back(ch);
-		}
-	}
-
-	m_transport->SendCommandQueued("FORMat:DATA REAL,32"); //Report in f32
-	m_transport->SendCommandQueued("ACQuire:COUNt 1"); //Limit to one acquired waveform per "SINGLE"
-	m_transport->SendCommandQueued("EXPort:WAVeform:INCXvalues OFF"); //Don't include X values in data
-	m_transport->SendCommandQueued("TIMebase:ROLL:ENABle OFF"); //No roll mode
-	m_transport->SendCommandQueued("TRIGGER1:MODE NORMAL"); //No auto trigger
-	m_transport->SendCommandQueued("ACQuire:CDTA ON"); //All channels have same timebase/etc
-	m_transport->SendCommandQueued("PROBE1:SETUP:ATT:MODE MAN"); //Allow/use manual attenuation setting with unknown probes
-	m_transport->SendCommandQueued("SYSTEM:KLOCK OFF"); //Don't lock front-panel
-	m_transport->SendCommandQueued("*WAI");
-
-	GetSampleDepth();
-	*/
+	auto chan = new CANChannel(this, "CAN", "#808080", 0);
+	m_channels.push_back(chan);
 }
 
 SocketCANAnalyzer::~SocketCANAnalyzer()
@@ -278,7 +136,7 @@ void SocketCANAnalyzer::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*li
 {
 }
 
-vector<unsigned int> SocketCANAnalyzer::GetChannelBandwidthLimiters(size_t i)
+vector<unsigned int> SocketCANAnalyzer::GetChannelBandwidthLimiters(size_t /*i*/)
 {
 	vector<unsigned int> ret;
 	return ret;
@@ -313,288 +171,104 @@ Oscilloscope::TriggerMode SocketCANAnalyzer::PollTrigger()
 
 bool SocketCANAnalyzer::AcquireData()
 {
-	/*
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->FlushCommandQueue();
-	LogDebug(" ** AcquireData ** \n");
-	LogIndenter li;
+	//Get the existing waveform if we have one
+	//TODO: Start a new waveform only if a new trigger cycle
 
-	GetSampleDepth();
+	//auto data = dynamic_cast<CANWaveform*>(
+	double tstart = GetTime();
+	auto cap = new CANWaveform;
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = floor(tstart);
+	cap->m_startFemtoseconds = (tstart - cap->m_startTimestamp) * FS_PER_SECOND;
+	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
-	auto start_time = std::chrono::system_clock::now();
-
-	// m_transport->SendCommandQueued("*DCL; *WAI");
-
-	map<int, vector<WaveformBase*> > pending_waveforms;
-	bool any_data = false;
-
-	for(size_t i=0; i<m_analogChannelCount; i++)
+	//Read frames until we run out
+	while(true)
 	{
-		if(!IsChannelEnabled(i))
-			continue;
+		can_frame frame;
+		int nbytes = m_transport->ReadRawData(sizeof(frame), (uint8_t*)&frame);
+		if(nbytes < 0)
+			break;
 
-		LogDebug("Starting acquisition phase for ch%ld\n", i);
+		double delta = GetTime();
+		delta -= tstart;
+		int64_t trel = delta * FS_PER_SECOND;
 
-		auto cap = new UniformAnalogWaveform;
-		size_t length = AcquireHeader(cap, m_channels[i]->GetHwname());
+		bool ext = (frame.can_id & CAN_EFF_MASK) > 2047;
+		bool rtr = (frame.can_id & CAN_RTR_FLAG) == CAN_RTR_FLAG;
 
-		if (!length)
+		//Add timeline samples (fake durations assuming 500 Kbps for now)
+		//TODO make this configurable
+		int64_t ui = 2 * 1000LL * 1000LL * 1000LL;
+		cap->m_offsets.push_back(trel);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, 0));
+
+		cap->m_offsets.push_back(trel + ui);
+		cap->m_durations.push_back(31 * ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ID, frame.can_id));
+
+		cap->m_offsets.push_back(trel + 32*ui);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, rtr));
+
+		cap->m_offsets.push_back(trel + 33*ui);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_FD, 0));
+
+		cap->m_offsets.push_back(trel + 34*ui);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_R0, 0));
+
+		cap->m_offsets.push_back(trel + 35*ui);
+		cap->m_durations.push_back(ui*4);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DLC, frame.can_dlc));
+
+		//Data
+		for(int i=0; i<frame.can_dlc; i++)
 		{
-			delete cap;
-			pending_waveforms[i].push_back(NULL);
-			continue;
+			cap->m_offsets.push_back(trel + 39*ui + i*8*ui);
+			cap->m_durations.push_back(ui*8);
+			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DATA, frame.data[i]));
 		}
-
-		any_data = true;
-
-		size_t transferred = 0;
-		const size_t block_size =
-			#if __APPLE__
-				50e6 // For some reason values larger than this on my coworkers macbook fail in recv(2)
-			#else
-				10000e6
-			#endif
-		;
-
-		unsigned char* dest_buf = (unsigned char*)cap->m_samples.GetCpuPointer();
-
-		LogDebug(" - Begin transfer of %lu bytes\n", length);
-
-		while (transferred != length)
-		{
-			size_t this_length = block_size;
-			if (this_length > (length - transferred))
-				this_length = length - transferred;
-
-			string params =  " "+to_string(transferred)+","+to_string(this_length);
-
-			if (transferred == 0 && this_length == length)
-				params = "";
-
-			LogDebug("[%3d%%] Query ...`DATA?%s` (B)\n", (int)(100*((float)transferred/(float)length)), params.c_str());
-
-			//Ask for the data
-			size_t len_bytes;
-			unsigned char* samples = (unsigned char*)m_transport->SendCommandImmediateWithRawBlockReply(m_channels[i]->GetHwname() + ":DATA?"+params+"; *WAI", len_bytes);
-
-			if (len_bytes != (this_length*sizeof(float)))
-			{
-				LogError("Unexpected number of bytes back; aborting acquisition");
-				std::this_thread::sleep_for(std::chrono::microseconds(100000));
-				m_transport->FlushRXBuffer();
-
-				delete cap;
-
-				for (auto* c : pending_waveforms[i])
-				{
-					delete c;
-				}
-
-				delete[] samples;
-
-				return false;
-			}
-
-			unsigned char* cpy_target = dest_buf+(transferred*sizeof(float));
-			// LogDebug("Copying %luB from %p to %p\n", len_bytes, samples, cpy_target);
-
-			memcpy(cpy_target, samples, len_bytes);
-			transferred += this_length;
-			delete[] samples;
-
-			//Discard trailing newline
-			uint8_t disregard;
-			m_transport->ReadRawData(1, &disregard);
-		}
-
-		LogDebug("[100%%] Done\n");
-
-		cap->MarkSamplesModifiedFromCpu();
-
-		//Done, update the data
-		pending_waveforms[i].push_back(cap);
 	}
 
-	bool didAcquireAnyDigitalChannels = false;
+	//Now that we have all of the pending waveforms, save them in sets across all channels
+	m_pendingWaveformsMutex.lock();
+	SequenceSet s;
+	s[m_channels[0]] = cap;
+	m_pendingWaveforms.push_back(s);
+	m_pendingWaveformsMutex.unlock();
 
-	for(size_t i=m_digitalChannelBase; i<(m_digitalChannelBase + m_digitalChannelCount); i++)
-	{
-		if(!IsChannelEnabled(i))
-			continue;
-
-		if (!didAcquireAnyDigitalChannels)
-		{
-			while (m_transport->SendCommandImmediateWithReply("FORM?") != "ASC,0")
-			{
-				m_transport->SendCommandImmediate("FORM ASC; *WAI"); //Only possible to get data out in ASCII format
-				std::this_thread::sleep_for(std::chrono::microseconds(1000000));
-			}
-			didAcquireAnyDigitalChannels = true;
-		}
-
-		string hwname = "DIG" + to_string(HWDigitalNumber(i));
-
-		LogDebug("Starting acquisition for dig%d\n", HWDigitalNumber(i));
-
-		auto cap = new SparseDigitalWaveform;
-		size_t length = AcquireHeader(cap, hwname);
-
-		if (!length)
-		{
-			delete cap;
-			pending_waveforms[i].push_back(NULL);
-			continue;
-		}
-
-		size_t expected_bytes = length * 2; // Commas between items + newline
-
-		// Digital channels do not appear to support selecting a subset, so no 'chunking'
-
-		LogDebug(" - Begin transfer of %lu bytes (*2)\n", length);
-
-		// Since it's ascii the scope just sends it as a SCPI 'line' without the size block
-		m_transport->SendCommandImmediate(hwname + ":DATA?; *WAI");
-		unsigned char* samples = new unsigned char[expected_bytes];
-		size_t read_bytes = m_transport->ReadRawData(expected_bytes, samples);
-
-		if (read_bytes != expected_bytes)
-		{
-			LogWarning("Unexpected number of bytes back; aborting acquisiton\n");
-			std::this_thread::sleep_for(std::chrono::microseconds(100000));
-			m_transport->FlushRXBuffer();
-
-			delete cap;
-
-			for (auto* c : pending_waveforms[i])
-			{
-				delete c;
-			}
-
-			delete[] samples;
-
-			return false;
-		}
-
-		bool last = samples[0] == '1';
-
-		cap->m_offsets[0] = 0;
-		cap->m_durations[0] = 1;
-		cap->m_samples[0] = last;
-
-		size_t k = 0;
-
-		for(size_t m=1; m<length; m++)
-		{
-			bool sample = samples[m*2] == '1';
-
-			//Deduplicate consecutive samples with same value
-			//FIXME: temporary workaround for rendering bugs
-			//if(last == sample)
-			if( (last == sample) && ((m+5) < length) && (m > 5))
-				cap->m_durations[k] ++;
-
-			//Nope, it toggled - store the new value
-			else
-			{
-				k++;
-				cap->m_offsets[k] = m;
-				cap->m_durations[k] = 1;
-				cap->m_samples[k] = sample;
-				last = sample;
-			}
-		}
-
-		//Free space reclaimed by deduplication
-		cap->Resize(k);
-		cap->m_offsets.shrink_to_fit();
-		cap->m_durations.shrink_to_fit();
-		cap->m_samples.shrink_to_fit();
-
-		cap->MarkSamplesModifiedFromCpu();
-		cap->MarkTimestampsModifiedFromCpu();
-
-		delete[] samples;
-
-		//Done, update the data
-		pending_waveforms[i].push_back(cap);
-	}
-
-	if (didAcquireAnyDigitalChannels)
-		m_transport->SendCommandImmediate("FORMat:DATA REAL,32"); //Return to f32
-
-	if (any_data)
-	{
-		//Now that we have all of the pending waveforms, save them in sets across all channels
-		m_pendingWaveformsMutex.lock();
-		size_t num_pending = 1;	//TODO: segmented capture support
-		for(size_t i=0; i<num_pending; i++)
-		{
-			SequenceSet s;
-			for(size_t j=0; j<m_channels.size(); j++)
-			{
-				if(IsChannelEnabled(j))
-					s[m_channels[j]] = pending_waveforms[j][i];
-			}
-			m_pendingWaveforms.push_back(s);
-		}
-		m_pendingWaveformsMutex.unlock();
-	}
-
-	if(!any_data || !m_triggerOneShot)
-	{
-		m_transport->SendCommandImmediate("SINGle");
-		std::this_thread::sleep_for(std::chrono::microseconds(100000));
-		// If we don't wait here, sending the query for available waveforms will race and return 1 for the exitisting waveform and jam everything up.
-		m_triggerArmed = true;
-	}
-	else
-	{
+	if(m_triggerOneShot)
 		m_triggerArmed = false;
-	}
-
-	auto end_time = std::chrono::system_clock::now();
-
-	LogDebug("Acquisition took %lu\n", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
-
-	return any_data;*/
 
 	return true;
 }
 
 void SocketCANAnalyzer::Start()
-{/*
-	LogDebug("Start\n");
-	m_transport->SendCommandImmediate("SINGle");
-	std::this_thread::sleep_for(std::chrono::microseconds(100000));
-	// If we don't wait here, sending the query for available waveforms will race and return 1 for the exitisting waveform and jam everything up.
+{
 	m_triggerArmed = true;
-	m_triggerOneShot = false;*/
+	m_triggerOneShot = false;
 }
 
 void SocketCANAnalyzer::StartSingleTrigger()
-{/*
-	LogDebug("Start oneshot\n");
-	m_transport->SendCommandImmediate("SINGle");
-	std::this_thread::sleep_for(std::chrono::microseconds(100000));
-	// If we don't wait here, sending the query for available waveforms will race and return 1 for the exitisting waveform and jam everything up.
+{
 	m_triggerArmed = true;
-	m_triggerOneShot = true;*/
+	m_triggerOneShot = true;
 }
 
 void SocketCANAnalyzer::Stop()
-{/*
+{
 	m_triggerArmed = false;
-
-	LogDebug("Stop!\n");
-	m_transport->SendCommandImmediate("STOP");
-	m_triggerArmed = false;
-	m_triggerOneShot = true;*/
+	m_triggerOneShot = true;
 }
 
 void SocketCANAnalyzer::ForceTrigger()
 {
-	/*if (m_triggerArmed)
-		m_transport->SendCommandImmediate("TRIGGER1:FORCE");*/
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 bool SocketCANAnalyzer::IsTriggerArmed()
@@ -771,3 +445,5 @@ void SocketCANAnalyzer::PushEdgeTrigger(EdgeTrigger* trig)
 	}
 }
 */
+
+#endif

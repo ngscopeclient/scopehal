@@ -225,7 +225,9 @@ void DriverStaticInit()
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 	AddDriverClass(ThunderScopeOscilloscope);
+#ifdef __linux
 	AddDriverClass(SocketCANAnalyzer);
+#endif
 
 	AddFunctionGeneratorDriverClass(RigolFunctionGenerator);
 
