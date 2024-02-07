@@ -145,8 +145,9 @@ double EyeWaveform::GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, 
 		int64_t totalhits = innerhits;
 		for(size_t i=len; ; i++)
 		{
-			auto x = static_cast<size_t>(round(xmid + uvecx*i));
-			auto y = static_cast<size_t>(round(ymid + uvecy*i));
+			// must cast through a signed int type to avoid UB [conv.fpint]
+			size_t x = static_cast<ssize_t>(round(xmid + uvecx*i));
+			size_t y = static_cast<ssize_t>(round(ymid + uvecy*i));
 
 			//no lower bounds check since size_t is unsigned
 			//if we go off the low end we'll wrap and fail the high side bounds check
