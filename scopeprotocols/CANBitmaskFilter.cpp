@@ -198,11 +198,12 @@ void CANBitmaskFilter::Refresh()
 
 	//Add three padding samples (do we still have this rendering bug??)
 	int64_t tlast = cap->m_offsets[nlast];
+	bool vlast = cap->m_samples[nlast];
 	for(size_t i=0; i<3; i++)
 	{
 		cap->m_offsets.push_back(tlast + i);
 		cap->m_durations.push_back(1);
-		cap->m_samples.push_back(cap->m_samples[nlast]);
+		cap->m_samples.push_back(vlast);
 	}
 
 	//Done updating

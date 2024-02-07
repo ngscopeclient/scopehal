@@ -228,9 +228,12 @@ bool SocketCANAnalyzer::AcquireData()
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
-	//Read frames until we run out
+	//Read frames until we run out or a timeout elapses
+	double tstart = GetTime();
+	size_t npackets = 0;
 	while(true)
 	{
+		//Grab a frame and stop capturing if nothing shows up within the timeout window
 		can_frame frame;
 		int nbytes = m_transport->ReadRawData(sizeof(frame), (uint8_t*)&frame);
 		if(nbytes < 0)
@@ -276,6 +279,15 @@ bool SocketCANAnalyzer::AcquireData()
 			cap->m_offsets.push_back(trel + 39*ui + i*8*ui);
 			cap->m_durations.push_back(ui*8);
 			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DATA, frame.data[i]));
+		}
+
+		//Every 100 packets check timeout, after 50ms of acquisition stop
+		npackets ++;
+		if( (npackets % 100) == 0)
+		{
+			double now = GetTime();
+			if( (now - tstart) > 0.05)
+				break;
 		}
 	}
 
