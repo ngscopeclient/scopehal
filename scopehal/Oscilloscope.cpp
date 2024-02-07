@@ -181,6 +181,14 @@ bool Oscilloscope::PopPendingWaveform()
 	return false;
 }
 
+/**
+	@brief Checks if we are appending to the existing waveform or creating a new one
+ */
+bool Oscilloscope::IsAppendingToWaveform()
+{
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Averaging
 

@@ -46,6 +46,8 @@ SocketCANAnalyzer::SocketCANAnalyzer(SCPITransport* transport)
 	, SCPIInstrument(transport, false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_appendingNext(false)
+	, m_tstart(0)
 {
 	auto chan = new CANChannel(this, "CAN", "#808080", 0);
 	m_channels.push_back(chan);
@@ -169,17 +171,60 @@ Oscilloscope::TriggerMode SocketCANAnalyzer::PollTrigger()
 	return TRIGGER_MODE_TRIGGERED;
 }
 
+bool SocketCANAnalyzer::IsAppendingToWaveform()
+{
+	return m_appendingNext;
+}
+
+bool SocketCANAnalyzer::PopPendingWaveform()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	if(m_pendingWaveforms.size())
+	{
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+		{
+			auto chan = it.first.m_channel;
+			auto data = dynamic_cast<CANWaveform*>(it.second);
+			auto nstream = it.first.m_stream;
+
+			//If there is an existing waveform, append to it
+			//TODO: make this more efficient
+			auto oldWaveform = dynamic_cast<CANWaveform*>(chan->GetData(nstream));
+			if(oldWaveform && data && m_appendingNext)
+			{
+				size_t len = data->size();
+				oldWaveform->PrepareForCpuAccess();
+				data->PrepareForCpuAccess();
+				for(size_t i=0; i<len; i++)
+				{
+					oldWaveform->m_samples.push_back(data->m_samples[i]);
+					oldWaveform->m_offsets.push_back(data->m_offsets[i]);
+					oldWaveform->m_durations.push_back(data->m_durations[i]);
+				}
+				oldWaveform->m_revision ++;
+				oldWaveform->MarkModifiedFromCpu();
+			}
+			else
+				chan->SetData(data, nstream);
+		}
+		m_pendingWaveforms.pop_front();
+
+		m_appendingNext = true;
+		return true;
+	}
+	return false;
+}
+
 bool SocketCANAnalyzer::AcquireData()
 {
 	//Get the existing waveform if we have one
 	//TODO: Start a new waveform only if a new trigger cycle
 
-	//auto data = dynamic_cast<CANWaveform*>(
-	double tstart = GetTime();
 	auto cap = new CANWaveform;
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = floor(tstart);
-	cap->m_startFemtoseconds = (tstart - cap->m_startTimestamp) * FS_PER_SECOND;
+	cap->m_startTimestamp = floor(m_tstart);
+	cap->m_startFemtoseconds = (m_tstart - cap->m_startTimestamp) * FS_PER_SECOND;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
@@ -192,7 +237,7 @@ bool SocketCANAnalyzer::AcquireData()
 			break;
 
 		double delta = GetTime();
-		delta -= tstart;
+		delta -= m_tstart;
 		int64_t trel = delta * FS_PER_SECOND;
 
 		bool ext = (frame.can_id & CAN_EFF_MASK) > 2047;
@@ -234,11 +279,13 @@ bool SocketCANAnalyzer::AcquireData()
 		}
 	}
 
-	//Now that we have all of the pending waveforms, save them in sets across all channels
+	cap->MarkModifiedFromCpu();
+
+	//Save newly created waveform
 	m_pendingWaveformsMutex.lock();
-	SequenceSet s;
-	s[m_channels[0]] = cap;
-	m_pendingWaveforms.push_back(s);
+		SequenceSet s;
+		s[m_channels[0]] = cap;
+		m_pendingWaveforms.push_back(s);
 	m_pendingWaveformsMutex.unlock();
 
 	if(m_triggerOneShot)
@@ -251,12 +298,16 @@ void SocketCANAnalyzer::Start()
 {
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
+	m_tstart = GetTime();
+	m_appendingNext = false;
 }
 
 void SocketCANAnalyzer::StartSingleTrigger()
 {
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
+	m_tstart = GetTime();
+	m_appendingNext = false;
 }
 
 void SocketCANAnalyzer::Stop()
@@ -267,8 +318,7 @@ void SocketCANAnalyzer::Stop()
 
 void SocketCANAnalyzer::ForceTrigger()
 {
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
+	StartSingleTrigger();
 }
 
 bool SocketCANAnalyzer::IsTriggerArmed()

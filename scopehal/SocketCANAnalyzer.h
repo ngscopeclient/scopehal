@@ -108,11 +108,16 @@ public:
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
 
+	virtual bool PopPendingWaveform() override;
+	virtual bool IsAppendingToWaveform() override;
+
 protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	//uint64_t m_sampleDepth;
+	bool m_appendingNext;
+
+	double m_tstart;
 
 public:
 	static std::string GetDriverNameInternal();

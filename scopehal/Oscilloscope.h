@@ -866,6 +866,7 @@ public:
 	void ClearPendingWaveforms();
 	size_t GetPendingWaveformCount();
 	virtual bool PopPendingWaveform();
+	virtual bool IsAppendingToWaveform();
 
 protected:
 	typedef std::map<StreamDescriptor, WaveformBase*> SequenceSet;
