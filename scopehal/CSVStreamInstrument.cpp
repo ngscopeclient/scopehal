@@ -54,7 +54,7 @@ CSVStreamInstrument::CSVStreamInstrument(SCPITransport* transport)
 		0));
 
 	//needs to run *before* the Oscilloscope class implementation
-	m_preloaders.push_front(sigc::mem_fun(this, &CSVStreamInstrument::DoPreLoadConfiguration));
+	m_preloaders.push_front(sigc::mem_fun(*this, &CSVStreamInstrument::DoPreLoadConfiguration));
 }
 
 CSVStreamInstrument::~CSVStreamInstrument()

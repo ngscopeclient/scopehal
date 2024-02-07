@@ -37,7 +37,7 @@ using namespace std;
 SCPIInstrument::SCPIInstrument(SCPITransport* transport, bool identify)
 	: SCPIDevice(transport, identify)
 {
-	m_serializers.push_back(sigc::mem_fun(this, &SCPIInstrument::DoSerializeConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &SCPIInstrument::DoSerializeConfiguration));
 }
 
 SCPIInstrument::~SCPIInstrument()

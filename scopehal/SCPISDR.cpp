@@ -39,9 +39,9 @@ SCPISDR::SDRCreateMapType SCPISDR::m_sdrcreateprocs;
 
 SCPISDR::SCPISDR()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &SCPISDR::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &SCPISDR::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &SCPISDR::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &SCPISDR::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &SCPISDR::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &SCPISDR::DoPreLoadConfiguration));
 }
 
 SCPISDR::~SCPISDR()
