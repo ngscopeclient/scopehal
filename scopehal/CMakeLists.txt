@@ -168,6 +168,7 @@ set(SCOPEHAL_SOURCES
 	PicoVNA.cpp
 	RigolFunctionGenerator.cpp
 	RigolOscilloscope.cpp
+	HP662xAPowerSupply.cpp
 	RigolDP8xxPowerSupply.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RSRTO6Oscilloscope.cpp
