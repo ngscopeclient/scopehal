@@ -196,6 +196,15 @@ void CANBitmaskFilter::Refresh()
 	size_t nlast = cap->m_offsets.size() - 1;
 	cap->m_durations[nlast] = (din->m_offsets[len-1] * din->m_timescale) - cap->m_offsets[nlast];
 
+	//Add three padding samples (do we still have this rendering bug??)
+	int64_t tlast = cap->m_offsets[nlast];
+	for(size_t i=0; i<3; i++)
+	{
+		cap->m_offsets.push_back(tlast + i);
+		cap->m_durations.push_back(1);
+		cap->m_samples.push_back(cap->m_samples[nlast]);
+	}
+
 	//Done updating
 	cap->MarkModifiedFromCpu();
 }
