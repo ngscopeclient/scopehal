@@ -51,6 +51,7 @@
 #include "BINImportFilter.h"
 #include "BurstWidthMeasurement.h"
 #include "BusHeatmapFilter.h"
+#include "CANAnalyzerFilter.h"
 #include "CANBitmaskFilter.h"
 #include "CANDecoder.h"
 #include "CandumpImportFilter.h"

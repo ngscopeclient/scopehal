@@ -14,6 +14,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	BINImportFilter.cpp
 	BurstWidthMeasurement.cpp
 	BusHeatmapFilter.cpp
+	CANAnalyzerFilter.cpp
 	CANBitmaskFilter.cpp
 	CANDecoder.cpp
 	CandumpImportFilter.cpp

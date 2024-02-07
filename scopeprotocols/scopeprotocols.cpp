@@ -52,6 +52,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(BINImportFilter);
 	AddDecoderClass(BurstWidthMeasurement);
 	AddDecoderClass(BusHeatmapFilter);
+	AddDecoderClass(CANAnalyzerFilter);
 	AddDecoderClass(CANBitmaskFilter);
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(CandumpImportFilter);

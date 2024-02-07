@@ -29,63 +29,51 @@
 
 #include "../scopehal/scopehal.h"
 #include "CANDecoder.h"
-#include "CANBitmaskFilter.h"
+#include "CANAnalyzerFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-CANBitmaskFilter::CANBitmaskFilter(const string& color)
-	: Filter(color, CAT_BUS)
-	, m_initValue("Initial Value")
-	, m_busAddress("Bus Address")
-	, m_bitmask("Pattern Bitmask")
-	, m_pattern("Pattern Target")
+CANAnalyzerFilter::CANAnalyzerFilter(const string& color)
+	: PacketDecoder(color, CAT_BUS)
 {
-	AddDigitalStream("data");
-
 	CreateInput("din");
-
-	m_parameters[m_initValue] = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_initValue].SetIntVal(0);
-
-	m_parameters[m_busAddress] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_busAddress].SetIntVal(0);
-
-	m_parameters[m_bitmask] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_bitmask].SetIntVal(0);
-
-	m_parameters[m_pattern] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_pattern].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+// Accessors
 
-bool CANBitmaskFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+string CANAnalyzerFilter::GetProtocolName()
 {
-	if(stream.m_channel == NULL)
-		return false;
+	return "CAN Analyzer";
+}
 
+vector<string> CANAnalyzerFilter::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("ID");
+	ret.push_back("Mode");
+	ret.push_back("Format");
+	ret.push_back("Type");
+	ret.push_back("Ack");
+	ret.push_back("Len");
+	return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+bool CANAnalyzerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
 	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
 
 	return false;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string CANBitmaskFilter::GetProtocolName()
-{
-	return "CAN Bitmask";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void CANBitmaskFilter::Refresh()
+void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
 {
 	if(!VerifyAllInputsOK())
 	{
@@ -96,116 +84,77 @@ void CANBitmaskFilter::Refresh()
 	auto din = dynamic_cast<CANWaveform*>(GetInputWaveform(0));
 	auto len = din->size();
 
-	//Make output waveform
-	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
-	cap->PrepareForCpuAccess();
+	//copy input to output
+	auto cap = new CANWaveform;
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
+	cap->m_offsets.CopyFrom(din->m_offsets);
+	cap->m_durations.CopyFrom(din->m_durations);
+	cap->m_samples.CopyFrom(din->m_samples);
+	SetData(cap, 0);
+
+	ClearPackets();
 
 	enum
 	{
 		STATE_IDLE,
-		STATE_DLC,
 		STATE_DATA
 	} state = STATE_IDLE;
 
-	//Initial sample at time zero
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(0);
-	cap->m_samples.push_back(static_cast<bool>(m_parameters[m_initValue].GetIntVal()));
-
-	int64_t mask = m_parameters[m_bitmask].GetIntVal();
-	int64_t pattern = m_parameters[m_pattern].GetIntVal();
-	auto targetaddr = m_parameters[m_busAddress].GetIntVal() ;
-
-	//Process the CAN packet stream
-	//TODO: support CAN-FD which can have longer frames (up to 64 bytes)?
-	int64_t framestart = 0;
-	int64_t payload = 0;
-	size_t bytesleft = 0;
+	Packet* pack = nullptr;
 	for(size_t i=0; i<len; i++)
 	{
-		auto& s = din->m_samples[i];
+		auto s = din->m_samples[i];
 
 		switch(state)
 		{
-			//Look for a CAN ID (ignore anything else)
 			case STATE_IDLE:
-				if(s.m_stype == CANSymbol::TYPE_ID)
-				{
-					//ID match?
-					if(targetaddr == s.m_data)
-					{
-						framestart = din->m_offsets[i] * din->m_timescale;
-						payload = 0;
-						state = STATE_DLC;
-					}
 
-					//otherwise ignore the frame, not interesting
-				}
-				break;
+				if( (s.m_stype == CANSymbol::TYPE_ID) && pack)
+					pack->m_headers["ID"] = to_string_hex(s.m_data);
 
-			//Look for the DLC so we know how many bytes to read
-			case STATE_DLC:
-				if(s.m_stype == CANSymbol::TYPE_DLC)
+				if( (s.m_stype == CANSymbol::TYPE_DLC) && pack)
 				{
-					bytesleft = s.m_data;
+					pack->m_headers["Len"] = to_string(s.m_data);
 					state = STATE_DATA;
 				}
 
 				break;
 
-			//Read the actual data bytes, MSB first
 			case STATE_DATA:
-				if(s.m_stype == CANSymbol::TYPE_DATA)
+
+				if( (s.m_stype == CANSymbol::TYPE_DATA) && pack)
 				{
-					//Grab the data byte
-					payload = (payload << 8) | s.m_data;
+					pack->m_data.push_back(s.m_data);
 
-					//Are we done with the frame?
-					bytesleft --;
-					if(bytesleft == 0)
-					{
-						//Extend the previous sample to the start of this frame
-						size_t nlast = cap->m_offsets.size() - 1;
-						cap->m_durations[nlast] = framestart - cap->m_offsets[nlast];
-
-						//Check the bitmask and add a new sample
-						cap->m_offsets.push_back(framestart);
-						cap->m_durations.push_back(0);
-
-						if( (payload & mask) == pattern )
-							cap->m_samples.push_back(true);
-						else
-							cap->m_samples.push_back(false);
-
-						state = STATE_IDLE;
-					}
+					//Extend duration
+					pack->m_len =
+						din->m_triggerPhase +
+						din->m_timescale * (din->m_offsets[i] + din->m_durations[i]) -
+						pack->m_offset;
 				}
 
-				//Discard anything else
-				else
-					state = STATE_IDLE;
+				break;
+
+			default:
 				break;
 		}
 
-		//If we see a SOF previous frame was truncated, reset
+		//Start a new packet
 		if(s.m_stype == CANSymbol::TYPE_SOF)
+		{
+			pack = new Packet;
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+			pack->m_offset = din->m_triggerPhase + din->m_timescale * din->m_offsets[i];
+			m_packets.push_back(pack);
+
+			//TODO: FD / RTR support etc?
+			pack->m_headers["Format"] = "BASE";
+			pack->m_headers["Mode"] = "CAN";
+
 			state = STATE_IDLE;
+		}
 	}
-
-	//Extend the last sample to the end of the capture
-	size_t nlast = cap->m_offsets.size() - 1;
-	cap->m_durations[nlast] = (din->m_offsets[len-1] * din->m_timescale) - cap->m_offsets[nlast];
-
-	//Add three padding samples (do we still have this rendering bug??)
-	int64_t tlast = cap->m_offsets[nlast];
-	bool vlast = cap->m_samples[nlast];
-	for(size_t i=0; i<2; i++)
-	{
-		cap->m_offsets.push_back(tlast + i);
-		cap->m_durations.push_back(1);
-		cap->m_samples.push_back(vlast);
-	}
-
-	//Done updating
-	cap->MarkModifiedFromCpu();
 }
