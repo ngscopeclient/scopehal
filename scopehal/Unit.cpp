@@ -29,6 +29,8 @@
 
 #include "scopehal.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 #ifdef _WIN32
