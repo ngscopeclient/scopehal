@@ -61,7 +61,7 @@ public:
 	/**
 		@brief Signal emitted every time autobaud is requested
 	 */
-	sigc::signal<void> signal_calculateBitRate()
+	sigc::signal<void()> signal_calculateBitRate()
 	{ return m_calculateBitRateSignal; }
 
 	/**
@@ -122,7 +122,7 @@ protected:
 	std::string m_lecroyEqName;
 	std::string m_polarityName;
 
-	sigc::signal<void> m_calculateBitRateSignal;
+	sigc::signal<void()> m_calculateBitRateSignal;
 };
 
 #endif

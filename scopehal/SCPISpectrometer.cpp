@@ -39,9 +39,9 @@ SCPISpectrometer::SpectrometerCreateMapType SCPISpectrometer::m_spectrometercrea
 
 SCPISpectrometer::SCPISpectrometer()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &SCPISpectrometer::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &SCPISpectrometer::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &SCPISpectrometer::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &SCPISpectrometer::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &SCPISpectrometer::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &SCPISpectrometer::DoPreLoadConfiguration));
 }
 
 SCPISpectrometer::~SCPISpectrometer()

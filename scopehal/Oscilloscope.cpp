@@ -56,9 +56,9 @@ Oscilloscope::Oscilloscope()
 {
 	m_trigger = NULL;
 
-	m_serializers.push_back(sigc::mem_fun(this, &Oscilloscope::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &Oscilloscope::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &Oscilloscope::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &Oscilloscope::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &Oscilloscope::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &Oscilloscope::DoPreLoadConfiguration));
 }
 
 Oscilloscope::~Oscilloscope()

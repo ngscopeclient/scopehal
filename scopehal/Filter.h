@@ -1074,12 +1074,12 @@ protected:
 #endif
 
 public:
-	sigc::signal<void> signal_outputsChanged()
+	sigc::signal<void()> signal_outputsChanged()
 	{ return m_outputsChangedSignal; }
 
 protected:
 	///@brief Signal emitted when the set of output streams changes
-	sigc::signal<void> m_outputsChangedSignal;
+	sigc::signal<void()> m_outputsChangedSignal;
 
 	/**
 		@brief Instance number (for auto naming)

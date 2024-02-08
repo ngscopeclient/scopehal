@@ -199,13 +199,13 @@ public:
 	/**
 		@brief Signal emitted every time the parameter's value changes
 	 */
-	sigc::signal<void> signal_changed()
+	sigc::signal<void()> signal_changed()
 	{ return m_changeSignal; }
 
 	/**
 		@brief Signal emitted every time the list of enumeration values changes
 	 */
-	sigc::signal<void> signal_enums_changed()
+	sigc::signal<void()> signal_enums_changed()
 	{ return m_enumSignal; }
 
 	/**
@@ -242,8 +242,8 @@ public:
 protected:
 	ParameterTypes				m_type;
 
-	sigc::signal<void>			m_changeSignal;
-	sigc::signal<void>			m_enumSignal;
+	sigc::signal<void()>		m_changeSignal;
+	sigc::signal<void()>		m_enumSignal;
 
 	Unit						m_unit;
 

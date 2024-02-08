@@ -34,9 +34,9 @@ using namespace std;
 
 BERT::BERT()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &BERT::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &BERT::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &BERT::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &BERT::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &BERT::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &BERT::DoPreLoadConfiguration));
 }
 
 BERT::~BERT()

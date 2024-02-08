@@ -37,9 +37,9 @@ using namespace std;
 
 FunctionGenerator::FunctionGenerator()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &FunctionGenerator::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &FunctionGenerator::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &FunctionGenerator::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &FunctionGenerator::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &FunctionGenerator::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &FunctionGenerator::DoPreLoadConfiguration));
 }
 
 FunctionGenerator::~FunctionGenerator()

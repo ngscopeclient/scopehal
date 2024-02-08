@@ -34,9 +34,9 @@ using namespace std;
 
 PowerSupply::PowerSupply()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &PowerSupply::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &PowerSupply::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &PowerSupply::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &PowerSupply::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &PowerSupply::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &PowerSupply::DoPreLoadConfiguration));
 }
 
 PowerSupply::~PowerSupply()

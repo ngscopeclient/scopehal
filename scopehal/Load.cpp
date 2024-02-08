@@ -35,9 +35,9 @@ using namespace std;
 
 Load::Load()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &Load::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &Load::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &Load::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &Load::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &Load::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &Load::DoPreLoadConfiguration));
 }
 
 Load::~Load()

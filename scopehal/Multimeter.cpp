@@ -34,9 +34,9 @@ using namespace std;
 
 Multimeter::Multimeter()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &Multimeter::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &Multimeter::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &Multimeter::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &Multimeter::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &Multimeter::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &Multimeter::DoPreLoadConfiguration));
 }
 
 Multimeter::~Multimeter()

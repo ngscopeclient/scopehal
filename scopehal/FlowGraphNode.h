@@ -218,19 +218,19 @@ protected:
 
 public:
 
-	sigc::signal<void> signal_parametersChanged()
+	sigc::signal<void()> signal_parametersChanged()
 	{ return m_parametersChangedSignal; }
 
-	sigc::signal<void> signal_inputsChanged()
+	sigc::signal<void()> signal_inputsChanged()
 	{ return m_inputsChangedSignal; }
 
 protected:
 
 	///@brief Signal emitted when the set of parameters changes
-	sigc::signal<void> m_parametersChangedSignal;
+	sigc::signal<void()> m_parametersChangedSignal;
 
 	///@brief Signal emitted when the set of inputs changes
-	sigc::signal<void> m_inputsChangedSignal;
+	sigc::signal<void()> m_inputsChangedSignal;
 };
 
 #endif
