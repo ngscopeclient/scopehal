@@ -838,24 +838,24 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sample format conversion
 public:
-	static void Convert8BitSamples(float* pout, int8_t* pin, float gain, float offset, size_t count);
-	static void Convert8BitSamplesGeneric(float* pout, int8_t* pin, float gain, float offset, size_t count);
+	static void Convert8BitSamples(float* pout, const int8_t* pin, float gain, float offset, size_t count);
+	static void Convert8BitSamplesGeneric(float* pout, const int8_t* pin, float gain, float offset, size_t count);
 #ifdef __x86_64__
-	static void Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, float offset, size_t count);
+	static void Convert8BitSamplesAVX2(float* pout, const int8_t* pin, float gain, float offset, size_t count);
 #endif
 
-	static void ConvertUnsigned8BitSamples(float* pout, uint8_t* pin, float gain, float offset, size_t count);
-	static void ConvertUnsigned8BitSamplesGeneric(float* pout, uint8_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned8BitSamples(float* pout, const uint8_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned8BitSamplesGeneric(float* pout, const uint8_t* pin, float gain, float offset, size_t count);
 #ifdef __x86_64__
-	static void ConvertUnsigned8BitSamplesAVX2(float* pout, uint8_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned8BitSamplesAVX2(float* pout, const uint8_t* pin, float gain, float offset, size_t count);
 #endif
 
-	static void Convert16BitSamples(float* pout, int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesGeneric(float* pout, int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamples(float* pout, const int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesGeneric(float* pout, const int16_t* pin, float gain, float offset, size_t count);
 #ifdef __x86_64__
-	static void Convert16BitSamplesAVX2(float* pout, int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesFMA(float* pout, int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesAVX512F(float* pout, int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesAVX2(float* pout, const int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesFMA(float* pout, const int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, float gain, float offset, size_t count);
 #endif
 
 public:

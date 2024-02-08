@@ -1633,8 +1633,10 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	else
 		num_samples = datalen;
 	size_t num_per_segment = num_samples / num_sequences;
-	int16_t* wdata = (int16_t*)&data[0];
-	int8_t* bdata = (int8_t*)&data[0];
+	// int16_t* wdata = (int16_t*)&data[0];
+	// int8_t* bdata = (int8_t*)&data[0];
+	const int16_t* wdata = reinterpret_cast<const int16_t*>(data);
+	const int8_t* bdata = reinterpret_cast<const int8_t*>(data);
 
 	float codes_per_div;
 
