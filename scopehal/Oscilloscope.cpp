@@ -980,7 +980,7 @@ void Oscilloscope::Convert8BitSamplesAVX2(float* pout, const int8_t* pin, float 
 	{
 		//Load all 32 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k));
 
 		//Extract the low and high 16 samples from the block
 		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
@@ -1112,7 +1112,7 @@ void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(float* pout, const uint8_t* pi
 	{
 		//Load all 32 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k));
 
 		//Extract the low and high 16 samples from the block
 		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
@@ -1270,8 +1270,8 @@ void Oscilloscope::Convert16BitSamplesAVX2(float* pout, const int16_t* pin, floa
 	{
 		//Load all 32 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
-		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
+		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k));
+		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k + 16));
 
 		//Extract the low and high halves (8 samples each) from the input blocks
 		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
@@ -1327,10 +1327,10 @@ void Oscilloscope::Convert16BitSamplesFMA(float* pout, const int16_t* pin, float
 	{
 		//Load all 64 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
-		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
-		__m256i raw_samples3 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 32));
-		__m256i raw_samples4 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 48));
+		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k));
+		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k + 16));
+		__m256i raw_samples3 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k + 32));
+		__m256i raw_samples4 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(pin + k + 48));
 
 		//Extract the low and high halves (8 samples each) from the input blocks
 		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
@@ -1402,8 +1402,8 @@ void Oscilloscope::Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, f
 	{
 		//Load all 64 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m512i raw_samples1 = _mm512_loadu_si512(reinterpret_cast<__m512i*>(pin + k));
-		__m512i raw_samples2 = _mm512_loadu_si512(reinterpret_cast<__m512i*>(pin + k + 32));
+		__m512i raw_samples1 = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(pin + k));
+		__m512i raw_samples2 = _mm512_loadu_si512(reinterpret_cast<const __m512i*>(pin + k + 32));
 
 		//Extract the high and low halves (16 samples each) from the input blocks
 		__m256i block0_i16 = _mm512_extracti64x4_epi64(raw_samples1, 0);
