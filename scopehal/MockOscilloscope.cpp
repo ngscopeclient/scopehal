@@ -193,6 +193,8 @@ void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& no
 			type = Stream::STREAM_TYPE_DIGITAL;
 		else if(stype == "trigger")
 			type = Stream::STREAM_TYPE_TRIGGER;
+		else if(stype == "protocol")
+			type = Stream::STREAM_TYPE_PROTOCOL;
 
 		auto chan = new OscilloscopeChannel(
 			this,

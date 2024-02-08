@@ -268,13 +268,19 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 				if(HasFrequencyControls())
 					channelNode["centerfreq"] = GetCenterFrequency(i);
 				break;
+
 			case Stream::STREAM_TYPE_DIGITAL:
 				channelNode["type"] = "digital";
 				channelNode["thresh"] = GetDigitalThreshold(i);
 				channelNode["hys"] = GetDigitalHysteresis(i);
 				break;
+
 			case Stream::STREAM_TYPE_TRIGGER:
 				channelNode["type"] = "trigger";
+				break;
+
+			case Stream::STREAM_TYPE_PROTOCOL:
+				channelNode["type"] = "protocol";
 				break;
 
 			//should never get complex channels on a scope
