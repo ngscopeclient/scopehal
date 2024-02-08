@@ -1,6 +1,3 @@
-include_directories(SYSTEM ${CAIROMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
-link_directories(${CAIROMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
-
 set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleFilter.cpp
 	ACRMSMeasurement.cpp
@@ -197,23 +194,15 @@ set(SCOPEPROTOCOLS_SOURCES
 add_library(scopeprotocols SHARED
 	${SCOPEPROTOCOLS_SOURCES})
 
-if(APPLE_SILICON)
-	target_link_libraries(scopeprotocols
-		scopehal
-		)
-	target_include_directories(scopeprotocols
-	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-		)
-else()
-	target_link_libraries(scopeprotocols
-		scopehal
-		${LIBFFTS_LIBRARIES}
-		)
-	target_include_directories(scopeprotocols
-	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-		${LIBFFTS_INCLUDE_DIR}
-		)
-endif()
+target_link_libraries(scopeprotocols
+	scopehal
+	)
+
+target_include_directories(scopeprotocols
+	PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}
+	${glslang_INCLUDE_DIR}/glslang/Include
+	)
 
 # Setup for vkfft
 target_compile_definitions(scopeprotocols PUBLIC -DVK_API_VERSION=10 -DVKFFT_BACKEND=0)

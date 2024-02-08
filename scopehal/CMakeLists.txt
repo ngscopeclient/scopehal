@@ -1,10 +1,41 @@
-include_directories(SYSTEM ${CAIROMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
-link_directories(${CAIROMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
+# At the moment, this is meant to be built as part of scopehal-apps.
+# Standalone build/install is a potential long-term goal.
+#If there is interest in a standalone build, please reach out. 
 
-find_library(LXI_LIB lxi)
-find_library(TIRPC_LIB tirpc)
-find_library(LINUXGPIB_LIB gpib)
-find_package(glfw3 REQUIRED)
+# Libraries specific to scopehal library not provided by root CMakeLists
+
+if(LINUX)
+	pkg_check_modules(LXI liblxi QUIET IMPORTED_TARGET)
+	#WORKAROUND LXI on Debian Bullseye lacks a pkgconfig file
+	if(NOT LXI_FOUND)
+		find_library(LXI_LINK_LIBRARIES lxi)
+	endif()
+	if(LXI_LINK_LIBRARIES)
+		message("-- Found LXI: ${LXI_LINK_LIBRARIES}")
+		# LXI requires TIRPC but does not link it automatically
+		pkg_check_modules(TIRPC libtirpc QUIET IMPORTED_TARGET)
+		if(TIRPC_FOUND)
+			message("-- Found TIRPC: ${TIRPC_LINK_LIBRARIES}")
+		else()
+			message(FATAL_ERROR "TIRPC library is required for LXI to function. The LXI library was found, but TIRPC is missing.")
+		endif()
+	else()
+		message("-- LXI library not found, LXI (VXI-11/TCP and RAW/TCP ) instrument support will not be available.")
+		unset(LXI_LINK_LIBRARIES CACHE)
+	endif()
+
+
+	pkg_check_modules(LINUXGPIB libgpib QUIET IMPORTED_TARGET)
+	if(LINUXGPIB_FOUND)
+		message("-- Found Linux GPIB: ${LINUXGPIB_LINK_LIBRARIES}")
+	else()
+		message("-- Linux GPIB not found, GPIB instrument support will not be available.")
+	endif()
+endif()
+
+# This is needed for the precompiled header
+get_target_property(Vulkan_INCLUDE_DIR Vulkan::Headers INTERFACE_INCLUDE_DIRECTORIES)
+
 
 #Set up versioning (with a dummy string for now if Git isn't present)
 if(Git_FOUND)
@@ -16,55 +47,17 @@ if(Git_FOUND)
 else()
 	set(SCOPEHAL_VERSION "unknown")
 endif()
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 configure_file(scopehal-version.h.in scopehal-version.h)
 
 # Additional Windows/Linux libraries
 if(WIN32)
 	set(WIN_LIBS shlwapi)
-	# The packaging for yaml-cpp on mingw64 seems to be broken, not providing a
-	# libyaml-cpp.dll.a to be found by find_library inside of find_package(YAML)
-	# when using FindYAML.cmake, just set the library directly
-	set(YAML_LIBRARIES yaml-cpp)
-else()
-	set(LIN_LIBS dl)
-	find_package(YAML REQUIRED)
-endif()
-
-if(LINUX AND CMAKE_SYSTEM_VERSION MATCHES "\.fc[0-9]+\.")
-	set(FEDORA TRUE)
-endif()
-
-if(WIN32 OR FEDORA)
-	set(SPIRV_LIBRARIES SPIRV SPIRV-Tools-opt SPIRV-Tools)
-else()
-	set(SPIRV_LIBRARIES "")
 endif()
 
 # Apple has their own idea about stat structs
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Dst_mtim=st_mtimespec")
-endif()
-
-if(LXI_LIB AND (NOT FEDORA OR TIRPC_LIB))
-	set(HAS_LXI true)
-	if (FEDORA)
-		# On Fedora, tirpc is (still?) not linked into lxi
-		set(LXI_LIBRARIES ${LXI_LIB} ${TIRPC_LIB})
-	else()
-		set(LXI_LIBRARIES ${LXI_LIB})
-	endif()
-else()
-	set(HAS_LXI false)
-	set(LXI_LIBRARIES "")
-endif()
-
-if(LINUXGPIB_LIB)
-	set(HAS_LINUXGPIB true)
-	set(LINUXGPIB_LIBRARIES ${LINUXGPIB_LIB})
-else()
-	set(HAS_LINUXGPIB false)
-	set(LINUXGPIB_LIBRARIES "")
+	add_compile_options(-Dst_mtim=st_mtimespec)
 endif()
 
 set(SCOPEHAL_SOURCES
@@ -168,12 +161,6 @@ set(SCOPEHAL_SOURCES
 	PicoVNA.cpp
 	RigolFunctionGenerator.cpp
 	RigolOscilloscope.cpp
-	HP662xAPowerSupply.cpp
-	RigolDP8xxPowerSupply.cpp
-	RohdeSchwarzOscilloscope.cpp
-	RSRTO6Oscilloscope.cpp
-	RohdeSchwarzHMC8012Multimeter.cpp
-	RohdeSchwarzHMC804xPowerSupply.cpp
 	SiglentLoad.cpp
 	SiglentPowerSupply.cpp
 	SiglentSCPIOscilloscope.cpp
@@ -181,6 +168,12 @@ set(SCOPEHAL_SOURCES
 	TektronixOscilloscope.cpp
 	ThunderScopeOscilloscope.cpp
 	UHDBridgeSDR.cpp
+	HP662xAPowerSupply.cpp
+	RigolDP8xxPowerSupply.cpp
+	RohdeSchwarzOscilloscope.cpp
+	RSRTO6Oscilloscope.cpp
+	RohdeSchwarzHMC8012Multimeter.cpp
+	RohdeSchwarzHMC804xPowerSupply.cpp
 
 	StandardColors.cpp
 	Filter.cpp
@@ -203,7 +196,7 @@ set(SCOPEHAL_SOURCES
 	QueueManager.cpp
 	)
 
-if(NOT WIN32 AND NOT APPLE)
+if(LINUX)
 	list(APPEND SCOPEHAL_SOURCES
 		# TMC is only supported on Linux for now.
 		# https://github.com/glscopeclient/scopehal/issues/519
@@ -216,138 +209,70 @@ configure_file(config.h.in config.h)
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 
-if(WIN32)
 # mingw64 build using
 # https://sdk.lunarg.com/sdk/download/1.3.224.1/windows/VulkanSDK-1.3.224.1-Installer.exe
 # https://github.com/KhronosGroup/glslang.git (tags/sdk-1.3.224.1) static lib (SPIRV* glslang OGLCompiler GenericCodeGen MachineIndependent OSDependent)
+
 target_link_libraries(scopehal
-	${SIGCXX_LIBRARIES}
-	${CAIROMM_LIBRARIES}
 	xptools
 	log
-	${YAML_LIBRARIES}
-	${LXI_LIBRARIES}
-	${LINUXGPIB_LIBRARIES}
-	${WIN_LIBS}
-	${LIN_LIBS}
-	${LIBFFTS_LIBRARIES}
-	${OpenMP_CXX_LIBRARIES}
-	${Vulkan_LIBRARIES}
-	${SPIRV_LIBRARIES}
-	glslang
-	Vulkan::Vulkan
-	-Wl,--start-group
-	OGLCompiler
-	GenericCodeGen
-	MachineIndependent
-	-Wl,--end-group
-	OSDependent
+	PkgConfig::SIGCXX
+	PkgConfig::CAIROMM
+	yaml-cpp::yaml-cpp
+	OpenMP::OpenMP_CXX
+	Vulkan::Loader
+	Vulkan::Headers
+	glslang::glslang
+	glslang::SPIRV
 	glfw
-	)
-elseif(APPLE_SILICON)
-target_link_libraries(scopehal
-	${SIGCXX_LIBRARIES}
-	${CAIROMM_LIBRARIES}
-	xptools
-	log
-	${YAML_LIBRARIES}
-	${LXI_LIBRARIES}
-	${LINUXGPIB_LIBRARIES}
 	${WIN_LIBS}
-	${LIN_LIBS}
-	${OpenMP_CXX_LIBRARIES}
-	${Vulkan_LIBRARIES}
-	${SPIRV_LIBRARIES}
-	Vulkan::Vulkan
-	Vulkan::glslang
-	Vulkan::shaderc_combined
-	glfw
 	)
-else()
-target_link_libraries(scopehal
-	${SIGCXX_LIBRARIES}
-	${CAIROMM_LIBRARIES}
-	xptools
-	log
-	${YAML_LIBRARIES}
-	${LXI_LIBRARIES}
-	${LINUXGPIB_LIBRARIES}
-	${WIN_LIBS}
-	${LIN_LIBS}
-	${LIBFFTS_LIBRARIES}
-	${OpenMP_CXX_LIBRARIES}
-	${Vulkan_LIBRARIES}
-	${SPIRV_LIBRARIES}
-	Vulkan::Vulkan
-	Vulkan::glslang
-	Vulkan::shaderc_combined
-	glfw
+
+if(LXI_FOUND)
+	target_link_libraries(scopehal
+		PkgConfig::LXI
+		PkgConfig::TIRPC
 	)
+	target_compile_definitions(scopehal PUBLIC HAS_LXI)
 endif()
 
-if(APPLE_SILICON)
-	target_include_directories(scopehal
-	PUBLIC
-		${CMAKE_CURRENT_SOURCE_DIR}
-		${CMAKE_CURRENT_BINARY_DIR}
-		${YAML_INCLUDES}
-
-		# TODO: this needs to come from FindPackage etc
-		/usr/include/glslang/Include
-		# for macOS:
-		/usr/local/include/glslang/Include
-		)
-else()
-	target_include_directories(scopehal
-	PUBLIC
-		${CMAKE_CURRENT_SOURCE_DIR}
-		${CMAKE_CURRENT_BINARY_DIR}
-		${LIBFFTS_INCLUDE_DIR}
-		${YAML_INCLUDES}
-
-		# TODO: this needs to come from FindPackage etc
-		/usr/include/glslang/Include
-		# for macOS:
-		/usr/local/include/glslang/Include
-		)
+if(LINUXGPIB_FOUND)
+	target_link_libraries(scopehal
+		PkgConfig::LINUXGPIB
+	)
+	target_compile_definitions(scopehal PUBLIC HAS_LINUXGPIB)
 endif()
 
 target_include_directories(scopehal
-PUBLIC SYSTEM
+PRIVATE
+	${glslang_INCLUDE_DIR}/glslang/Include
+PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}
+	${CMAKE_CURRENT_BINARY_DIR}
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
+)
+
+if(NOT APPLE_SILICON)
+	target_link_libraries(scopehal
+		${LIBFFTS_LIBRARIES}
 	)
 
-target_include_directories(scopehal
-PUBLIC SYSTEM
-	${OpenMP_CXX_INCLUDE_DIR}
+	target_include_directories(scopehal
+		PUBLIC
+		${LIBFFTS_INCLUDE_DIRS}
 	)
-
-# Don't include yaml-cpp in Windows PCH because this seems to give errors about path resolution
-# TODO: fix this for faster builds
-if(${WIN32})
-	set(YAML_PCH_PATH "")
-else()
-	set(YAML_PCH_PATH "${YAML_INCLUDES}/yaml-cpp/yaml.h")
 endif()
 
 target_precompile_headers(scopehal
 PUBLIC
 
-	# libstdc++ headers used by vulkan and/or very widely throughout the project
+	# C++ library headers used by vulkan and/or very widely throughout the project
 	${CMAKE_CURRENT_SOURCE_DIR}/scopehal-pch.h
 
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
 	${YAML_PCH_PATH}
 	)
-
-if(${HAS_LXI})
-	target_compile_definitions(scopehal PUBLIC HAS_LXI)
-endif()
-
-if(${HAS_LINUXGPIB})
-	target_compile_definitions(scopehal PUBLIC HAS_LINUXGPIB)
-endif()
 
 install(TARGETS scopehal LIBRARY)
 
