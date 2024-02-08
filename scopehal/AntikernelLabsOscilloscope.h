@@ -45,50 +45,50 @@ public:
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	virtual void FlushConfigCache();
+	virtual void FlushConfigCache() override;
 
 	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual unsigned int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
 
 	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
 
 	//Timebase
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
 
 protected:
 	SCPITransport* m_waveformTransport;

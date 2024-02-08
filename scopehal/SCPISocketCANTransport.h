@@ -47,7 +47,7 @@ public:
 	SCPISocketCANTransport(const std::string& args);
 	virtual ~SCPISocketCANTransport();
 
-	virtual std::string GetConnectionString();
+	virtual std::string GetConnectionString() override;
 	static std::string GetTransportName();
 
 	virtual void FlushRXBuffer(void) override;

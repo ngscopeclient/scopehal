@@ -31,6 +31,8 @@
 #include "ESPIDecoder.h"
 #include "SPIDecoder.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -982,7 +984,7 @@ void ESPIDecoder::Refresh()
 					//64-127 platform specific
 					else if(addr <= 127)
 					{
-						snprintf(tmp, sizeof(tmp), "Platform specific %02lx:%02x\n", addr, current_byte);
+						snprintf(tmp, sizeof(tmp), "Platform specific %02" PRIx64 ":%02x\n", addr, current_byte);
 						pack->m_headers["Info"] += tmp;
 					}
 
@@ -1115,7 +1117,7 @@ void ESPIDecoder::Refresh()
 
 						//Don't report free space in the protocol analyzer
 						//to save column space
-						snprintf(tmp, sizeof(tmp), "%08lx", data);
+						snprintf(tmp, sizeof(tmp), "%08" PRIx64, data);
 						pack->m_headers["Address"] = tmp;
 
 						count = 0;
@@ -1272,7 +1274,7 @@ void ESPIDecoder::Refresh()
 						cap->m_durations.push_back(timestamp - tstart);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_IO_ADDR, addr));
 
-						snprintf(tmp, sizeof(tmp), "%04lx", addr);
+						snprintf(tmp, sizeof(tmp), "%04" PRIx64, addr);
 						pack->m_headers["Address"] = tmp;
 
 						pack->m_headers["Len"] = to_string(payload_len);
@@ -1321,7 +1323,7 @@ void ESPIDecoder::Refresh()
 						cap->m_durations.push_back(timestamp - tstart);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_IO_ADDR, addr));
 
-						snprintf(tmp, sizeof(tmp), "%04lx", addr);
+						snprintf(tmp, sizeof(tmp), "%04" PRIx64, addr);
 						pack->m_headers["Address"] = tmp;
 
 						count = 0;
@@ -1588,7 +1590,7 @@ string ESPIWaveform::GetText(size_t i)
 					return "Put I/O Read";
 
 				default:
-					snprintf(tmp, sizeof(tmp), "Unknown Cmd (%02lx)", s.m_data);
+					snprintf(tmp, sizeof(tmp), "Unknown Cmd (%02" PRIx64 ")", s.m_data);
 					return tmp;
 			}
 			break;
@@ -1605,7 +1607,7 @@ string ESPIWaveform::GetText(size_t i)
 
 				//Print as hex if unknown
 				default:
-					snprintf(tmp, sizeof(tmp), "%04lx", s.m_data);
+					snprintf(tmp, sizeof(tmp), "%04" PRIx64, s.m_data);
 					return tmp;
 			}
 
@@ -1622,7 +1624,7 @@ string ESPIWaveform::GetText(size_t i)
 			return string("Index: ") + to_string_hex(s.m_data);
 
 		case ESPISymbol::TYPE_VWIRE_DATA:
-			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "%02" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_RESPONSE_OP:
@@ -1644,7 +1646,7 @@ string ESPIWaveform::GetText(size_t i)
 					return "No Response";
 
 				default:
-					snprintf(tmp, sizeof(tmp), "Unknown response %lx", s.m_data & 0xf);
+					snprintf(tmp, sizeof(tmp), "Unknown response %" PRIx64, s.m_data & 0xf);
 					return tmp;
 			}
 			break;
@@ -1973,7 +1975,7 @@ string ESPIWaveform::GetText(size_t i)
 
 		case ESPISymbol::TYPE_RESPONSE_DATA_32:
 		case ESPISymbol::TYPE_COMMAND_DATA_32:
-			snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "%08" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_RESPONSE_STATUS:
@@ -2027,19 +2029,19 @@ string ESPIWaveform::GetText(size_t i)
 		case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
 		case ESPISymbol::TYPE_IO_DATA:
 		case ESPISymbol::TYPE_COMPLETION_DATA:
-			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "%02" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
-			snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Addr: %08" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_IO_ADDR:
-			snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Addr: %04" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
-			snprintf(tmp, sizeof(tmp), "Addr: %02lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Addr: %02" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
@@ -2049,7 +2051,7 @@ string ESPIWaveform::GetText(size_t i)
 				return "Invalid";
 
 		case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
-			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "%02" PRIx64, s.m_data);
 			return tmp;
 
 		case ESPISymbol::TYPE_COMPLETION_TYPE:

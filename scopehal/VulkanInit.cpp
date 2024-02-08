@@ -473,13 +473,13 @@ bool VulkanInit(bool skipGLFW)
 					auto heap = memProperties.memoryHeaps[j];
 
 					if(heap.size > g)
-						LogDebug("Size: %zu GB\n", heap.size / g);
+						LogDebug("Size: %" PRIu64 " GB\n", heap.size / g);
 					else if(heap.size > m)
-						LogDebug("Size: %zu MB\n", heap.size / m);
+						LogDebug("Size: %" PRIu64 " MB\n", heap.size / m);
 					else if(heap.size > k)
-						LogDebug("Size: %zu kB\n", heap.size / k);
+						LogDebug("Size: %" PRIu64 " kB\n", heap.size / k);
 					else
-						LogDebug("Size: %zu B\n", heap.size);
+						LogDebug("Size: %" PRIu64 " B\n", heap.size);
 
 					if(heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal)
 						LogDebug("Device local\n");

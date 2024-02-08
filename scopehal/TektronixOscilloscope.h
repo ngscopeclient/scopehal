@@ -105,105 +105,105 @@ public:
 	virtual std::string GetProbeName(size_t i) override;
 
 	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool PeekTriggerArmed();
-	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
-	std::vector<std::string> GetTriggerTypes();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool PeekTriggerArmed() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
+	std::vector<std::string> GetTriggerTypes() override;
 
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
 
-	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
-	virtual int64_t GetDeskewForChannel(size_t channel);
+	virtual void SetDeskewForChannel(size_t channel, int64_t skew) override;
+	virtual int64_t GetDeskewForChannel(size_t channel) override;
 
-	virtual void SetUseExternalRefclk(bool external);
-	virtual void EnableTriggerOutput();
+	virtual void SetUseExternalRefclk(bool external) override;
+	virtual void EnableTriggerOutput() override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 
-	virtual std::vector<DigitalBank> GetDigitalBanks();
-	virtual DigitalBank GetDigitalBank(size_t channel);
-	virtual bool IsDigitalHysteresisConfigurable();
-	virtual bool IsDigitalThresholdConfigurable();
-	virtual float GetDigitalHysteresis(size_t channel);
-	virtual float GetDigitalThreshold(size_t channel);
-	virtual void SetDigitalHysteresis(size_t channel, float level);
-	virtual void SetDigitalThreshold(size_t channel, float level);
+	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+	virtual DigitalBank GetDigitalBank(size_t channel) override;
+	virtual bool IsDigitalHysteresisConfigurable() override;
+	virtual bool IsDigitalThresholdConfigurable() override;
+	virtual float GetDigitalHysteresis(size_t channel) override;
+	virtual float GetDigitalThreshold(size_t channel) override;
+	virtual void SetDigitalHysteresis(size_t channel, float level) override;
+	virtual void SetDigitalThreshold(size_t channel, float level) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Multimeter stuff
 
-	virtual unsigned int GetMeasurementTypes();
+	virtual unsigned int GetMeasurementTypes() override;
 	virtual int GetMeterChannelCount();
-	virtual int GetCurrentMeterChannel();
-	virtual void SetCurrentMeterChannel(int chan);
-	virtual MeasurementTypes GetMeterMode();
-	virtual void SetMeterMode(MeasurementTypes type);
-	virtual void SetMeterAutoRange(bool enable);
-	virtual bool GetMeterAutoRange();
-	virtual void StartMeter();
-	virtual void StopMeter();
-	virtual double GetMeterValue();
-	virtual int GetMeterDigits();
+	virtual int GetCurrentMeterChannel() override;
+	virtual void SetCurrentMeterChannel(int chan) override;
+	virtual MeasurementTypes GetMeterMode() override;
+	virtual void SetMeterMode(MeasurementTypes type) override;
+	virtual void SetMeterAutoRange(bool enable) override;
+	virtual bool GetMeterAutoRange() override;
+	virtual void StartMeter() override;
+	virtual void StopMeter() override;
+	virtual double GetMeterValue() override;
+	virtual int GetMeterDigits() override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Function generator
 
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
 
 	//Configuration
-	virtual bool GetFunctionChannelActive(int chan);
-	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual bool GetFunctionChannelActive(int chan) override;
+	virtual void SetFunctionChannelActive(int chan, bool on) override;
 
-	virtual float GetFunctionChannelDutyCycle(int chan);
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+	virtual float GetFunctionChannelDutyCycle(int chan) override;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
 
-	virtual float GetFunctionChannelAmplitude(int chan);
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelAmplitude(int chan) override;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
 
-	virtual float GetFunctionChannelOffset(int chan);
-	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelOffset(int chan) override;
+	virtual void SetFunctionChannelOffset(int chan, float offset) override;
 
-	virtual float GetFunctionChannelFrequency(int chan);
-	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual float GetFunctionChannelFrequency(int chan) override;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
 
-	virtual WaveShape GetFunctionChannelShape(int chan);
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual WaveShape GetFunctionChannelShape(int chan) override;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
 
-	virtual bool HasFunctionRiseFallTimeControls(int chan);
+	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
 
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration
 
-	virtual bool HasFrequencyControls();
-	virtual void SetSpan(int64_t span);
-	virtual int64_t GetSpan();
-	virtual void SetCenterFrequency(size_t channel, int64_t freq);
-	virtual int64_t GetCenterFrequency(size_t channel);
-	virtual void SetResolutionBandwidth(int64_t rbw);
-	virtual int64_t GetResolutionBandwidth();
+	virtual bool HasFrequencyControls() override;
+	virtual void SetSpan(int64_t span) override;
+	virtual int64_t GetSpan() override;
+	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
+	virtual int64_t GetCenterFrequency(size_t channel) override;
+	virtual void SetResolutionBandwidth(int64_t rbw) override;
+	virtual int64_t GetResolutionBandwidth() override;
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;

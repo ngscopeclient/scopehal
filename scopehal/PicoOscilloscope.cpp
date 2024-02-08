@@ -207,7 +207,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
 	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
-		move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 
 	if(g_hasDebugUtils)
 	{

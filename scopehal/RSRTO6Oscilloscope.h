@@ -46,96 +46,96 @@ public:
 
 public:
 	//Device information
-	virtual unsigned int GetInstrumentTypes() const;
+	virtual unsigned int GetInstrumentTypes() const override;
 
-	virtual void FlushConfigCache();
-	virtual OscilloscopeChannel* GetExternalTrigger();
+	virtual void FlushConfigCache() override;
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
 
 	//Channel configuration
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual unsigned int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
-	virtual std::string GetProbeName(size_t i);
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual std::string GetProbeName(size_t i) override;
 
 	//Digital channel configuration
-	virtual std::vector<DigitalBank> GetDigitalBanks();
-	virtual DigitalBank GetDigitalBank(size_t channel);
-	virtual bool IsDigitalHysteresisConfigurable();
-	virtual bool IsDigitalThresholdConfigurable();
-	// virtual float GetDigitalHysteresis(size_t channel);
-	virtual float GetDigitalThreshold(size_t channel);
-	// virtual void SetDigitalHysteresis(size_t channel, float level);
-	virtual void SetDigitalThreshold(size_t channel, float level);
+	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+	virtual DigitalBank GetDigitalBank(size_t channel) override;
+	virtual bool IsDigitalHysteresisConfigurable() override;
+	virtual bool IsDigitalThresholdConfigurable() override;
+	// virtual float GetDigitalHysteresis(size_t channel) override;
+	virtual float GetDigitalThreshold(size_t channel) override;
+	// virtual void SetDigitalHysteresis(size_t channel, float level) override;
+	virtual void SetDigitalThreshold(size_t channel, float level) override;
 
 	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
 
 	//Timebase
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Function generator
 
 	//Channel info
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
 
 	//Configuration
-	virtual bool GetFunctionChannelActive(int chan);
-	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual bool GetFunctionChannelActive(int chan) override;
+	virtual void SetFunctionChannelActive(int chan, bool on) override;
 
-	virtual bool HasFunctionDutyCycleControls(int chan);
-	virtual float GetFunctionChannelDutyCycle(int chan);
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+	virtual bool HasFunctionDutyCycleControls(int chan) override;
+	virtual float GetFunctionChannelDutyCycle(int chan) override;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
 
-	virtual float GetFunctionChannelAmplitude(int chan);
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelAmplitude(int chan) override;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
 
-	virtual float GetFunctionChannelOffset(int chan);
-	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelOffset(int chan) override;
+	virtual void SetFunctionChannelOffset(int chan, float offset) override;
 
-	virtual float GetFunctionChannelFrequency(int chan);
-	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual float GetFunctionChannelFrequency(int chan) override;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
 
-	virtual WaveShape GetFunctionChannelShape(int chan);
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual WaveShape GetFunctionChannelShape(int chan) override;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
 
-	virtual bool HasFunctionRiseFallTimeControls(int chan);
+	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
 
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;

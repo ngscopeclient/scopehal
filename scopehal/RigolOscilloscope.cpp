@@ -27,14 +27,17 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#include "scopehal.h"
+#include "RigolOscilloscope.h"
+#include "EdgeTrigger.h"
+
+#include <cinttypes>
+
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
 #endif
 
-#include "scopehal.h"
-#include "RigolOscilloscope.h"
-#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -1043,7 +1046,7 @@ uint64_t RigolOscilloscope::GetSampleRate()
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:SRAT?"));
 
 	uint64_t rate;
-	sscanf(ret.c_str(), "%lu", &rate);
+	sscanf(ret.c_str(), "%" PRIu64, &rate);
 	m_srate = rate;
 	m_srateValid = true;
 	return rate;
@@ -1098,18 +1101,18 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 				if(m_opt200M)
 					m_transport->SendCommandQueued("ACQ:MDEP 50M");
 				else
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 				break;
 			case 100000000:
 				//m_transport->SendCommandQueued("ACQ:MDEP 100M");
-				LogError("Invalid memory depth for channel: %lu\n", depth);
+				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 				break;
 			case 200000000:
 				//m_transport->SendCommandQueued("ACQ:MDEP 200M");
-				LogError("Invalid memory depth for channel: %lu\n", depth);
+				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 				break;
 			default:
-				LogError("Invalid memory depth for channel: %lu\n", depth);
+				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 		}
 		m_transport->SendCommandQueued(":TRIG:SWE " + trigger_sweep_mode);
 		// This is a little hairy - do we want to stop the instrument again if it was stopped previously? Probably?

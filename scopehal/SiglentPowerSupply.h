@@ -46,7 +46,7 @@ public:
 
 	//Device capabilities
 	virtual bool SupportsIndividualOutputSwitching() override;
-	virtual bool SupportsVoltageCurrentControl(int chan);
+	virtual bool SupportsVoltageCurrentControl(int chan) override;
 
 	//Read sensors
 	virtual double GetPowerVoltageActual(int chan) override;	//actual voltage after current limiting

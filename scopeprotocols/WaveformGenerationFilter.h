@@ -40,9 +40,9 @@ class WaveformGenerationFilter : public Filter
 public:
 	WaveformGenerationFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 protected:
 	virtual size_t GetBitsPerSymbol() =0;

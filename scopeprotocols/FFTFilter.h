@@ -62,17 +62,17 @@ public:
 	FFTFilter(const std::string& color);
 	virtual ~FFTFilter();
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	virtual DataLocation GetInputLocation();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual float GetVoltageRange(size_t stream) override;
+	virtual float GetOffset(size_t stream) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream) override;
+	virtual void SetOffset(float offset, size_t stream) override;
 
 	enum WindowFunction
 	{

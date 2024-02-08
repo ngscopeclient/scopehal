@@ -98,18 +98,18 @@ class SDCmdDecoder : public PacketDecoder
 public:
 	SDCmdDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool GetShowDataColumn();
+	virtual bool GetShowDataColumn() override;
 
-	std::vector<std::string> GetHeaders();
+	std::vector<std::string> GetHeaders() override;
 
-	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
-	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	enum CardType
 	{

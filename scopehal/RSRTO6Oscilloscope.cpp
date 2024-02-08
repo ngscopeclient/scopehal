@@ -41,6 +41,8 @@
 #include "RSRTO6Oscilloscope.h"
 #include "EdgeTrigger.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -713,18 +715,18 @@ template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, string ch
 	double capture_len_sec = xstop - xstart;
 	double sec_per_sample = capture_len_sec / length;
 	int64_t fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
-	LogDebug("%ld fs/sample\n", fs_per_sample);
+	LogDebug("%" PRId64 " fs/sample\n", fs_per_sample);
 
 	size_t reported_srate = (FS_PER_SECOND / fs_per_sample);
 
 	if (reported_srate != m_sampleRate)
 	{
-		LogWarning("Reported sample rate %lu != expected sample rate %lu; using what it said\n", reported_srate, m_sampleRate);
+		LogWarning("Reported sample rate %zu != expected sample rate %" PRIu64 "; using what it said\n", reported_srate, m_sampleRate);
 	}
 
 	if (length != m_sampleDepth)
 	{
-		LogWarning("Reported depth %lu != expected depth %lu; using what I think is correct\n", length, m_sampleDepth);
+		LogWarning("Reported depth %zu != expected depth %" PRIu64 "; using what I think is correct\n", length, m_sampleDepth);
 		length = m_sampleDepth;
 	}
 
@@ -984,7 +986,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 
 	auto end_time = std::chrono::system_clock::now();
 
-	LogDebug("Acquisition took %lu\n", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
+	LogDebug("Acquisition took %" PRId64 "\n", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
 	return any_data;
 }
@@ -1151,14 +1153,14 @@ uint64_t RSRTO6Oscilloscope::GetSampleRate()
 {
 	if(m_sampleRateValid)
 	{
-		LogDebug("GetSampleRate() queried and returned cached value %ld\n", m_sampleRate);
+		LogDebug("GetSampleRate() queried and returned cached value %" PRIu64 "\n", m_sampleRate);
 		return m_sampleRate;
 	}
 
 	m_sampleRate = stod(m_transport->SendCommandQueuedWithReply("ACQUIRE:SRATE?"));
 	m_sampleRateValid = true;
 
-	LogDebug("GetSampleRate() queried and got new value %ld\n", m_sampleRate);
+	LogDebug("GetSampleRate() queried and got new value %" PRIu64 "\n", m_sampleRate);
 
 	return 1;
 }
@@ -1167,7 +1169,7 @@ uint64_t RSRTO6Oscilloscope::GetSampleDepth()
 {
 	if(m_sampleDepthValid)
 	{
-		LogDebug("GetSampleDepth() queried and returned cached value %ld\n", m_sampleDepth);
+		LogDebug("GetSampleDepth() queried and returned cached value %" PRIu64 "\n", m_sampleDepth);
 		return m_sampleDepth;
 	}
 
@@ -1176,7 +1178,7 @@ uint64_t RSRTO6Oscilloscope::GetSampleDepth()
 	m_sampleDepth = stod(m_transport->SendCommandQueuedWithReply("TIMEBASE:RANGE?")) * (double)m_sampleRate;
 	m_sampleDepthValid = true;
 
-	LogDebug("GetSampleDepth() queried and got new value %ld\n", m_sampleDepth);
+	LogDebug("GetSampleDepth() queried and got new value %" PRIu64 "\n", m_sampleDepth);
 
 	return 1;
 }
@@ -1192,7 +1194,7 @@ void RSRTO6Oscilloscope::SetSampleDepth(uint64_t depth)
 		m_sampleDepthValid = true;
 	}
 
-	LogDebug("SetSampleDepth() setting to %ld\n", depth);
+	LogDebug("SetSampleDepth() setting to %" PRIu64 "\n", depth);
 
 	m_transport->SendCommandQueued(string("TIMEBASE:RANGE ") + to_string((double)depth / (double)m_sampleRate));
 }
@@ -1206,7 +1208,7 @@ void RSRTO6Oscilloscope::SetSampleRate(uint64_t rate)
 		m_sampleRateValid = true;
 	}
 
-	LogDebug("SetSampleRate() setting to %ld\n", rate);
+	LogDebug("SetSampleRate() setting to %" PRIu64 "\n", rate);
 
 	m_transport->SendCommandQueued(string("ACQUIRE:SRATE ") + to_string(rate));
 

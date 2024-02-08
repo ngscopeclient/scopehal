@@ -155,14 +155,10 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Filter evaluation
+	[[deprecated]]
+	virtual void Refresh();
 
-	virtual void
-	#ifndef _MSC_VER
-	__attribute__((deprecated))
-	#endif
-	 Refresh();
-
-	//GPU accelerated refresh method
+	//Filter evaluation (GPU accelerated)
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 
 	//Input handling helpers

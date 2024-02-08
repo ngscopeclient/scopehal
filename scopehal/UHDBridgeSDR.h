@@ -53,7 +53,7 @@ public:
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	virtual void FlushConfigCache();
+	virtual void FlushConfigCache() override;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i) override;

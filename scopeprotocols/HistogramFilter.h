@@ -40,20 +40,20 @@ class HistogramFilter : public Filter
 public:
 	HistogramFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	virtual void SetDefaultName() override;
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
+	virtual float GetVoltageRange(size_t stream) override;
+	virtual void SetVoltageRange(float range, size_t stream) override;
 
-	virtual float GetOffset(size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+	virtual float GetOffset(size_t stream) override;
+	virtual void SetOffset(float offset, size_t stream) override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual void ClearSweeps();
+	virtual void ClearSweeps() override;
 
 	PROTOCOL_DECODER_INITPROC(HistogramFilter)
 

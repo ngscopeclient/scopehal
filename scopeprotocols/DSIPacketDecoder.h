@@ -83,16 +83,16 @@ class DSIPacketDecoder : public PacketDecoder
 public:
 	DSIPacketDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	std::vector<std::string> GetHeaders();
+	std::vector<std::string> GetHeaders() override;
 
-	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
-	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
 
 	//From table 16
 	enum

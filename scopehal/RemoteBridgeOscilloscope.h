@@ -43,36 +43,36 @@ public:
 	virtual ~RemoteBridgeOscilloscope();
 
 	// Channel Configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
 
-	OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
 
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
 
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
 
 	// Triggering
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void ForceTrigger();
-	virtual void Stop();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
-	virtual bool IsTriggerArmed();
-	virtual bool PeekTriggerArmed();
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void ForceTrigger() override;
+	virtual void Stop() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual bool PeekTriggerArmed() override;
 
 	// Timebase
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
 
 protected:
 	bool m_triggerArmed;

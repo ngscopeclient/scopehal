@@ -36,6 +36,8 @@
 #include "../scopehal/scopehal.h"
 #include "Ethernet64b66bDecoder.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,7 +204,7 @@ string Ethernet64b66bWaveform::GetText(size_t i)
 	const Ethernet64b66bSymbol& s = m_samples[i];
 
 	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "%016lx", s.m_data);
+	snprintf(tmp, sizeof(tmp), "%016" PRIx64, s.m_data);
 	return string(tmp);
 }
 

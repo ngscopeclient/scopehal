@@ -73,13 +73,13 @@ class SWDMemAPDecoder : public PacketDecoder
 public:
 	SWDMemAPDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	std::vector<std::string> GetHeaders();
+	std::vector<std::string> GetHeaders() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(SWDMemAPDecoder)
 

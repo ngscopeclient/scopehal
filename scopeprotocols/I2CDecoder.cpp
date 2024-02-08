@@ -36,6 +36,7 @@
 #include "../scopehal/scopehal.h"
 #include "I2CDecoder.h"
 #include <algorithm>
+#include <cinttypes>
 
 using namespace std;
 
@@ -107,7 +108,7 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 		//SDA falling with SCL high is beginning of a start condition
 		if(!cur_sda && last_sda && cur_scl)
 		{
-			LogTrace("found i2c start at time %zu\n", timestamp);
+			LogTrace("found i2c start at time %" PRId64 "\n", timestamp);
 
 			//If we're following an ACK, this is a restart
 			if(current_type == I2CSymbol::TYPE_DATA)
@@ -162,7 +163,7 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 		//SDA rising with SCL high is a stop condition
 		else if(cur_sda && !last_sda && cur_scl)
 		{
-			LogTrace("found i2c stop at time %zu\n", timestamp);
+			LogTrace("found i2c stop at time %" PRIx64 "\n", timestamp);
 
 			cap->m_offsets.push_back(tstart);
 			cap->m_durations.push_back(timestamp - tstart);

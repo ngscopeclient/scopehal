@@ -73,7 +73,7 @@ public:
 	{ return GetScalarValue(STREAM_SET_POINT); }
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 protected:
 	Load* m_load;

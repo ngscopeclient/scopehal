@@ -62,7 +62,7 @@ SCPISocketCANTransport::SCPISocketCANTransport(const string& args)
 	}
 
 	ifreq ifr;
-	strncpy(ifr.ifr_name, args.c_str(), sizeof(ifr.ifr_name - 1));
+	strncpy(ifr.ifr_name, args.c_str(), sizeof(ifr.ifr_name) - 1);
 	if(0 != ioctl(m_socket, SIOCGIFINDEX, &ifr))
 	{
 		perror("SIOCGIFINDEX failed\n");

@@ -30,8 +30,6 @@
 #include "scopehal.h"
 #include "LeCroyOscilloscope.h"
 #include "base64.h"
-#include <locale>
-#include <omp.h>
 
 #include "CDR8B10BTrigger.h"
 #include "CDRNRZPatternTrigger.h"
@@ -43,6 +41,10 @@
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
+
+#include <cinttypes>
+#include <locale>
+#include <omp.h>
 
 using namespace std;
 
@@ -1096,17 +1098,17 @@ uint32_t LeCroyOscilloscope::GetInstrumentTypesForChannel(size_t i) const
 		return Instrument::INST_OSCILLOSCOPE;
 }
 
-string LeCroyOscilloscope::GetName()
+string LeCroyOscilloscope::GetName() const
 {
 	return m_model;
 }
 
-string LeCroyOscilloscope::GetVendor()
+string LeCroyOscilloscope::GetVendor() const
 {
 	return m_vendor;
 }
 
-string LeCroyOscilloscope::GetSerial()
+string LeCroyOscilloscope::GetSerial() const
 {
 	return m_serial;
 }
@@ -2609,7 +2611,7 @@ map<int, SparseDigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(stri
 	tmp = data.substr(data.find("<FirstEventTime>") + 16);
 	tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
 	int64_t timestamp;
-	if(1 != sscanf(tmp.c_str(), "%ld", &timestamp))
+	if(1 != sscanf(tmp.c_str(), "%" PRId64, &timestamp))
 		return ret;
 
 	//Get the client's local time.
@@ -3489,7 +3491,7 @@ uint64_t LeCroyOscilloscope::GetSampleRate()
 		auto reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Horizontal.SamplingRate'");
 		//What's the difference between SampleRate and SamplingRate?
 		//Seems like at low speed we want to use SamplingRate, not SampleRate
-		sscanf(reply.c_str(), "%ld", &m_sampleRate);
+		sscanf(reply.c_str(), "%" PRId64, &m_sampleRate);
 		m_sampleRateValid = true;
 	}
 

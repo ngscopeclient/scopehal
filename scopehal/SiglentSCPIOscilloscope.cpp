@@ -77,11 +77,6 @@
 #include "scopehal.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "base64.h"
-#include <locale>
-#include <stdarg.h>
-#include <omp.h>
-#include <thread>
-#include <chrono>
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
@@ -90,6 +85,13 @@
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
+
+#include <locale>
+#include <stdarg.h>
+#include <omp.h>
+#include <thread>
+#include <chrono>
+#include <cinttypes>
 
 using namespace std;
 
@@ -2795,7 +2797,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					sendOnly("MEMORY_SIZE 14M");
 					break;
 				default:
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 			}
 			if(IsTriggerArmed())
 			{
@@ -2855,7 +2857,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				//	sendOnly("ACQUIRE:MDEPTH 200M");
 				//	break;
 				default:
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 			}
 
 			if(IsTriggerArmed())
@@ -2947,7 +2949,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					sendOnly("ACQUIRE:MDEPTH 125M");
 					break;
 				default:
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 			}
 
 			if(IsTriggerArmed())

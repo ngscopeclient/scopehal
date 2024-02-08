@@ -602,7 +602,7 @@ string SDCmdWaveform::GetText(size_t i)
 					case 6:
 						if(cardtype == SDCmdDecoder::SD_EMMC)
 						{
-							int access = (s.m_data && 24) & 3;
+							int access = (s.m_data >> 24) & 3;
 							int cmdset = s.m_data & 3;
 							int index = (s.m_data >> 16) & 0xff;
 							int value = (s.m_data >> 8) & 0xff;

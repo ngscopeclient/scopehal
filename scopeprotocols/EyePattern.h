@@ -44,16 +44,16 @@ class EyePattern : public Filter
 public:
 	EyePattern(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
+	virtual float GetVoltageRange(size_t stream) override;
+	virtual float GetOffset(size_t stream) override;
 
-	virtual void ClearSweeps();
+	virtual void ClearSweeps() override;
 
 	void RecalculateUIWidth();
 	EyeWaveform* ReallocateWaveform();

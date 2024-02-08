@@ -31,6 +31,8 @@
 #include "DPAuxChannelDecoder.h"
 #include "I2CDecoder.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +294,7 @@ void DPAuxChannelDecoder::Refresh()
 				current_state = !current_state;
 
 				if(!good)
-					LogTrace("Edge was in the wrong place (delta=%zu), skipping it and attempting resync\n", delta);
+					LogTrace("Edge was in the wrong place (delta=%" PRId64 "), skipping it and attempting resync\n", delta);
 				else if(frame_state == FRAME_PAYLOAD)
 					LogTrace("Got valid sync pattern\n");
 				else if(frame_state == FRAME_END_1)
