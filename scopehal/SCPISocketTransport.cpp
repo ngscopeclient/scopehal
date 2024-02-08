@@ -159,11 +159,11 @@ size_t SCPISocketTransport::ReadRawData(size_t len, unsigned char* buf)
 {
 	if(!m_socket.RecvLooped(buf, len))
 	{
-		LogTrace("Failed to get %ld bytes\n", len);
+		LogTrace("Failed to get %zu bytes\n", len);
 		return 0;
 	}
 
-	LogTrace("Got %ld bytes\n", len);
+	LogTrace("Got %zu bytes\n", len);
 	return len;
 }
 

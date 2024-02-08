@@ -765,7 +765,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 		if(!IsChannelEnabled(i))
 			continue;
 
-		LogDebug("Starting acquisition phase for ch%ld\n", i);
+		LogDebug("Starting acquisition phase for ch%zu\n", i);
 
 		auto cap = new UniformAnalogWaveform;
 		size_t length = AcquireHeader(cap, m_channels[i]->GetHwname());
@@ -790,7 +790,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 
 		unsigned char* dest_buf = (unsigned char*)cap->m_samples.GetCpuPointer();
 
-		LogDebug(" - Begin transfer of %lu bytes\n", length);
+		LogDebug(" - Begin transfer of %zu bytes\n", length);
 
 		while (transferred != length)
 		{
@@ -828,7 +828,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 			}
 
 			unsigned char* cpy_target = dest_buf+(transferred*sizeof(float));
-			// LogDebug("Copying %luB from %p to %p\n", len_bytes, samples, cpy_target);
+			// LogDebug("Copying %zuB from %p to %p\n", len_bytes, samples, cpy_target);
 
 			memcpy(cpy_target, samples, len_bytes);
 			transferred += this_length;
@@ -882,7 +882,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 
 		// Digital channels do not appear to support selecting a subset, so no 'chunking'
 
-		LogDebug(" - Begin transfer of %lu bytes (*2)\n", length);
+		LogDebug(" - Begin transfer of %zu bytes (*2)\n", length);
 
 		// Since it's ascii the scope just sends it as a SCPI 'line' without the size block
 		m_transport->SendCommandImmediate(hwname + ":DATA?; *WAI");

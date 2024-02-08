@@ -217,13 +217,13 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eCommandPool,
-				reinterpret_cast<int64_t>(static_cast<VkCommandPool>(**m_pool)),
+				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
 				poolname.c_str()));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
 				bufname.c_str()));
 	}
 

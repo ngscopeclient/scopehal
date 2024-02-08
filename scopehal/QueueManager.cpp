@@ -77,7 +77,7 @@ void QueueHandle::AddName(string name)
 		m_device->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eQueue,
-				reinterpret_cast<int64_t>(static_cast<VkQueue>(**m_queue)),
+				reinterpret_cast<uint64_t>(static_cast<VkQueue>(**m_queue)),
 				m_name.c_str()));
 	}
 }
@@ -95,7 +95,7 @@ void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 		m_device->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eFence,
-				reinterpret_cast<int64_t>(static_cast<VkFence>(**m_fence)),
+				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
 				m_name.c_str()));
 	}
 	m_queue->submit(info, **m_fence);
@@ -114,7 +114,7 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 		m_device->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eFence,
-				reinterpret_cast<int64_t>(static_cast<VkFence>(**m_fence)),
+				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
 				m_name.c_str()));
 	}
 	m_queue->submit(info, **m_fence);

@@ -498,7 +498,7 @@ bool KeysightDCA::AcquireData()
 
 		auto buf = GetWaveformData(chname);
 		if(preamble.length != buf.size())
-			LogError("Waveform preamble length (%lu) does not match data length (%lu)", preamble.length, buf.size());
+			LogError("Waveform preamble length (%zu) does not match data length (%zu)", preamble.length, buf.size());
 		cap->Resize(buf.size());
 		for(size_t j = 0; j < buf.size(); j++)
 		{

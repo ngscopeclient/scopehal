@@ -208,13 +208,13 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eCommandPool,
-				reinterpret_cast<int64_t>(static_cast<VkCommandPool>(*pool)),
+				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(*pool)),
 				poolname.c_str()));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(*cmdbuf)),
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmdbuf)),
 				bufname.c_str()));
 	}
 

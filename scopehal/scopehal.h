@@ -36,7 +36,12 @@
 #ifndef scopehal_h
 #define scopehal_h
 
-#define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
+#ifdef _WIN32
+
+// These must be included first, as ws2tcpip.h pulls in winsock2.h, which overrides WinSock1 features in windows.h
+#include <ws2tcpip.h>
+#include <windows.h>
+#endif
 
 #include <deque>
 #include <vector>

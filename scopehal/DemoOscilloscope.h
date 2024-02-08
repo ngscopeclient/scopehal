@@ -131,8 +131,8 @@ protected:
 
 	float m_sweepFreq;
 
-	size_t m_depth;
-	size_t m_rate;
+	uint64_t m_depth;
+	uint64_t m_rate;
 
 	std::random_device m_rd;
 	std::minstd_rand* m_rng[5];

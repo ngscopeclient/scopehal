@@ -267,6 +267,13 @@ if(NOT APPLE_SILICON)
 	)
 endif()
 
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+	target_compile_definitions(scopehal
+		PRIVATE
+		VULKAN_HPP_TYPESAFE_CONVERSION=1
+	)
+endif()
+
 target_precompile_headers(scopehal
 PUBLIC
 
