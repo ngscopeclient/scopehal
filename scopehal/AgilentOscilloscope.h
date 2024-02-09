@@ -143,6 +143,23 @@ protected:
 	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
 	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
 
+	enum Family
+	{
+		FAMILY_EDUX1000,
+		FAMILY_DSOX1200,
+		FAMILY_MSOX2000,
+		FAMILY_MSOX3000,
+		FAMILY_DSO5000,
+		FAMILY_DSO6000,
+		FAMILY_MSO6000,
+		FAMILY_DSO7000,
+		FAMILY_MSO7000,
+		FAMILY_UNKNOWN
+	} m_family;
+
+	// Hardware option (Model ends in G)
+	bool hasAWG;
+
 private:
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
 

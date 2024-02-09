@@ -44,6 +44,27 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
+	if(m_model.find("EDUX10") == 0)
+		m_family = FAMILY_EDUX1000;
+	else if(m_model.find("DSOX12") == 0)
+		m_family = FAMILY_DSOX1200;
+	else if(m_model.find("MSOX2") == 0)
+		m_family = FAMILY_MSOX2000;
+	else if(m_model.find("MSOX3") == 0)
+		m_family = FAMILY_MSOX3000;
+	else if(m_model.find("DSO5") == 0)
+		m_family = FAMILY_DSO5000;
+	else if(m_model.find("DSO6") == 0)
+		m_family = FAMILY_DSO6000;
+	else if(m_model.find("MSO6") == 0)
+		m_family = FAMILY_MSO6000;
+	else if(m_model.find("DSO7") == 0)
+		m_family = FAMILY_DSO7000;
+	else if(m_model.find("MSO7") == 0)
+		m_family = FAMILY_MSO7000;
+	else
+		m_family = FAMILY_UNKNOWN;
+
 	//Last digit of the model number is the number of channels
 	std::string model_number = m_model;
 	model_number.erase(
@@ -827,7 +848,7 @@ set<Oscilloscope::InterleaveConflict> AgilentOscilloscope::GetInterleaveConflict
 
 vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	return {
+	vector<uint64_t> ret = {
 		100,
 		250,
 		500,
@@ -845,6 +866,31 @@ vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 		4000000,
 		8000000,
 	};
+
+	switch (m_family)
+	{
+	case FAMILY_EDUX1000:
+		ret.resize(ret.size() - 5);
+		break;
+
+	case FAMILY_DSOX1200:
+		if(m_analogChannelCount == 2)
+		{
+			ret.resize(ret.size() - 2); //2M unless external trigger used
+		}
+		else
+		{
+			ret.resize(ret.size() - 3); //1M unless interleaving turned on
+		}
+		break;
+
+	case FAMILY_MSOX3000:
+	default:
+		break;
+	}
+
+	return ret;
+
 }
 
 vector<uint64_t> AgilentOscilloscope::GetSampleDepthsInterleaved()
