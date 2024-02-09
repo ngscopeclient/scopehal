@@ -780,13 +780,8 @@ bool RSRTO6Oscilloscope::AcquireData()
 		any_data = true;
 
 		size_t transferred = 0;
-		const size_t block_size =
-			#if __APPLE__
-				50e6 // For some reason values larger than this on my coworkers macbook fail in recv(2)
-			#else
-				10000e6
-			#endif
-		;
+		// Request a reasonably-sized buffer as this may cause RAM allocation in recv(2)
+		const size_t block_size = 50e6;
 
 		unsigned char* dest_buf = (unsigned char*)cap->m_samples.GetCpuPointer();
 
