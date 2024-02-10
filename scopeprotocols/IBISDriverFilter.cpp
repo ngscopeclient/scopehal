@@ -54,10 +54,10 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fname].m_fileFilterMask = "*.ibs";
 	m_parameters[m_fname].m_fileFilterName = "IBIS model files (*.ibs)";
-	m_parameters[m_fname].signal_changed().connect(sigc::mem_fun(this, &IBISDriverFilter::OnFnameChanged));
+	m_parameters[m_fname].signal_changed().connect(sigc::mem_fun(*this, &IBISDriverFilter::OnFnameChanged));
 
 	m_parameters[m_modelName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modelName].signal_changed().connect(sigc::mem_fun(this, &IBISDriverFilter::OnModelChanged));
+	m_parameters[m_modelName].signal_changed().connect(sigc::mem_fun(*this, &IBISDriverFilter::OnModelChanged));
 
 	m_parameters[m_cornerName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_cornerName].AddEnumValue("Minimum", CORNER_MIN);

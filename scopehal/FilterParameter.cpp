@@ -129,6 +129,7 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 		case TYPE_FLOAT:
 			m_floatval = m_unit.ParseString(str, useDisplayLocale);
 			m_intval = m_floatval;
+			break;
 
 		case TYPE_INT:
 			//If there's a decimal point parse it as a float

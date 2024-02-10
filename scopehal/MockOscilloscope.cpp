@@ -58,9 +58,9 @@ MockOscilloscope::MockOscilloscope(
 	, m_args(args)
 {
 	//Need to run this loader prior to the main Oscilloscope loader
-	m_loaders.push_front(sigc::mem_fun(this, &MockOscilloscope::DoLoadConfiguration));
+	m_loaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoLoadConfiguration));
 
-	m_serializers.push_back(sigc::mem_fun(this, &MockOscilloscope::DoSerializeConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &MockOscilloscope::DoSerializeConfiguration));
 }
 
 MockOscilloscope::~MockOscilloscope()

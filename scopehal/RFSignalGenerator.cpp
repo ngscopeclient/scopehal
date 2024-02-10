@@ -36,9 +36,9 @@ using namespace std;
 
 RFSignalGenerator::RFSignalGenerator()
 {
-	m_serializers.push_back(sigc::mem_fun(this, &RFSignalGenerator::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(this, &RFSignalGenerator::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(this, &RFSignalGenerator::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &RFSignalGenerator::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &RFSignalGenerator::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &RFSignalGenerator::DoPreLoadConfiguration));
 }
 
 RFSignalGenerator::~RFSignalGenerator()
