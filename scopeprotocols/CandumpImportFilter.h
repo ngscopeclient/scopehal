@@ -51,6 +51,7 @@ public:
 
 protected:
 	std::string m_fpname;
+	std::string m_datarate;
 
 	void OnFileNameChanged();
 };

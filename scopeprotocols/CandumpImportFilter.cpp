@@ -38,12 +38,16 @@ using namespace std;
 
 CandumpImportFilter::CandumpImportFilter(const string& color)
 	: PacketDecoder(color, CAT_GENERATION)
+	, m_datarate("Data Rate")
 {
 	m_fpname = "Log File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.log";
 	m_parameters[m_fpname].m_fileFilterName = "Candump log files (*.log)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &CandumpImportFilter::OnFileNameChanged));
+
+	m_parameters[m_datarate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_parameters[m_datarate].SetIntVal(500 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,6 +109,10 @@ void CandumpImportFilter::OnFileNameChanged()
 	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
+	//Calculate length of a single bit on the bus
+	int64_t baud = m_parameters[m_datarate].GetIntVal();
+	int64_t ui = FS_PER_SECOND / baud;
+
 	//Read the file and process line by line
 	bool first = true;
 	double timestamp;
@@ -161,9 +169,7 @@ void CandumpImportFilter::OnFileNameChanged()
 
 		bool ext = (id > 2047);
 
-		//Add timeline samples (fake durations assuming 500 Kbps for now)
-		//TODO make this configurable
-		int64_t ui = 2 * 1000LL * 1000LL * 1000LL;
+		//Add timeline samples (fake durations based on user provided baud rate)
 		cap->m_offsets.push_back(trel);
 		cap->m_durations.push_back(ui);
 		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, 0));
