@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -178,6 +178,10 @@ void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& no
 	for(auto it : chans)
 	{
 		auto& cnode = it.second;
+
+		//if no type, it's probably not a scope channel. skip it
+		if(!cnode["type"])
+			continue;
 
 		//Allocate channel space if we didn't have it yet
 		size_t index = cnode["index"].as<int>();

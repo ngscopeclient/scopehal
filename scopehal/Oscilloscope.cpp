@@ -385,6 +385,24 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 		if(!chan)
 			continue;
 
+		//Make sure the session also says it's a scope channel
+		auto types = cnode["types"];
+		if(types)
+		{
+			bool isScope = false;
+			for(auto t : types)
+			{
+				auto st = t.as<string>();
+				if(st == "oscilloscope")
+				{
+					isScope = true;
+					break;
+				}
+			}
+			if(!isScope)
+				continue;
+		}
+
 		table.emplace(cnode["id"].as<int>(), chan);
 
 		//Ignore name/type.
