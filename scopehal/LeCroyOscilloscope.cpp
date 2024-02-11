@@ -1145,7 +1145,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	}
 
 	//Digital
-	else if(i >= m_digitalChannelBase)
+	else if( (i >= m_digitalChannelBase) && (i < (m_digitalChannelBase + m_digitalChannelCount) ) )
 	{
 		//If the digital channel *group* is off, don't show anything
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.Digital1.UseGrid'"));
