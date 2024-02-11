@@ -150,6 +150,7 @@
 #include "OvershootMeasurement.h"
 #include "ParallelBus.h"
 #include "PAM4DemodulatorFilter.h"
+#include "PAMEdgeDetectorFilter.h"
 #include "PcapngImportFilter.h"
 #include "PCIe128b130bDecoder.h"
 #include "PCIeDataLinkDecoder.h"

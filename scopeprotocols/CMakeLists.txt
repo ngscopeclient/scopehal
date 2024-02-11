@@ -110,6 +110,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
 	PAM4DemodulatorFilter.cpp
+	PAMEdgeDetectorFilter.cpp
 	ParallelBus.cpp
 	PcapngImportFilter.cpp
 	PCIe128b130bDecoder.cpp
