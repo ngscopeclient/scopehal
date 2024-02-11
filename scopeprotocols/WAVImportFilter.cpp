@@ -125,10 +125,15 @@ void WAVImportFilter::OnFileNameChanged()
 		fclose(fp);
 		return;
 	}
-	uint16_t afmt = *(uint16_t*)(format);
-	uint16_t nchans = *(uint16_t*)(format + 2);
-	uint32_t srate = *(uint32_t*)(format + 4);
-	uint16_t nbits = *(uint16_t*)(format + 14);
+
+	// Do not violate strict aliasing, compiler will optimize out the memcpy's
+	uint16_t afmt, nchans, nbits;
+	uint32_t srate;
+	memcpy(&afmt, format, sizeof(uint16_t));
+	memcpy(&nchans, format+2, sizeof(uint16_t));
+	memcpy(&srate, format+4, sizeof(uint32_t));
+	memcpy(&nbits, format+14, sizeof(uint16_t));
+
 	//Ignore any extensions to the format header
 
 	//1 = integer PCM, 3 = ieee754 float
@@ -229,7 +234,10 @@ void WAVImportFilter::OnFileNameChanged()
 			//Floating point samples can be read as is
 			if(afmt == 3)
 			{
-				wfm->m_samples[i] = *(float*)(buf + off);
+				//Do not violate strict aliasing, compiler will optimize out the memcpy
+				float val;
+				memcpy(&val,buf+off,sizeof(float));
+				wfm->m_samples[i] = val;
 				off += 4;
 			}
 
@@ -239,7 +247,10 @@ void WAVImportFilter::OnFileNameChanged()
 				//16 bit is signed
 				if(nbits == 16)
 				{
-					wfm->m_samples[i] = *(int16_t*)(buf + off) / 32768.0f;
+					//Do not violate strict aliasing, compiler will optimize out the memcpy
+					int16_t val;
+					memcpy(&val,buf+off,sizeof(int16_t));
+					wfm->m_samples[i] = val / 32768.0f;
 					off += 2;
 				}
 

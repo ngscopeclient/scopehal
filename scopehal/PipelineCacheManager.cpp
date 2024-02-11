@@ -180,7 +180,7 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::ePipelineCache,
-				reinterpret_cast<int64_t>(static_cast<VkPipelineCache>(**ret)),
+				reinterpret_cast<uint64_t>(static_cast<VkPipelineCache>(**ret)),
 				name.c_str()));
 	}
 

@@ -44,7 +44,7 @@
 
 using namespace std;
 
-vector<string> Glob(const string& pathPattern, bool onlyDirectories)
+vector<string> Glob(const string& pathPattern, [[maybe_unused]] bool onlyDirectories)
 {
 	vector<string> result{ };
 

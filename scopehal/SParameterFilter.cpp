@@ -54,7 +54,7 @@ bool SParameterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//Must be a valid port number (assume we take a single set of s-params as input)
-	auto nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_parameters[m_portCountName].GetIntVal();
 	if(i >= (2*nports*nports) )
 		return false;
 

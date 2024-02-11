@@ -65,7 +65,7 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	m_commandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 	vk::CommandBufferAllocateInfo bufinfo(**m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
 	m_commandBuffer = make_unique<vk::raii::CommandBuffer>(
-		move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 }
 
 TRCImportFilter::~TRCImportFilter()

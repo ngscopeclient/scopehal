@@ -30,6 +30,8 @@
 #include "../scopehal/scopehal.h"
 #include "CSVExportFilter.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,9 +178,9 @@ void CSVExportFilter::Export()
 			if(xunit == Unit(Unit::UNIT_FS))
 				fprintf(m_fp, "%.10e", timestamp / FS_PER_SECOND);
 			else if(xunit == Unit(Unit::UNIT_HZ))
-				fprintf(m_fp, "%ld", timestamp);
+				fprintf(m_fp, "%" PRId64 "", timestamp);
 			else
-				fprintf(m_fp, "%ld", timestamp);
+				fprintf(m_fp, "%" PRId64 "", timestamp);
 
 			//Write values
 			for(size_t i=0; i<GetInputCount(); i++)

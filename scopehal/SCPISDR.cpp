@@ -236,19 +236,20 @@ void SCPISDR::SetChannelOffset(size_t i, size_t stream, float offset)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+//TODO Implement SCPISDR serialization
 void SCPISDR::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
 	//node["integration"] = GetIntegrationTime();
 }
 
-void SCPISDR::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+void SCPISDR::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
 {
 	//if(node["integration"])
 	//	SetIntegrationTime(node["integration"].as<int64_t>());
 }
 
 void SCPISDR::DoPreLoadConfiguration(
-	int /*version*/,
+	int version,
 	const YAML::Node& node,
 	IDTable& idmap,
 	ConfigWarningList& list)

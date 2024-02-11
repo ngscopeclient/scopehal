@@ -47,19 +47,19 @@ public:
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Load
-	virtual LoadMode GetLoadMode(size_t channel);
-	virtual void SetLoadMode(size_t channel, LoadMode mode);
-	virtual std::vector<float> GetLoadCurrentRanges(size_t channel);
-	virtual size_t GetLoadCurrentRange(size_t channel);
-	virtual std::vector<float> GetLoadVoltageRanges(size_t channel);
-	virtual size_t GetLoadVoltageRange(size_t channel);
-	virtual bool GetLoadActive(size_t channel);
-	virtual void SetLoadActive(size_t channel, bool active);
-	virtual void SetLoadVoltageRange(size_t channel, size_t rangeIndex);
-	virtual void SetLoadCurrentRange(size_t channel, size_t rangeIndex);
+	virtual LoadMode GetLoadMode(size_t channel) override;
+	virtual void SetLoadMode(size_t channel, LoadMode mode) override;
+	virtual std::vector<float> GetLoadCurrentRanges(size_t channel) override;
+	virtual size_t GetLoadCurrentRange(size_t channel) override;
+	virtual std::vector<float> GetLoadVoltageRanges(size_t channel) override;
+	virtual size_t GetLoadVoltageRange(size_t channel) override;
+	virtual bool GetLoadActive(size_t channel) override;
+	virtual void SetLoadActive(size_t channel, bool active) override;
+	virtual void SetLoadVoltageRange(size_t channel, size_t rangeIndex) override;
+	virtual void SetLoadCurrentRange(size_t channel, size_t rangeIndex) override;
 
-	virtual float GetLoadSetPoint(size_t channel);
-	virtual void SetLoadSetPoint(size_t channel, float target);
+	virtual float GetLoadSetPoint(size_t channel) override;
+	virtual void SetLoadSetPoint(size_t channel, float target) override;
 
 	//TODO: FlushConfigCache should get pulled up from Oscilloscope into Load
 
@@ -70,8 +70,8 @@ public:
 protected:
 	LoadMode GetLoadModeUncached(size_t channel);
 
-	virtual float GetLoadVoltageActual(size_t channel);
-	virtual float GetLoadCurrentActual(size_t channel);
+	virtual float GetLoadVoltageActual(size_t channel) override;
+	virtual float GetLoadCurrentActual(size_t channel) override;
 	virtual float GetLoadSetPointActual(size_t channel);
 
 	//Cache config

@@ -138,7 +138,7 @@ VulkanFFTPlan::VulkanFFTPlan(
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eFence,
-				reinterpret_cast<int64_t>(m_rawfence),
+				reinterpret_cast<uint64_t>(m_rawfence),
 				"VulkanFFTPlan.m_rawfence"));
 	}
 

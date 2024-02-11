@@ -31,6 +31,8 @@
 #include "../scopehal/AlignedAllocator.h"
 #include "JitterSpectrumFilter.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +145,7 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 		}
 	}
 
-	LogTrace("Initial UI width estimate: %zu\n", ui_width);
+	LogTrace("Initial UI width estimate: %" PRId64 "\n", ui_width);
 
 	//Take a weighted average to smooth out the peak location somewhat.
 	int64_t leftbound = ui_width * 90 / 100;
@@ -159,7 +161,7 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 		ui_width += jt->first * jt->second;
 	}
 	ui_width /= ui_width_samples;
-	LogTrace("Averaged UI width estimate: %zu\n", ui_width);
+	LogTrace("Averaged UI width estimate: %" PRId64 "\n", ui_width);
 
 	ui_width *= 1000;	//convert back to fs
 	return ui_width;

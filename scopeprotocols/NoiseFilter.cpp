@@ -135,7 +135,7 @@ void NoiseFilter::CopyWithAwgnAVX2(float* dest, float* src, size_t len, float si
 		m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister());
 	__m256i rng_state2 = _mm256_set_epi32(
 		m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister());
-	__m256 rng_scale	= _mm256_set1_ps(1.0f / 0xffffffff);
+	__m256 rng_scale	= _mm256_set1_ps(1.0f / static_cast<float>(0xffffffff));
 
 	//Create normally distributed output using Box-Muller
 	for(size_t i=0; i<end; i += 16)

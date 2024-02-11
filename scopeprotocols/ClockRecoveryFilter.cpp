@@ -175,7 +175,7 @@ void ClockRecoveryFilter::Refresh()
 	size_t nedge = 1;
 	int64_t edgepos = edges[0];
 	bool value = false;
-	int64_t total_error = 0;
+	[[maybe_unused]] int64_t total_error = 0;
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
 

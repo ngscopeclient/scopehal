@@ -460,11 +460,11 @@ int64_t PicoVNA::GetSpan()
 	return 0;
 }
 
-void PicoVNA::SetCenterFrequency(size_t /*channel*/, int64_t freq)
+void PicoVNA::SetCenterFrequency(size_t channel, int64_t freq)
 {
 }
 
-int64_t PicoVNA::GetCenterFrequency(size_t /*channel*/)
+int64_t PicoVNA::GetCenterFrequency(size_t channel)
 {
 	return 0;
 }

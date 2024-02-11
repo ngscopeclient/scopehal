@@ -47,15 +47,15 @@ public:
 	LeCroyFWPOscilloscope(const LeCroyFWPOscilloscope& rhs) =delete;
 	LeCroyFWPOscilloscope& operator=(const LeCroyFWPOscilloscope& rhs) =delete;
 
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
-	virtual void Start();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
 
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
 
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
 
 protected:
 	void SendEnableMask();

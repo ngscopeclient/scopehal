@@ -49,13 +49,13 @@ class FIRFilter : public Filter
 public:
 	FIRFilter(const std::string& color);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	virtual DataLocation GetInputLocation();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	virtual void SetDefaultName() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(FIRFilter)
 

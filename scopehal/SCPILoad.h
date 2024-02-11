@@ -58,7 +58,7 @@ protected:
 #define LOAD_INITPROC(T) \
 	static SCPILoad* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() const \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddLoadDriverClass(T) SCPILoad::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

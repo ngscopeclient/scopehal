@@ -419,9 +419,9 @@ bool VulkanInit(bool skipGLFW)
 				const size_t g = k*m;
 
 				LogDebug("Max image dim 2D:       %u\n", limits.maxImageDimension2D);
-				LogDebug("Max storage buf range:  %lu MB\n", limits.maxStorageBufferRange / m);
-				LogDebug("Max mem alloc:          %lu MB\n", limits.maxMemoryAllocationCount / m);
-				LogDebug("Max compute shared mem: %lu KB\n", limits.maxComputeSharedMemorySize / k);
+				LogDebug("Max storage buf range:  %zu MB\n", limits.maxStorageBufferRange / m);
+				LogDebug("Max mem alloc:          %zu MB\n", limits.maxMemoryAllocationCount / m);
+				LogDebug("Max compute shared mem: %zu KB\n", limits.maxComputeSharedMemorySize / k);
 				LogDebug("Max compute grp count:  %u x %u x %u\n",
 					limits.maxComputeWorkGroupCount[0],
 					limits.maxComputeWorkGroupCount[1],
@@ -473,13 +473,13 @@ bool VulkanInit(bool skipGLFW)
 					auto heap = memProperties.memoryHeaps[j];
 
 					if(heap.size > g)
-						LogDebug("Size: %zu GB\n", heap.size / g);
+						LogDebug("Size: %" PRIu64 " GB\n", heap.size / g);
 					else if(heap.size > m)
-						LogDebug("Size: %zu MB\n", heap.size / m);
+						LogDebug("Size: %" PRIu64 " MB\n", heap.size / m);
 					else if(heap.size > k)
-						LogDebug("Size: %zu kB\n", heap.size / k);
+						LogDebug("Size: %" PRIu64 " kB\n", heap.size / k);
 					else
-						LogDebug("Size: %zu B\n", heap.size);
+						LogDebug("Size: %" PRIu64 " B\n", heap.size);
 
 					if(heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal)
 						LogDebug("Device local\n");
@@ -892,20 +892,20 @@ bool VulkanInit(bool skipGLFW)
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eDevice,
-				reinterpret_cast<int64_t>(static_cast<VkDevice>(**g_vkComputeDevice)),
+				reinterpret_cast<uint64_t>(static_cast<VkDevice>(**g_vkComputeDevice)),
 				"g_vkComputeDevice"));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(**g_vkTransferCommandBuffer)),
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**g_vkTransferCommandBuffer)),
 				"g_vkTransferCommandBuffer"));
 
 		//For some reason this doesn't work?
 		/*g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::ePhysicalDevice,
-				reinterpret_cast<int64_t>(static_cast<VkPhysicalDevice>(**g_vkComputePhysicalDevice)),
+				reinterpret_cast<uint64_t>(static_cast<VkPhysicalDevice>(**g_vkComputePhysicalDevice)),
 				"g_vkComputePhysicalDevice"));*/
 	}
 

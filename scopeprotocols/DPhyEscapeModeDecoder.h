@@ -75,13 +75,13 @@ class DPhyEscapeModeDecoder : public PacketDecoder
 public:
 	DPhyEscapeModeDecoder(const std::string& color);
 
-	std::vector<std::string> GetHeaders();
+	std::vector<std::string> GetHeaders() override;
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(DPhyEscapeModeDecoder)
 };

@@ -82,13 +82,13 @@ class SDDataDecoder : public PacketDecoder
 public:
 	SDDataDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
-	std::vector<std::string> GetHeaders();
+	std::vector<std::string> GetHeaders() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(SDDataDecoder)
 

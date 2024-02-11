@@ -50,35 +50,35 @@ public:
 
 	//Device information
 	virtual unsigned int GetInstrumentTypes() const override;
-	virtual void FlushConfigCache();
+	virtual void FlushConfigCache() override;
 
 	//Channel configuration
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual unsigned int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual bool CanEnableChannel(size_t i);
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual bool CanEnableChannel(size_t i) override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
 
 	// Captures
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void ForceTrigger();
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void ForceTrigger() override;
 
 	//Timebase
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
 
 protected:
 	void ResetPerCaptureDiagnostics();

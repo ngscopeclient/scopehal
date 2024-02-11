@@ -100,6 +100,7 @@
 #include <wordexp.h>
 #include <dirent.h>
 #else
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <shlwapi.h>
 #include <shlobj.h>
@@ -405,7 +406,6 @@ void InitializePlugins()
 		{
 			auto fileName = findData.cFileName;
 			auto fileNameCStr = reinterpret_cast<const char*>(fileName);
-			auto extension = PathFindExtension(fileName);
 
 			// The file name does not contain the full path, which poses a problem since the file is
 			// located in the plugins subdirectory

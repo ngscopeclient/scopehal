@@ -42,15 +42,15 @@ class CTLEFilter : public DeEmbedFilter
 public:
 	CTLEFilter(const std::string& color);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
 	PROTOCOL_DECODER_INITPROC(CTLEFilter)
 
 protected:
-	virtual int64_t GetGroupDelay();
-	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
+	virtual int64_t GetGroupDelay() override;
+	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts) override;
 
 	std::string m_dcGainName;
 	std::string m_zeroFreqName;

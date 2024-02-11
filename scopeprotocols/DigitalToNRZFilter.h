@@ -50,9 +50,9 @@ protected:
 	std::string m_level0;
 	std::string m_level1;
 
-	virtual size_t GetBitsPerSymbol();
-	virtual std::vector<float> GetVoltageLevels();
-	virtual size_t GetVoltageCode(size_t i, SparseDigitalWaveform& samples) ;
+	virtual size_t GetBitsPerSymbol() override;
+	virtual std::vector<float> GetVoltageLevels() override;
+	virtual size_t GetVoltageCode(size_t i, SparseDigitalWaveform& samples) override;
 };
 
 #endif

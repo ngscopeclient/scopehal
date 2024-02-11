@@ -43,7 +43,7 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	PROTOCOL_DECODER_INITPROC(ReferencePlaneExtensionFilter)
 

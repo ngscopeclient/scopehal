@@ -40,6 +40,8 @@
 #include <time.h>
 #endif
 
+#include <cstdint>
+
 double GetTime()
 {
 #ifdef _WIN32

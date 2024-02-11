@@ -182,7 +182,7 @@ bool SCPITransport::FlushCommandQueue()
 	list<string> tmp;
 	{
 		lock_guard<mutex> lock(m_queueMutex);
-		tmp = move(m_txQueue);
+		tmp = std::move(m_txQueue);
 		m_txQueue.clear();
 	}
 

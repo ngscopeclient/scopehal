@@ -48,18 +48,18 @@ public:
 	SCPITMCTransport(const SCPITMCTransport&) =delete;
 	SCPITMCTransport& operator=(const SCPITMCTransport&) =delete;
 
-	virtual std::string GetConnectionString();
+	virtual std::string GetConnectionString() override;
 	static std::string GetTransportName();
 
-	virtual bool SendCommand(const std::string& cmd);
-	virtual std::string ReadReply(bool endOnSemicolon = true);
-	virtual size_t ReadRawData(size_t len, unsigned char* buf);
-	virtual void SendRawData(size_t len, const unsigned char* buf);
+	virtual bool SendCommand(const std::string& cmd) override;
+	virtual std::string ReadReply(bool endOnSemicolon = true) override;
+	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
+	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
-	virtual bool IsCommandBatchingSupported();
-	virtual bool IsConnected();
+	virtual bool IsCommandBatchingSupported() override;
+	virtual bool IsConnected() override;
 
-	virtual void FlushRXBuffer(void);
+	virtual void FlushRXBuffer(void) override;
 
 	TRANSPORT_INITPROC(SCPITMCTransport)
 

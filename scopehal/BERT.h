@@ -39,7 +39,7 @@ public:
 	BERT();
 	virtual ~BERT();
 
-	virtual unsigned int GetInstrumentTypes() const;
+	virtual unsigned int GetInstrumentTypes() const override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// TX pattern generator configuration

@@ -186,6 +186,7 @@ public:
 	 */
 	virtual void ClearSweeps();
 
+	[[deprecated]]
 	virtual void Refresh() override;
 
 	//GPU accelerated refresh method

@@ -47,11 +47,11 @@ public:
 	PCIeGen3LogicalDecoder(const std::string& color);
 	virtual ~PCIeGen3LogicalDecoder();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(PCIeGen3LogicalDecoder)
 

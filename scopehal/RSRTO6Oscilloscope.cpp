@@ -41,6 +41,8 @@
 #include "RSRTO6Oscilloscope.h"
 #include "EdgeTrigger.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -713,18 +715,18 @@ template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, string ch
 	double capture_len_sec = xstop - xstart;
 	double sec_per_sample = capture_len_sec / length;
 	int64_t fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
-	LogDebug("%ld fs/sample\n", fs_per_sample);
+	LogDebug("%" PRId64 " fs/sample\n", fs_per_sample);
 
 	size_t reported_srate = (FS_PER_SECOND / fs_per_sample);
 
 	if (reported_srate != m_sampleRate)
 	{
-		LogWarning("Reported sample rate %lu != expected sample rate %lu; using what it said\n", reported_srate, m_sampleRate);
+		LogWarning("Reported sample rate %zu != expected sample rate %" PRIu64 "; using what it said\n", reported_srate, m_sampleRate);
 	}
 
 	if (length != m_sampleDepth)
 	{
-		LogWarning("Reported depth %lu != expected depth %lu; using what I think is correct\n", length, m_sampleDepth);
+		LogWarning("Reported depth %zu != expected depth %" PRIu64 "; using what I think is correct\n", length, m_sampleDepth);
 		length = m_sampleDepth;
 	}
 
@@ -763,7 +765,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 		if(!IsChannelEnabled(i))
 			continue;
 
-		LogDebug("Starting acquisition phase for ch%ld\n", i);
+		LogDebug("Starting acquisition phase for ch%zu\n", i);
 
 		auto cap = new UniformAnalogWaveform;
 		size_t length = AcquireHeader(cap, m_channels[i]->GetHwname());
@@ -778,17 +780,12 @@ bool RSRTO6Oscilloscope::AcquireData()
 		any_data = true;
 
 		size_t transferred = 0;
-		const size_t block_size =
-			#if __APPLE__
-				50e6 // For some reason values larger than this on my coworkers macbook fail in recv(2)
-			#else
-				10000e6
-			#endif
-		;
+		// Request a reasonably-sized buffer as this may cause RAM allocation in recv(2)
+		const size_t block_size = 50e6;
 
 		unsigned char* dest_buf = (unsigned char*)cap->m_samples.GetCpuPointer();
 
-		LogDebug(" - Begin transfer of %lu bytes\n", length);
+		LogDebug(" - Begin transfer of %zu bytes\n", length);
 
 		while (transferred != length)
 		{
@@ -826,7 +823,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 			}
 
 			unsigned char* cpy_target = dest_buf+(transferred*sizeof(float));
-			// LogDebug("Copying %luB from %p to %p\n", len_bytes, samples, cpy_target);
+			// LogDebug("Copying %zuB from %p to %p\n", len_bytes, samples, cpy_target);
 
 			memcpy(cpy_target, samples, len_bytes);
 			transferred += this_length;
@@ -880,7 +877,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 
 		// Digital channels do not appear to support selecting a subset, so no 'chunking'
 
-		LogDebug(" - Begin transfer of %lu bytes (*2)\n", length);
+		LogDebug(" - Begin transfer of %zu bytes (*2)\n", length);
 
 		// Since it's ascii the scope just sends it as a SCPI 'line' without the size block
 		m_transport->SendCommandImmediate(hwname + ":DATA?; *WAI");
@@ -984,7 +981,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 
 	auto end_time = std::chrono::system_clock::now();
 
-	LogDebug("Acquisition took %lu\n", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
+	LogDebug("Acquisition took %" PRId64 "\n", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
 	return any_data;
 }
@@ -1151,14 +1148,14 @@ uint64_t RSRTO6Oscilloscope::GetSampleRate()
 {
 	if(m_sampleRateValid)
 	{
-		LogDebug("GetSampleRate() queried and returned cached value %ld\n", m_sampleRate);
+		LogDebug("GetSampleRate() queried and returned cached value %" PRIu64 "\n", m_sampleRate);
 		return m_sampleRate;
 	}
 
 	m_sampleRate = stod(m_transport->SendCommandQueuedWithReply("ACQUIRE:SRATE?"));
 	m_sampleRateValid = true;
 
-	LogDebug("GetSampleRate() queried and got new value %ld\n", m_sampleRate);
+	LogDebug("GetSampleRate() queried and got new value %" PRIu64 "\n", m_sampleRate);
 
 	return 1;
 }
@@ -1167,7 +1164,7 @@ uint64_t RSRTO6Oscilloscope::GetSampleDepth()
 {
 	if(m_sampleDepthValid)
 	{
-		LogDebug("GetSampleDepth() queried and returned cached value %ld\n", m_sampleDepth);
+		LogDebug("GetSampleDepth() queried and returned cached value %" PRIu64 "\n", m_sampleDepth);
 		return m_sampleDepth;
 	}
 
@@ -1176,7 +1173,7 @@ uint64_t RSRTO6Oscilloscope::GetSampleDepth()
 	m_sampleDepth = stod(m_transport->SendCommandQueuedWithReply("TIMEBASE:RANGE?")) * (double)m_sampleRate;
 	m_sampleDepthValid = true;
 
-	LogDebug("GetSampleDepth() queried and got new value %ld\n", m_sampleDepth);
+	LogDebug("GetSampleDepth() queried and got new value %" PRIu64 "\n", m_sampleDepth);
 
 	return 1;
 }
@@ -1192,7 +1189,7 @@ void RSRTO6Oscilloscope::SetSampleDepth(uint64_t depth)
 		m_sampleDepthValid = true;
 	}
 
-	LogDebug("SetSampleDepth() setting to %ld\n", depth);
+	LogDebug("SetSampleDepth() setting to %" PRIu64 "\n", depth);
 
 	m_transport->SendCommandQueued(string("TIMEBASE:RANGE ") + to_string((double)depth / (double)m_sampleRate));
 }
@@ -1206,7 +1203,7 @@ void RSRTO6Oscilloscope::SetSampleRate(uint64_t rate)
 		m_sampleRateValid = true;
 	}
 
-	LogDebug("SetSampleRate() setting to %ld\n", rate);
+	LogDebug("SetSampleRate() setting to %" PRIu64 "\n", rate);
 
 	m_transport->SendCommandQueued(string("ACQUIRE:SRATE ") + to_string(rate));
 

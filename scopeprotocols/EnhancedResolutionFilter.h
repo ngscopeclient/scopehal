@@ -42,8 +42,8 @@ class EnhancedResolutionFilter : public FIRFilter
 public:
 	EnhancedResolutionFilter(const std::string& color);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	virtual void SetDefaultName();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual void SetDefaultName() override;
 
 	static std::string GetProtocolName();
 

@@ -54,90 +54,90 @@ public:
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	virtual void FlushConfigCache();
+	virtual void FlushConfigCache() override;
 
 	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual unsigned int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual bool CanEnableChannel(size_t i);
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual bool CanEnableChannel(size_t i) override;
 
 	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
 
 	//Timebase
-	virtual bool CanInterleave();
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
+	virtual bool CanInterleave() override;
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
 
 	//ADC configuration
-	virtual std::vector<AnalogBank> GetAnalogBanks();
-	virtual AnalogBank GetAnalogBank(size_t channel);
-	virtual bool IsADCModeConfigurable();
-	virtual std::vector<std::string> GetADCModeNames(size_t channel);
-	virtual size_t GetADCMode(size_t channel);
-	virtual void SetADCMode(size_t channel, size_t mode);
+	virtual std::vector<AnalogBank> GetAnalogBanks() override;
+	virtual AnalogBank GetAnalogBank(size_t channel) override;
+	virtual bool IsADCModeConfigurable() override;
+	virtual std::vector<std::string> GetADCModeNames(size_t channel) override;
+	virtual size_t GetADCMode(size_t channel) override;
+	virtual void SetADCMode(size_t channel, size_t mode) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Function generator
 
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
 
 	//Configuration
-	virtual bool GetFunctionChannelActive(int chan);
-	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual bool GetFunctionChannelActive(int chan) override;
+	virtual void SetFunctionChannelActive(int chan, bool on) override;
 
-	virtual float GetFunctionChannelDutyCycle(int chan);
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+	virtual float GetFunctionChannelDutyCycle(int chan) override;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
 
-	virtual float GetFunctionChannelAmplitude(int chan);
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelAmplitude(int chan) override;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
 
-	virtual float GetFunctionChannelOffset(int chan);
-	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelOffset(int chan) override;
+	virtual void SetFunctionChannelOffset(int chan, float offset) override;
 
-	virtual float GetFunctionChannelFrequency(int chan);
-	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual float GetFunctionChannelFrequency(int chan) override;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
 
-	virtual WaveShape GetFunctionChannelShape(int chan);
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual WaveShape GetFunctionChannelShape(int chan) override;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
 
-	virtual bool HasFunctionRiseFallTimeControls(int chan);
+	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
 
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 
-	virtual std::vector<DigitalBank> GetDigitalBanks();
-	virtual DigitalBank GetDigitalBank(size_t channel);
-	virtual bool IsDigitalHysteresisConfigurable();
-	virtual bool IsDigitalThresholdConfigurable();
-	virtual float GetDigitalHysteresis(size_t channel);
-	virtual float GetDigitalThreshold(size_t channel);
-	virtual void SetDigitalHysteresis(size_t channel, float level);
-	virtual void SetDigitalThreshold(size_t channel, float level);
+	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+	virtual DigitalBank GetDigitalBank(size_t channel) override;
+	virtual bool IsDigitalHysteresisConfigurable() override;
+	virtual bool IsDigitalThresholdConfigurable() override;
+	virtual float GetDigitalHysteresis(size_t channel) override;
+	virtual float GetDigitalThreshold(size_t channel) override;
+	virtual void SetDigitalHysteresis(size_t channel, float level) override;
+	virtual void SetDigitalThreshold(size_t channel, float level) override;
 
 	enum Series
 	{
