@@ -306,7 +306,13 @@ YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 	//Parameters
 	YAML::Node parameters;
 	for(auto it : m_parameters)
-		parameters[it.first] = it.second.ToString(false);
+	{
+		//Save both type and value for the parameter
+		YAML::Node pnode;
+		pnode["type"] = it.second.GetUnit().ToString();
+		pnode["value"] = it.second.ToString(false);
+		parameters[it.first] = pnode;
+	}
 	node["parameters"] = parameters;
 
 	return node;
@@ -317,8 +323,20 @@ void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 	auto parameters = node["parameters"];
 	for(auto it : parameters)
 	{
-		auto name = it.first.as<string>();
-		GetParameter(name).ParseString(it.second.as<string>(), false);
+		auto& param = GetParameter(it.first.as<string>());
+
+		//Older files (up to bb51fd93e3e460b98986622e7559d1c8602b327e) would store just the value,
+		//which didn't handle dynamic parameters (type depends on runtime configuration) well.
+		auto& pnode = it.second;
+		if(pnode.IsScalar())
+			param.ParseString(pnode.as<string>(), false);
+
+		//Newer files explicitly store the type.
+		else
+		{
+			param.SetUnit(Unit(pnode["type"].as<string>()));
+			param.ParseString(pnode["value"].as<string>(), false);
+		}
 	}
 }
 

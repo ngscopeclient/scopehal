@@ -955,7 +955,6 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 
 		//Parse the base value
 		sscanf(str.c_str(), "%20lf", &ret);
-		ret *= scale;
 
 		//Apply a unit-specific scaling factor
 		switch(m_type)
@@ -965,7 +964,6 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 				break;
 
 			case Unit::UNIT_MICROVOLTS:
-				LogDebug("Parsing string \"%s\" as %.0f uV\n", str.c_str(), ret);
 				ret *= 1e6;
 				break;
 
@@ -980,6 +978,8 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 			default:
 				break;
 		}
+
+		ret *= scale;
 	}
 
 	SetDefaultLocale();
