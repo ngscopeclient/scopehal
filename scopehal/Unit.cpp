@@ -91,6 +91,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_RHO;
 	else if(rhs == "mV")
 		m_type = UNIT_MILLIVOLTS;
+	else if(rhs == "μV")
+		m_type = UNIT_MICROVOLTS;
 	else if(rhs == "Vs")
 		m_type = UNIT_VOLT_SEC;
 	else if(rhs == "hex")
@@ -182,6 +184,9 @@ string Unit::ToString() const
 
 		case UNIT_MILLIVOLTS:
 			return "mV";
+
+		case UNIT_MICROVOLTS:
+			return "μV";
 
 		case UNIT_MICROAMPS:
 			return "μA";
@@ -348,6 +353,38 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 		//uA is not a SI base unit either
 		case UNIT_MICROAMPS:
 			suffix = "A";
+
+			if(fabs(num) >= 1e12)
+			{
+				scaleFactor = 1e-12;
+				prefix = "M";
+			}
+			else if(fabs(num) >= 1e9)
+			{
+				scaleFactor = 1e-9;
+				prefix = "k";
+			}
+			else if(fabs(num) >= 1e6)
+			{
+				scaleFactor = 1e-6;
+				prefix = "";
+			}
+			else if(fabs(num) >= 1e3)
+			{
+				scaleFactor = 1e-3;
+				prefix = "m";
+			}
+			else
+			{
+				scaleFactor = 1;
+				prefix = "μ";
+			}
+
+			break;
+
+		//uV is not a SI base unit either
+		case UNIT_MICROVOLTS:
+			suffix = "V";
 
 			if(fabs(num) >= 1e12)
 			{
@@ -927,6 +964,11 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 				ret *= 1e15;
 				break;
 
+			case Unit::UNIT_MICROVOLTS:
+				LogDebug("Parsing string \"%s\" as %.0f uV\n", str.c_str(), ret);
+				ret *= 1e6;
+				break;
+
 			case Unit::UNIT_PM:
 				ret *= 1e12;
 				break;
@@ -980,6 +1022,10 @@ int64_t Unit::ParseStringInt64(const string& str, bool useDisplayLocale)
 
 			case Unit::UNIT_PM:
 				mulscale = 1e12;
+				break;
+
+			case Unit::UNIT_MICROVOLTS:
+				mulscale = 1e6;
 				break;
 
 			case Unit::UNIT_PERCENT:

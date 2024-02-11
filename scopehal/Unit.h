@@ -85,6 +85,7 @@ public:
 							//(1 picometer to +/- 9223 km) of distances using int64's.
 
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
+		UNIT_MICROVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 		UNIT_VOLT_SEC,      //Hack needed to measure area under the curve in terms of volt-seconds
 
 		UNIT_BYTES,			//used mostly for displaying memory usage
