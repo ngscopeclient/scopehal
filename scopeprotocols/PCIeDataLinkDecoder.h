@@ -119,13 +119,13 @@ public:
 	PCIeDataLinkDecoder(const std::string& color);
 	virtual ~PCIeDataLinkDecoder();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual std::vector<std::string> GetHeaders();
+	virtual std::vector<std::string> GetHeaders() override;
 
 	enum FramingMode
 	{

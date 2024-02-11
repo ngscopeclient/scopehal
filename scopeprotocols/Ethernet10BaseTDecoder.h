@@ -41,7 +41,7 @@ public:
 	Ethernet10BaseTDecoder(const std::string& color);
 	virtual ~Ethernet10BaseTDecoder();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 	static std::string GetProtocolName();
 
 	PROTOCOL_DECODER_INITPROC(Ethernet10BaseTDecoder)

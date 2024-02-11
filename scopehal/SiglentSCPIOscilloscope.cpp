@@ -77,11 +77,6 @@
 #include "scopehal.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "base64.h"
-#include <locale>
-#include <stdarg.h>
-#include <omp.h>
-#include <thread>
-#include <chrono>
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
@@ -90,6 +85,13 @@
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
+
+#include <locale>
+#include <stdarg.h>
+#include <omp.h>
+#include <thread>
+#include <chrono>
+#include <cinttypes>
 
 using namespace std;
 
@@ -1277,12 +1279,12 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 		case MODEL_SIGLENT_SDS6000A:
 			if(i < m_analogChannelCount)
 			{
-				sendOnly(":CHANNEL%ld:LABEL:TEXT \"%s\"", i + 1, name.c_str());
-				sendOnly(":CHANNEL%ld:LABEL ON", i + 1);
+				sendOnly(":CHANNEL%zu:LABEL:TEXT \"%s\"", i + 1, name.c_str());
+				sendOnly(":CHANNEL%zu:LABEL ON", i + 1);
 			}
 			else
 			{
-				sendOnly(":DIGITAL:LABEL%ld \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
+				sendOnly(":DIGITAL:LABEL%zu \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
 			}
 			break;
 		// --------------------------------------------------
@@ -1631,8 +1633,10 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	else
 		num_samples = datalen;
 	size_t num_per_segment = num_samples / num_sequences;
-	int16_t* wdata = (int16_t*)&data[0];
-	int8_t* bdata = (int8_t*)&data[0];
+	// int16_t* wdata = (int16_t*)&data[0];
+	// int8_t* bdata = (int8_t*)&data[0];
+	const int16_t* wdata = reinterpret_cast<const int16_t*>(data);
+	const int8_t* bdata = reinterpret_cast<const int8_t*>(data);
 
 	float codes_per_div;
 
@@ -1676,7 +1680,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	// m_triggerOffset = ((interval * datalen) / 2) + h_off;
 	// m_triggerOffsetValid = true;
 
-	LogTrace("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%ld\n",
+	LogTrace("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%zu\n",
 		v_gain,
 		v_off,
 		interval,
@@ -2301,14 +2305,14 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			reply = converse("C%ld:OFST?", i + 1);
+			reply = converse("C%zu:OFST?", i + 1);
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			reply = converse(":CHANNEL%ld:OFFSET?", i + 1);
+			reply = converse(":CHANNEL%zu:OFFSET?", i + 1);
 			break;
 		// --------------------------------------------------
 		default:
@@ -2337,14 +2341,14 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, floa
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS1000:
 			case MODEL_SIGLENT_SDS2000XE:
-				sendOnly("C%ld:OFST %1.2E", i + 1, offset);
+				sendOnly("C%zu:OFST %1.2E", i + 1, offset);
 				break;
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS2000X_HD:
 			case MODEL_SIGLENT_SDS5000X:
 			case MODEL_SIGLENT_SDS6000A:
-				sendOnly(":CHANNEL%ld:OFFSET %1.2E", i + 1, offset);
+				sendOnly(":CHANNEL%zu:OFFSET %1.2E", i + 1, offset);
 				break;
 			// --------------------------------------------------
 			default:
@@ -2412,14 +2416,14 @@ void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			sendOnly("C%ld:VOLT_DIV %.4f", i + 1, vdiv);
+			sendOnly("C%zu:VOLT_DIV %.4f", i + 1, vdiv);
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":CHANNEL%ld:SCALE %.4f", i + 1, vdiv);
+			sendOnly(":CHANNEL%zu:SCALE %.4f", i + 1, vdiv);
 			break;
 		// --------------------------------------------------
 		default:
@@ -2795,7 +2799,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					sendOnly("MEMORY_SIZE 14M");
 					break;
 				default:
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 			}
 			if(IsTriggerArmed())
 			{
@@ -2855,7 +2859,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				//	sendOnly("ACQUIRE:MDEPTH 200M");
 				//	break;
 				default:
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 			}
 
 			if(IsTriggerArmed())
@@ -2947,7 +2951,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					sendOnly("ACQUIRE:MDEPTH 125M");
 					break;
 				default:
-					LogError("Invalid memory depth for channel: %lu\n", depth);
+					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 			}
 
 			if(IsTriggerArmed())
@@ -3222,14 +3226,14 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			sendOnly("C%ld:SKEW %1.2E", channel + 1, skew * SECONDS_PER_FS);
+			sendOnly("C%zu:SKEW %1.2E", channel + 1, skew * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":CHANNEL%ld:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
+			sendOnly(":CHANNEL%zu:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
 		default:
@@ -3264,14 +3268,14 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			reply = converse("C%ld:SKEW?", channel + 1);
+			reply = converse("C%zu:SKEW?", channel + 1);
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			reply = converse(":CHANNEL%ld:SKEW?", channel + 1);
+			reply = converse(":CHANNEL%zu:SKEW?", channel + 1);
 			break;
 		// --------------------------------------------------
 		default:

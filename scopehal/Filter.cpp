@@ -814,7 +814,6 @@ void Filter::FindPeaks(SparseAnalogWaveform* data, float peak_threshold, vector<
 
 void Filter::Refresh()
 {
-	Refresh();
 }
 
 void Filter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)

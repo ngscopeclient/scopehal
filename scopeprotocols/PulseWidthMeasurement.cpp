@@ -218,5 +218,5 @@ void PulseWidthMeasurement::Refresh()
 	}
 
 	if (GetVoltageRange(0) == 0)
-		SetVoltageRange(10000000000000, 0);
+		SetVoltageRange(10000000000000.0f, 0);
 }

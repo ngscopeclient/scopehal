@@ -43,11 +43,11 @@ class QuadratureDecoder : public Filter
 public:
 	QuadratureDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	enum InterpolationMode
 	{

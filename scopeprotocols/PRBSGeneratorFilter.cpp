@@ -45,7 +45,7 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_COUNTS), "Clock", Stream::STREAM_TYPE_DIGITAL);
 
 	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_baudname].SetIntVal(103125L * 100L * 1000L);
+	m_parameters[m_baudname].SetIntVal(103125LL * 100LL * 1000LL);
 
 	m_parameters[m_polyname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_polyname].AddEnumValue("PRBS-7", POLY_PRBS7);

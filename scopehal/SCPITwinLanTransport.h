@@ -47,14 +47,14 @@ public:
 	SCPITwinLanTransport(const std::string& args);
 	virtual ~SCPITwinLanTransport();
 
-	virtual std::string GetConnectionString();
+	virtual std::string GetConnectionString() override;
 	static std::string GetTransportName();
 
 	unsigned short GetDataPort()
 	{ return m_dataport; }
 
-	virtual size_t ReadRawData(size_t len, unsigned char* buf);
-	virtual void SendRawData(size_t len, const unsigned char* buf);
+	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
+	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
 	TRANSPORT_INITPROC(SCPITwinLanTransport)
 

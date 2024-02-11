@@ -42,11 +42,11 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
-	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table) override;
 
 	PROTOCOL_DECODER_INITPROC(IBISDriverFilter)
 

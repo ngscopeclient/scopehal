@@ -191,7 +191,10 @@ void BINImportFilter::OnFileNameChanged()
 					//Logic samples (counts 32-bit float data waveforms)
 					if (dh.type == 5)
 					{
-						s = (uint8_t)*(float*)(f.c_str() + fpos);
+						//Do not violate strict aliasing, compiler will optimize out the memcpy
+						float val;
+						memcpy(&val, f.c_str() + fpos, sizeof(float));
+						s = static_cast<uint8_t>(val);
 					}
 					//Logic samples (digital unsigned 8-bit character data)
 					else if (dh.type == 6)
@@ -250,7 +253,9 @@ void BINImportFilter::OnFileNameChanged()
 				//Float samples (analog waveforms)
 				for(size_t k=0; k<wh.samples; k++)
 				{
-					float* sample_f = (float*)(f.c_str() + fpos);
+					//Do not violate strict aliasing, compiler will optimize out the memcpy
+					float* sample_f;
+					memcpy(&sample_f, f.c_str() + fpos, sizeof(float));
 					wfm->m_samples.push_back(*sample_f);
 					fpos += dh.depth;
 				}

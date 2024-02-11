@@ -390,7 +390,7 @@ bool DemoOscilloscope::IsInterleaving()
 	return false;
 }
 
-bool DemoOscilloscope::SetInterleaving(bool /*combine*/)
+bool DemoOscilloscope::SetInterleaving(bool combine)
 {
 	return false;
 }

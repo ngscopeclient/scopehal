@@ -48,17 +48,17 @@ public:
 	SCPISocketTransport(const std::string& hostname, unsigned short port);
 	virtual ~SCPISocketTransport();
 
-	virtual std::string GetConnectionString();
+	virtual std::string GetConnectionString() override;
 	static std::string GetTransportName();
 
-	virtual void FlushRXBuffer(void);
-	virtual bool SendCommand(const std::string& cmd);
-	virtual std::string ReadReply(bool endOnSemicolon = true);
-	virtual size_t ReadRawData(size_t len, unsigned char* buf);
-	virtual void SendRawData(size_t len, const unsigned char* buf);
+	virtual void FlushRXBuffer(void) override;
+	virtual bool SendCommand(const std::string& cmd) override;
+	virtual std::string ReadReply(bool endOnSemicolon = true) override;
+	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
+	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
-	virtual bool IsCommandBatchingSupported();
-	virtual bool IsConnected();
+	virtual bool IsCommandBatchingSupported() override;
+	virtual bool IsConnected() override;
 
 	TRANSPORT_INITPROC(SCPISocketTransport)
 

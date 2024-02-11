@@ -76,7 +76,7 @@ bool TouchstoneExportFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//Validate port index
-	auto portCount = m_parameters[m_portCount].GetIntVal();
+	size_t portCount = m_parameters[m_portCount].GetIntVal();
 	if(i >= (portCount*portCount*2) )
 		return false;
 

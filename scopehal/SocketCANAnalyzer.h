@@ -47,29 +47,29 @@ public:
 
 public:
 	//Device information
-	virtual unsigned int GetInstrumentTypes() const;
+	virtual unsigned int GetInstrumentTypes() const override;
 
 	virtual void FlushConfigCache() override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 
 	//Channel configuration
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual unsigned int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
-	virtual std::string GetProbeName(size_t i);
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual std::string GetProbeName(size_t i) override;
 
 	/*
 	//Digital channel configuration

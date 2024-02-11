@@ -40,11 +40,11 @@ class UartClockRecoveryFilter : public Filter
 public:
 	UartClockRecoveryFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor streaml);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor streaml) override;
 
 	PROTOCOL_DECODER_INITPROC(UartClockRecoveryFilter)
 

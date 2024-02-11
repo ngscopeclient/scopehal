@@ -768,8 +768,8 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 	if(m_type == Unit::UNIT_HEXNUM)
 	{
 		//Do the actual float to ascii conversion
-		snprintf(tmp1, sizeof(tmp1), "%lx", (int64_t)valueMinRescaled);
-		snprintf(tmp2, sizeof(tmp2), "%lx", (int64_t)valueMaxRescaled);
+		snprintf(tmp1, sizeof(tmp1), "%" PRIx64, (int64_t)valueMinRescaled);
+		snprintf(tmp2, sizeof(tmp2), "%" PRIx64, (int64_t)valueMaxRescaled);
 
 		//Special case: if zero is somewhere in the pixel, just print zero
 		if( (valueMinRescaled <= 0) && (valueMaxRescaled >= 0) )

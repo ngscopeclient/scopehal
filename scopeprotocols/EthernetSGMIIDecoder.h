@@ -42,7 +42,7 @@ class EthernetSGMIIDecoder : public Ethernet1000BaseXDecoder
 public:
 	EthernetSGMIIDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 	static std::string GetProtocolName();
 
 	PROTOCOL_DECODER_INITPROC(EthernetSGMIIDecoder)

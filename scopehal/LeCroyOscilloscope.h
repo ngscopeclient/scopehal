@@ -70,14 +70,14 @@ protected:
 
 public:
 	//Device information
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+	virtual std::string GetName() const override;
+	virtual std::string GetVendor() const override;
+	virtual std::string GetSerial() const override;
 	virtual unsigned int GetInstrumentTypes() const override;
-	virtual unsigned int GetMeasurementTypes();
+	virtual unsigned int GetMeasurementTypes() override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	virtual void FlushConfigCache();
+	virtual void FlushConfigCache() override;
 
 	void ForceHDMode(bool mode);
 
@@ -122,54 +122,54 @@ public:
 	{ return m_fastEdgeChannel; }
 
 	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool PeekTriggerArmed();
-	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
-	virtual void EnableTriggerOutput();
-	virtual std::vector<std::string> GetTriggerTypes();
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool PeekTriggerArmed() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
+	virtual void EnableTriggerOutput() override;
+	virtual std::vector<std::string> GetTriggerTypes() override;
 	bool IsCDRLocked();
 
 	//DMM configuration
 	virtual int GetMeterChannelCount();
-	virtual int GetCurrentMeterChannel();
-	virtual void SetCurrentMeterChannel(int chan);
-	virtual void StartMeter();
-	virtual void StopMeter();
-	virtual void SetMeterAutoRange(bool enable);
-	virtual bool GetMeterAutoRange();
-	virtual double GetMeterValue();
-	virtual Multimeter::MeasurementTypes GetMeterMode();
-	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
-	virtual int GetMeterDigits();
+	virtual int GetCurrentMeterChannel() override;
+	virtual void SetCurrentMeterChannel(int chan) override;
+	virtual void StartMeter() override;
+	virtual void StopMeter() override;
+	virtual void SetMeterAutoRange(bool enable) override;
+	virtual bool GetMeterAutoRange() override;
+	virtual double GetMeterValue() override;
+	virtual Multimeter::MeasurementTypes GetMeterMode() override;
+	virtual void SetMeterMode(Multimeter::MeasurementTypes type) override;
+	virtual int GetMeterDigits() override;
 
 	//Function generator
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
-	virtual bool GetFunctionChannelActive(int chan);
-	virtual void SetFunctionChannelActive(int chan, bool on);
-	virtual float GetFunctionChannelDutyCycle(int chan);
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
-	virtual float GetFunctionChannelAmplitude(int chan);
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
-	virtual float GetFunctionChannelOffset(int chan);
-	virtual void SetFunctionChannelOffset(int chan, float offset);
-	virtual float GetFunctionChannelFrequency(int chan);
-	virtual void SetFunctionChannelFrequency(int chan, float hz);
-	virtual FunctionGenerator::WaveShape GetFunctionChannelShape(int chan);
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
-	virtual float GetFunctionChannelRiseTime(int chan);
-	virtual void SetFunctionChannelRiseTime(int chan, float fs);
-	virtual float GetFunctionChannelFallTime(int chan);
-	virtual void SetFunctionChannelFallTime(int chan, float fs);
-	virtual bool HasFunctionRiseFallTimeControls(int chan);
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
+	virtual bool GetFunctionChannelActive(int chan) override;
+	virtual void SetFunctionChannelActive(int chan, bool on) override;
+	virtual float GetFunctionChannelDutyCycle(int chan) override;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
+	virtual float GetFunctionChannelAmplitude(int chan) override;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
+	virtual float GetFunctionChannelOffset(int chan) override;
+	virtual void SetFunctionChannelOffset(int chan, float offset) override;
+	virtual float GetFunctionChannelFrequency(int chan) override;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
+	virtual FunctionGenerator::WaveShape GetFunctionChannelShape(int chan) override;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
+	virtual float GetFunctionChannelRiseTime(int chan) override;
+	virtual void SetFunctionChannelRiseTime(int chan, float fs) override;
+	virtual float GetFunctionChannelFallTime(int chan) override;
+	virtual void SetFunctionChannelFallTime(int chan, float fs) override;
+	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
 
 	//Scope models.
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
@@ -209,42 +209,42 @@ public:
 	{ return m_modelid; }
 
 	//Timebase
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetUseExternalRefclk(bool external);
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
-	virtual bool IsSamplingModeAvailable(SamplingMode mode);
-	virtual SamplingMode GetSamplingMode();
-	virtual void SetSamplingMode(SamplingMode mode);
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
+	virtual void SetUseExternalRefclk(bool external) override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
+	virtual bool IsSamplingModeAvailable(SamplingMode mode) override;
+	virtual SamplingMode GetSamplingMode() override;
+	virtual void SetSamplingMode(SamplingMode mode) override;
 
 	//DBI mode
 	bool HasDBICapability();
 	bool IsDBIEnabled(size_t channel);
 
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
-	virtual int64_t GetDeskewForChannel(size_t channel);
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+	virtual void SetDeskewForChannel(size_t channel, int64_t skew) override;
+	virtual int64_t GetDeskewForChannel(size_t channel) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 
-	virtual std::vector<DigitalBank> GetDigitalBanks();
-	virtual DigitalBank GetDigitalBank(size_t channel);
-	virtual bool IsDigitalHysteresisConfigurable();
-	virtual bool IsDigitalThresholdConfigurable();
-	virtual float GetDigitalHysteresis(size_t channel);
-	virtual float GetDigitalThreshold(size_t channel);
-	virtual void SetDigitalHysteresis(size_t channel, float level);
-	virtual void SetDigitalThreshold(size_t channel, float level);
+	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+	virtual DigitalBank GetDigitalBank(size_t channel) override;
+	virtual bool IsDigitalHysteresisConfigurable() override;
+	virtual bool IsDigitalThresholdConfigurable() override;
+	virtual float GetDigitalHysteresis(size_t channel) override;
+	virtual float GetDigitalThreshold(size_t channel) override;
+	virtual void SetDigitalHysteresis(size_t channel, float level) override;
+	virtual void SetDigitalThreshold(size_t channel, float level) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// ADC bit depth configuration
@@ -252,10 +252,10 @@ public:
 	//All currently supported LeCroy scopes have only one analog bank (same ADC config for all channels)
 	//so no need to override those
 
-	virtual bool IsADCModeConfigurable();
-	virtual std::vector<std::string> GetADCModeNames(size_t channel);
-	virtual size_t GetADCMode(size_t channel);
-	virtual void SetADCMode(size_t channel, size_t mode);
+	virtual bool IsADCModeConfigurable() override;
+	virtual std::vector<std::string> GetADCModeNames(size_t channel) override;
+	virtual size_t GetADCMode(size_t channel) override;
+	virtual void SetADCMode(size_t channel, size_t mode) override;
 
 	//public so it can be called by TRCImportFilter
 	static time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);

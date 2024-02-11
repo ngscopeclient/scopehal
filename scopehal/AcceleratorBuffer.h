@@ -1291,13 +1291,13 @@ protected:
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eBuffer,
-				reinterpret_cast<int64_t>(static_cast<VkBuffer>(**m_gpuBuffer)),
+				reinterpret_cast<uint64_t>(static_cast<VkBuffer>(**m_gpuBuffer)),
 				gpuBufName.c_str()));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eDeviceMemory,
-				reinterpret_cast<int64_t>(static_cast<VkDeviceMemory>(**m_gpuPhysMem)),
+				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(**m_gpuPhysMem)),
 				gpuPhysName.c_str()));
 	}
 
@@ -1318,13 +1318,13 @@ protected:
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eBuffer,
-				reinterpret_cast<int64_t>(static_cast<VkBuffer>(**m_cpuBuffer)),
+				reinterpret_cast<uint64_t>(static_cast<VkBuffer>(**m_cpuBuffer)),
 				cpuBufName.c_str()));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eDeviceMemory,
-				reinterpret_cast<int64_t>(static_cast<VkDeviceMemory>(**m_cpuPhysMem)),
+				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(**m_cpuPhysMem)),
 				cpuPhysName.c_str()));
 	}
 

@@ -151,7 +151,7 @@ protected:
 	{ \
 		return new T(args); \
 	} \
-	virtual std::string GetName() \
+	virtual std::string GetName() override \
 	{ return GetTransportName(); }
 
 #define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance)

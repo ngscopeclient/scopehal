@@ -43,11 +43,11 @@ public:
 	ThermalDiodeFilter(const std::string& color);
 	~ThermalDiodeFilter();
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(ThermalDiodeFilter)
 

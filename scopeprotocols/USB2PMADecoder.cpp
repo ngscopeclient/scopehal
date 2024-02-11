@@ -104,7 +104,7 @@ void USB2PMADecoder::Refresh()
 	//Set appropriate thresholds for different speeds
 	auto threshold_diff = (speed == SPEED_HIGH) ? 0.15 : 0.2;
 	auto threshold_se   = 0.8;
-	int64_t transition_time;
+	int64_t transition_time = 0;
 	switch(speed)
 	{
 	case SPEED_HIGH:

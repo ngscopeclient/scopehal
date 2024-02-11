@@ -86,11 +86,11 @@ public:
 
 	static FilterParameter MakeIBM8b10bDisplayFormatParameter();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	enum DisplayFormat
 	{

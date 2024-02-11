@@ -40,13 +40,13 @@ class PeakHoldFilter : public PeakDetectionFilter
 public:
 	PeakHoldFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual void ClearSweeps();
+	virtual void ClearSweeps() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(PeakHoldFilter)
 

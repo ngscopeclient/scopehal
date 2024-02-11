@@ -188,19 +188,19 @@ void ComputePipeline::DeferredInit()
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::ePipeline,
-				reinterpret_cast<int64_t>(static_cast<VkPipeline>(**m_computePipeline)),
+				reinterpret_cast<uint64_t>(static_cast<VkPipeline>(**m_computePipeline)),
 				pipelineName.c_str()));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eDescriptorSetLayout,
-				reinterpret_cast<int64_t>(static_cast<VkDescriptorSetLayout>(**m_descriptorSetLayout)),
+				reinterpret_cast<uint64_t>(static_cast<VkDescriptorSetLayout>(**m_descriptorSetLayout)),
 				dlName.c_str()));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::ePipelineLayout,
-				reinterpret_cast<int64_t>(static_cast<VkPipelineLayout>(**m_pipelineLayout)),
+				reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(**m_pipelineLayout)),
 				plName.c_str()));
 
 		if(!g_hasPushDescriptor)
@@ -208,13 +208,13 @@ void ComputePipeline::DeferredInit()
 			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 				vk::DebugUtilsObjectNameInfoEXT(
 					vk::ObjectType::eDescriptorPool,
-					reinterpret_cast<int64_t>(static_cast<VkDescriptorPool>(**m_descriptorPool)),
+					reinterpret_cast<uint64_t>(static_cast<VkDescriptorPool>(**m_descriptorPool)),
 					dpName.c_str()));
 
 			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 				vk::DebugUtilsObjectNameInfoEXT(
 					vk::ObjectType::eDescriptorSet,
-					reinterpret_cast<int64_t>(static_cast<VkDescriptorSet>(**m_descriptorSet)),
+					reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(**m_descriptorSet)),
 					dsName.c_str()));
 		}
 	}

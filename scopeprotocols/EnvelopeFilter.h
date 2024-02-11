@@ -40,12 +40,12 @@ class EnvelopeFilter : public Filter
 public:
 	EnvelopeFilter(const std::string& color);
 
-	virtual void Refresh();
-	virtual void ClearSweeps();
+	virtual void Refresh() override;
+	virtual void ClearSweeps() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(EnvelopeFilter)
 

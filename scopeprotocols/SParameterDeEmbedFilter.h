@@ -44,16 +44,16 @@ public:
 	SParameterDeEmbedFilter(const std::string& color);
 	~SParameterDeEmbedFilter();
 
-	bool ValidateChannel(size_t i, StreamDescriptor stream);
+	bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetProtocolName();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	PROTOCOL_DECODER_INITPROC(SParameterDeEmbedFilter)
 
 protected:
-	virtual void RefreshPorts();
+	virtual void RefreshPorts() override;
 
 	enum Side
 	{

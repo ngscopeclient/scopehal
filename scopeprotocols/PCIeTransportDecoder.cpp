@@ -36,6 +36,8 @@
 #include "PCIeDataLinkDecoder.h"
 #include "PCIeTransportDecoder.h"
 
+#include <cinttypes>
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -610,7 +612,7 @@ void PCIeTransportDecoder::Refresh()
 							state = STATE_ADDRESS_1;
 						else
 						{
-							snprintf(tmp, sizeof(tmp), "%08lx", mem_addr);
+							snprintf(tmp, sizeof(tmp), "%08" PRIx64, mem_addr);
 							pack->m_headers["Addr"] = tmp;
 
 							nbyte = 0;
@@ -642,7 +644,7 @@ void PCIeTransportDecoder::Refresh()
 						cap->m_samples[ilast].m_data = mem_addr;
 						cap->m_samples[ilast].m_type = PCIeTransportSymbol::TYPE_ADDRESS_X64;
 
-						snprintf(tmp, sizeof(tmp), "%016lx", mem_addr);
+						snprintf(tmp, sizeof(tmp), "%016" PRIx64, mem_addr);
 						pack->m_headers["Addr"] = tmp;
 
 						nbyte = 0;
@@ -996,19 +998,19 @@ string PCIeTransportWaveform::GetText(size_t i)
 			return string("Completer: ") + PCIeTransportDecoder::FormatID(s.m_data);
 
 		case PCIeTransportSymbol::TYPE_ADDRESS_X32:
-			snprintf(tmp, sizeof(tmp), "Address: %08lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Address: %08" PRIx64, s.m_data);
 			return tmp;
 
 		case PCIeTransportSymbol::TYPE_ADDRESS_X64:
-			snprintf(tmp, sizeof(tmp), "Address: %016lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Address: %016" PRIx64, s.m_data);
 			return tmp;
 
 		case PCIeTransportSymbol::TYPE_TAG:
-			snprintf(tmp, sizeof(tmp), "Tag: %02lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Tag: %02" PRIx64, s.m_data);
 			return tmp;
 
 		case PCIeTransportSymbol::TYPE_DATA:
-			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			snprintf(tmp, sizeof(tmp), "%02" PRIx64, s.m_data);
 			return tmp;
 
 		case PCIeTransportSymbol::TYPE_FLAGS:

@@ -135,9 +135,11 @@ void MilStd1553Decoder::Refresh()
 	const float low = -2;
 
 	//Nominal duration of various protocol elements
-	int64_t sync_len_fs			= 1500 * 1000 * 1000;
-	int64_t data_len_fs			= 500 * 1000 * 1000;
-	int64_t ifg_len_fs			= 4000 * 1000 * 1000L;
+	const int64_t k = 1000;
+
+	int64_t sync_len_fs			= 1500 * k * k;
+	int64_t data_len_fs			= 500 * k * k;
+	int64_t ifg_len_fs			= 4000 * k * k;
 
 	int64_t sync_data_threshold	= (sync_len_fs*2 + data_len_fs/2) / din->m_timescale;
 	int64_t data_len_threshold	= (data_len_fs*2 + data_len_fs/2) / din->m_timescale;

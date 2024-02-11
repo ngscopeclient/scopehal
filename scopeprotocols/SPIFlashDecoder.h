@@ -125,13 +125,13 @@ public:
 	SPIFlashDecoder(const std::string& color);
 	virtual ~SPIFlashDecoder();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
-	std::vector<std::string> GetHeaders();
+	std::vector<std::string> GetHeaders() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	enum VendorIDs
 	{
@@ -147,8 +147,8 @@ public:
 		FLASH_TYPE_WINBOND_W25N
 	};
 
-	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
-	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
 

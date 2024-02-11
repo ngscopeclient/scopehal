@@ -108,14 +108,14 @@ class USB2PacketDecoder : public PacketDecoder
 public:
 	USB2PacketDecoder(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual std::vector<std::string> GetHeaders();
-	virtual bool GetShowDataColumn();
+	virtual std::vector<std::string> GetHeaders() override;
+	virtual bool GetShowDataColumn() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(USB2PacketDecoder)
 
