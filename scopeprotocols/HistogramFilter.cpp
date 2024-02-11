@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -147,7 +147,19 @@ void HistogramFilter::Refresh()
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
-	m_xAxisUnit = GetInput(0).GetYAxisUnits();
+	//Update units for parameters
+	auto xunit = GetInput(0).GetYAxisUnits();
+	int64_t scale = 1;
+	if(xunit == Unit(Unit::UNIT_VOLTS))
+	{
+		m_xAxisUnit = Unit(Unit::UNIT_MICROVOLTS);
+		scale = 1e6;
+	}
+	else
+		m_xAxisUnit = xunit;
+	m_parameters[m_minName].SetUnit(xunit);
+	m_parameters[m_maxName].SetUnit(xunit);
+	m_parameters[m_binSizeName].SetUnit(m_xAxisUnit);
 
 	//Calculate min/max of the input data
 	float nmin = GetMinVoltage(sdin, udin);
@@ -193,7 +205,8 @@ void HistogramFilter::Refresh()
 	reallocate |= (cap == nullptr);
 	// Always need to reallocate if don't have an output yet
 
-	range = m_max - m_min;
+	//Calculate range in Y axis units
+	range = (m_max - m_min) * scale;
 
 	bool didClipRange = (nmin < m_min) || (nmax > m_max);
 
@@ -217,7 +230,7 @@ void HistogramFilter::Refresh()
 		cap->m_timescale = binsize;
 		cap->m_startTimestamp = din->m_startTimestamp;
 		cap->m_startFemtoseconds = din->m_startFemtoseconds;
-		cap->m_triggerPhase = m_min;
+		cap->m_triggerPhase = m_min * scale;
 		cap->m_flags = 0; // Updated at end
 		SetData(cap, 0);
 
