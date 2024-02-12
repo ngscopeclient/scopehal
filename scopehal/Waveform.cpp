@@ -156,6 +156,8 @@ optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zer
 
 	if(!swaveform && !uwaveform)
 		return {};
+	if(waveform->empty())
+		return {};
 
 	//Find the approximate index of the sample of interest and interpolate the cursor position
 	bool out_of_range;
@@ -195,6 +197,8 @@ optional<bool> GetDigitalValueAtTime(WaveformBase* waveform, int64_t time_fs)
 
 	if(!swaveform && !uwaveform)
 		return {};
+	if(waveform->empty())
+		return {};
 
 	//Find the approximate index of the sample of interest and interpolate the cursor position
 	bool out_of_range;
@@ -222,6 +226,8 @@ optional<string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs)
 	auto swaveform = dynamic_cast<SparseWaveformBase*>(waveform);
 	if(!swaveform)
 		return {};
+	if(waveform->empty())
+		return {};
 
 	//Find the approximate index of the sample of interest and interpolate the cursor position
 	bool out_of_range;
@@ -242,6 +248,7 @@ optional<string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs)
 
 //from imgui but we don't want to depend on it here
 #define IM_COL32_R_SHIFT    0
+
 #define IM_COL32_G_SHIFT    8
 #define IM_COL32_B_SHIFT    16
 #define IM_COL32_A_SHIFT    24
