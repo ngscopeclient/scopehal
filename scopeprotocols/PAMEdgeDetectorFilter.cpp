@@ -77,7 +77,9 @@ string PAMEdgeDetectorFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PAMEdgeDetectorFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
+void PAMEdgeDetectorFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	if(!VerifyAllInputsOK())
 	{
@@ -99,16 +101,114 @@ void PAMEdgeDetectorFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared
 	din->PrepareForCpuAccess();
 	auto vmin = GetMinVoltage(din);
 	auto vmax = GetMaxVoltage(din);
-	Unit v(Unit::UNIT_VOLTS);
-	LogTrace("Bounds are %s to %s\n", v.PrettyPrint(vmin).c_str(), v.PrettyPrint(vmax).c_str());
+	Unit yunit(Unit::UNIT_VOLTS);
+	LogTrace("Bounds are %s to %s\n", yunit.PrettyPrint(vmin).c_str(), yunit.PrettyPrint(vmax).c_str());
 
 	//Take a histogram and find the top N peaks (should be roughly evenly distributed)
-	const int64_t nbins = 100;
-	auto peaks = MakeHistogram(din, vmin, vmax, nbins);
-	float binsize = (vmax - vmin) / bins;
+	const int64_t nbins = 250;
+	auto hist = MakeHistogram(din, vmin, vmax, nbins);
+	float binsize = (vmax - vmin) / nbins;
 
 	//Search radius for bins (for now hard code, TODO make this adaptive?)
-	const int64_t searchrad = 4;
+	const int64_t searchrad = 10;
+	ssize_t nend = len - 1;
+	vector<Peak> peaks;
+	for(ssize_t i=searchrad; i<(nbins - searchrad); i++)
+	{
+		//Locate the peak
+		ssize_t left = std::max((ssize_t)searchrad, (ssize_t)(i - searchrad));
+		ssize_t right = std::min((ssize_t)(i + searchrad), (ssize_t)nend);
+
+		float target = hist[i];
+		bool is_peak = true;
+		for(ssize_t j=left; j<=right; j++)
+		{
+			if(i == j)
+				continue;
+			if(hist[j] >= target)
+			{
+				//Something higher is to our right.
+				//It's higher than anything from left to j. This makes it a candidate peak.
+				//Restart our search from there.
+				if(j > i)
+					i = j-1;
+
+				is_peak = false;
+				break;
+			}
+		}
+		if(!is_peak)
+			continue;
+
+		//Do a weighted average of our immediate neighbors to fine tune our position
+		ssize_t fine_rad = 10;
+		left = std::max((ssize_t)1, i - fine_rad);
+		right = std::min(i + fine_rad, nend);
+		double total = 0;
+		double count = 0;
+		for(ssize_t j=left; j<=right; j++)
+		{
+			total += j*hist[j];
+			count += hist[j];
+		}
+		peaks.push_back(Peak(round(total / count), target, 1));
+	}
+
+	//Sort the peak table by height and pluck out the requested count, use these as our levels
+	std::sort(peaks.rbegin(), peaks.rend(), std::less<Peak>());
+	vector<float> levels;
+	if(peaks.size() < order)
+	{
+		LogDebug("Requested PAM-%zu but only found %zu peaks, cannot proceed\n", order, peaks.size());
+		SetData(nullptr, 0);
+		return;
+	}
+	for(size_t i=0; i<order; i++)
+		levels.push_back((peaks[i].m_x * binsize) + vmin);
+
+	//Now sort the levels by voltage to get symbol values from lowest to highest
+	std::sort(levels.begin(), levels.end());
+
+	//Print out level of each symbol by name
+	//TODO: naming only tested for PAM3
+	LogTrace("Symbol levels:\n");
+	bool oddOrder = ((order & 1) == 1);
+	int64_t symbase = 0;
+	if(oddOrder)
+		symbase = -static_cast<int64_t>(order/2);
+	for(size_t i=0; i<order; i++)
+	{
+		LogIndenter li;
+		LogTrace("%2" PRIi64 ": %s\n",
+			static_cast<int64_t>(i) + symbase,
+			yunit.PrettyPrint(levels[i]).c_str());
+	}
+
+	//Make thresholds for each transition
+	LogTrace("Transition thresholds:\n");
+	vector< vector<float> > thresholds;
+	thresholds.resize(order);
+	for(size_t i=0; i<order; i++)
+	{
+		LogIndenter li;
+
+		thresholds[i].resize(order);
+
+		float vfrom = levels[i];
+		for(size_t j=0; j<order; j++)
+		{
+			float vto = levels[j];
+			if(i != j)
+			{
+				float thresh = vfrom + (vto - vfrom)/2;
+				thresholds[i][j] = thresh;
+				LogTrace("%2" PRIi64 " -> %2" PRIi64 ": %s\n",
+					static_cast<int64_t>(i) + symbase,
+					static_cast<int64_t>(j) + symbase,
+					yunit.PrettyPrint(thresh).c_str());
+			}
+		}
+	}
 
 	/*
 	//Setup
