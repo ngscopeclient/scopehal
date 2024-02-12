@@ -1390,6 +1390,11 @@ void Oscilloscope::Convert16BitSamplesFMA(float* pout, const int16_t* pin, float
 		pout[k] = pin[k] * gain - offset;
 }
 
+//WORKAROUND https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105593 on Debian bookworm
+#if !defined(__llvm__) && ((__GNUC__ < 12) || ((__GNUC__ == 12) && (__GNUC_MINOR <= 2)))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 __attribute__((target("avx512f")))
 void Oscilloscope::Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, float gain, float offset, size_t count)
 {
@@ -1441,5 +1446,9 @@ void Oscilloscope::Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, f
 	for(size_t k=end; k<count; k++)
 		pout[k] = pin[k] * gain - offset;
 }
+#if !defined(__llvm__) && ((__GNUC__ < 12) || ((__GNUC__ == 12) && (__GNUC_MINOR <= 2)))
+#pragma GCC diagnostic pop
+#endif
+
 #endif /* __x86_64__ */
 
