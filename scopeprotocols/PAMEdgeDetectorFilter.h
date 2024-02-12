@@ -35,6 +35,8 @@
 #ifndef PAMEdgeDetectorFilter_h
 #define PAMEdgeDetectorFilter_h
 
+#include <cinttypes>
+
 class PAMEdgeDetectorFilter : public Filter
 {
 public:
@@ -49,7 +51,11 @@ public:
 	PROTOCOL_DECODER_INITPROC(PAMEdgeDetectorFilter)
 
 protected:
+
+	size_t GetState(float v, std::vector<float>& sthresholds);
+
 	std::string m_order;
+	std::string m_baudname;
 };
 
 #endif
