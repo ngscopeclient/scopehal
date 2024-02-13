@@ -41,6 +41,7 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	, m_baudname("Symbol rate")
 {
 	AddDigitalStream("data");
+
 	CreateInput("din");
 
 	m_parameters[m_order] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
@@ -195,179 +196,138 @@ void PAMEdgeDetectorFilter::Refresh(
 		sthresholds[i] = (from + to) / 2;
 	}
 
-	//Midpoints for interpolating each transition
-	LogTrace("Transition thresholds:\n");
-	vector< vector<float> > lerpthresholds;
-	lerpthresholds.resize(order);
-	for(size_t i=0; i<order; i++)
-	{
-		LogIndenter li;
-
-		lerpthresholds[i].resize(order);
-
-		float vfrom = levels[i];
-		for(size_t j=0; j<order; j++)
-		{
-			float vto = levels[j];
-			if(i != j)
-			{
-				float thresh = vfrom + (vto - vfrom)/2;
-				lerpthresholds[i][j] = thresh;
-				LogTrace("%2" PRIi64 " -> %2" PRIi64 ": %s\n",
-					static_cast<int64_t>(i) + symbase,
-					static_cast<int64_t>(j) + symbase,
-					yunit.PrettyPrint(thresh).c_str());
-			}
-		}
-	}
-
 	//Output waveform is sparse since we interpolate edge positions
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
-
-	//Figure out symbol value at time zero
-	auto lastSymbol = GetState(din->m_samples[0], sthresholds);
-	int64_t tlast = 0;
-	size_t ilast = 0;
-	LogTrace("First symbol has value %zu (%s)\n", lastSymbol, yunit.PrettyPrint(din->m_samples[0]).c_str());
 
 	//Add initial dummy sample at time zero
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(1);
 	cap->m_samples.push_back(0);
 
-	//Loop over samples and look for transitions
-	int64_t minTransitionTime = ui * 0.6;
-	LogTrace("minTransitionTime = %s\n", Unit(Unit::UNIT_FS).PrettyPrint(minTransitionTime).c_str());
-	bool nextValue = true;
-	float noEdgeThreshold = (levels[1] - levels[0]) * 0.1;
-	float fracUI = din->m_timescale * 1.0 / ui;
+	//Find *all* level crossings
+	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1
+	struct edge_t
+	{
+		size_t index;
+		size_t value;
+		bool rising;
+	};
+	vector<edge_t> levelCrossings;
 	for(size_t i=1; i<len-1; i++)
 	{
-		//See what state we're in
-		auto vnow = din->m_samples[i];
-		auto state = GetState(vnow, sthresholds);
-		int64_t tnow = i*din->m_timescale;
+		//Check against each threshold for both rising and falling edges
+		float prev = din->m_samples[i-1];
+		float cur = din->m_samples[i];
 
-		//Look at the delta from the previous value to the next
-		//If we're changing rapidly, we're probably still in an edge
-		float dv = din->m_samples[i+1] - din->m_samples[i-1];
-		float slew = dv / (2*fracUI);
-		/*LogTrace("[%s] state=%zu slew=%f\n",
-			Unit(Unit::UNIT_FS).PrettyPrint(tnow).c_str(),
-			state,
-			slew);
-		LogIndenter li;*/
-		if(fabs(slew) > 0.25)
-		{
-			//LogTrace("slew reject\n");
-			continue;
-		}
+		//Prepare to make a new edge
+		edge_t edge;
+		edge.index = i;
 
-		//Not an edge if we're the same symbol value we've been before
-		//BUT: if we're within a fairly small delta (10% for now) of the nominal symbol value
-		//then we're in a multi bit run, don't count this as the start of a transition
-		if(state == lastSymbol)
+		for(size_t j=0; j<sthresholds.size(); j++)
 		{
-			auto nominal = levels[state];
-			auto delta = fabs(vnow - nominal);
-			if(delta < noEdgeThreshold)
+			float t = sthresholds[j];
+
+			//Check for rising edge
+			if( (prev <= t) && (cur > t) )
 			{
-				/*LogTrace("[%s] lastSymbol=%zu, state=%zu, delta=%.3f, noEdgeThreshold=%.3f\n",
-					Unit(Unit::UNIT_FS).PrettyPrint(tnow).c_str(),
-					lastSymbol,
-					state,
-					delta,
-					noEdgeThreshold);*/
-
-				ilast = i;
-				tlast = tnow;
-			}
-			//LogTrace("unchanged reject\n");
-			continue;
-		}
-
-		//State is different. How long has it been?
-		//Should have been most of a UI since the last edge
-		int64_t delta = tnow - tlast;
-		if(delta < minTransitionTime)
-		{
-			//LogTrace("ui reject\n");
-			continue;
-		}
-
-		bool rising = state > lastSymbol;
-		float target = lerpthresholds[lastSymbol][state];
-		//LogTrace("New symbol has value %zu (at time %s)\n", state, Unit(Unit::UNIT_FS).PrettyPrint(tnow).c_str());
-		//LogTrace("Searching for level crossing at %s\n", yunit.PrettyPrint(target).c_str());
-
-		//Search the transition region to find the actual level crossing, knowing the start and end states
-		size_t j = ilast;
-		for(; j < i; j++)
-		{
-			float a = din->m_samples[j];
-			float b = din->m_samples[j+1];
-
-			if(rising && (a <= target) && (b >= target) )
-			{
-				/*LogTrace("Found rising edge (between samples at %s and %s with values %s and %s)\n",
-					Unit(Unit::UNIT_FS).PrettyPrint(j*din->m_timescale).c_str(),
-					Unit(Unit::UNIT_FS).PrettyPrint( (j+1)*din->m_timescale).c_str(),
-					yunit.PrettyPrint(a).c_str(),
-					yunit.PrettyPrint(b).c_str());*/
+				edge.rising = true;
+				edge.value = j+1;
+				levelCrossings.push_back(edge);
 				break;
 			}
 
-			if(!rising && (a >= target) && (b <= target) )
+			//Check for falling edge
+			else if( (prev >= t) && (cur < t) )
 			{
-				/*LogTrace("Found falling edge (between samples at %s and %s with values %s and %s)\n",
-					Unit(Unit::UNIT_FS).PrettyPrint(j*din->m_timescale).c_str(),
-					Unit(Unit::UNIT_FS).PrettyPrint( (j+1)*din->m_timescale).c_str(),
-					yunit.PrettyPrint(a).c_str(),
-					yunit.PrettyPrint(b).c_str());*/
+				edge.rising = false;
+				edge.value = j;
+				levelCrossings.push_back(edge);
 				break;
 			}
+
+			//else not a level crossing
 		}
-		auto frac = InterpolateTime(din, j, target);
-		int64_t lerp = j*din->m_timescale + frac*din->m_timescale;
-
-		//Extend previous sample, if any
-		size_t outlen = cap->m_offsets.size();
-		if(outlen)
-			cap->m_durations[outlen-1] = lerp - cap->m_offsets[outlen-1];
-
-		//Add new sample
-		cap->m_offsets.push_back(lerp);
-		cap->m_durations.push_back(1);
-		cap->m_samples.push_back(nextValue);
-
-		//Prepare for the next sample
-		nextValue = !nextValue;
-		lastSymbol = state;
-		ilast = i;
-		tlast = lerp;
-
-		/*LogTrace("Interpolated zero crossing at %s\n",
-			Unit(Unit::UNIT_FS).PrettyPrint(lerp + din->m_triggerPhase).c_str());
-
-		if(outlen > 10)
-			break;*/
 	}
+	LogTrace("First pass: Found %zu level crossings\n", levelCrossings.size());
 
-	//Done
-	cap->MarkModifiedFromCpu();
-}
-
-/**
-	@brief Figure out the symbol value for a given voltage
- */
-size_t PAMEdgeDetectorFilter::GetState(float v, vector<float>& sthresholds)
-{
-	for(size_t i=0; i<sthresholds.size(); i++)
+	//Loop over level crossings and figure out what they are
+	int64_t halfui = ui / 2;
+	bool nextValue = true;
+	for(size_t i=0; i<levelCrossings.size(); i++)
 	{
-		if(v < sthresholds[i])
-			return i;
+		size_t istart = levelCrossings[i].index - 1;
+		size_t iend = levelCrossings[i].index + 1;
+		size_t symstart;
+		size_t symend = levelCrossings[i].value;
+
+		if(levelCrossings[i].rising)
+			symstart = symend - 1;
+		else
+			symstart = symend + 1;
+
+		//If the previous edge is close to this one (< 0.5 UI)
+		//and they're both rising or falling, merge them
+		//TODO: for PAM-4 we need a larger lookahead window but that will come later
+		bool merging = false;
+		if(i > 1)
+		{
+			int64_t delta = (levelCrossings[i].index - levelCrossings[i-1].index) * din->m_timescale;
+			if( (levelCrossings[i-1].rising == levelCrossings[i].rising) && (delta < halfui) )
+			{
+				merging = true;
+				istart = levelCrossings[i-1].index-1;
+
+				if(levelCrossings[i].rising)
+					symstart = symend - 2;
+				else
+					symstart = symend + 2;
+			}
+		}
+
+		//Find the midpoint (for now, fixed threshold still)
+		float target = (levels[symstart] + levels[symend]) / 2;
+		int64_t tlerp = 0;
+		for(size_t j=istart; j<iend; j++)
+		{
+			float prev = din->m_samples[j-1];
+			float cur = din->m_samples[j];
+
+			if(	( (prev <= target) && (cur > target) ) ||
+				( (prev >= target) && (cur < target) ) )
+			{
+				tlerp = j*din->m_timescale + InterpolateTime(din, j, target)*din->m_timescale;
+				break;
+			}
+		}
+
+		//Add the symbol
+		if(!merging)
+		{
+			cap->m_offsets.push_back(tlerp);
+			cap->m_durations.push_back(1);
+			cap->m_samples.push_back(nextValue);
+
+			//Extend previous sample, if any
+			size_t outlen = cap->m_offsets.size();
+			if(outlen)
+				cap->m_durations[outlen-1] = tlerp - cap->m_offsets[outlen-1];
+
+			nextValue = !nextValue;
+		}
+
+		//Overwrite previous sample
+		else
+		{
+			size_t outlen = cap->m_offsets.size();
+			cap->m_offsets[outlen-1] = tlerp;
+
+			//Update duration of previous sample
+			if(outlen > 1)
+				cap->m_durations[outlen-2] = tlerp - cap->m_offsets[outlen-2];
+		}
 	}
-	return sthresholds.size();
+
+	cap->MarkModifiedFromCpu();
 }

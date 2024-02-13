@@ -52,8 +52,6 @@ public:
 
 protected:
 
-	size_t GetState(float v, std::vector<float>& sthresholds);
-
 	std::string m_order;
 	std::string m_baudname;
 };
