@@ -269,21 +269,25 @@ void PAMEdgeDetectorFilter::Refresh(
 
 		//If the previous edge is close to this one (< 0.5 UI)
 		//and they're both rising or falling, merge them
-		//TODO: for PAM-4 we need a larger lookahead window but that will come later
 		bool merging = false;
-		if(i > 1)
+		for(size_t lookback = 1; lookback < order-1; lookback ++)
 		{
-			int64_t delta = (levelCrossings[i].index - levelCrossings[i-1].index) * din->m_timescale;
-			if( (levelCrossings[i-1].rising == levelCrossings[i].rising) && (delta < halfui) )
+			if(i <= lookback)
+				break;
+
+			int64_t delta = (levelCrossings[i].index - levelCrossings[i-lookback].index) * din->m_timescale;
+			if( (levelCrossings[i-lookback].rising == levelCrossings[i].rising) && (delta < halfui) )
 			{
 				merging = true;
-				istart = levelCrossings[i-1].index-1;
+				istart = levelCrossings[i-lookback].index-1;
 
 				if(levelCrossings[i].rising)
-					symstart = symend - 2;
+					symstart = symend - (lookback+1);
 				else
-					symstart = symend + 2;
+					symstart = symend + (lookback+1);
 			}
+			else
+				break;
 		}
 
 		//Find the midpoint (for now, fixed threshold still)
