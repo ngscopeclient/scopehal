@@ -37,6 +37,7 @@ using namespace std;
 
 IQDemuxFilter::IQDemuxFilter(const string& color)
 	: Filter(color, CAT_RF)
+	, m_alignment("Alignment")
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
@@ -44,6 +45,11 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 
 	CreateInput("din");
 	CreateInput("clk");
+
+	m_parameters[m_alignment] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_alignment].AddEnumValue("None", ALIGN_NONE);
+	m_parameters[m_alignment].AddEnumValue("100Base-T1", ALIGN_100BASET1);
+	m_parameters[m_alignment].SetIntVal(ALIGN_NONE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,13 +106,6 @@ void IQDemuxFilter::Refresh(
 	qout->m_triggerPhase = 0;
 	clkout->m_triggerPhase = 0;
 
-	LogTrace("Sampled values:\n");
-	for(size_t i=0; i<6; i++)
-	{
-		LogIndenter li;
-		LogTrace("%s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(sampled.m_samples[i]).c_str());
-	}
-
 	iout->PrepareForCpuAccess();
 	qout->PrepareForCpuAccess();
 	clkout->PrepareForCpuAccess();
@@ -127,11 +126,53 @@ void IQDemuxFilter::Refresh(
 	clkout->m_triggerPhase = 0;
 	clkout->m_timescale = 1;
 
-	//Synthesize the output
 	size_t len = sampled.size();
 	LogTrace("%zu sampled data points\n", len);
+
+	//Figure out the proper I-vs-Q alignment (even/odd is not specified)
+	auto align = static_cast<AlignmentType>(m_parameters[m_alignment].GetIntVal());
+	size_t istart = 0;
+	if(align == ALIGN_100BASET1)
+	{
+		//Look at a fixed window in the start of the waveform and see which one has the least (0,0) symbols
+		size_t window = min(len, (size_t)10000);
+
+		size_t leastZeros = window;
+		for(size_t phase=0; phase<2; phase++)
+		{
+			size_t numSymbols = 0;
+			size_t numZeros = 0;
+
+			for(size_t i=phase; i+1 < window; i += 2)
+			{
+				//For now, fixed threshold of +/- 250 mV for zero code
+				auto fi = sampled.m_samples[i];
+				auto fq = sampled.m_samples[i+1];
+
+				bool izero = fabs(fi) < 0.25;
+				bool qzero = fabs(fq) < 0.25;
+
+				numSymbols ++;
+				if(izero && qzero)
+					numZeros ++;
+			}
+
+			LogTrace("Phase %zu\n", phase);
+			LogIndenter li;
+			LogTrace("Symbols: %zu\n", numSymbols);
+			LogTrace("Zeros:  %zu\n", numZeros);
+
+			if(numZeros < leastZeros)
+			{
+				istart = phase;
+				leastZeros = numZeros;
+			}
+		}
+	}
+
+	//Synthesize the output
 	bool clkval = false;
-	for(size_t i=0; i+1 < len; i += 2)
+	for(size_t i=istart; i+1 < len; i += 2)
 	{
 		int64_t tnow = sampled.m_offsets[i];
 
