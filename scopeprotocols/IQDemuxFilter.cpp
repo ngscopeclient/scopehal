@@ -96,6 +96,16 @@ void IQDemuxFilter::Refresh(
 	auto iout = SetupEmptySparseAnalogOutputWaveform(&sampled, 0);
 	auto qout = SetupEmptySparseAnalogOutputWaveform(&sampled, 1);
 	auto clkout = SetupEmptySparseDigitalOutputWaveform(&sampled, 2);
+	iout->m_triggerPhase = 0;
+	qout->m_triggerPhase = 0;
+	clkout->m_triggerPhase = 0;
+
+	LogTrace("Sampled values:\n");
+	for(size_t i=0; i<6; i++)
+	{
+		LogIndenter li;
+		LogTrace("%s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(sampled.m_samples[i]).c_str());
+	}
 
 	iout->PrepareForCpuAccess();
 	qout->PrepareForCpuAccess();

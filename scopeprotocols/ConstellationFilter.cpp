@@ -103,7 +103,6 @@ void ConstellationFilter::Refresh(
 	if(!VerifyAllInputsOK())
 	{
 		//if input goes momentarily bad, don't delete output - just stop updating
-		//SetData(NULL, 0);
 		return;
 	}
 
@@ -125,21 +124,30 @@ void ConstellationFilter::Refresh(
 		cap = ReallocateWaveform();
 	cap->PrepareForCpuAccess();
 
-	//For now, fill the buffer manually with a
-	auto data = cap->GetAccumData();
-	for(size_t y=0; y<m_height; y++)
-	{
-		for(size_t x=0; x<m_width; x++)
-		{
-			size_t xquad = x/16;
-			size_t yquad = y/16;
+	//Recompute scales
+	float xscale = m_width / GetVoltageRange(0);
+	float xmid = m_width / 2;
+	float yscale = m_height / GetVoltageRange(0);
+	float ymid = m_height / 2;
 
-			data[y*m_width + x] = (xquad & 1) ^ (yquad & 1);
-		}
+	//Actual integration loop
+	//TODO: vectorize, GPU, or both?
+	auto data = cap->GetAccumData();
+	for(size_t i=0; i<inlen; i++)
+	{
+		ssize_t x = static_cast<ssize_t>(round(xmid + xscale * samples_i.m_samples[i]));
+		ssize_t y = static_cast<ssize_t>(round(ymid + yscale * samples_q.m_samples[i]));
+
+		//bounds check
+		if( (x < 0) || (x >= (ssize_t)m_width) || (y < 0) || (y >= (ssize_t)m_height) )
+			continue;
+
+		//fill
+		data[y*m_width + x] ++;
 	}
 
-	//Count total number of UIs we've integrated
-	//cap->IntegrateUIs(inlen);
+	//Count total number of symbols we've integrated
+	cap->IntegrateSymbols(inlen);
 	cap->Normalize();
 }
 

@@ -57,18 +57,13 @@ void ConstellationWaveform::Normalize()
 {
 	//Preprocessing
 	int64_t nmax = 0;
-	int64_t halfwidth = m_width/2;
-	size_t blocksize = halfwidth * sizeof(int64_t);
 	for(size_t y=0; y<m_height; y++)
 	{
 		int64_t* row = m_accumdata + y*m_width;
 
 		//Find peak amplitude
-		for(size_t x=halfwidth; x<m_width; x++)
+		for(size_t x=0; x<m_width; x++)
 			nmax = max(row[x], nmax);
-
-		//Copy right half to left half
-		memcpy(row, row+halfwidth, blocksize);
 	}
 	if(nmax == 0)
 		nmax = 1;
