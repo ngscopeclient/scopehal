@@ -91,6 +91,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	I2CRegisterDecoder.cpp
 	IBISDriverFilter.cpp
 	IBM8b10bDecoder.cpp
+	IQDemuxFilter.cpp
 	InvertFilter.cpp
 	IPv4Decoder.cpp
 	IQSquelchFilter.cpp
