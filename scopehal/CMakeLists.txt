@@ -1,6 +1,6 @@
 # At the moment, this is meant to be built as part of scopehal-apps.
 # Standalone build/install is a potential long-term goal.
-#If there is interest in a standalone build, please reach out. 
+#If there is interest in a standalone build, please reach out.
 
 # Libraries specific to scopehal library not provided by root CMakeLists
 
@@ -71,6 +71,7 @@ set(SCOPEHAL_SOURCES
 	Unit.cpp
 	Waveform.cpp
 	DensityFunctionWaveform.cpp
+	ConstellationWaveform.cpp
 	EyeMask.cpp
 	EyeWaveform.cpp
 

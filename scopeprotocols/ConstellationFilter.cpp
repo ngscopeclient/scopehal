@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,101 +27,126 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Stream
- */
-#ifndef Stream_h
-#define Stream_h
-
-/**
-	@brief Information associated with a single stream
-
-	Each channel contains one or more streams, which represent a single element of a complex-valued waveform.
-	For example, the waveform from an RTSA might have a stream for I and a stream for Q within a single channel.
-	The waveform from a VNA might have a stream for magnitude and another for angle data on each path.
- */
-class Stream
-{
-public:
-	Stream();
-
-	/**
-		@brief General data type stored in a stream
-
-		This type is always valid even if m_waveform is null.
-	 */
-	enum StreamType
-	{
-		//Conventional time-series waveforms (or similar graphs like a FFT)
-		STREAM_TYPE_ANALOG,
-		STREAM_TYPE_DIGITAL,
-		STREAM_TYPE_DIGITAL_BUS,
-
-		//2D density plots
-		STREAM_TYPE_EYE,
-		STREAM_TYPE_SPECTROGRAM,
-		STREAM_TYPE_WATERFALL,
-		STREAM_TYPE_CONSTELLATION,
-
-		//Special channels not used for display
-		STREAM_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
-
-		//Class datatype from a protocol decoder
-		STREAM_TYPE_PROTOCOL,
-
-		//Single analog value
-		STREAM_TYPE_ANALOG_SCALAR,
-
-		//Other / unspecified
-		STREAM_TYPE_UNDEFINED
-	};
-
-	Stream(Unit yunit, std::string name, StreamType type, uint8_t flags = 0)
-	: m_yAxisUnit(yunit)
-	, m_name(name)
-	, m_waveform(nullptr)
-	, m_value(0)
-	, m_stype(type)
-	, m_flags(flags)
-	{}
-
-	///Unit of measurement for our vertical axis
-	Unit m_yAxisUnit;
-
-	///@brief Name of the stream
-	std::string m_name;
-
-	///@brief The current waveform (or null if nothing here)
-	WaveformBase* m_waveform;
-
-	///@brief The current value (only meaningful for analog scalar type)
-	double m_value;
-
-	///@brief General datatype stored in the stream
-	StreamType m_stype;
-
-
-	/**
-		@brief Flags that apply to this waveform. Bitfield.
-		STREAM_DO_NOT_INTERPOLATE: *hint* that this stream should not be rendered with interpolation
-		                           even though/if it is analog. E.g. measurement values related to
-		                           discrete parts of a waveform.
-
-		STREAM_FILL_UNDER:			requests that waveform be drawn with area under curve filled (e.g. histogram)
-
-		STREAM_INFREQUENTLY_USED:	hint that the stream is not commonly used, and should not be automatically added
-									to the scope display to prevent clutter
-	 */
-	uint8_t m_flags;
-
-	enum
-	{
-		STREAM_DO_NOT_INTERPOLATE	= 1,
-		STREAM_FILL_UNDER			= 2,
-		STREAM_INFREQUENTLY_USED	= 4
-	};
-};
-
+#include "../scopehal/scopehal.h"
+#include "ConstellationFilter.h"
+#include <algorithm>
+#ifdef __x86_64__
+#include <immintrin.h>
 #endif
+
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ConstellationFilter::ConstellationFilter(const string& color)
+	: Filter(color, CAT_RF)
+	, m_height(1)
+	, m_width(1)
+	, m_xscale(0)
+{
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_CONSTELLATION);
+
+	m_xAxisUnit = Unit(Unit::UNIT_MICROVOLTS);
+
+	CreateInput("i");
+	CreateInput("q");
+	CreateInput("clk");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+bool ConstellationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
+	if( (i == 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+		return true;
+
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string ConstellationFilter::GetProtocolName()
+{
+	return "Constellation";
+}
+
+float ConstellationFilter::GetVoltageRange(size_t /*stream*/)
+{
+	return m_inputs[0].GetVoltageRange();
+}
+
+float ConstellationFilter::GetOffset(size_t /*stream*/)
+{
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void ConstellationFilter::ClearSweeps()
+{
+	SetData(NULL, 0);
+}
+
+void ConstellationFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	if(!VerifyAllInputsOK())
+	{
+		//if input goes momentarily bad, don't delete output - just stop updating
+		//SetData(NULL, 0);
+		return;
+	}
+
+	auto din_i = GetInputWaveform(0);
+	auto din_q = GetInputWaveform(1);
+	auto clk = GetInputWaveform(2);
+
+	//Sample the I/Q input
+	SparseAnalogWaveform samples_i;
+	SparseAnalogWaveform samples_q;
+	SampleOnAnyEdgesBase(din_i, clk, samples_i);
+	SampleOnAnyEdgesBase(din_q, clk, samples_q);
+
+	size_t inlen = min(samples_i.size(), samples_q.size());
+
+	//Generate the output waveform
+	auto cap = dynamic_cast<ConstellationWaveform*>(GetData(0));
+	if(!cap)
+		cap = ReallocateWaveform();
+	cap->PrepareForCpuAccess();
+
+	//For now, fill the buffer manually with a
+	auto data = cap->GetAccumData();
+	for(size_t y=0; y<m_height; y++)
+	{
+		for(size_t x=0; x<m_width; x++)
+		{
+			size_t xquad = x/16;
+			size_t yquad = y/16;
+
+			data[y*m_width + x] = (xquad & 1) ^ (yquad & 1);
+		}
+	}
+
+	//Count total number of UIs we've integrated
+	//cap->IntegrateUIs(inlen);
+	cap->Normalize();
+}
+
+ConstellationWaveform* ConstellationFilter::ReallocateWaveform()
+{
+	auto cap = new ConstellationWaveform(m_width, m_height);
+	cap->m_timescale = 1;
+	SetData(cap, 0);
+	return cap;
+}

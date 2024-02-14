@@ -30,98 +30,42 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Stream
+	@brief Declaration of ConstellationWaveform
  */
-#ifndef Stream_h
-#define Stream_h
 
-/**
-	@brief Information associated with a single stream
+#ifndef ConstellationWaveform_h
+#define ConstellationWaveform_h
 
-	Each channel contains one or more streams, which represent a single element of a complex-valued waveform.
-	For example, the waveform from an RTSA might have a stream for I and a stream for Q within a single channel.
-	The waveform from a VNA might have a stream for magnitude and another for angle data on each path.
- */
-class Stream
+#include "../scopehal/DensityFunctionWaveform.h"
+
+class ConstellationWaveform : public DensityFunctionWaveform
 {
 public:
-	Stream();
 
-	/**
-		@brief General data type stored in a stream
+	ConstellationWaveform(size_t width, size_t height);
+	virtual ~ConstellationWaveform();
 
-		This type is always valid even if m_waveform is null.
-	 */
-	enum StreamType
-	{
-		//Conventional time-series waveforms (or similar graphs like a FFT)
-		STREAM_TYPE_ANALOG,
-		STREAM_TYPE_DIGITAL,
-		STREAM_TYPE_DIGITAL_BUS,
+	//not copyable or assignable
+	ConstellationWaveform(const ConstellationWaveform&) =delete;
+	ConstellationWaveform& operator=(const ConstellationWaveform&) =delete;
 
-		//2D density plots
-		STREAM_TYPE_EYE,
-		STREAM_TYPE_SPECTROGRAM,
-		STREAM_TYPE_WATERFALL,
-		STREAM_TYPE_CONSTELLATION,
+	int64_t* GetAccumData()
+	{ return m_accumdata; }
 
-		//Special channels not used for display
-		STREAM_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
+	void Normalize();
 
-		//Class datatype from a protocol decoder
-		STREAM_TYPE_PROTOCOL,
+	size_t GetTotalSymbols()
+	{ return m_totalSymbols; }
 
-		//Single analog value
-		STREAM_TYPE_ANALOG_SCALAR,
+	void IntegrateSymbols(size_t symbols)
+	{ m_totalSymbols += symbols; }
 
-		//Other / unspecified
-		STREAM_TYPE_UNDEFINED
-	};
+	float m_saturationLevel;
 
-	Stream(Unit yunit, std::string name, StreamType type, uint8_t flags = 0)
-	: m_yAxisUnit(yunit)
-	, m_name(name)
-	, m_waveform(nullptr)
-	, m_value(0)
-	, m_stype(type)
-	, m_flags(flags)
-	{}
+protected:
+	int64_t* m_accumdata;
 
-	///Unit of measurement for our vertical axis
-	Unit m_yAxisUnit;
-
-	///@brief Name of the stream
-	std::string m_name;
-
-	///@brief The current waveform (or null if nothing here)
-	WaveformBase* m_waveform;
-
-	///@brief The current value (only meaningful for analog scalar type)
-	double m_value;
-
-	///@brief General datatype stored in the stream
-	StreamType m_stype;
-
-
-	/**
-		@brief Flags that apply to this waveform. Bitfield.
-		STREAM_DO_NOT_INTERPOLATE: *hint* that this stream should not be rendered with interpolation
-		                           even though/if it is analog. E.g. measurement values related to
-		                           discrete parts of a waveform.
-
-		STREAM_FILL_UNDER:			requests that waveform be drawn with area under curve filled (e.g. histogram)
-
-		STREAM_INFREQUENTLY_USED:	hint that the stream is not commonly used, and should not be automatically added
-									to the scope display to prevent clutter
-	 */
-	uint8_t m_flags;
-
-	enum
-	{
-		STREAM_DO_NOT_INTERPOLATE	= 1,
-		STREAM_FILL_UNDER			= 2,
-		STREAM_INFREQUENTLY_USED	= 4
-	};
+	size_t m_totalSymbols;
 };
 
 #endif

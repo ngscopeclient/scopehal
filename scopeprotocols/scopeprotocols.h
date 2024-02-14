@@ -61,6 +61,7 @@
 #include "ComplexImportFilter.h"
 #include "ComplexSpectrogramFilter.h"
 #include "ConstantFilter.h"
+#include "ConstellationFilter.h"
 #include "CSVExportFilter.h"
 #include "CSVImportFilter.h"
 #include "CTLEFilter.h"

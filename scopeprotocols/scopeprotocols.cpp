@@ -62,6 +62,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ComplexImportFilter);
 	AddDecoderClass(ComplexSpectrogramFilter);
 	AddDecoderClass(ConstantFilter);
+	AddDecoderClass(ConstellationFilter);
 	AddDecoderClass(CSVExportFilter);
 	AddDecoderClass(CSVImportFilter);
 	AddDecoderClass(CTLEFilter);
