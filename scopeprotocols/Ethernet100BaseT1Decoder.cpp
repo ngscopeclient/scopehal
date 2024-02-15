@@ -122,8 +122,8 @@ void Ethernet100BaseT1Decoder::Refresh(
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_startTimestamp = isamples.m_startTimestamp;
+	cap->m_startFemtoseconds = isamples.m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
@@ -246,6 +246,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 						default:
 							break;
 					}
+					LogTrace("sd = %d curByte = %d nbits=%d\n", sd, curByte, nbits);
 
 					//Descramble sd
 					//Descrambler follows 40.3.1.4.2

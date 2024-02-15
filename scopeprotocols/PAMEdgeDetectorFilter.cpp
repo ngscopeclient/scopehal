@@ -100,8 +100,8 @@ void PAMEdgeDetectorFilter::Refresh(
 	//Find min/max of the input
 	size_t order = m_parameters[m_order].GetIntVal();
 	din->PrepareForCpuAccess();
-	auto vmin = GetMinVoltage(din);
-	auto vmax = GetMaxVoltage(din);
+	float vmin, vmax;
+	GetMinMaxVoltage(din, vmin, vmax);
 	Unit yunit(Unit::UNIT_VOLTS);
 	LogTrace("Bounds are %s to %s\n", yunit.PrettyPrint(vmin).c_str(), yunit.PrettyPrint(vmax).c_str());
 

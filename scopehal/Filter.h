@@ -355,6 +355,26 @@ public:
 	//TODO: create some process for caching this so we don't waste CPU time
 
 	/**
+		@brief Gets the lowest and highest voltage of a waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void GetMinMaxVoltage(T* cap, float& vmin, float& vmax)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		vmin = FLT_MAX;
+		vmax = FLT_MIN;
+		for(float f : cap->m_samples)
+		{
+			if(f < vmin)
+				vmin = f;
+			if(f > vmax)
+				vmax = f;
+		}
+	}
+
+	/**
 		@brief Gets the lowest voltage of a waveform
 	 */
 	template<class T>
