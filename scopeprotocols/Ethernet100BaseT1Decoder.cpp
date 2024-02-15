@@ -282,18 +282,29 @@ void Ethernet100BaseT1Decoder::Refresh(
 			case STATE_SSD_2:
 				if( (ci == 0) && (cq == 0) )
 				{
-					LogTrace("Found SSD at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
 					state = STATE_PACKET;
 
-					//Add the fake preamble byte
-					bytes.push_back(0x55);
-					starts.push_back(bytestart);
-					bytestart = tnow + (tlen * 2 / 3);
-					ends.push_back(bytestart);
+					if(scramblerLocked)
+					{
+						LogTrace("Found SSD at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
 
-					//We're now 1 bit into the first preamble byte, which is always a 1
-					nbits = 1;
-					curByte = 1;
+						//Add the fake preamble byte
+						bytes.push_back(0x55);
+						starts.push_back(bytestart);
+						bytestart = tnow + (tlen * 2 / 3);
+						ends.push_back(bytestart);
+
+						//We're now 1 bit into the first preamble byte, which is always a 1
+						nbits = 1;
+						curByte = 1;
+					}
+					else
+					{
+						//TODO: can we go back in time once we achieve lock
+						//and predict what the scrambler value had been to decode from the start of the waveform?
+						LogTrace("Found SSD at %s, but can't decode because no scrambler lock\n",
+							fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+					}
 				}
 				else
 					state = STATE_IDLE;
@@ -307,7 +318,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 					state = STATE_ESD_1;
 
 				//No, it's a data symbol
-				else
+				else if(scramblerLocked)
 				{
 					//Decode to a sequence of 3 scrambled data bits
 					uint8_t sd = 0;
@@ -369,7 +380,10 @@ void Ethernet100BaseT1Decoder::Refresh(
 				//ESD with error
 				//TODO: how to handle this? for now decode it anyway
 				else if( (ci == -1) && (cq == -1) )
-					BytesToFrames(bytes, starts, ends, cap);
+				{
+					if(scramblerLocked)
+						BytesToFrames(bytes, starts, ends, cap);
+				}
 
 				//invalid, don't try to decode
 				else
