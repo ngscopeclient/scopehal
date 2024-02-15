@@ -103,6 +103,7 @@
 #include "EthernetRMIIDecoder.h"
 #include "EthernetSGMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
+#include "Ethernet100BaseT1Decoder.h"
 #include "Ethernet100BaseTXDecoder.h"
 #include "Ethernet1000BaseXDecoder.h"
 #include "Ethernet10GBaseRDecoder.h"

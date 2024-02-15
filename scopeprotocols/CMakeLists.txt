@@ -56,6 +56,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ESPIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTXDecoder.cpp
+	Ethernet100BaseT1Decoder.cpp
 	Ethernet1000BaseXDecoder.cpp
 	Ethernet10GBaseRDecoder.cpp
 	Ethernet64b66bDecoder.cpp
