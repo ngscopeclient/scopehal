@@ -132,7 +132,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 	vector<uint64_t> ends;
 
 	int64_t bytestart = 0;
-	uint8_t curByte = 0;
+	uint16_t curNib = 0;
 	uint8_t nbits = 0;
 	bool scramblerLocked = false;
 
@@ -141,6 +141,9 @@ void Ethernet100BaseT1Decoder::Refresh(
 
 	uint64_t scramblerErrors = 0;
 	size_t lastScramblerError = 0;
+
+	uint8_t prevNib = 0;
+	bool phaseLow = true;
 
 	for(size_t i=0; i<ilen; i++)
 	{
@@ -174,19 +177,12 @@ void Ethernet100BaseT1Decoder::Refresh(
 		else
 			scrambler = (scrambler << 1) | ( b32 ^ b19 );
 
-		/*
-			(-1, -1): Sx = 1, Sd = 3'b1x1
-			(-1,  0): Sx = x, Sd = 3'b000
-			(-1,  1): Sx = x, Sd = 3'b010
-
-			( 0, -1): Sx = 0, Sd = 3'b1x1
-			( 0,  0): SSD, not an idle
-			( 0,  1): Sx = 0, Sd = 3'b0x1
-
-			( 1, -1): Sx = x, Sd = 3'b110
-			( 1,  0): Sx = x, Sd = 3'b100
-			( 1,  1): Sx = 1, Sd = 3'b0x1
-		 */
+		//Extract scrambler bits we care about for the data bits
+		auto b16 = (scrambler >> 16) & 1;
+		bool b8 = (scrambler >> 8) & 1;
+		bool b6 = (scrambler >> 6) & 1;
+		bool b3 = (scrambler >> 3) & 1;
+		bool b0 = (scrambler & 1);
 
 		switch(state)
 		{
@@ -202,23 +198,37 @@ void Ethernet100BaseT1Decoder::Refresh(
 				//Not a SSD, it's idles.
 				else
 				{
-					//96.3.4.4
-					//RX scrambler (and optional polarity?) alignment
-					//Note that 96.3.4.4 says to align assuming Sxn = 0:
-					//    When Sd[0] is 0, I is nonzero
-					//    When Sd[0] is 1, I is zero
-					//But mid span I don't think we can rely on that being the case since we're not training?
-					//That seems to be the case if we're in SEND_I, or in SEND_N with Sxn = 0
+					/*
+						96.3.4.4
+						RX scrambler (and optional polarity?) alignment
+						Note that 96.3.4.4 says to align assuming Sxn = 0:
+						    When Sd[0] is 0, I is nonzero
+						    When Sd[0] is 1, I is zero
+						But mid span I don't think we can rely on that being the case since we're not training?
+						That seems to be the case if we're in SEND_I, or in SEND_N with Sxn = 0
 
-					//96.3.3.3.8 / table 96-3
-					//(-1, -1), (0, -1), (0, 1), (1, 1) all mean Sd[0] == 1
-					//else Sd[0] = 1
-					//Unlike the algorithm in 96.3.4.4 this works for all modes
-					//(SEND_I, or SEND_N with Sxn = 0 or Sxn=1)
+						96.3.3.3.8 / table 96-3
+						(-1, -1), (0, -1), (0, 1), (1, 1) all mean Sd[0] == 1
+						else Sd[0] = 1
+						Unlike the algorithm in 96.3.4.4 this works for all modes
+						(SEND_I, or SEND_N with Sxn = 0 or Sxn=1)
+
+						(-1, -1): Sx = 1, Sd = 3'b1x1
+						(-1,  0): Sx = x, Sd = 3'b000
+						(-1,  1): Sx = x, Sd = 3'b010
+
+						( 0, -1): Sx = 0, Sd = 3'b1x1
+						( 0,  0): SSD, not an idle
+						( 0,  1): Sx = 0, Sd = 3'b0x1
+
+						( 1, -1): Sx = x, Sd = 3'b110
+						( 1,  0): Sx = x, Sd = 3'b100
+						( 1,  1): Sx = 1, Sd = 3'b0x1
+					 */
 					bool expected_lsb = ( (ci == -1) && (cq == -1) ) || (ci == 0) || ( (ci == 1) && (cq == 1) );
 
 					//See if we already got the expected value out of the scrambler
-					bool current_lsb = (scrambler & 1) == 1;
+					bool current_lsb = (b0 == 1);
 
 					//Yes? We got more idles
 					if(expected_lsb == current_lsb)
@@ -296,7 +306,10 @@ void Ethernet100BaseT1Decoder::Refresh(
 
 						//We're now 1 bit into the first preamble byte, which is always a 1
 						nbits = 1;
-						curByte = 1;
+						curNib = 1;
+
+						prevNib = 0;
+						phaseLow = true;
 					}
 					else
 					{
@@ -344,19 +357,53 @@ void Ethernet100BaseT1Decoder::Refresh(
 						default:
 							break;
 					}
-					LogTrace("sd = %d curByte = %d nbits=%d\n", sd, curByte, nbits);
 
-					//Descramble sd
-					//Descrambler follows 40.3.1.4.2
+					/*
+						Descramble sd per 40.3.1.4.2
 
-					//Master and slave use separate 33-bit scrambler polynomials
-					//Side-stream scrambler
-					//Master: x^33 + x^13 + 1 (xor bits 12 and 32 then feed back into 0)
-					//Slave: x^33 + x^20 + 1 (xor bits 19 and 32 then feed back into 0)
+						Sy0 = scr0
+						sy1 = scr3 ^ 8
+						sy2 = scr6 ^ 16
+						sy3 = scr9 ^ 14 ^ 19 ^ 24
 
-					//Each cycle generate 8 bits Sxn[3:0] and Syn[3:0]
-					//Xn = xor of scrambler bits 4 and 6
-					//Yn = xor of scrambler bits 1 and 5
+						sx0 = scr4 ^ scr6
+						sx1 = scr7 ^ 9 ^ 12 ^ 14
+						sx2 = scr10 ^ 12 ^ 20 ^ 22
+						sx3 = scr13 ^ 15 ^ 18 ^ 20 ^ 23 ^ 25 ^ 28 ^ 30
+
+						scrambler for 7:4 is sx
+						scrambler for 3:0 is sy
+					 */
+					bool sy0 = b0;
+					bool sy1 = b3 ^ b8;
+					bool sy2 = b6 ^ b16;
+					sd ^= (sy2 << 2) ^ (sy1 << 1) ^ sy0;
+
+					//Add the 3 descrambled bits into the current nibble
+					curNib |= (sd << nbits);
+					nbits += 3;
+
+					//At this point we should have 3, 4, 5, or 6 bits in the current nibble
+					if(nbits >= 4)
+					{
+						uint8_t nib = curNib & 0xf;
+
+						curNib >>= 4;
+						nbits -= 4;
+
+						//TODO: get start/end timing properly
+						//For now, hack and just round to 3-bit symbol boundaries??
+
+						//Combine nibbles into bytes
+						if(!phaseLow)
+						{
+							uint8_t bval = (nib << 4) | prevNib;
+							LogTrace("Byte: %02x\n", bval);
+						}
+
+						prevNib = nib;
+						phaseLow = !phaseLow;
+					}
 				}
 
 				break;
