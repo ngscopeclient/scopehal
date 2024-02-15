@@ -136,6 +136,12 @@ void Ethernet100BaseT1Decoder::Refresh(
 	uint8_t nbits = 0;
 	bool scramblerLocked = false;
 
+	uint64_t scrambler = 0;
+	uint64_t idlesMatched = 0;
+
+	uint64_t scramblerErrors = 0;
+	size_t lastScramblerError = 0;
+
 	for(size_t i=0; i<ilen; i++)
 	{
 		int64_t tnow = isamples.m_offsets[i];
@@ -155,6 +161,33 @@ void Ethernet100BaseT1Decoder::Refresh(
 		else if(fq < cutn)
 			cq = -1;
 
+		//Advance the scrambler for each constellation point
+		//Master: x^33 + x^13 + 1 (xor bits 12 and 32 then feed back into 0)
+		//Slave: x^33 + x^20 + 1 (xor bits 19 and 32 then feed back into 0)
+		//for now assume master mode
+		auto b32 = (scrambler >> 32) & 1;
+		auto b19 = (scrambler >> 19) & 1;
+		auto b12 = (scrambler >> 12) & 1;
+		bool masterMode = true;
+		if(masterMode)
+			scrambler = (scrambler << 1) | ( b32 ^ b12 );
+		else
+			scrambler = (scrambler << 1) | ( b32 ^ b19 );
+
+		/*
+			(-1, -1): Sx = 1, Sd = 3'b1x1
+			(-1,  0): Sx = x, Sd = 3'b000
+			(-1,  1): Sx = x, Sd = 3'b010
+
+			( 0, -1): Sx = 0, Sd = 3'b1x1
+			( 0,  0): SSD, not an idle
+			( 0,  1): Sx = 0, Sd = 3'b0x1
+
+			( 1, -1): Sx = x, Sd = 3'b110
+			( 1,  0): Sx = x, Sd = 3'b100
+			( 1,  1): Sx = 1, Sd = 3'b0x1
+		 */
+
 		switch(state)
 		{
 			//Look for three (0,0) points in a row to indicate SSD
@@ -167,21 +200,75 @@ void Ethernet100BaseT1Decoder::Refresh(
 				}
 
 				//Not a SSD, it's idles.
-				//Try to get a scrambler lock
+				else
+				{
+					//96.3.4.4
+					//RX scrambler (and optional polarity?) alignment
+					//Note that 96.3.4.4 says to align assuming Sxn = 0:
+					//    When Sd[0] is 0, I is nonzero
+					//    When Sd[0] is 1, I is zero
+					//But mid span I don't think we can rely on that being the case since we're not training?
+					//That seems to be the case if we're in SEND_I, or in SEND_N with Sxn = 0
 
-				/*
-					(-1, -1): Sx = 1, Sd = 3'b1x1
-					(-1,  0): Sx = x, Sd = 3'b000
-					(-1,  1): Sx = x, Sd = 3'b010
+					//96.3.3.3.8 / table 96-3
+					//(-1, -1), (0, -1), (0, 1), (1, 1) all mean Sd[0] == 1
+					//else Sd[0] = 1
+					//Unlike the algorithm in 96.3.4.4 this works for all modes
+					//(SEND_I, or SEND_N with Sxn = 0 or Sxn=1)
+					bool expected_lsb = ( (ci == -1) && (cq == -1) ) || (ci == 0) || ( (ci == 1) && (cq == 1) );
 
-					( 0, -1): Sx = 0, Sd = 3'b1x1
-					( 0,  0): SSD, not an idle
-					( 0,  1): Sx = 0, Sd = 3'b0x1
+					//See if we already got the expected value out of the scrambler
+					bool current_lsb = (scrambler & 1) == 1;
 
-					( 1, -1): Sx = x, Sd = 3'b110
-					( 1,  0): Sx = x, Sd = 3'b100
-					( 1,  1): Sx = 1, Sd = 3'b0x1
-				 */
+					//Yes? We got more idles
+					if(expected_lsb == current_lsb)
+					{
+						idlesMatched ++;
+
+						//Clear scrambler error counter after 1K error-free bits
+						if(lastScramblerError > 1024)
+						{
+							lastScramblerError = 0;
+							scramblerErrors = 0;
+						}
+					}
+
+					//Nope, reset idle counter and force this bit into the scrambler
+					else
+					{
+						//Was scrambler locked? We might have lost sync but give some tolerance to bit errors
+						if(scramblerLocked)
+						{
+							lastScramblerError = i;
+							scramblerErrors ++;
+
+							LogTrace("Scrambler error at %s (%zu recently)\n",
+								fs.PrettyPrint(isamples.m_offsets[i]).c_str(), scramblerErrors);
+
+							if(scramblerErrors > 16)
+							{
+								LogTrace("Scrambler unlocked\n");
+								scramblerLocked = false;
+							}
+						}
+
+						//No, unlocked. Feed data in and try to get a lock
+						else
+						{
+							idlesMatched = 0;
+							scrambler = (scrambler & ~1) | expected_lsb;
+						}
+					}
+
+					//Declare lock after 256 error-free idles
+					if( (idlesMatched > 256) && !scramblerLocked)
+					{
+						LogTrace("Scrambler locked at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+						scramblerLocked = true;
+						scramblerErrors = 0;
+						lastScramblerError = i;
+					}
+				 }
 
 				break;
 
