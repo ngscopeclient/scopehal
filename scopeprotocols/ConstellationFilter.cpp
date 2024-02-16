@@ -44,11 +44,11 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	, m_height(1)
 	, m_width(1)
 	, m_xscale(0)
-	, m_nominalRangeI(0.5)
-	, m_nominalRangeQ(0.5)
-	, m_nominalCenterI(0)
-	, m_nominalCenterQ(0)
 	, m_modulation("Modulation")
+	, m_nomci("Center I")
+	, m_nomcq("Center Q")
+	, m_nomri("Range I")
+	, m_nomrq("Range Q")
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_CONSTELLATION);
 
@@ -64,6 +64,18 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	m_parameters[m_modulation].AddEnumValue("QAM-9 / 2D-PAM3", MOD_QAM9);
 	m_parameters[m_modulation].AddEnumValue("QAM-16", MOD_QAM16);
 	m_parameters[m_modulation].SetIntVal(MOD_NONE);
+
+	m_parameters[m_nomci] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_nomci].SetFloatVal(0);
+
+	m_parameters[m_nomcq] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_nomcq].SetFloatVal(0);
+
+	m_parameters[m_nomri] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_nomri].SetFloatVal(0.5);
+
+	m_parameters[m_nomrq] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_nomrq].SetFloatVal(0.5);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,6 +182,12 @@ void ConstellationFilter::RecomputeNominalPoints()
 {
 	m_points.clear();
 
+	float nomci = m_parameters[m_nomci].GetFloatVal();
+	float nomcq = m_parameters[m_nomcq].GetFloatVal();
+
+	float nomri = m_parameters[m_nomri].GetFloatVal();
+	float nomrq = m_parameters[m_nomrq].GetFloatVal();
+
 	auto mod = m_parameters[m_modulation].GetIntVal();
 	switch(mod)
 	{
@@ -181,8 +199,8 @@ void ConstellationFilter::RecomputeNominalPoints()
 				for(int q=-1; q<=1; q += 2)
 				{
 					m_points.push_back(ConstellationPoint(
-						(m_nominalCenterI + i*m_nominalRangeI) * 1e6,	//convert V to uV
-						m_nominalCenterQ + q*m_nominalRangeQ,
+						(nomci + i*nomri) * 1e6,	//convert V to uV
+						nomcq + q*nomrq,
 						i,
 						q));
 				}
@@ -198,8 +216,8 @@ void ConstellationFilter::RecomputeNominalPoints()
 				for(int q=-1; q<=1; q++)
 				{
 					m_points.push_back(ConstellationPoint(
-						(m_nominalCenterI + i*m_nominalRangeI) * 1e6,	//convert V to uV
-						m_nominalCenterQ + q*m_nominalRangeQ,
+						(nomci + i*nomri) * 1e6,	//convert V to uV
+						nomcq + q*nomrq,
 						i,
 						q));
 				}
@@ -215,8 +233,8 @@ void ConstellationFilter::RecomputeNominalPoints()
 				for(float q=-1; q<=1; q += 2.0/3)
 				{
 					m_points.push_back(ConstellationPoint(
-						(m_nominalCenterI + i*m_nominalRangeI) * 1e6,	//convert V to uV
-						m_nominalCenterQ + q*m_nominalRangeQ,
+						(nomci + i*nomri) * 1e6,	//convert V to uV
+						nomcq + q*nomrq,
 						i,
 						q));
 				}
@@ -302,11 +320,11 @@ bool ConstellationFilter::PerformAction(const string& id)
 			LogTrace("I symbol range: (%s, %s)\n", yunit.PrettyPrint(ismin).c_str(), yunit.PrettyPrint(ismax).c_str());
 			LogTrace("Q symbol range: (%s, %s)\n", yunit.PrettyPrint(qsmin).c_str(), yunit.PrettyPrint(qsmax).c_str());
 
-			m_nominalCenterI = (ismin + ismax) / 2;
-			m_nominalCenterQ = (qsmin + qsmax) / 2;
+			m_parameters[m_nomci].SetFloatVal( (ismin + ismax) / 2 );
+			m_parameters[m_nomcq].SetFloatVal( (qsmin + qsmax) / 2 );
 
-			m_nominalRangeI = (ismax - ismin) / 2;
-			m_nominalRangeQ = (qsmax - qsmin) / 2;
+			m_parameters[m_nomri].SetFloatVal( (ismax - ismin) / 2 );
+			m_parameters[m_nomrq].SetFloatVal(  (qsmax - qsmin) / 2 );
 		}
 	}
 	return true;

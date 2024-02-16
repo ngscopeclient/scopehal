@@ -143,13 +143,12 @@ protected:
 	size_t m_width;
 
 	float m_xscale;
-	float m_nominalRangeI;
-	float m_nominalRangeQ;
-
-	float m_nominalCenterI;
-	float m_nominalCenterQ;
 
 	std::string m_modulation;
+	std::string m_nomci;
+	std::string m_nomcq;
+	std::string m_nomri;
+	std::string m_nomrq;
 
 	///@brief Nominal locations of each constellation point
 	std::vector<ConstellationPoint> m_points;
