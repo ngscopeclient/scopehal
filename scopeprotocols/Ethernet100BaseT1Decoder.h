@@ -46,6 +46,15 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(Ethernet100BaseT1Decoder)
+
+	enum scrambler_t
+	{
+		SCRAMBLER_M_B13,
+		SCRAMBLER_S_B19
+	};
+
+protected:
+	std::string m_scrambler;
 };
 
 #endif

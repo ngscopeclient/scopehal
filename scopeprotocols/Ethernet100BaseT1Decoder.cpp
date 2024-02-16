@@ -38,6 +38,7 @@ using namespace std;
 
 Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 	: EthernetProtocolDecoder(color)
+	, m_scrambler("Scrambler polynomial")
 {
 	m_signalNames.clear();
 	m_inputs.clear();
@@ -45,6 +46,11 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 	CreateInput("i");
 	CreateInput("q");
 	CreateInput("clk");
+
+	m_parameters[m_scrambler] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_scrambler].AddEnumValue("x^33 + x^13 + 1 (M)", SCRAMBLER_M_B13);
+	m_parameters[m_scrambler].AddEnumValue("x^33 + x^20 + 1 (S)", SCRAMBLER_S_B19);
+	m_parameters[m_scrambler].SetIntVal(SCRAMBLER_M_B13);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,6 +151,8 @@ void Ethernet100BaseT1Decoder::Refresh(
 	uint8_t prevNib = 0;
 	bool phaseLow = true;
 
+	bool masterMode = (m_parameters[m_scrambler].GetIntVal() == SCRAMBLER_M_B13);
+
 	for(size_t i=0; i<ilen; i++)
 	{
 		int64_t tnow = isamples.m_offsets[i];
@@ -165,13 +173,9 @@ void Ethernet100BaseT1Decoder::Refresh(
 			cq = -1;
 
 		//Advance the scrambler for each constellation point
-		//Master: x^33 + x^13 + 1 (xor bits 12 and 32 then feed back into 0)
-		//Slave: x^33 + x^20 + 1 (xor bits 19 and 32 then feed back into 0)
-		//for now assume master mode
 		auto b32 = (scrambler >> 32) & 1;
 		auto b19 = (scrambler >> 19) & 1;
 		auto b12 = (scrambler >> 12) & 1;
-		bool masterMode = true;
 		if(masterMode)
 			scrambler = (scrambler << 1) | ( b32 ^ b12 );
 		else
@@ -383,7 +387,8 @@ void Ethernet100BaseT1Decoder::Refresh(
 					curNib |= (sd << nbits);
 					nbits += 3;
 
-					//At this point we should have 3, 4, 5, or 6 bits in the current nibble
+					//At this point we should have 3, 4, 5, or 6 bits in the current nibble-in-progress.
+					//If we have at least a whole nibble, process it
 					if(nbits >= 4)
 					{
 						uint8_t nib = curNib & 0xf;
@@ -391,14 +396,19 @@ void Ethernet100BaseT1Decoder::Refresh(
 						curNib >>= 4;
 						nbits -= 4;
 
-						//TODO: get start/end timing properly
-						//For now, hack and just round to 3-bit symbol boundaries??
-
 						//Combine nibbles into bytes
 						if(!phaseLow)
 						{
 							uint8_t bval = (nib << 4) | prevNib;
-							LogTrace("Byte: %02x\n", bval);
+
+							//Add the byte
+							bytes.push_back(bval);
+							starts.push_back(bytestart);
+
+							//Byte end time depends on how many bits from this symbol weren't consumed
+							bytestart = tnow + (tlen * (2 - nbits) / 3);
+
+							ends.push_back(bytestart);
 						}
 
 						prevNib = nib;
