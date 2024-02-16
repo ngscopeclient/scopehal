@@ -112,7 +112,7 @@ void PAMEdgeDetectorFilter::Refresh(
 
 	//Search radius for bins (for now hard code, TODO make this adaptive?)
 	const int64_t searchrad = 10;
-	ssize_t nend = len - 1;
+	ssize_t nend = nbins - 1;
 	vector<Peak> peaks;
 	for(ssize_t i=searchrad; i<(nbins - searchrad); i++)
 	{

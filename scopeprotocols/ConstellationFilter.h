@@ -37,8 +37,34 @@
 #define ConstellationFilter_h
 
 #include "../scopehal/ConstellationWaveform.h"
+#include "../scopehal/ActionProvider.h"
 
-class ConstellationFilter : public Filter
+class ConstellationPoint
+{
+public:
+	ConstellationPoint(int64_t x, float y, float xn, float yn)
+		: m_xval(x)
+		, m_yval(y)
+		, m_xnorm(xn)
+		, m_ynorm(yn)
+	{}
+
+	///@brief Nominal X coordinate
+	int64_t m_xval;
+
+	///@brief Nominal Y coordinate
+	float m_yval;
+
+	///@brief Normalized X coordinate
+	float m_xnorm;
+
+	///@brief Normalized Y coordinate
+	float m_ynorm;
+};
+
+class ConstellationFilter
+	: public Filter
+	, public ActionProvider
 {
 public:
 	ConstellationFilter(const std::string& color);
@@ -53,6 +79,9 @@ public:
 	virtual float GetOffset(size_t stream) override;
 
 	virtual void ClearSweeps() override;
+
+	virtual std::vector<std::string> EnumActions() override;
+	virtual bool PerformAction(const std::string& id) override;
 
 	ConstellationWaveform* ReallocateWaveform();
 
@@ -88,13 +117,42 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(ConstellationFilter)
 
+	enum modulation_t
+	{
+		MOD_NONE,
+		MOD_QAM4,
+		MOD_QAM9,
+		MOD_QAM16,
+	};
+
+	const std::vector<ConstellationPoint>& GetNominalPoints()
+	{ return m_points; }
+
 protected:
-	void DoMaskTest(EyeWaveform* cap);
+	void RecomputeNominalPoints();
+	void GetMinMaxSymbols(
+		std::vector<size_t>& hist,
+		float vmin,
+		float& vmin_out,
+		float& vmax_out,
+		float binsize,
+		size_t order,
+		ssize_t nbins);
 
 	size_t m_height;
 	size_t m_width;
 
 	float m_xscale;
+	float m_nominalRangeI;
+	float m_nominalRangeQ;
+
+	float m_nominalCenterI;
+	float m_nominalCenterQ;
+
+	std::string m_modulation;
+
+	///@brief Nominal locations of each constellation point
+	std::vector<ConstellationPoint> m_points;
 };
 
 #endif
