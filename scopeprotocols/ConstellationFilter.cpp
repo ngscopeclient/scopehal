@@ -47,10 +47,11 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	, m_modulation("Modulation")
 	, m_nomci("Center I")
 	, m_nomcq("Center Q")
-	, m_nomri("Range I")
-	, m_nomrq("Range Q")
+	, m_nomr("Range")
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_CONSTELLATION);
+	AddStream(Unit(Unit::UNIT_VOLTS), "EVM raw", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_PERCENT), "EVM normalized", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	m_xAxisUnit = Unit(Unit::UNIT_MICROVOLTS);
 
@@ -63,6 +64,9 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	m_parameters[m_modulation].AddEnumValue("QAM-4 / QPSK", MOD_QAM4);
 	m_parameters[m_modulation].AddEnumValue("QAM-9 / 2D-PAM3", MOD_QAM9);
 	m_parameters[m_modulation].AddEnumValue("QAM-16", MOD_QAM16);
+	m_parameters[m_modulation].AddEnumValue("QAM-32", MOD_QAM32);
+	m_parameters[m_modulation].AddEnumValue("QAM-64", MOD_QAM64);
+	m_parameters[m_modulation].AddEnumValue("PSK-8", MOD_PSK8);
 	m_parameters[m_modulation].SetIntVal(MOD_NONE);
 
 	m_parameters[m_nomci] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
@@ -71,11 +75,8 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	m_parameters[m_nomcq] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_nomcq].SetFloatVal(0);
 
-	m_parameters[m_nomri] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_nomri].SetFloatVal(0.5);
-
-	m_parameters[m_nomrq] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_nomrq].SetFloatVal(0.5);
+	m_parameters[m_nomr] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_nomr].SetFloatVal(0.5);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,10 +161,15 @@ void ConstellationFilter::Refresh(
 	//Actual integration loop
 	//TODO: vectorize, GPU, or both?
 	auto data = cap->GetAccumData();
+	double evsum = 0;
+	int64_t evcount = 0;
 	for(size_t i=0; i<inlen; i++)
 	{
-		ssize_t x = static_cast<ssize_t>(round(xmid + xscale * samples_i.m_samples[i]));
-		ssize_t y = static_cast<ssize_t>(round(ymid + yscale * samples_q.m_samples[i]));
+		float ival = samples_i.m_samples[i];
+		float qval = samples_q.m_samples[i];
+
+		ssize_t x = static_cast<ssize_t>(round(xmid + xscale * ival));
+		ssize_t y = static_cast<ssize_t>(round(ymid + yscale * qval));
 
 		//bounds check
 		if( (x < 0) || (x >= (ssize_t)m_width) || (y < 0) || (y >= (ssize_t)m_height) )
@@ -171,7 +177,30 @@ void ConstellationFilter::Refresh(
 
 		//fill
 		data[y*m_width + x] ++;
+
+		//Compute error vector
+		if(m_points.size())
+		{
+			//TODO: this can definitely be made more efficient!!!
+			float minvec = FLT_MAX;
+			for(auto p : m_points)
+			{
+				float dx = (p.m_xval * 1e-6) - ival;
+				float dy = p.m_yval - qval;
+				float dsq = dx*dx + dy*dy;
+				minvec = min(minvec, dsq);
+			}
+
+			evcount ++;
+			evsum += sqrt(minvec);
+		}
 	}
+
+	double evmRaw = evsum / evcount;
+	double evmNorm = evmRaw / m_parameters[m_nomr].GetFloatVal();
+
+	m_streams[1].m_value = evmRaw;
+	m_streams[2].m_value = evmNorm;
 
 	//Count total number of symbols we've integrated
 	cap->IntegrateSymbols(inlen);
@@ -185,8 +214,7 @@ void ConstellationFilter::RecomputeNominalPoints()
 	float nomci = m_parameters[m_nomci].GetFloatVal();
 	float nomcq = m_parameters[m_nomcq].GetFloatVal();
 
-	float nomri = m_parameters[m_nomri].GetFloatVal();
-	float nomrq = m_parameters[m_nomrq].GetFloatVal();
+	float nomr = m_parameters[m_nomr].GetFloatVal();
 
 	auto mod = m_parameters[m_modulation].GetIntVal();
 	switch(mod)
@@ -199,8 +227,8 @@ void ConstellationFilter::RecomputeNominalPoints()
 				for(int q=-1; q<=1; q += 2)
 				{
 					m_points.push_back(ConstellationPoint(
-						(nomci + i*nomri) * 1e6,	//convert V to uV
-						nomcq + q*nomrq,
+						(nomci + i*nomr) * 1e6,	//convert V to uV
+						nomcq + q*nomr,
 						i,
 						q));
 				}
@@ -216,8 +244,8 @@ void ConstellationFilter::RecomputeNominalPoints()
 				for(int q=-1; q<=1; q++)
 				{
 					m_points.push_back(ConstellationPoint(
-						(nomci + i*nomri) * 1e6,	//convert V to uV
-						nomcq + q*nomrq,
+						(nomci + i*nomr) * 1e6,	//convert V to uV
+						nomcq + q*nomr,
 						i,
 						q));
 				}
@@ -233,15 +261,70 @@ void ConstellationFilter::RecomputeNominalPoints()
 				for(float q=-1; q<=1; q += 2.0/3)
 				{
 					m_points.push_back(ConstellationPoint(
-						(nomci + i*nomri) * 1e6,	//convert V to uV
-						nomcq + q*nomrq,
+						(nomci + i*nomr) * 1e6,	//convert V to uV
+						nomcq + q*nomr,
 						i,
 						q));
 				}
 			}
 
+			break;
+
+		//6x6 square minus the corners
+		case MOD_QAM32:
+
+			for(float i=-1; i<=1; i += 1.0 / 2.5)
+			{
+				for(float q=-1; q<=1; q += 1.0 / 2.5)
+				{
+					if( ( (i < -0.99) || (i >= 0.99) ) &&
+						( (q < -0.99) || (q >= 0.99) ) )
+					{
+						//skip the corners
+					}
+					else
+					{
+						m_points.push_back(ConstellationPoint(
+							(nomci + i*nomr) * 1e6,	//convert V to uV
+							nomcq + q*nomr,
+							i,
+							q));
+					}
+				}
+			}
 
 			break;
+
+		//8x8 square
+		case MOD_QAM64:
+
+			for(float i=-1; i<=1; i += 1.0/3.5)
+			{
+				for(float q=-1; q<=1; q += 1.0/3.5)
+				{
+					m_points.push_back(ConstellationPoint(
+						(nomci + i*nomr) * 1e6,	//convert V to uV
+						nomcq + q*nomr,
+						i,
+						q));
+				}
+			}
+
+			break;
+
+		//8 points around a circle
+		case MOD_PSK8:
+			for(float theta =0; theta < 2*M_PI; theta += M_PI_4)
+			{
+				float i = sin(theta);
+				float q = cos(theta);
+
+				m_points.push_back(ConstellationPoint(
+					(nomci + i*nomr) * 1e6,	//convert V to uV
+					nomcq + q*nomr,
+					i,
+					q));
+			}
 
 		//Nothing
 		default:
@@ -285,6 +368,19 @@ bool ConstellationFilter::PerformAction(const string& id)
 				order = 4;
 				break;
 
+			case MOD_QAM32:
+				order = 6;
+				break;
+
+			case MOD_QAM64:
+				order = 8;
+				break;
+
+			//for 8psk we only want the extrema
+			case MOD_PSK8:
+				order = 2;
+				break;
+
 			//can't autoscale if no constellation to fit!
 			case MOD_NONE:
 			default:
@@ -323,8 +419,10 @@ bool ConstellationFilter::PerformAction(const string& id)
 			m_parameters[m_nomci].SetFloatVal( (ismin + ismax) / 2 );
 			m_parameters[m_nomcq].SetFloatVal( (qsmin + qsmax) / 2 );
 
-			m_parameters[m_nomri].SetFloatVal( (ismax - ismin) / 2 );
-			m_parameters[m_nomrq].SetFloatVal(  (qsmax - qsmin) / 2 );
+			float fmax = (ismax + qsmax) / 2;
+			float fmin = (ismin + qsmin) / 2;
+
+			m_parameters[m_nomr].SetFloatVal( (fmax - fmin) / 2 );
 		}
 	}
 	return true;

@@ -123,6 +123,9 @@ public:
 		MOD_QAM4,
 		MOD_QAM9,
 		MOD_QAM16,
+		MOD_QAM32,
+		MOD_QAM64,
+		MOD_PSK8
 	};
 
 	const std::vector<ConstellationPoint>& GetNominalPoints()
@@ -147,8 +150,7 @@ protected:
 	std::string m_modulation;
 	std::string m_nomci;
 	std::string m_nomcq;
-	std::string m_nomri;
-	std::string m_nomrq;
+	std::string m_nomr;
 
 	///@brief Nominal locations of each constellation point
 	std::vector<ConstellationPoint> m_points;
