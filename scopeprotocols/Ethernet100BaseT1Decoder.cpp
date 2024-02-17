@@ -145,7 +145,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 	uint64_t scrambler = 0;
 	uint64_t idlesMatched = 0;
 
-	uint64_t scramblerErrors = 0;
+	size_t scramblerErrors = 0;
 	size_t lastScramblerError = 0;
 
 	uint8_t prevNib = 0;
