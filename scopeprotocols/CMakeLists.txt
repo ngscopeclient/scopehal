@@ -22,6 +22,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ComplexSpectrogramFilter.cpp
 	ConstellationFilter.cpp
 	ConstantFilter.cpp
+	CouplerDeEmbedFilter.cpp
 	CSVExportFilter.cpp
 	CSVImportFilter.cpp
 	CTLEFilter.cpp
