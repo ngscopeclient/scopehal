@@ -48,6 +48,8 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	, m_nomci("Center I")
 	, m_nomcq("Center Q")
 	, m_nomr("Range")
+	, m_evmSum(0)
+	, m_evmCount(0)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_CONSTELLATION);
 	AddStream(Unit(Unit::UNIT_VOLTS), "EVM raw", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -118,7 +120,9 @@ float ConstellationFilter::GetOffset(size_t /*stream*/)
 
 void ConstellationFilter::ClearSweeps()
 {
-	SetData(NULL, 0);
+	SetData(nullptr, 0);
+	m_evmSum = 0;
+	m_evmCount = 0;
 }
 
 void ConstellationFilter::Refresh(
@@ -161,8 +165,6 @@ void ConstellationFilter::Refresh(
 	//Actual integration loop
 	//TODO: vectorize, GPU, or both?
 	auto data = cap->GetAccumData();
-	double evsum = 0;
-	int64_t evcount = 0;
 	for(size_t i=0; i<inlen; i++)
 	{
 		float ival = samples_i.m_samples[i];
@@ -191,12 +193,12 @@ void ConstellationFilter::Refresh(
 				minvec = min(minvec, dsq);
 			}
 
-			evcount ++;
-			evsum += sqrt(minvec);
+			m_evmCount ++;
+			m_evmSum += sqrt(minvec);
 		}
 	}
 
-	double evmRaw = evsum / evcount;
+	double evmRaw = m_evmSum / m_evmCount;
 	double evmNorm = evmRaw / m_parameters[m_nomr].GetFloatVal();
 
 	m_streams[1].m_value = evmRaw;

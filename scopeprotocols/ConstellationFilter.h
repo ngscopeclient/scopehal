@@ -152,6 +152,9 @@ protected:
 	std::string m_nomcq;
 	std::string m_nomr;
 
+	double m_evmSum;
+	int64_t m_evmCount;
+
 	///@brief Nominal locations of each constellation point
 	std::vector<ConstellationPoint> m_points;
 };
