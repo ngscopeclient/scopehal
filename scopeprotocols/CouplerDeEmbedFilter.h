@@ -201,7 +201,6 @@ protected:
 	AcceleratorBuffer<float> m_vectorTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf2;
 	AcceleratorBuffer<float> m_vectorTempBuf3;
-	AcceleratorBuffer<float> m_scalarTempBuf2;
 
 	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_deEmbedComputePipeline;

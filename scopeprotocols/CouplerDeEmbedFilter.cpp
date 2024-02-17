@@ -70,7 +70,7 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
 
-	m_scalarTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_scalarTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_scalarTempBuf1.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	m_vectorTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
@@ -81,9 +81,6 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 
 	m_vectorTempBuf3.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_vectorTempBuf3.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-
-	m_scalarTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_scalarTempBuf2.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 CouplerDeEmbedFilter::~CouplerDeEmbedFilter()
@@ -200,7 +197,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		m_vectorTempBuf1.resize(2 * nouts);
 		m_vectorTempBuf2.resize(2 * nouts);
 		m_vectorTempBuf3.resize(2 * nouts);
-		m_scalarTempBuf2.resize(npoints);
 
 		m_cachedNumPoints = npoints;
 		sizechange = true;
@@ -253,23 +249,22 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	if(sizechange || clipchange || m_reverseLeakageParams.NeedUpdate(dmag, dang, bin_hz))
 		m_reverseLeakageParams.Refresh(dmag, dang, bin_hz, false, nouts, maxGain, dinFwd->m_timescale, npoints);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	//De-embed the forward path
 	ProcessScalarInput(cmdBuf, dinFwd->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
 	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_forwardCoupledParams, npoints, nouts);
 
-	//TODO: calculate and correct for group delay in the crosstalk path
-
-	//Generate debug output for the forward path
+	//DEBUG: this should be a copy of dinFwd
 	size_t istart = 0;
 	size_t iend = npoints_raw;
-	int64_t phaseshift;
-	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf2);
+	int64_t phaseshift = 0;
+	//GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf1);
+
+	//TODO: calculate and correct for group delay in the crosstalk path
 
 	//Calculate forward path crosstalk from this
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_forwardLeakageParams, npoints, nouts);
@@ -280,20 +275,24 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	GroupDelayCorrection(m_forwardLeakageParams, istart, iend, phaseshift, false);
 	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 2, npoints, phaseshift, m_vectorTempBuf2);
 
-	/////
+	///////////////////////
 
 	//De-embed the reverse path
 	ProcessScalarInput(cmdBuf, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
 	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_reverseCoupledParams, npoints, nouts);
 
-	//Generate debug output for the forward path
-	istart = 0;
-	iend = npoints_raw;
-	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf2);
-
 	//Calculate reverse path crosstalk
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_reverseLeakageParams, npoints, nouts);
+
+	//Calculate forward path signal minus crosstalk from the reverse path
+	//SubtractInPlace(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf2, nouts*2);
+
+	//Generate debug output for the no-crosstalk path
+	//DEBUG: This SHOULD be identical to dinFwd
+	/*istart = 0;
+	iend = npoints_raw;
+	phaseshift = 0;
+	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf3);*/
 
 	//Generate debug output for the leakage path
 	istart = 0;
@@ -314,16 +313,12 @@ void CouplerDeEmbedFilter::SubtractInPlace(
 		AcceleratorBuffer<float>& samplesSub,
 		size_t npoints)
 {
-	/*
-	m_deEmbedComputePipeline.Bind(cmdBuf);
-	m_deEmbedComputePipeline.BindBufferNonblocking(0, samplesIn, cmdBuf);
-	m_deEmbedComputePipeline.BindBufferNonblocking(1, samplesOut, cmdBuf, true);
-	m_deEmbedComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamSines, cmdBuf);
-	m_deEmbedComputePipeline.BindBufferNonblocking(3, params.m_resampledSparamCosines, cmdBuf);
-	m_deEmbedComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
-	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-	samplesOut.MarkModifiedFromGpu();
-	*/
+	m_subtractInPlaceComputePipeline.Bind(cmdBuf);
+	m_subtractInPlaceComputePipeline.BindBufferNonblocking(0, samplesInout, cmdBuf);
+	m_subtractInPlaceComputePipeline.BindBufferNonblocking(1, samplesSub, cmdBuf);
+	m_subtractInPlaceComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)npoints, GetComputeBlockCount(npoints, 64));
+	m_subtractInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	samplesInout.MarkModifiedFromGpu();
 }
 
 /**
@@ -352,7 +347,7 @@ void CouplerDeEmbedFilter::GroupDelayCorrection(
 /**
 	@brief Generates a scalar output from a complex input
 
-	Overwrites m_scalarTempBuf2
+	Overwrites m_scalarTempBuf1
  */
 void CouplerDeEmbedFilter::GenerateScalarOutput(
 	vk::raii::CommandBuffer& cmdBuf,
@@ -374,7 +369,7 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 	cap->m_triggerPhase = phaseshift;
 
 	//Do the actual FFT operation
-	m_vkReversePlan->AppendReverse(samplesIn, m_scalarTempBuf2, cmdBuf);
+	m_vkReversePlan->AppendReverse(samplesIn, m_scalarTempBuf1, cmdBuf);
 
 	//Copy and normalize output
 	//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
@@ -383,7 +378,7 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 	nargs.istart = istart;
 	nargs.scale = scale;
 	m_normalizeComputePipeline.Bind(cmdBuf);
-	m_normalizeComputePipeline.BindBufferNonblocking(0, m_scalarTempBuf2, cmdBuf);
+	m_normalizeComputePipeline.BindBufferNonblocking(0, m_scalarTempBuf1, cmdBuf);
 	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
 	m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
 	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
@@ -462,6 +457,8 @@ void CouplerDeEmbedFilter::ProcessScalarInput(
 
 	//Do the actual FFT operation
 	m_vkForwardPlan->AppendForward(m_scalarTempBuf1, samplesOut, cmdBuf);
+	samplesOut.MarkModifiedFromGpu();
+	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 }
 
 /**
