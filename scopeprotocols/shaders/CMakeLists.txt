@@ -45,6 +45,7 @@ add_compute_shaders(
 		RectangularWindow.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
+		SubtractInPlace.glsl
 		UpsampleFilter.glsl
 		WaterfallFilter.glsl
 	)

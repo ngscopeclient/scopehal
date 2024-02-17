@@ -157,6 +157,12 @@ protected:
 		size_t npoints,
 		size_t nouts);
 
+	void SubtractInPlace(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInout,
+		AcceleratorBuffer<float>& samplesSub,
+		size_t npoints);
+
 	void GenerateScalarOutput(
 		vk::raii::CommandBuffer& cmdBuf,
 		size_t istart,
@@ -194,12 +200,14 @@ protected:
 	AcceleratorBuffer<float> m_scalarTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf2;
+	AcceleratorBuffer<float> m_vectorTempBuf3;
 	AcceleratorBuffer<float> m_scalarTempBuf2;
 
 	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_deEmbedComputePipeline;
 	ComputePipeline m_deEmbedInPlaceComputePipeline;
 	ComputePipeline m_normalizeComputePipeline;
+	ComputePipeline m_subtractInPlaceComputePipeline;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
 	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;

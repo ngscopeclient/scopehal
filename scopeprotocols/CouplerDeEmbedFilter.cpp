@@ -42,11 +42,12 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_deEmbedComputePipeline("shaders/DeEmbedOutOfPlace.spv", 4, sizeof(uint32_t))
 	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
+	, m_subtractInPlaceComputePipeline("shaders/SubtractInPlace.spv", 2, sizeof(uint32_t))
 {
 	//AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
 	//AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_dbed1", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_dbed1", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_xtr1", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_xtr1", Stream::STREAM_TYPE_ANALOG);
 
 	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_fext", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_fext", Stream::STREAM_TYPE_ANALOG);
@@ -72,11 +73,14 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	m_scalarTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_scalarTempBuf1.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-	m_vectorTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_vectorTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_vectorTempBuf1.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-	m_vectorTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_vectorTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_vectorTempBuf2.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_vectorTempBuf3.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_vectorTempBuf3.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	m_scalarTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_scalarTempBuf2.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -195,6 +199,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		m_scalarTempBuf1.resize(npoints);
 		m_vectorTempBuf1.resize(2 * nouts);
 		m_vectorTempBuf2.resize(2 * nouts);
+		m_vectorTempBuf3.resize(2 * nouts);
 		m_scalarTempBuf2.resize(npoints);
 
 		m_cachedNumPoints = npoints;
@@ -301,6 +306,24 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Done, block until the compute operations finish
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
+}
+
+void CouplerDeEmbedFilter::SubtractInPlace(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInout,
+		AcceleratorBuffer<float>& samplesSub,
+		size_t npoints)
+{
+	/*
+	m_deEmbedComputePipeline.Bind(cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(0, samplesIn, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(1, samplesOut, cmdBuf, true);
+	m_deEmbedComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamSines, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(3, params.m_resampledSparamCosines, cmdBuf);
+	m_deEmbedComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	samplesOut.MarkModifiedFromGpu();
+	*/
 }
 
 /**
