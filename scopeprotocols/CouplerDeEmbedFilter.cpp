@@ -57,17 +57,15 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
-	m_cachedOutLen = 0;
-	m_cachedIstart = 0;
 
-	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_forwardInBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_scalarTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_scalarTempBuf1.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-	m_forwardOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_forwardOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_vectorTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_vectorTempBuf1.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-	m_reverseOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_reverseOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_scalarTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_scalarTempBuf2.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 CouplerDeEmbedFilter::~CouplerDeEmbedFilter()
@@ -176,9 +174,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
-		m_forwardInBuf.resize(npoints);
-		m_forwardOutBuf.resize(2 * nouts);
-		m_reverseOutBuf.resize(npoints);
+		m_scalarTempBuf1.resize(npoints);
+		m_vectorTempBuf1.resize(2 * nouts);
+		m_scalarTempBuf2.resize(npoints);
 
 		m_cachedNumPoints = npoints;
 		sizechange = true;
@@ -223,40 +221,85 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//DEBUG REMOVE THIS
-	auto groupdelay_samples = m_forwardCoupledParams.m_groupDelaySamples;
-	auto groupdelay_fs = m_forwardCoupledParams.m_groupDelayFs;
-	bool invert = true;
-	auto& din = dinFwd;
+	//De-embed the forward path
+	ProcessScalarInput(cmdBuf, dinFwd->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
+	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_forwardCoupledParams, npoints, nouts);
 
-	//Calculate bounds for the *meaningful* output data.
-	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
+	//Generate the output for the forward path
 	size_t istart = 0;
 	size_t iend = npoints_raw;
-	UniformAnalogWaveform* cap = NULL;
-	if(invert)
-		iend -= groupdelay_samples;
-	else
-		istart += groupdelay_samples;
-	m_cachedIstart = istart;
-	cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	int64_t phaseshift;
+	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
+	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf1);
 
-	//Apply phase shift for the group delay so we draw the waveform in the right place
+	/////
+
+	//De-embed the reverse path
+	ProcessScalarInput(cmdBuf, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
+	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, npoints, nouts);
+
+	//Generate the output for the forward path
+	istart = 0;
+	iend = npoints_raw;
+	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
+	GenerateScalarOutput(cmdBuf, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf1);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	//Done, block until the compute operations finish
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+}
+
+/**
+	@brief Calculate bounds for the *meaningful* output data.
+	Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
+ */
+void CouplerDeEmbedFilter::GroupDelayCorrection(
+	CouplerSParameters& params,
+	size_t& istart,
+	size_t& iend,
+	int64_t& phaseshift,
+	bool invert)
+{
 	if(invert)
-		cap->m_triggerPhase = -groupdelay_fs;
+	{
+		iend -= params.m_groupDelaySamples;
+		phaseshift = -params.m_groupDelayFs;
+	}
 	else
-		cap->m_triggerPhase = groupdelay_fs;
+	{
+		istart += params.m_groupDelaySamples;
+		phaseshift = params.m_groupDelayFs;
+	}
+}
+
+/**
+	@brief Generates a scalar output from a complex input
+
+	Overwrites m_scalarTempBuf2
+ */
+void CouplerDeEmbedFilter::GenerateScalarOutput(
+	vk::raii::CommandBuffer& cmdBuf,
+	size_t istart,
+	size_t iend,
+	WaveformBase* refin,
+	size_t stream,
+	size_t npoints,
+	int64_t phaseshift,
+	AcceleratorBuffer<float>& samplesIn)
+{
+	//Prepare the output waveform
 	float scale = 1.0f / npoints;
 	size_t outlen = iend - istart;
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(refin, stream);
 	cap->Resize(outlen);
-	m_cachedOutLen = outlen;
 
-	//De-embed the forward path
-	ProcessScalarInput(cmdBuf, dinFwd->m_samples, m_forwardOutBuf, npoints, npoints_raw);
-	ApplySParameters(cmdBuf, m_forwardOutBuf, m_forwardCoupledParams, npoints, nouts);
+	//Apply phase shift for the group delay so we draw the waveform in the right place
+	cap->m_triggerPhase = phaseshift;
 
 	//Do the actual FFT operation
-	m_vkReversePlan->AppendReverse(m_forwardOutBuf, m_reverseOutBuf, cmdBuf);
+	m_vkReversePlan->AppendReverse(samplesIn, m_scalarTempBuf2, cmdBuf);
 
 	//Copy and normalize output
 	//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
@@ -264,16 +307,12 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	nargs.outlen = outlen;
 	nargs.istart = istart;
 	nargs.scale = scale;
-	m_normalizeComputePipeline.BindBufferNonblocking(0, m_reverseOutBuf, cmdBuf);
+	m_normalizeComputePipeline.Bind(cmdBuf);
+	m_normalizeComputePipeline.BindBufferNonblocking(0, m_scalarTempBuf2, cmdBuf);
 	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-	m_normalizeComputePipeline.Dispatch(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
+	m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
 	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	//Done, block until the compute operations finish
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
 	cap->MarkModifiedFromGpu();
 }
 
@@ -299,7 +338,7 @@ void CouplerDeEmbedFilter::ApplySParameters(
 /**
 	@brief Zero-pad a scalar input to the proper length and FFT it
 
-	Overwrites m_forwardInBuf
+	Overwrites m_scalarTempBuf1
  */
 void CouplerDeEmbedFilter::ProcessScalarInput(
 	vk::raii::CommandBuffer& cmdBuf,
@@ -320,13 +359,13 @@ void CouplerDeEmbedFilter::ProcessScalarInput(
 	args.offsetOut = 0;
 	m_rectangularComputePipeline.Bind(cmdBuf);
 	m_rectangularComputePipeline.BindBufferNonblocking(0, samplesIn, cmdBuf);
-	m_rectangularComputePipeline.BindBufferNonblocking(1, m_forwardInBuf, cmdBuf, true);
+	m_rectangularComputePipeline.BindBufferNonblocking(1, m_scalarTempBuf1, cmdBuf, true);
 	m_rectangularComputePipeline.DispatchNoRebind(cmdBuf, args, GetComputeBlockCount(npointsPadded, 64));
 	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-	m_forwardInBuf.MarkModifiedFromGpu();
+	m_scalarTempBuf1.MarkModifiedFromGpu();
 
 	//Do the actual FFT operation
-	m_vkForwardPlan->AppendForward(m_forwardInBuf, samplesOut, cmdBuf);
+	m_vkForwardPlan->AppendForward(m_scalarTempBuf1, samplesOut, cmdBuf);
 }
 
 /**

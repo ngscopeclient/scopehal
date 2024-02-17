@@ -149,6 +149,23 @@ protected:
 		size_t npoints,
 		size_t nouts);
 
+	void GenerateScalarOutput(
+		vk::raii::CommandBuffer& cmdBuf,
+		size_t istart,
+		size_t iend,
+		WaveformBase* refin,
+		size_t stream,
+		size_t npoints,
+		int64_t phaseshift,
+		AcceleratorBuffer<float>& samplesIn);
+
+	void GroupDelayCorrection(
+		CouplerSParameters& params,
+		size_t& istart,
+		size_t& iend,
+		int64_t& phaseshift,
+		bool invert);
+
 	std::string m_maxGainName;
 
 	enum TruncationMode
@@ -160,15 +177,13 @@ protected:
 	float m_cachedMaxGain;
 
 	size_t m_cachedNumPoints;
-	size_t m_cachedOutLen;
-	size_t m_cachedIstart;
 
 	CouplerSParameters m_forwardCoupledParams;
 	CouplerSParameters m_reverseCoupledParams;
 
-	AcceleratorBuffer<float> m_forwardInBuf;
-	AcceleratorBuffer<float> m_forwardOutBuf;
-	AcceleratorBuffer<float> m_reverseOutBuf;
+	AcceleratorBuffer<float> m_scalarTempBuf1;
+	AcceleratorBuffer<float> m_vectorTempBuf1;
+	AcceleratorBuffer<float> m_scalarTempBuf2;
 
 	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_deEmbedComputePipeline;
