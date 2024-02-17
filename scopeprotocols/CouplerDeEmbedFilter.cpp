@@ -39,11 +39,16 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	: Filter(color, CAT_RF)
 	, m_maxGainName("Max Gain")
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
-	, m_deEmbedComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
+	, m_deEmbedComputePipeline("shaders/DeEmbedOutOfPlace.spv", 4, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
+	//AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
+	//AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_dbed1", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_dbed1", Stream::STREAM_TYPE_ANALOG);
+
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_fext", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_fext", Stream::STREAM_TYPE_ANALOG);
 
 	CreateInput("forward");
 	CreateInput("reverse");
@@ -51,6 +56,11 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	CreateInput("forwardCoupAng");
 	CreateInput("reverseCoupMag");
 	CreateInput("reverseCoupAng");
+
+	CreateInput("forwardLeakMag");
+	CreateInput("forwardLeakAng");
+	CreateInput("reverseLeakMag");
+	CreateInput("reverseLeakAng");
 
 	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_parameters[m_maxGainName].SetFloatVal(30);
@@ -63,6 +73,9 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 
 	m_vectorTempBuf1.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_vectorTempBuf1.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_vectorTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_vectorTempBuf2.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	m_scalarTempBuf2.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_scalarTempBuf2.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -90,12 +103,16 @@ bool CouplerDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		//mag
 		case 2:
 		case 4:
+		case 6:
+		case 8:
 			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 					(stream.GetYAxisUnits() == Unit::UNIT_DB);
 
 		//angle
 		case 3:
 		case 5:
+		case 7:
+		case 9:
 			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 					(stream.GetYAxisUnits() == Unit::UNIT_DEGREES);
 
@@ -176,6 +193,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	{
 		m_scalarTempBuf1.resize(npoints);
 		m_vectorTempBuf1.resize(2 * nouts);
+		m_vectorTempBuf2.resize(2 * nouts);
 		m_scalarTempBuf2.resize(npoints);
 
 		m_cachedNumPoints = npoints;
@@ -206,6 +224,8 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
 	//Resample S-parameters to our FFT bin size and cache where possible
+
+	//Coupled paths
 	auto dmag = GetInput(2).GetData();
 	auto dang = GetInput(3).GetData();
 	if(sizechange || clipchange || m_forwardCoupledParams.NeedUpdate(dmag, dang, bin_hz) )
@@ -216,6 +236,17 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	if(sizechange || clipchange || m_reverseCoupledParams.NeedUpdate(dmag, dang, bin_hz))
 		m_reverseCoupledParams.Refresh(dmag, dang, bin_hz, true, nouts, maxGain, dinFwd->m_timescale, npoints);
 
+	//Leakage paths
+	dmag = GetInput(6).GetData();
+	dang = GetInput(7).GetData();
+	if(sizechange || clipchange || m_forwardLeakageParams.NeedUpdate(dmag, dang, bin_hz))
+		m_forwardLeakageParams.Refresh(dmag, dang, bin_hz, false, nouts, maxGain, dinFwd->m_timescale, npoints);
+
+	dmag = GetInput(8).GetData();
+	dang = GetInput(9).GetData();
+	if(sizechange || clipchange || m_reverseLeakageParams.NeedUpdate(dmag, dang, bin_hz))
+		m_reverseLeakageParams.Refresh(dmag, dang, bin_hz, false, nouts, maxGain, dinFwd->m_timescale, npoints);
+
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
 
@@ -223,26 +254,28 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//De-embed the forward path
 	ProcessScalarInput(cmdBuf, dinFwd->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
-	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_forwardCoupledParams, npoints, nouts);
+	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_forwardCoupledParams, npoints, nouts);
 
-	//Generate the output for the forward path
+	//Generate debug output for the forward path
 	size_t istart = 0;
 	size_t iend = npoints_raw;
 	int64_t phaseshift;
 	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf1);
+	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf2);
+
+	//Calculate forward path crosstalk
 
 	/////
 
 	//De-embed the reverse path
 	ProcessScalarInput(cmdBuf, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
-	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, npoints, nouts);
+	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_reverseCoupledParams, npoints, nouts);
 
-	//Generate the output for the forward path
+	//Generate debug output for the forward path
 	istart = 0;
 	iend = npoints_raw;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf1);
+	GenerateScalarOutput(cmdBuf, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf2);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -321,18 +354,20 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
  */
 void CouplerDeEmbedFilter::ApplySParameters(
 		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesInout,
+		AcceleratorBuffer<float>& samplesIn,
+		AcceleratorBuffer<float>& samplesOut,
 		CouplerSParameters& params,
 		size_t npoints,
 		size_t nouts)
 {
 	m_deEmbedComputePipeline.Bind(cmdBuf);
-	m_deEmbedComputePipeline.BindBufferNonblocking(0, samplesInout, cmdBuf);
-	m_deEmbedComputePipeline.BindBufferNonblocking(1, params.m_resampledSparamSines, cmdBuf);
-	m_deEmbedComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamCosines, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(0, samplesIn, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(1, samplesOut, cmdBuf, true);
+	m_deEmbedComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamSines, cmdBuf);
+	m_deEmbedComputePipeline.BindBufferNonblocking(3, params.m_resampledSparamCosines, cmdBuf);
 	m_deEmbedComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
 	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-	samplesInout.MarkModifiedFromGpu();
+	samplesOut.MarkModifiedFromGpu();
 }
 
 /**

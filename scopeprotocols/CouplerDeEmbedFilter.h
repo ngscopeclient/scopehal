@@ -144,7 +144,8 @@ protected:
 
 	void ApplySParameters(
 		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesInout,
+		AcceleratorBuffer<float>& samplesIn,
+		AcceleratorBuffer<float>& samplesOut,
 		CouplerSParameters& params,
 		size_t npoints,
 		size_t nouts);
@@ -180,9 +181,12 @@ protected:
 
 	CouplerSParameters m_forwardCoupledParams;
 	CouplerSParameters m_reverseCoupledParams;
+	CouplerSParameters m_forwardLeakageParams;
+	CouplerSParameters m_reverseLeakageParams;
 
 	AcceleratorBuffer<float> m_scalarTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf1;
+	AcceleratorBuffer<float> m_vectorTempBuf2;
 	AcceleratorBuffer<float> m_scalarTempBuf2;
 
 	ComputePipeline m_rectangularComputePipeline;
