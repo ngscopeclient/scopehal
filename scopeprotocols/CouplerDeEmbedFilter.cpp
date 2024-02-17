@@ -257,6 +257,8 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	ProcessScalarInput(cmdBuf, dinFwd->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
 	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_forwardCoupledParams, npoints, nouts);
 
+	//TODO: calculate and correct for group delay in the crosstalk path
+
 	//Generate debug output for the forward path
 	size_t istart = 0;
 	size_t iend = npoints_raw;
