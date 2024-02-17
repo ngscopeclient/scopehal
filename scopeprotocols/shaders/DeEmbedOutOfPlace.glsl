@@ -30,12 +30,12 @@
 #version 430
 #pragma shader_stage(compute)
 
-layout(std430, binding=0) restrict buffer buf_din
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
 	float din[];
 };
 
-layout(std430, binding=1) restrict buffer buf_dout
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
 	float dout[];
 };

@@ -40,6 +40,7 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_maxGainName("Max Gain")
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_deEmbedComputePipeline("shaders/DeEmbedOutOfPlace.spv", 4, sizeof(uint32_t))
+	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 {
 	//AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
@@ -263,7 +264,14 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf2);
 
-	//Calculate forward path crosstalk
+	//Calculate forward path crosstalk from this
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_forwardLeakageParams, npoints, nouts);
+
+	//Generate debug output for the leakage path
+	istart = 0;
+	iend = npoints_raw;
+	GroupDelayCorrection(m_forwardLeakageParams, istart, iend, phaseshift, false);
+	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 2, npoints, phaseshift, m_vectorTempBuf2);
 
 	/////
 
@@ -276,6 +284,15 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	iend = npoints_raw;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(cmdBuf, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf2);
+
+	//Calculate reverse path crosstalk
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_reverseLeakageParams, npoints, nouts);
+
+	//Generate debug output for the leakage path
+	istart = 0;
+	iend = npoints_raw;
+	GroupDelayCorrection(m_reverseLeakageParams, istart, iend, phaseshift, false);
+	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 3, npoints, phaseshift, m_vectorTempBuf2);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -368,6 +385,25 @@ void CouplerDeEmbedFilter::ApplySParameters(
 	m_deEmbedComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
 	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesOut.MarkModifiedFromGpu();
+}
+
+/**
+	@brief Apply a set of processed S-parameters (either forward or inverse channel response)
+ */
+void CouplerDeEmbedFilter::ApplySParametersInPlace(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInout,
+		CouplerSParameters& params,
+		size_t npoints,
+		size_t nouts)
+{
+	m_deEmbedInPlaceComputePipeline.Bind(cmdBuf);
+	m_deEmbedInPlaceComputePipeline.BindBufferNonblocking(0, samplesInout, cmdBuf);
+	m_deEmbedInPlaceComputePipeline.BindBufferNonblocking(1, params.m_resampledSparamSines, cmdBuf);
+	m_deEmbedInPlaceComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamCosines, cmdBuf);
+	m_deEmbedInPlaceComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+	m_deEmbedInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	samplesInout.MarkModifiedFromGpu();
 }
 
 /**

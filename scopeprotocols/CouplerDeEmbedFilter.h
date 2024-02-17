@@ -150,6 +150,13 @@ protected:
 		size_t npoints,
 		size_t nouts);
 
+	void ApplySParametersInPlace(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInout,
+		CouplerSParameters& params,
+		size_t npoints,
+		size_t nouts);
+
 	void GenerateScalarOutput(
 		vk::raii::CommandBuffer& cmdBuf,
 		size_t istart,
@@ -191,6 +198,7 @@ protected:
 
 	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_deEmbedComputePipeline;
+	ComputePipeline m_deEmbedInPlaceComputePipeline;
 	ComputePipeline m_normalizeComputePipeline;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
