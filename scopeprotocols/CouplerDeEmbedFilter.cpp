@@ -48,9 +48,6 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
 
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_fext", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_xtr1", Stream::STREAM_TYPE_ANALOG);
-
 	CreateInput("forward");
 	CreateInput("reverse");
 	CreateInput("forwardCoupMag");
@@ -200,11 +197,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		if(m_vkReversePlan2->size() != npoints)
 			m_vkReversePlan2 = nullptr;
 	}
-	if(m_vkReversePlan3)
-	{
-		if(m_vkReversePlan3->size() != npoints)
-			m_vkReversePlan3 = nullptr;
-	}
 
 	//Set up the FFT and allocate buffers if we change point count
 	bool sizechange = false;
@@ -229,8 +221,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 	if(!m_vkReversePlan2)
 		m_vkReversePlan2 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
-	if(!m_vkReversePlan3)
-		m_vkReversePlan3 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 
 	//Calculate size of each bin
 	double fs = dinFwd->m_timescale;
@@ -296,20 +286,15 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
 	Subtract(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_vectorTempBuf4, nouts*2);
 
-	//Generate debug output from the clean reverse signal
-	size_t istart = 0;
-	size_t iend = npoints_raw;
-	int64_t phaseshift = 0;
-	GenerateScalarOutput(cmdBuf, m_vkReversePlan3, istart, iend, dinFwd, 3, npoints, phaseshift, m_vectorTempBuf4);
-
 	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
 	//to get signal at coupler input
 	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf4, m_reverseCoupledParams, npoints, nouts);
 
 	//Generate final clean reverse path output
-	istart = 0;
-	iend = npoints_raw;
+	size_t istart = 0;
+	size_t iend = npoints_raw;
+	int64_t phaseshift = 0;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4);
 

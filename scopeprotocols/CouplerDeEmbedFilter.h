@@ -224,7 +224,6 @@ protected:
 
 	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
 	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan2;
-	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan3;
 };
 
 #endif
