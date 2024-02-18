@@ -192,11 +192,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		if(m_vkReversePlan->size() != npoints)
 			m_vkReversePlan = nullptr;
 	}
-	if(m_vkReversePlan2)
-	{
-		if(m_vkReversePlan2->size() != npoints)
-			m_vkReversePlan2 = nullptr;
-	}
 
 	//Set up the FFT and allocate buffers if we change point count
 	bool sizechange = false;
@@ -219,8 +214,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		m_vkForwardPlan2 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
 	if(!m_vkReversePlan)
 		m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
-	if(!m_vkReversePlan2)
-		m_vkReversePlan2 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 
 	//Calculate size of each bin
 	double fs = dinFwd->m_timescale;
@@ -296,31 +289,31 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	size_t iend = npoints_raw;
 	int64_t phaseshift = 0;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4);
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4);
 
 	//De-embed the reverse path
-	//vec1 = raw rev, vec2 = de-embedded reverse, vec3 = raw fwd
-	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_reverseCoupledParams, npoints, nouts);
+	//vec1 = de-embedded reverse, vec2 = fwd leakage, vec3 = raw fwd
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, npoints, nouts);
 
 	//Calculate reverse path leakage
 	//TODO: calculate and correct for group delay in the leakage path
-	//vec1 = raw rev, vec2 = reverse leakage, vec3 = raw fwd
-	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_reverseLeakageParams, npoints, nouts);
+	//vec1 = reverse leakage, vec2 = fwd leakage, vec3 = raw fwd
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseLeakageParams, npoints, nouts);
 
 	//Calculate forward path signal minus leakage from the reverse path
 	//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward
-	SubtractInPlace(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf2, nouts*2);
+	SubtractInPlace(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf1, nouts*2);
 
 	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
 	//to get signal at coupler input
-	//vec1 = raw rev, vec2 = reverse leakage, vec3 = final forward output
-	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf3, m_forwardCoupledParams, npoints, nouts);
+	//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward, vec4 = final reverse output
+	ApplySParameters(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf4, m_forwardCoupledParams, npoints, nouts);
 
 	//Generate final clean forward path output
 	istart = 0;
 	iend = npoints_raw;
 	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf3);
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf4);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
