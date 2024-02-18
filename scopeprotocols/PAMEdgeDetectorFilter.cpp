@@ -93,82 +93,24 @@ void PAMEdgeDetectorFilter::Refresh(
 		SetData(nullptr, 0);
 		return;
 	}
+	din->PrepareForCpuAccess();
 	auto len = din->size();
 
 	int64_t ui = round(FS_PER_SECOND / m_parameters[m_baudname].GetIntVal());
-
-	//Find min/max of the input
 	size_t order = m_parameters[m_order].GetIntVal();
-	din->PrepareForCpuAccess();
-	float vmin, vmax;
-	GetMinMaxVoltage(din, vmin, vmax);
-	Unit yunit(Unit::UNIT_VOLTS);
-	LogTrace("Bounds are %s to %s\n", yunit.PrettyPrint(vmin).c_str(), yunit.PrettyPrint(vmax).c_str());
 
-	//Take a histogram and find the top N peaks (should be roughly evenly distributed)
-	const int64_t nbins = 250;
-	auto hist = MakeHistogram(din, vmin, vmax, nbins);
-	float binsize = (vmax - vmin) / nbins;
-
-	//Search radius for bins (for now hard code, TODO make this adaptive?)
-	const int64_t searchrad = 10;
-	ssize_t nend = nbins - 1;
-	vector<Peak> peaks;
-	for(ssize_t i=searchrad; i<(nbins - searchrad); i++)
-	{
-		//Locate the peak
-		ssize_t left = std::max((ssize_t)searchrad, (ssize_t)(i - searchrad));
-		ssize_t right = std::min((ssize_t)(i + searchrad), (ssize_t)nend);
-
-		float target = hist[i];
-		bool is_peak = true;
-		for(ssize_t j=left; j<=right; j++)
-		{
-			if(i == j)
-				continue;
-			if(hist[j] >= target)
-			{
-				//Something higher is to our right.
-				//It's higher than anything from left to j. This makes it a candidate peak.
-				//Restart our search from there.
-				if(j > i)
-					i = j-1;
-
-				is_peak = false;
-				break;
-			}
-		}
-		if(!is_peak)
-			continue;
-
-		//Do a weighted average of our immediate neighbors to fine tune our position
-		ssize_t fine_rad = 10;
-		left = std::max((ssize_t)1, i - fine_rad);
-		right = std::min(i + fine_rad, nend);
-		double total = 0;
-		double count = 0;
-		for(ssize_t j=left; j<=right; j++)
-		{
-			total += j*hist[j];
-			count += hist[j];
-		}
-		peaks.push_back(Peak(round(total / count), target, 1));
-	}
-
-	//Sort the peak table by height and pluck out the requested count, use these as our levels
-	std::sort(peaks.rbegin(), peaks.rend(), std::less<Peak>());
+	//Extract parameter values for input thresholds
 	vector<float> levels;
-	if(peaks.size() < order)
-	{
-		LogDebug("Requested PAM-%zu but only found %zu peaks, cannot proceed\n", order, peaks.size());
-		SetData(nullptr, 0);
-		return;
-	}
 	for(size_t i=0; i<order; i++)
-		levels.push_back((peaks[i].m_x * binsize) + vmin);
+	{
+		//If no threshold available, autofit
+		auto pname = string("Level ") + to_string(i);
+		if(m_parameters.find(pname) == m_parameters.end())
+			AutoLevel(din);
 
-	//Now sort the levels by voltage to get symbol values from lowest to highest
-	std::sort(levels.begin(), levels.end());
+		//Extract the level
+		levels.push_back(m_parameters[pname].GetFloatVal());
+	}
 
 	//Decision thresholds for initial symbol assignment
 	//This is fast so no need to cache
@@ -344,5 +286,84 @@ bool PAMEdgeDetectorFilter::PerformAction(const string& id)
 
 void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
 {
+	size_t order = m_parameters[m_order].GetIntVal();
 
+	float vmin, vmax;
+	GetMinMaxVoltage(din, vmin, vmax);
+	Unit yunit(Unit::UNIT_VOLTS);
+	LogTrace("Bounds are %s to %s\n", yunit.PrettyPrint(vmin).c_str(), yunit.PrettyPrint(vmax).c_str());
+
+	//Take a histogram and find the top N peaks (should be roughly evenly distributed)
+	const int64_t nbins = 250;
+	auto hist = MakeHistogram(din, vmin, vmax, nbins);
+	float binsize = (vmax - vmin) / nbins;
+
+	//Search radius for bins (for now hard code, TODO make this adaptive?)
+	const int64_t searchrad = 10;
+	ssize_t nend = nbins - 1;
+	vector<Peak> peaks;
+	for(ssize_t i=searchrad; i<(nbins - searchrad); i++)
+	{
+		//Locate the peak
+		ssize_t left = std::max((ssize_t)searchrad, (ssize_t)(i - searchrad));
+		ssize_t right = std::min((ssize_t)(i + searchrad), (ssize_t)nend);
+
+		float target = hist[i];
+		bool is_peak = true;
+		for(ssize_t j=left; j<=right; j++)
+		{
+			if(i == j)
+				continue;
+			if(hist[j] >= target)
+			{
+				//Something higher is to our right.
+				//It's higher than anything from left to j. This makes it a candidate peak.
+				//Restart our search from there.
+				if(j > i)
+					i = j-1;
+
+				is_peak = false;
+				break;
+			}
+		}
+		if(!is_peak)
+			continue;
+
+		//Do a weighted average of our immediate neighbors to fine tune our position
+		ssize_t fine_rad = 10;
+		left = std::max((ssize_t)1, i - fine_rad);
+		right = std::min(i + fine_rad, nend);
+		double total = 0;
+		double count = 0;
+		for(ssize_t j=left; j<=right; j++)
+		{
+			total += j*hist[j];
+			count += hist[j];
+		}
+		peaks.push_back(Peak(round(total / count), target, 1));
+	}
+
+	//Sort the peak table by height and pluck out the requested count, use these as our levels
+	std::sort(peaks.rbegin(), peaks.rend(), std::less<Peak>());
+	vector<float> levels;
+	if(peaks.size() < order)
+	{
+		LogDebug("Requested PAM-%zu but only found %zu peaks, cannot proceed\n", order, peaks.size());
+		SetData(nullptr, 0);
+		return;
+	}
+	for(size_t i=0; i<order; i++)
+		levels.push_back((peaks[i].m_x * binsize) + vmin);
+
+	//Now sort the levels by voltage to get symbol values from lowest to highest
+	std::sort(levels.begin(), levels.end());
+
+	//Save levels
+	for(size_t i=0; i<levels.size(); i++)
+	{
+		auto pname = string("Level ") + to_string(i);
+		if(m_parameters.find(pname) == m_parameters.end())
+			m_parameters[pname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+		m_parameters[pname].SetFloatVal(levels[i]);
+	}
 }
