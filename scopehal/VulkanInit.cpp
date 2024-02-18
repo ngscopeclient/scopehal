@@ -148,6 +148,7 @@ bool g_hasShaderAtomicFloat = false;
 bool g_hasDebugUtils = false;
 bool g_hasMemoryBudget = false;
 bool g_hasPushDescriptor = false;
+bool g_vulkanDeviceHasUnifiedMemory = false;
 
 //Max compute group count in each direction
 size_t g_maxComputeGroupCount[3] = {0};
@@ -420,7 +421,7 @@ bool VulkanInit(bool skipGLFW)
 
 				LogDebug("Max image dim 2D:       %u\n", limits.maxImageDimension2D);
 				LogDebug("Max storage buf range:  %zu MB\n", limits.maxStorageBufferRange / m);
-				LogDebug("Max mem alloc:          %zu MB\n", limits.maxMemoryAllocationCount / m);
+				LogDebug("Max mem objects:        %u\n", limits.maxMemoryAllocationCount);
 				LogDebug("Max compute shared mem: %zu KB\n", limits.maxComputeSharedMemorySize / k);
 				LogDebug("Max compute grp count:  %u x %u x %u\n",
 					limits.maxComputeWorkGroupCount[0],
@@ -821,8 +822,29 @@ bool VulkanInit(bool skipGLFW)
 					}
 				}
 
-				LogDebug("Using type %u for pinned host memory\n", g_vkPinnedMemoryType);
-				LogDebug("Using type %u for card-local memory\n", g_vkLocalMemoryType);
+				// If pinned and local heap are the same, check if one type is a superset of the other.
+				// If so, we are probably running on an integrated GPU with unified memory and should enable
+				// optimizations for this
+				if(g_vkLocalMemoryHeap == g_vkPinnedMemoryHeap)
+				{
+					auto mTypeLocal = memProperties.memoryTypes[g_vkLocalMemoryType];
+					auto mTypePinned = memProperties.memoryTypes[g_vkPinnedMemoryType];
+
+					if((mTypeLocal.propertyFlags | mTypePinned.propertyFlags) == mTypeLocal.propertyFlags)
+					{
+						g_vkPinnedMemoryType = g_vkLocalMemoryType;
+						g_vulkanDeviceHasUnifiedMemory = true;
+					}
+					else if((mTypeLocal.propertyFlags | mTypePinned.propertyFlags) == mTypePinned.propertyFlags)
+					{
+						g_vkLocalMemoryType = g_vkPinnedMemoryType;
+						g_vulkanDeviceHasUnifiedMemory = true;
+					}
+				}
+
+				LogDebug("Using heap %u, type %u for pinned host memory\n", g_vkPinnedMemoryHeap, g_vkPinnedMemoryType);
+				LogDebug("Using heap %u, type %u for card-local memory\n", g_vkLocalMemoryHeap, g_vkLocalMemoryType);
+				if(g_vulkanDeviceHasUnifiedMemory) { LogDebug("Unified memory GPU optimizations are enabled\n"); }
 
 				//Make the queue manager
 				g_vkQueueManager = make_unique<QueueManager>(g_vkComputePhysicalDevice, g_vkComputeDevice);

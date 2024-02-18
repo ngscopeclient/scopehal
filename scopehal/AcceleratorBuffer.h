@@ -57,6 +57,7 @@ extern std::shared_ptr<QueueHandle> g_vkTransferQueue;
 extern std::mutex g_vkTransferMutex;
 
 extern bool g_hasDebugUtils;
+extern bool g_vulkanDeviceHasUnifiedMemory;
 
 template<class T>
 class AcceleratorBuffer;
@@ -170,7 +171,8 @@ public:
 			MEM_ATTRIB_CPU_SIDE | MEM_ATTRIB_CPU_REACHABLE | MEM_ATTRIB_CPU_FAST,
 
 		//Memory is located on the CPU, but can be accessed by the GPU.
-		//Fast to access from the CPU, but accesses from the GPU require PCIe DMA and are slow.
+		//Fast to access from the CPU, but accesses from the GPU require PCIe DMA and is slow
+		//(unless platform uses unified memory, in which case g_vulkanDeviceHasUnifiedMemory will be true)
 		MEM_TYPE_CPU_DMA_CAPABLE =
 			MEM_ATTRIB_CPU_SIDE | MEM_ATTRIB_CPU_REACHABLE | MEM_ATTRIB_CPU_FAST | MEM_ATTRIB_GPU_REACHABLE,
 
@@ -179,7 +181,8 @@ public:
 			MEM_ATTRIB_GPU_SIDE | MEM_ATTRIB_GPU_REACHABLE | MEM_ATTRIB_GPU_FAST,
 
 		//Memory is located on the GPU, but can be accessed by the CPU.
-		//Fast to access from the GPU, but accesses from the CPU require PCIe DMA and are slow.
+		//Fast to access from the GPU, but accesses from the CPU require PCIe DMA and is slow
+		//(should not be used if platform uses unified memory, in which case g_vulkanDeviceHasUnifiedMemory will be true)
 		MEM_TYPE_GPU_DMA_CAPABLE =
 			MEM_ATTRIB_GPU_SIDE | MEM_ATTRIB_GPU_REACHABLE | MEM_ATTRIB_GPU_FAST | MEM_ATTRIB_CPU_REACHABLE
 	};
@@ -301,8 +304,8 @@ public:
 		, m_gpuAccessHint(HINT_UNLIKELY)
 		, m_name(name)
 	{
-		//non-trivially-copyable types can't be copied to GPU
-		if(!std::is_trivially_copyable<T>::value)
+		//non-trivially-copyable types can't be copied to GPU except on unified memory platforms
+		if(!std::is_trivially_copyable<T>::value && !g_vulkanDeviceHasUnifiedMemory)
 			m_gpuAccessHint = HINT_NEVER;
 	}
 
@@ -532,7 +535,8 @@ protected:
 
 		//If we do not anticipate using the data on the CPU, we shouldn't waste RAM.
 		//Allocate a GPU-local buffer, copy data to it, then free the CPU-side buffer
-		if(m_cpuAccessHint == HINT_NEVER)
+		//Don't do this if the platform has unified memory
+		if( (m_cpuAccessHint == HINT_NEVER) && !g_vulkanDeviceHasUnifiedMemory)
 		{
 			PrepareForGpuAccess();
 			FreeCpuBuffer();
@@ -602,7 +606,8 @@ protected:
 		{
 			//If GPU access is unlikely, we probably want to just use pinned memory.
 			//If available, mark buffers as the same, and free any existing GPU buffer we might have
-			if( (m_gpuAccessHint == HINT_UNLIKELY) && (m_cpuMemoryType == MEM_TYPE_CPU_DMA_CAPABLE) )
+			//Always use pinned memory if the platform has unified memory
+			if( ((m_gpuAccessHint == HINT_UNLIKELY) && (m_cpuMemoryType == MEM_TYPE_CPU_DMA_CAPABLE)) || g_vulkanDeviceHasUnifiedMemory )
 				FreeGpuBuffer();
 
 			//Nope, we need to allocate dedicated GPU memory
@@ -861,8 +866,8 @@ public:
 	 */
 	void PrepareForGpuAccess(bool outputOnly = false)
 	{
-		//Early out if no content
-		if(m_size == 0)
+		//Early out if no content or if unified memory
+		if(m_size == 0 || g_vulkanDeviceHasUnifiedMemory)
 			return;
 
 		//If our current hint has no GPU access at all, update to say "unlikely" and reallocate
@@ -888,8 +893,8 @@ public:
 	 */
 	void PrepareForGpuAccessNonblocking(bool outputOnly, vk::raii::CommandBuffer& cmdBuf)
 	{
-		//Early out if no content
-		if(m_size == 0)
+		//Early out if no content or if unified memory
+		if(m_size == 0 || g_vulkanDeviceHasUnifiedMemory)
 			return;
 
 		//If our current hint has no GPU access at all, update to say "unlikely" and reallocate
