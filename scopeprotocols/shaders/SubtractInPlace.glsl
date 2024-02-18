@@ -54,6 +54,6 @@ void main()
 		return;
 
 	//Nope, do the subtraction
-	/*else
-		data[gl_GlobalInvocationID.x] -= sub[gl_GlobalInvocationID.x];*/
+	else
+		data[gl_GlobalInvocationID.x] -= sub[gl_GlobalInvocationID.x];
 }

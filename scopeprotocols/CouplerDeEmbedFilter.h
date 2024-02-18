@@ -136,6 +136,7 @@ protected:
 
 	void ProcessScalarInput(
 		vk::raii::CommandBuffer& cmdBuf,
+		std::unique_ptr<VulkanFFTPlan>& plan,
 		AcceleratorBuffer<float>& samplesIn,
 		AcceleratorBuffer<float>& samplesOut,
 		size_t npointsPadded,
@@ -165,6 +166,7 @@ protected:
 
 	void GenerateScalarOutput(
 		vk::raii::CommandBuffer& cmdBuf,
+		std::unique_ptr<VulkanFFTPlan>& plan,
 		size_t istart,
 		size_t iend,
 		WaveformBase* refin,
@@ -209,7 +211,11 @@ protected:
 	ComputePipeline m_subtractInPlaceComputePipeline;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
+	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan2;
+
 	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
+	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan2;
+	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan3;
 };
 
 #endif

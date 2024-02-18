@@ -44,13 +44,11 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 	, m_subtractInPlaceComputePipeline("shaders/SubtractInPlace.spv", 2, sizeof(uint32_t))
 {
-	//AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
-	//AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_xtr1", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_xtr1", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
 
 	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_fext", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_rev_fext", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "DEBUG_fwd_xtr1", Stream::STREAM_TYPE_ANALOG);
 
 	CreateInput("forward");
 	CreateInput("reverse");
@@ -183,10 +181,25 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		if(m_vkForwardPlan->size() != npoints)
 			m_vkForwardPlan = nullptr;
 	}
+	if(m_vkForwardPlan2)
+	{
+		if(m_vkForwardPlan2->size() != npoints)
+			m_vkForwardPlan = nullptr;
+	}
 	if(m_vkReversePlan)
 	{
 		if(m_vkReversePlan->size() != npoints)
 			m_vkReversePlan = nullptr;
+	}
+	if(m_vkReversePlan2)
+	{
+		if(m_vkReversePlan2->size() != npoints)
+			m_vkReversePlan2 = nullptr;
+	}
+	if(m_vkReversePlan3)
+	{
+		if(m_vkReversePlan3->size() != npoints)
+			m_vkReversePlan3 = nullptr;
 	}
 
 	//Set up the FFT and allocate buffers if we change point count
@@ -205,8 +218,14 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Set up new FFT plans
 	if(!m_vkForwardPlan)
 		m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+	if(!m_vkForwardPlan2)
+		m_vkForwardPlan2 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
 	if(!m_vkReversePlan)
 		m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
+	if(!m_vkReversePlan2)
+		m_vkReversePlan2 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
+	if(!m_vkReversePlan3)
+		m_vkReversePlan3 = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 
 	//Calculate size of each bin
 	double fs = dinFwd->m_timescale;
@@ -254,51 +273,61 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
 
+	//Pad and FFT both inputs
+	//vec1 = raw rev, vec3 = raw fwd
+	ProcessScalarInput(cmdBuf, m_vkForwardPlan, dinFwd->m_samples, m_vectorTempBuf3, npoints, npoints_raw);
+	ProcessScalarInput(cmdBuf, m_vkForwardPlan2, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
+
 	//De-embed the forward path
-	ProcessScalarInput(cmdBuf, dinFwd->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
-	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_forwardCoupledParams, npoints, nouts);
+	//vec1 = raw rev, vec2 = de-embedded fwd, vec3 = raw fwd
+	ApplySParameters(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf2, m_forwardCoupledParams, npoints, nouts);
 
-	//DEBUG: this should be a copy of dinFwd
-	size_t istart = 0;
-	size_t iend = npoints_raw;
-	int64_t phaseshift = 0;
-	//GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf1);
-
-	//TODO: calculate and correct for group delay in the crosstalk path
-
-	//Calculate forward path crosstalk from this
+	//Calculate forward path leakage from this
+	//TODO: calculate and correct for group delay in the leakage path
+	//vec1 = raw rev, vec2 = fwd leakage, vec3 = raw fwd
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_forwardLeakageParams, npoints, nouts);
 
 	//Generate debug output for the leakage path
-	istart = 0;
-	iend = npoints_raw;
+	size_t istart = 0;
+	size_t iend = npoints_raw;
+	int64_t phaseshift = 0;
 	GroupDelayCorrection(m_forwardLeakageParams, istart, iend, phaseshift, false);
-	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 2, npoints, phaseshift, m_vectorTempBuf2);
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinFwd, 2, npoints, phaseshift, m_vectorTempBuf2);
 
 	///////////////////////
 
-	//De-embed the reverse path
-	ProcessScalarInput(cmdBuf, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints_raw);
-	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_reverseCoupledParams, npoints, nouts);
+	//Calculate reverse path signal minus leakage from the forward path
+	//vec1 = clean reverse, vec2 = fwd leakage, vec3 = raw fwd
+	SubtractInPlace(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, nouts*2);
 
-	//Calculate reverse path crosstalk
-	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_reverseLeakageParams, npoints, nouts);
-
-	//Calculate forward path signal minus crosstalk from the reverse path
-	//SubtractInPlace(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf2, nouts*2);
-
-	//Generate debug output for the no-crosstalk path
-	//DEBUG: This SHOULD be identical to dinFwd
-	/*istart = 0;
-	iend = npoints_raw;
-	phaseshift = 0;
-	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf3);*/
-
-	//Generate debug output for the leakage path
+	//Generate debug output from the  clean reverse signal
 	istart = 0;
 	iend = npoints_raw;
-	GroupDelayCorrection(m_reverseLeakageParams, istart, iend, phaseshift, false);
-	GenerateScalarOutput(cmdBuf, istart, iend, dinFwd, 3, npoints, phaseshift, m_vectorTempBuf2);
+	phaseshift = 0;
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan3, istart, iend, dinFwd, 3, npoints, phaseshift, m_vectorTempBuf1);
+
+	//De-embed the reverse path
+	//vec1 = raw rev, vec2 = de-embedded reverse, vec3 = raw fwd
+	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_reverseCoupledParams, npoints, nouts);
+
+	//Calculate reverse path leakage
+	//vec1 = raw rev, vec2 = reverse leakage, vec3 = raw fwd
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_reverseLeakageParams, npoints, nouts);
+
+	//Calculate forward path signal minus leakage from the reverse path
+	//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward
+	SubtractInPlace(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf2, nouts*2);
+
+	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
+	//to get signal at coupler input
+	//vec1 = raw rev, vec2 = reverse leakage, vec3 = final forward output
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf3, m_forwardCoupledParams, npoints, nouts);
+
+	//Generate final clean forward path output
+	istart = 0;
+	iend = npoints_raw;
+	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf3);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -351,6 +380,7 @@ void CouplerDeEmbedFilter::GroupDelayCorrection(
  */
 void CouplerDeEmbedFilter::GenerateScalarOutput(
 	vk::raii::CommandBuffer& cmdBuf,
+	unique_ptr<VulkanFFTPlan>& plan,
 	size_t istart,
 	size_t iend,
 	WaveformBase* refin,
@@ -369,7 +399,7 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 	cap->m_triggerPhase = phaseshift;
 
 	//Do the actual FFT operation
-	m_vkReversePlan->AppendReverse(samplesIn, m_scalarTempBuf1, cmdBuf);
+	plan->AppendReverse(samplesIn, m_scalarTempBuf1, cmdBuf);
 
 	//Copy and normalize output
 	//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
@@ -433,6 +463,7 @@ void CouplerDeEmbedFilter::ApplySParametersInPlace(
  */
 void CouplerDeEmbedFilter::ProcessScalarInput(
 	vk::raii::CommandBuffer& cmdBuf,
+	unique_ptr<VulkanFFTPlan>& plan,
 	AcceleratorBuffer<float>& samplesIn,
 	AcceleratorBuffer<float>& samplesOut,
 	size_t npointsPadded,
@@ -456,7 +487,7 @@ void CouplerDeEmbedFilter::ProcessScalarInput(
 	m_scalarTempBuf1.MarkModifiedFromGpu();
 
 	//Do the actual FFT operation
-	m_vkForwardPlan->AppendForward(m_scalarTempBuf1, samplesOut, cmdBuf);
+	plan->AppendForward(m_scalarTempBuf1, samplesOut, cmdBuf);
 	samplesOut.MarkModifiedFromGpu();
 	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 }
