@@ -304,14 +304,14 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
 	//to get signal at coupler input
-	//vec1 = final reverse output, vec2 = fwd leakage, vec3 = raw fwd
-	/*ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, npoints, nouts);
+	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
+	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf4, m_reverseCoupledParams, npoints, nouts);
 
 	//Generate final clean reverse path output
 	istart = 0;
 	iend = npoints_raw;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf1);*/
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4);
 
 	//De-embed the reverse path
 	//vec1 = raw rev, vec2 = de-embedded reverse, vec3 = raw fwd
