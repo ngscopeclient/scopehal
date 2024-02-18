@@ -36,8 +36,11 @@
 #define PAMEdgeDetectorFilter_h
 
 #include <cinttypes>
+#include "../scopehal/ActionProvider.h"
 
-class PAMEdgeDetectorFilter : public Filter
+class PAMEdgeDetectorFilter
+	: public Filter
+	, public ActionProvider
 {
 public:
 	PAMEdgeDetectorFilter(const std::string& color);
@@ -48,9 +51,13 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
+	virtual std::vector<std::string> EnumActions() override;
+	virtual bool PerformAction(const std::string& id) override;
+
 	PROTOCOL_DECODER_INITPROC(PAMEdgeDetectorFilter)
 
 protected:
+	void AutoLevel(UniformAnalogWaveform* din);
 
 	std::string m_order;
 	std::string m_baudname;

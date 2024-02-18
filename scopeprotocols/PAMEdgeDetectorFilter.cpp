@@ -170,23 +170,8 @@ void PAMEdgeDetectorFilter::Refresh(
 	//Now sort the levels by voltage to get symbol values from lowest to highest
 	std::sort(levels.begin(), levels.end());
 
-	//Print out level of each symbol by name
-	//TODO: naming only tested for PAM3
-	LogTrace("Symbol levels:\n");
-	bool oddOrder = ((order & 1) == 1);
-	int64_t symbase = 0;
-	if(oddOrder)
-		symbase = -static_cast<int64_t>(order/2);
-	for(size_t i=0; i<order; i++)
-	{
-		LogIndenter li;
-		LogTrace("%2" PRIi64 ": %s\n",
-			static_cast<int64_t>(i) + symbase,
-			yunit.PrettyPrint(levels[i]).c_str());
-	}
-
 	//Decision thresholds for initial symbol assignment
-	LogTrace("Static thresholds:\n");
+	//This is fast so no need to cache
 	vector<float> sthresholds;
 	sthresholds.resize(order-1);
 	for(size_t i=0; i<order-1; i++)
@@ -207,7 +192,7 @@ void PAMEdgeDetectorFilter::Refresh(
 	cap->m_samples.push_back(0);
 
 	//Find *all* level crossings
-	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1
+	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
 	struct edge_t
 	{
 		size_t index;
@@ -334,4 +319,30 @@ void PAMEdgeDetectorFilter::Refresh(
 	}
 
 	cap->MarkModifiedFromCpu();
+}
+
+vector<string> PAMEdgeDetectorFilter::EnumActions()
+{
+	vector<string> ret;
+	ret.push_back("Auto Level");
+	return ret;
+}
+
+bool PAMEdgeDetectorFilter::PerformAction(const string& id)
+{
+	if(id == "Auto Level")
+	{
+		auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+		if(din)
+		{
+			din->PrepareForCpuAccess();
+			AutoLevel(din);
+		}
+	}
+	return false;
+}
+
+void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
+{
+
 }
