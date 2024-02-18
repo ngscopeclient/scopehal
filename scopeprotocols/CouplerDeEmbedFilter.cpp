@@ -43,6 +43,7 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 	, m_subtractInPlaceComputePipeline("shaders/SubtractInPlace.spv", 2, sizeof(uint32_t))
+	, m_subtractComputePipeline("shaders/SubtractOutOfPlace.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
@@ -79,6 +80,9 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 
 	m_vectorTempBuf3.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_vectorTempBuf3.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_vectorTempBuf4.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_vectorTempBuf4.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 CouplerDeEmbedFilter::~CouplerDeEmbedFilter()
@@ -210,6 +214,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		m_vectorTempBuf1.resize(2 * nouts);
 		m_vectorTempBuf2.resize(2 * nouts);
 		m_vectorTempBuf3.resize(2 * nouts);
+		m_vectorTempBuf4.resize(2 * nouts);
 
 		m_cachedNumPoints = npoints;
 		sizechange = true;
@@ -287,30 +292,33 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//vec1 = raw rev, vec2 = fwd leakage, vec3 = raw fwd
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_forwardLeakageParams, npoints, nouts);
 
-	//Generate debug output for the leakage path
+	//Calculate reverse path signal minus leakage from the forward path
+	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
+	Subtract(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_vectorTempBuf4, nouts*2);
+
+	//Generate debug output from the clean reverse signal
 	size_t istart = 0;
 	size_t iend = npoints_raw;
 	int64_t phaseshift = 0;
-	GroupDelayCorrection(m_forwardLeakageParams, istart, iend, phaseshift, false);
-	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinFwd, 2, npoints, phaseshift, m_vectorTempBuf2);
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan3, istart, iend, dinFwd, 3, npoints, phaseshift, m_vectorTempBuf4);
 
-	///////////////////////
+	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
+	//to get signal at coupler input
+	//vec1 = final reverse output, vec2 = fwd leakage, vec3 = raw fwd
+	/*ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, npoints, nouts);
 
-	//Calculate reverse path signal minus leakage from the forward path
-	//vec1 = clean reverse, vec2 = fwd leakage, vec3 = raw fwd
-	SubtractInPlace(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, nouts*2);
-
-	//Generate debug output from the  clean reverse signal
+	//Generate final clean reverse path output
 	istart = 0;
 	iend = npoints_raw;
-	phaseshift = 0;
-	GenerateScalarOutput(cmdBuf, m_vkReversePlan3, istart, iend, dinFwd, 3, npoints, phaseshift, m_vectorTempBuf1);
+	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
+	GenerateScalarOutput(cmdBuf, m_vkReversePlan2, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf1);*/
 
 	//De-embed the reverse path
 	//vec1 = raw rev, vec2 = de-embedded reverse, vec3 = raw fwd
 	ApplySParameters(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_reverseCoupledParams, npoints, nouts);
 
 	//Calculate reverse path leakage
+	//TODO: calculate and correct for group delay in the leakage path
 	//vec1 = raw rev, vec2 = reverse leakage, vec3 = raw fwd
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_reverseLeakageParams, npoints, nouts);
 
@@ -336,6 +344,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	queue->SubmitAndBlock(cmdBuf);
 }
 
+/**
+	@brief Subtract one signal from another and overwrite the first
+ */
 void CouplerDeEmbedFilter::SubtractInPlace(
 		vk::raii::CommandBuffer& cmdBuf,
 		AcceleratorBuffer<float>& samplesInout,
@@ -348,6 +359,25 @@ void CouplerDeEmbedFilter::SubtractInPlace(
 	m_subtractInPlaceComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)npoints, GetComputeBlockCount(npoints, 64));
 	m_subtractInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesInout.MarkModifiedFromGpu();
+}
+
+/**
+	@brief Subtract one signal from another and overwrite the first
+ */
+void CouplerDeEmbedFilter::Subtract(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesP,
+		AcceleratorBuffer<float>& samplesN,
+		AcceleratorBuffer<float>& samplesOut,
+		size_t npoints)
+{
+	m_subtractComputePipeline.Bind(cmdBuf);
+	m_subtractComputePipeline.BindBufferNonblocking(0, samplesP, cmdBuf);
+	m_subtractComputePipeline.BindBufferNonblocking(1, samplesN, cmdBuf);
+	m_subtractComputePipeline.BindBufferNonblocking(2, samplesOut, cmdBuf, true);
+	m_subtractComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)npoints, GetComputeBlockCount(npoints, 64));
+	m_subtractComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	samplesOut.MarkModifiedFromGpu();
 }
 
 /**
