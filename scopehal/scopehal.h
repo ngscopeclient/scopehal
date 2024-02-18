@@ -239,6 +239,7 @@ extern bool g_vulkanDeviceIsAnyMesa;
 extern bool g_vulkanDeviceIsMoltenVK;
 extern uint32_t g_vkPinnedMemoryHeap;
 extern uint32_t g_vkLocalMemoryHeap;
+extern bool g_vulkanDeviceHasUnifiedMemory;
 
 uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 
