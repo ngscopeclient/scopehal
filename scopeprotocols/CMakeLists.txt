@@ -58,6 +58,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTXDecoder.cpp
 	Ethernet100BaseT1Decoder.cpp
+	Ethernet100BaseT1LinkTrainingDecoder.cpp
 	Ethernet1000BaseXDecoder.cpp
 	Ethernet10GBaseRDecoder.cpp
 	Ethernet64b66bDecoder.cpp

@@ -30,30 +30,60 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseT1Decoder
+	@brief Declaration of Ethernet100BaseT1LinkTrainingDecoder
  */
-#ifndef Ethernet100BaseT1Decoder_h
-#define Ethernet100BaseT1Decoder_h
+#ifndef Ethernet100BaseT1LinkTrainingDecoder_h
+#define Ethernet100BaseT1LinkTrainingDecoder_h
 
-#include "EthernetProtocolDecoder.h"
+#include "Ethernet100BaseT1Decoder.h"
 
-class Ethernet100BaseT1Decoder : public EthernetProtocolDecoder
+class Ethernet100BaseT1LinkTrainingSymbol
 {
 public:
-	Ethernet100BaseT1Decoder(const std::string& color);
+
+	enum type_t
+	{
+		TYPE_SEND_Z,
+		TYPE_SEND_I_UNLOCKED,
+		TYPE_SEND_I_LOCKED,
+		TYPE_SEND_N,
+		TYPE_ERROR,
+	} m_type;
+
+	Ethernet100BaseT1LinkTrainingSymbol()
+	{}
+
+	Ethernet100BaseT1LinkTrainingSymbol(type_t type)
+	 : m_type(type)
+	{}
+
+	bool operator== (const Ethernet100BaseT1LinkTrainingSymbol& s) const
+	{
+		return (m_type == s.m_type);
+	}
+};
+
+class Ethernet100BaseT1LinkTrainingWaveform : public SparseWaveform<Ethernet100BaseT1LinkTrainingSymbol>
+{
+public:
+	Ethernet100BaseT1LinkTrainingWaveform () : SparseWaveform<Ethernet100BaseT1LinkTrainingSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
+};
+
+class Ethernet100BaseT1LinkTrainingDecoder : public Filter
+{
+public:
+	Ethernet100BaseT1LinkTrainingDecoder(const std::string& color);
+	virtual ~Ethernet100BaseT1LinkTrainingDecoder();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseT1Decoder)
-
-	enum scrambler_t
-	{
-		SCRAMBLER_M_B13,
-		SCRAMBLER_S_B19
-	};
+	PROTOCOL_DECODER_INITPROC(Ethernet100BaseT1LinkTrainingDecoder)
 
 protected:
 	std::string m_scrambler;

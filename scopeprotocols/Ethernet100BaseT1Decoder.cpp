@@ -63,7 +63,7 @@ string Ethernet100BaseT1Decoder::GetProtocolName()
 
 bool Ethernet100BaseT1Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
