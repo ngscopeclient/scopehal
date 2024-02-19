@@ -453,76 +453,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 				state = STATE_IDLE;
 				break;
 		}
-
-
-		//figure 96-6a 4b -> 3b conversion
 	}
 
-	/*
-
-	//Grab 5 bits at a time and decode them
-	bool first = true;
-	uint8_t current_byte = 0;
-	uint64_t current_start = 0;
-	size_t deslen = descrambled_bits.m_samples.size()-5;
-	for(; i<deslen; i+=5)
-	{
-		unsigned int code =
-			(descrambled_bits.m_samples[i+0] ? 16 : 0) |
-			(descrambled_bits.m_samples[i+1] ? 8 : 0) |
-			(descrambled_bits.m_samples[i+2] ? 4 : 0) |
-			(descrambled_bits.m_samples[i+3] ? 2 : 0) |
-			(descrambled_bits.m_samples[i+4] ? 1 : 0);
-
-		//Handle special stuff
-		if(code == 0x18)
-		{
-			//This is a /J/. Next code should be 0x11, /K/ - start of frame.
-			//Don't check it for now, just jump ahead 5 bits and get ready to read data
-			i += 5;
-			continue;
-		}
-		else if(code == 0x0d)
-		{
-			//This is a /T/. Next code should be 0x07, /R/ - end of frame.
-			//Crunch this frame
-			BytesToFrames(bytes, starts, ends, cap);
-
-			//Skip the /R/
-			i += 5;
-
-			//and reset for the next one
-			starts.clear();
-			ends.clear();
-			bytes.clear();
-			continue;
-		}
-
-		//TODO: process /H/ - 0x04 (error in the middle of a packet)
-
-		//Ignore idles
-		else if(code == 0x1f)
-			continue;
-
-		//Nope, normal nibble.
-		unsigned int decoded = code_5to4[code];
-		if(first)
-		{
-			current_start = descrambled_bits.m_offsets[i];
-			current_byte = decoded;
-		}
-		else
-		{
-			current_byte |= decoded << 4;
-
-			bytes.push_back(current_byte);
-			starts.push_back(current_start * cap->m_timescale);
-			uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
-			ends.push_back(end * cap->m_timescale);
-		}
-
-		first = !first;
-	}
-	*/
 	cap->MarkModifiedFromCpu();
 }
