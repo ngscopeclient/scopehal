@@ -144,6 +144,8 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 	cap->m_durations.push_back(0);
 	cap->m_samples.push_back(Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_Z));
 
+	size_t numZeroes = 0;
+
 	for(size_t i=0; i<ilen; i++)
 	{
 		int64_t tnow = isamples.m_offsets[i];
@@ -173,13 +175,6 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 		else
 			scrambler = (scrambler << 1) | ( b32 ^ b19 );
 
-		//Extract scrambler bits we care about for the data bits
-		auto b16 = (scrambler >> 16) & 1;
-		bool b8 = (scrambler >> 8) & 1;
-		bool b6 = (scrambler >> 6) & 1;
-		bool b3 = (scrambler >> 3) & 1;
-		bool b0 = (scrambler & 1);
-
 		//Extract Sd[0] from the I value in SEND_I mode
 		//I=0 means Sd[0] = 1
 		//I=+1 or -1 means Sd[0] = 0
@@ -197,6 +192,8 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 		{
 			//Sending zeroes
 			case STATE_SEND_Z:
+
+				numZeroes = 0;
 
 				//(0,0) in SEND_Z state means we're still in SEND_Z
 				if( (ci == 0) && (cq == 0) )
@@ -337,7 +334,23 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 				break;
 		}
 
-		//TODO: Reset to SEND_Z after a bunch of zeroes in a row
+		//Reset to SEND_Z after a bunch of zeroes in a row
+		if(state != STATE_SEND_Z)
+		{
+			if( (ci == 0) && (cq == 0) )
+				numZeroes ++;
+
+			if(numZeroes >= 10)
+			{
+				//Add a new SEND_I symbol
+				cap->m_offsets.push_back(tnow + tlen);
+				cap->m_durations.push_back(0);
+				cap->m_samples.push_back(
+					Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_Z));
+
+				state = STATE_SEND_Z;
+			}
+		}
 	}
 
 	cap->MarkModifiedFromCpu();
