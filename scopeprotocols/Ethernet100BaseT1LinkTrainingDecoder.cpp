@@ -175,6 +175,8 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 		else
 			scrambler = (scrambler << 1) | ( b32 ^ b19 );
 
+		bool b0 = (scrambler & 1);
+
 		//Extract Sd[0] from the I value in SEND_I mode
 		//I=0 means Sd[0] = 1
 		//I=+1 or -1 means Sd[0] = 0
