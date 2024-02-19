@@ -115,7 +115,9 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 	enum
 	{
 		STATE_SEND_Z,
-		STATE_SEND_I,
+		STATE_SEND_I_UNLOCKED,
+		STATE_SEND_I_LOCKED,
+		STATE_SEND_N
 	} state = STATE_SEND_Z;
 
 	//Decision thresholds
@@ -135,7 +137,7 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 
 	uint64_t scrambler = 0;
 	uint64_t idlesMatched = 0;
-	bool scramblerLocked = false;
+	size_t lastScramblerError = 0;
 
 	//Add initial sample assuming we're in SEND_Z mode
 	cap->m_offsets.push_back(0);
@@ -178,8 +180,22 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 		bool b3 = (scrambler >> 3) & 1;
 		bool b0 = (scrambler & 1);
 
+		//Extract Sd[0] from the I value in SEND_I mode
+		//I=0 means Sd[0] = 1
+		//I=+1 or -1 means Sd[0] = 0
+		bool expected_lsb_sendi = (ci == 0);
+
+		//Expected LSB in SEND-N mode (assuming no frames are showing up)
+		bool expected_lsb_sendn = ( (ci == -1) && (cq == -1) ) || (ci == 0) || ( (ci == 1) && (cq == 1) );
+
+		//See if we already got the expected value out of the scrambler
+		bool current_lsb = (b0 == 1);
+
+		const int minIdlesForLock = 256;
+
 		switch(state)
 		{
+			//Sending zeroes
 			case STATE_SEND_Z:
 
 				//(0,0) in SEND_Z state means we're still in SEND_Z
@@ -201,18 +217,127 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 					cap->m_samples.push_back(
 						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_I_UNLOCKED));
 
-					state = STATE_SEND_I;
+					state = STATE_SEND_I_UNLOCKED;
+					idlesMatched = 0;
+				}
+
+				break;	//STATE_SEND_Z
+
+			//SEND_I but decode isn't yet locked to scrambler
+			case STATE_SEND_I_UNLOCKED:
+
+				//Yes? We got more idles
+				if(expected_lsb_sendi == current_lsb)
+				{
+					idlesMatched ++;
+
+					//Clear scrambler error counter after 1K error-free bits
+					if(lastScramblerError > 1024)
+						lastScramblerError = 0;
+				}
+
+				//Nope, reset idle counter and force this bit into the scrambler
+				else
+				{
+					idlesMatched = 0;
+					scrambler = (scrambler & ~1) | expected_lsb_sendi;
+				}
+
+				//Declare lock after 256 error-free idles
+				//But we can back up and declare the lock as beginning at that point.
+				if(idlesMatched >= minIdlesForLock)
+				{
+					//LogTrace("Scrambler locked at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+
+					//Retcon the SEND_I_UNLOCKED to end when we got our first good idle
+					int64_t tlock = isamples.m_offsets[i - idlesMatched];
+					cap->m_durations[nlast] = tlock - cap->m_offsets[nlast];
+
+					//We're now locked
+					cap->m_offsets.push_back(tlock);
+					cap->m_durations.push_back(tnow - tlock);
+					cap->m_samples.push_back(
+						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_I_LOCKED));
+					state = STATE_SEND_I_LOCKED;
+
+					lastScramblerError = i;
+				}
+				break;	//STATE_SEND_I_UNLOCKED
+
+			//SEND_I and in locked state
+			case STATE_SEND_I_LOCKED:
+
+				//If we get the expected result for SEND_I, extend the SEND_I state
+				if(expected_lsb_sendi == current_lsb)
+					cap->m_durations[nlast] = (tnow + tlen) - cap->m_offsets[nlast];
+
+				//If we get the expected result for SEND_N, jump to SEND_N
+				else if(expected_lsb_sendn == current_lsb)
+				{
+					//End the SEND_I symbol here
+					cap->m_durations[nlast] = tnow - cap->m_offsets[nlast];
+
+					//Add the SEND_N symbol
+					cap->m_offsets.push_back(tnow);
+					cap->m_durations.push_back(tlen);
+					cap->m_samples.push_back(
+						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_N));
+
+					state = STATE_SEND_N;
+				}
+
+				//If we get neither, add an error symbol
+				else
+				{
+					//End the SEND_I symbol here
+					cap->m_durations[nlast] = tnow - cap->m_offsets[nlast];
+
+					//Add the error symbol
+					cap->m_offsets.push_back(tnow);
+					cap->m_durations.push_back(tlen);
+					cap->m_samples.push_back(
+						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_ERROR));
+
+					//Add a new SEND_I symbol
+					cap->m_offsets.push_back(tnow + tlen);
+					cap->m_durations.push_back(0);
+					cap->m_samples.push_back(
+						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_I_LOCKED));
 				}
 
 				break;
 
-			//TODO
-			case STATE_SEND_I:
+			//SEND_N: TODO handle packets showing up
+			case STATE_SEND_N:
+
+				if(expected_lsb_sendn == current_lsb)
+					cap->m_durations[nlast] = (tnow + tlen) - cap->m_offsets[nlast];
+
+				else
+				{
+					//End the SEND_N symbol here
+					cap->m_durations[nlast] = tnow - cap->m_offsets[nlast];
+
+					//Add the error symbol
+					cap->m_offsets.push_back(tnow);
+					cap->m_durations.push_back(tlen);
+					cap->m_samples.push_back(
+						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_ERROR));
+
+					//Add a new SEND_I symbol
+					cap->m_offsets.push_back(tnow + tlen);
+					cap->m_durations.push_back(0);
+					cap->m_samples.push_back(
+						Ethernet100BaseT1LinkTrainingSymbol(Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_N));
+				}
+
 				break;
 
 			default:
 				break;
 		}
+
+		//TODO: Reset to SEND_Z after a bunch of zeroes in a row
 	}
 
 	cap->MarkModifiedFromCpu();
@@ -248,15 +373,15 @@ string Ethernet100BaseT1LinkTrainingWaveform::GetText(size_t i)
 	switch(s.m_type)
 	{
 		case Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_Z:
-			return "SEND-Z";
+			return "SEND_Z";
 
 		case Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_I_UNLOCKED:
-			return "SEND-I (scrambler unlocked)";
+			return "SEND_I (scrambler unlocked)";
 		case Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_I_LOCKED:
-			return "SEND-I";
+			return "SEND_I";
 
 		case Ethernet100BaseT1LinkTrainingSymbol::TYPE_SEND_N:
-			return "SEND-N";
+			return "SEND_N";
 
 		case Ethernet100BaseT1LinkTrainingSymbol::TYPE_ERROR:
 		default:
