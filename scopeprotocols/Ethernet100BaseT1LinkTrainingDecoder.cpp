@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "Ethernet100BaseT1LinkTrainingDecoder.h"
-#include "SPIDecoder.h"
 
 using namespace std;
 
