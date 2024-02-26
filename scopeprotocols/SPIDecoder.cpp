@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,11 +44,17 @@ using namespace std;
 
 SPIDecoder::SPIDecoder(const string& color)
 	: Filter(color, CAT_BUS)
+	, m_cpol("Clock Polarity")
 {
 	AddProtocolStream("data");
 	CreateInput("clk");
 	CreateInput("cs#");
 	CreateInput("data");
+
+	m_parameters[m_cpol] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_cpol].AddEnumValue("Idle low", 0);
+	m_parameters[m_cpol].AddEnumValue("Idle high", 1);
+	m_parameters[m_cpol].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,8 +121,8 @@ void SPIDecoder::Refresh()
 	{
 		STATE_IDLE,
 		STATE_DESELECTED,
-		STATE_SELECTED_CLKLO,
-		STATE_SELECTED_CLKHI
+		STATE_SELECTED_CLK_INACTIVE,
+		STATE_SELECTED_CLK_ACTIVE
 	} state = STATE_IDLE;
 
 	uint8_t	current_byte	= 0;
@@ -133,6 +139,15 @@ void SPIDecoder::Refresh()
 	size_t clklen = clk->size();
 	size_t cslen = csn->size();
 	size_t datalen = data->size();
+
+	//Get SPI clock polarity
+	auto cpol = m_parameters[m_cpol].GetIntVal();
+
+	bool active_clk;
+	if(cpol == 0)
+		active_clk = true;
+	else
+		active_clk = false;
 
 	while(true)
 	{
@@ -153,7 +168,7 @@ void SPIDecoder::Refresh()
 			case STATE_DESELECTED:
 				if(!cur_cs)
 				{
-					state = STATE_SELECTED_CLKLO;
+					state = STATE_SELECTED_CLK_INACTIVE;
 					current_byte = 0;
 					bitcount = 0;
 					bytestart = timestamp;
@@ -162,8 +177,8 @@ void SPIDecoder::Refresh()
 				break;
 
 			//wait for rising edge of clk
-			case STATE_SELECTED_CLKLO:
-				if(cur_clk)
+			case STATE_SELECTED_CLK_INACTIVE:
+				if(cur_clk == active_clk)
 				{
 					if(bitcount == 0)
 					{
@@ -187,7 +202,7 @@ void SPIDecoder::Refresh()
 						bytestart = timestamp;
 					}
 
-					state = STATE_SELECTED_CLKHI;
+					state = STATE_SELECTED_CLK_ACTIVE;
 
 					//TODO: selectable msb/lsb first direction
 					bitcount ++;
@@ -222,9 +237,9 @@ void SPIDecoder::Refresh()
 				break;
 
 			//wait for falling edge of clk
-			case STATE_SELECTED_CLKHI:
-				if(!cur_clk)
-					state = STATE_SELECTED_CLKLO;
+			case STATE_SELECTED_CLK_ACTIVE:
+				if(cur_clk != active_clk)
+					state = STATE_SELECTED_CLK_INACTIVE;
 
 				//end of packet
 				//TODO: error if a byte is truncated
