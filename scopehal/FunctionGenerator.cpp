@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -434,7 +434,12 @@ void FunctionGenerator::DoPreLoadConfiguration(
 		//Save basic info
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
-		idmap.emplace(channelNode["funcgenid"].as<uintptr_t>(), chan);
+		if(!channelNode)
+			continue;
+		auto fnode = channelNode["funcgenid"];
+		if(!fnode)
+			continue;
+		idmap.emplace(fnode.as<uintptr_t>(), chan);
 
 		//Changing impedance from high-Z to 50 ohm will double output swing
 		if(HasFunctionImpedanceControls(i))
@@ -496,6 +501,11 @@ void FunctionGenerator::DoLoadConfiguration(int /*version*/, const YAML::Node& n
 		//Load basic info
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
+		if(!channelNode)
+			continue;
+		auto fnode = channelNode["funcgenid"];
+		if(!fnode)
+			continue;
 
 		SetFunctionChannelAmplitude(i, channelNode["amplitude"].as<float>());
 		SetFunctionChannelOffset(i, channelNode["offset"].as<float>());
