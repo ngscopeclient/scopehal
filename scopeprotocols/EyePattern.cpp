@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -58,6 +58,7 @@ EyePattern::EyePattern(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_EYE);
 	AddStream(Unit(Unit::UNIT_RATIO_SCI), "hitrate", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_UI), "samplesIntegrated", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
 	CreateInput("clk");
@@ -289,6 +290,7 @@ void EyePattern::Refresh()
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock_edges.size());
 	cap->Normalize();
+	m_streams[2].m_value = cap->GetTotalUIs();
 
 	//If we have an eye mask, prepare it for processing
 	if(m_mask.GetFileName() != "")
