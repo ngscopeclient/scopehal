@@ -812,6 +812,11 @@ bool RigolOscilloscope::AcquireData()
 			sscanf((char*)header, "#%c", &header_size);
 			header_size = header_size - '0';
 
+			if (header_size > 12)
+			{
+				header_size = 12;
+			}
+
 			m_transport->ReadRawData(header_size, header);
 
 			//Look up the block size
@@ -833,6 +838,11 @@ bool RigolOscilloscope::AcquireData()
 					cap = nullptr;
 				}
 				break;
+			}
+
+			if (header_blocksize > maxpoints)
+			{
+				header_blocksize = maxpoints;
 			}
 
 			//Read actual block content and decode it
