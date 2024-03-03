@@ -130,8 +130,8 @@ bool MaximumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 void MaximumFilter::ClearSweeps()
 {
-	m_streams[0].m_value = 0;
-	m_streams[1].m_value = FLT_MIN;
+	m_streams[0].m_value = -FLT_MAX;
+	m_streams[1].m_value = -FLT_MAX;
 	m_streams[2].m_value = 0;
 	m_streams[3].m_value = 0;
 }
