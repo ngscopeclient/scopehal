@@ -4005,6 +4005,9 @@ bool LeCroyOscilloscope::IsDigitalThresholdConfigurable()
 
 float LeCroyOscilloscope::GetDigitalHysteresis(size_t channel)
 {
+	if(channel < m_digitalChannelBase)
+		return 0;
+
 	string reply;
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis0'");
@@ -4016,6 +4019,9 @@ float LeCroyOscilloscope::GetDigitalHysteresis(size_t channel)
 
 float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 {
+	if(channel < m_digitalChannelBase)
+		return 0;
+
 	string reply;
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxThreshold0'");
@@ -4027,6 +4033,9 @@ float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 
 void LeCroyOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 {
+	if(channel < m_digitalChannelBase)
+		return;
+
 	char tmp[128];
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxHysteresis0 = %e'", level);
@@ -4037,6 +4046,9 @@ void LeCroyOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 
 void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
+	if(channel < m_digitalChannelBase)
+		return;
+
 	char tmp[128];
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxThreshold0 = %e'", level);
