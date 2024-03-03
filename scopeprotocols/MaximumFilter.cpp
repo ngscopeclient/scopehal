@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -79,7 +79,7 @@ void MaximumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 		auto data = din.GetData();
 		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
 		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
-		float total = 0;
+		float total = -FLT_MAX;
 		size_t len = data->size();
 
 		if(udata)
