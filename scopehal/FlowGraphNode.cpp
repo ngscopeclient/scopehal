@@ -140,6 +140,17 @@ string FlowGraphNode::GetInputName(size_t i)
 }
 
 /**
+	@brief Called when a new input is connected to the node
+
+	The default implementation does nothing, but some special cases may find this hook useful.
+
+	For example, instrument channels may make hardware changes as soon as a new input is connected.
+ */
+void FlowGraphNode::OnInputChanged([[maybe_unused]] size_t i)
+{
+}
+
+/**
 	@brief Connects a stream to the input of this node
 
 	@param i		Index of the input port to connect
@@ -192,6 +203,9 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 
 		//All good, we can save the new input
 		m_inputs[i] = stream;
+
+		//Notify the derived class in case it wants to do anything
+		OnInputChanged(i);
 	}
 	else
 	{

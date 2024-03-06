@@ -109,6 +109,9 @@ public:
 
 	StreamDescriptor GetInput(size_t i);
 
+protected:
+	virtual void OnInputChanged(size_t i);
+
 	//Parameters
 public:
 	FilterParameter& GetParameter(std::string s);
