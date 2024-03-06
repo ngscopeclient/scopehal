@@ -56,6 +56,7 @@
 #include "TektronixOscilloscope.h"
 #include "ThunderScopeOscilloscope.h"
 
+#include "AntikernelLabsTriggerCrossbar.h"
 #include "MultiLaneBERT.h"
 
 #include "CSVStreamInstrument.h"
@@ -209,6 +210,7 @@ void DriverStaticInit()
 	InitializeSearchPaths();
 	DetectCPUFeatures();
 
+	AddBERTDriverClass(AntikernelLabsTriggerCrossbar);
 	AddBERTDriverClass(MultiLaneBERT);
 
 	AddDriverClass(AgilentOscilloscope);

@@ -114,6 +114,9 @@ set(SCOPEHAL_SOURCES
 	BERTInputChannel.cpp
 	BERTOutputChannel.cpp
 	CANChannel.cpp
+	DigitalIOChannel.cpp
+	DigitalInputChannel.cpp
+	DigitalOutputChannel.cpp
 	FunctionGenerator.cpp
 	FunctionGeneratorChannel.cpp
 	Load.cpp
@@ -144,6 +147,7 @@ set(SCOPEHAL_SOURCES
 
 	AgilentOscilloscope.cpp
 	AntikernelLabsOscilloscope.cpp
+	AntikernelLabsTriggerCrossbar.cpp
 	AntikernelLogicAnalyzer.cpp
 	AseqSpectrometer.cpp
 	CopperMountainVNA.cpp

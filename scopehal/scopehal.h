@@ -128,6 +128,9 @@ extern size_t g_maxComputeGroupCount[3];
 
 #include "Instrument.h"
 #include "BERT.h"
+#include "DigitalIOChannel.h"
+#include "DigitalInputChannel.h"
+#include "DigitalOutputChannel.h"
 #include "FunctionGenerator.h"
 #include "FunctionGeneratorChannel.h"
 #include "Load.h"
