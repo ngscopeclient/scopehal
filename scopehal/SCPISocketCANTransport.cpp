@@ -44,6 +44,9 @@
 
 #include <linux/can.h>
 #include <linux/can/raw.h>
+#include <linux/net_tstamp.h>
+#include <linux/sockios.h>
+#include <linux/errqueue.h>
 
 using namespace std;
 
@@ -62,6 +65,7 @@ SCPISocketCANTransport::SCPISocketCANTransport(const string& args)
 	}
 
 	ifreq ifr;
+	memset(&ifr, 0, sizeof(ifr));
 	strncpy(ifr.ifr_name, args.c_str(), sizeof(ifr.ifr_name) - 1);
 	if(0 != ioctl(m_socket, SIOCGIFINDEX, &ifr))
 	{
@@ -88,7 +92,31 @@ SCPISocketCANTransport::SCPISocketCANTransport(const string& args)
 	if(0 != setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)))
 	{
 		perror("setsockopt SO_RCVTIMEO\n");
-		LogError("Failed to open set RX timeout\n");
+		LogError("Failed to set RX timeout\n");
+		return;
+	}
+
+	//request hardware timestamping requires root
+	//alternatively do hwstamp_ctl -i can0 -r 1
+	hwtstamp_config cfg;
+	/*cfg.flags = 0;
+	cfg.tx_type = HWTSTAMP_TX_OFF;
+	cfg.rx_filter = HWTSTAMP_FILTER_ALL;*/
+	ifr.ifr_data = (char*)&cfg;
+	if(0 != ioctl(m_socket, SIOCGHWTSTAMP, &ifr))
+		perror("SIOCGHWTSTAMP failed\n");
+
+	if(cfg.rx_filter == HWTSTAMP_FILTER_ALL)
+		LogDebug("hardware timestamp enabled\n");
+	else
+		LogDebug("hardware timestamp state %d\n", cfg.rx_filter);
+
+	//Enable hardware timestamping
+	int enable = 1;
+	if(0 != setsockopt(m_socket, SOL_SOCKET, SO_TIMESTAMPNS, &enable, sizeof(enable)))
+	{
+		perror("setsockopt SO_TIMESTAMPNS\n");
+		LogError("Failed to enable timestamping\n");
 		return;
 	}
 }
@@ -135,9 +163,106 @@ void SCPISocketCANTransport::SendRawData(size_t /*len*/, const unsigned char* /*
 {
 }
 
+/**
+	@brief Recommended interface w/ hardware timestamping
+ */
+size_t SCPISocketCANTransport::ReadPacket(can_frame* frame)
+{
+	iovec iov;
+	iov.iov_base = frame;
+	iov.iov_len = sizeof(can_frame);
+
+	char ctrl[1536];
+	
+	msghdr msg;
+	msg.msg_name = nullptr;
+	msg.msg_namelen = 0;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = ctrl;
+	msg.msg_controllen = sizeof(ctrl);
+	msg.msg_flags = 0;
+
+	auto rlen = recvmsg(m_socket, &msg, 0);
+
+	//failed
+	if(rlen < 0)
+	{
+		//normal timeout
+		if( (errno == EAGAIN) || (errno == EWOULDBLOCK) )
+			return 0;
+		
+		perror("ReadRawData failed\n");
+		return 0;
+	}
+
+	//no data 
+	else if(rlen == 0)
+		return 0;
+
+	//extract timestamp
+	for(auto pmsg = CMSG_FIRSTHDR(&msg); pmsg != nullptr; pmsg = CMSG_NXTHDR(&msg, pmsg) )
+	{
+		if(pmsg->cmsg_level != SOL_SOCKET)
+			continue;
+		if(pmsg->cmsg_type != SCM_TIMESTAMPNS)
+			continue;
+		
+		scm_timestamping64 data;
+		memcpy(&data, CMSG_DATA(pmsg), sizeof(data));
+
+		/*
+		LogDebug("got valid timestamp\n");
+		for(int i=0; i<3; i++)
+			LogDebug("[%d] %lld.%lld\n", i, data.ts[i].tv_sec, data.ts[i].tv_nsec);
+		*/
+		
+		//got a timestamp, for now only use the first
+		//(there can be up to 3 and its not clear which to use, but the first looks to make the most sense)
+		break;		
+	}
+	
+	return rlen;
+}
+
+/**
+	@brief For backward compatibility, doesn't provide timestamps
+ */
 size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf)
 {
-	return read(m_socket, buf, len);
+	iovec iov;
+	iov.iov_base = buf;
+	iov.iov_len = len;
+
+	char ctrl[1536];
+	
+	msghdr msg;
+	msg.msg_name = nullptr;
+	msg.msg_namelen = 0;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = ctrl;
+	msg.msg_controllen = sizeof(ctrl);
+	msg.msg_flags = 0;
+
+	auto rlen = recvmsg(m_socket, &msg, 0);
+
+	//failed
+	if(rlen < 0)
+	{
+		//normal timeout
+		if( (errno == EAGAIN) || (errno == EWOULDBLOCK) )
+			return 0;
+		
+		perror("ReadRawData failed\n");
+		return 0;
+	}
+
+	//no data 
+	else if(rlen == 0)
+		return 0;
+
+	return rlen;
 }
 
 bool SCPISocketCANTransport::IsCommandBatchingSupported()

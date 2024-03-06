@@ -38,6 +38,9 @@
 
 #ifdef __linux
 
+#include <linux/can.h>
+#include <linux/can/raw.h>
+
 /**
 	@brief SocketCAN based interface for implementing CAN protocol analyzer functionality
  */
@@ -55,6 +58,8 @@ public:
 	virtual std::string ReadReply(bool endOnSemicolon = true) override;
 	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
 	virtual void SendRawData(size_t len, const unsigned char* buf) override;
+
+	size_t ReadPacket(can_frame* frame);
 
 	virtual bool IsCommandBatchingSupported() override;
 	virtual bool IsConnected() override;

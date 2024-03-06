@@ -218,6 +218,10 @@ bool SocketCANAnalyzer::PopPendingWaveform()
 
 bool SocketCANAnalyzer::AcquireData()
 {
+	auto transport = dynamic_cast<SCPISocketCANTransport*>(m_transport);
+	if(!transport)
+		return false;
+	
 	//Get the existing waveform if we have one
 	//TODO: Start a new waveform only if a new trigger cycle
 
@@ -235,7 +239,7 @@ bool SocketCANAnalyzer::AcquireData()
 	{
 		//Grab a frame and stop capturing if nothing shows up within the timeout window
 		can_frame frame;
-		int nbytes = m_transport->ReadRawData(sizeof(frame), (uint8_t*)&frame);
+		int nbytes = transport->ReadPacket(&frame);
 		if(nbytes < 0)
 			break;
 
