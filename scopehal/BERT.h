@@ -57,6 +57,10 @@ public:
 		//Custom output pattern
 		PATTERN_CUSTOM,
 
+		//1-0 patterns
+		PATTERN_CLOCK_DIV2,		//1-0-1-0 pattern
+		PATTERN_CLOCK_DIV32,	//16 0s followed by 16 1s
+
 		//Autodetect input pattern
 		PATTERN_AUTO
 	};

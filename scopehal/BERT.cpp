@@ -74,6 +74,12 @@ string BERT::GetPatternName(Pattern pat)
 		case PATTERN_CUSTOM:
 			return "Custom";
 
+		case PATTERN_CLOCK_DIV2:
+			return "2 UI clock";
+
+		case PATTERN_CLOCK_DIV32:
+			return "32 UI clock";
+
 		case PATTERN_AUTO:
 			return "Auto";
 
@@ -98,6 +104,10 @@ BERT::Pattern BERT::GetPatternOfName(string name)
 		return PATTERN_PRBS31;
 	else if(name == "Custom")
 		return PATTERN_CUSTOM;
+	else if(name == "2 UI clock")
+		return PATTERN_CLOCK_DIV2;
+	else if(name == "32 UI clock")
+		return PATTERN_CLOCK_DIV32;
 	else if(name == "Auto")
 		return PATTERN_AUTO;
 

@@ -46,6 +46,8 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	SetDataRate(10312500000LL);
 	*/
 
+	//TODO: add commands to firmware so we can query the existing config at startup
+
 	//Input-only channels
 	m_triggerInChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
@@ -78,21 +80,45 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 			m_channels.size()));
 	}
 
-	//Add and provide default configuration for pattern generator channels
+	//Set up pattern generator channels
 	m_txChannelBase = m_channels.size();
 	for(int i=0; i<2; i++)
 	{
+		auto hwname = string("TX") + to_string(i);
+
 		m_channels.push_back(new BERTOutputChannel(
-			string("TX") + to_string(i),
+			hwname,
 			this,
 			"#808080",
-			i));
-		/*SetTxPattern(i, PATTERN_PRBS7);
-		SetTxInvert(i, false);*/
-		SetTxDriveStrength(i, 0.269);
-		/*SetTxEnable(i, true);
-		SetTxPreCursor(i, 0);
-		SetTxPostCursor(i, 0);*/
+			m_channels.size()));
+
+		//Read existing config once, then cache
+		//No need to ever flush cache as instrument has no front panel UI
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":PATTERN?"));
+		m_txPattern[i] = GetPatternOfName(reply);
+
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":INVERT?"));
+		m_txInvert[i] = (atoi(reply.c_str()) == 1);
+
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":SWING?"));
+		auto drives = AntikernelLabsTriggerCrossbar::GetAvailableTxDriveStrengths(m_txChannelBase+i);
+		size_t idx = atoi(reply.c_str());
+		if(idx >= drives.size())
+			idx = drives.size() - 1;
+		m_txDrive[i] = drives[idx];
+
+		//precursor range is 0 to 20
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":PRECURSOR?"));
+		idx = atoi(reply.c_str());
+		m_txPreCursor[i] = 20.0f / idx;
+
+		//postcursor range is 0 to 31
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":POSTCURSOR?"));
+		idx = atoi(reply.c_str());
+		m_txPostCursor[i] = 20.0f / idx;
+
+		//TODO
+		SetTxEnable(m_txChannelBase + i, true);
 	}
 	/*
 	//Add pattern checker channels
@@ -133,9 +159,13 @@ string AntikernelLabsTriggerCrossbar::GetDriverNameInternal()
 	return "akl.crossbar";
 }
 
-uint32_t AntikernelLabsTriggerCrossbar::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t AntikernelLabsTriggerCrossbar::GetInstrumentTypesForChannel(size_t i) const
 {
-	return INST_BERT;
+	//TODO: trigger types
+	if(i < m_txChannelBase)
+		return 0;
+	else
+		return INST_BERT;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,44 +282,47 @@ vector<BERT::Pattern> AntikernelLabsTriggerCrossbar::GetAvailableTxPatterns(size
 	ret.push_back(PATTERN_PRBS15);
 	ret.push_back(PATTERN_PRBS23);
 	ret.push_back(PATTERN_PRBS31);
+	ret.push_back(PATTERN_CLOCK_DIV2);
+	ret.push_back(PATTERN_CLOCK_DIV32);
 	//ret.push_back(PATTERN_CUSTOM);
 	return ret;
 }
 
 BERT::Pattern AntikernelLabsTriggerCrossbar::GetTxPattern(size_t i)
 {
-	//return m_txPattern[i];
-	return PATTERN_PRBS7;
+	return m_txPattern[i - m_txChannelBase];
 }
 
 void AntikernelLabsTriggerCrossbar::SetTxPattern(size_t i, Pattern pattern)
 {
-	/*
 	switch(pattern)
 	{
 		case PATTERN_PRBS7:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS7");
-			break;
-		case PATTERN_PRBS9:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS9");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PATTERN PRBS7");
 			break;
 		case PATTERN_PRBS15:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS15");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PATTERN PRBS15");
 			break;
 		case PATTERN_PRBS23:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS23");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PATTERN PRBS23");
 			break;
 		case PATTERN_PRBS31:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS31");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PATTERN PRBS31");
+			break;
+		case PATTERN_CLOCK_DIV2:
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PATTERN FASTSQUARE");
+			break;
+		case PATTERN_CLOCK_DIV32:
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PATTERN SLOWSQUARE");
 			break;
 
 		case PATTERN_CUSTOM:
 		default:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY USER");
+			//m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY USER");
+			break;
 	}
 
-	m_txPattern[i] = pattern;
-	*/
+	m_txPattern[i - m_txChannelBase] = pattern;
 }
 
 bool AntikernelLabsTriggerCrossbar::IsCustomPatternPerChannel()
@@ -299,7 +332,7 @@ bool AntikernelLabsTriggerCrossbar::IsCustomPatternPerChannel()
 
 size_t AntikernelLabsTriggerCrossbar::GetCustomPatternLength()
 {
-	return 16;
+	return 64;
 }
 
 void AntikernelLabsTriggerCrossbar::SetGlobalCustomPattern([[maybe_unused]] uint64_t pattern)
@@ -316,41 +349,59 @@ uint64_t AntikernelLabsTriggerCrossbar::GetGlobalCustomPattern()
 
 bool AntikernelLabsTriggerCrossbar::GetTxInvert(size_t i)
 {
-	return false;
-	//return m_txInvert[i];
+	return m_txInvert[i - m_txChannelBase];
 }
 
 void AntikernelLabsTriggerCrossbar::SetTxInvert(size_t i, bool invert)
 {
-	/*if(invert)
+	if(invert)
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 1");
 	else
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 0");
 
-	m_txInvert[i] = invert;*/
+	m_txInvert[i - m_txChannelBase] = invert;
 }
 
 vector<float> AntikernelLabsTriggerCrossbar::GetAvailableTxDriveStrengths([[maybe_unused]] size_t i)
 {
 	vector<float> ret;
-	/*ret.push_back(0.0);
-	ret.push_back(0.1);
-	ret.push_back(0.2);
-	ret.push_back(0.3);
-	ret.push_back(0.4);*/
+	ret.push_back(0.269);
+	ret.push_back(0.336);
+	ret.push_back(0.407);
+	ret.push_back(0.474);
+	ret.push_back(0.543);
+	ret.push_back(0.609);
+	ret.push_back(0.677);
+	ret.push_back(0.741);
+	ret.push_back(0.807);
+	ret.push_back(0.866);
+	ret.push_back(0.924);
+	ret.push_back(0.973);
+	ret.push_back(1.018);
+	ret.push_back(1.056);
+	ret.push_back(1.092);
+	ret.push_back(1.119);
 	return ret;
 }
 
 float AntikernelLabsTriggerCrossbar::GetTxDriveStrength(size_t i)
 {
-	//return m_txDrive[i];
-	return 1;
+	return m_txDrive[i - m_txChannelBase];
 }
 
 void AntikernelLabsTriggerCrossbar::SetTxDriveStrength(size_t i, float drive)
 {
-	//m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":SWING " + to_string((int)(drive*1000)));
-	//m_txDrive[i] = drive;
+	//Convert specified drive strength to a TXDIFFCTRL step value
+	auto drives = GetAvailableTxDriveStrengths(i);
+	size_t swing = 0;
+	for(size_t j=0; j<drives.size(); j++)
+	{
+		if(drive >= (drives[j] - 0.001))
+			swing = j;
+	}
+
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":SWING " + to_string(swing));
+	m_txDrive[i - m_txChannelBase] = drive;
 }
 
 void AntikernelLabsTriggerCrossbar::SetTxEnable(size_t i, bool enable)
@@ -360,39 +411,41 @@ void AntikernelLabsTriggerCrossbar::SetTxEnable(size_t i, bool enable)
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":ENABLE 1");
 	else
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":ENABLE 0");
-
-	m_txEnable[i] = enable;
 	*/
+	m_txEnable[i - m_txChannelBase] = enable;
 }
 
 bool AntikernelLabsTriggerCrossbar::GetTxEnable(size_t i)
 {
-	//return m_txEnable[i];
-	return true;
+	return m_txEnable[i - m_txChannelBase];
 }
 
 float AntikernelLabsTriggerCrossbar::GetTxPreCursor(size_t i)
 {
-	//return m_txPreCursor[i];
-	return 1;
+	return m_txPreCursor[i - m_txChannelBase];
 }
 
 void AntikernelLabsTriggerCrossbar::SetTxPreCursor(size_t i, float precursor)
 {
-	//m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PRECURSOR " + to_string((int)(precursor*100)));
-	//m_txPreCursor[i] = precursor;
+	//precursor values range from 0 to 20
+	int precursorScaled = round(precursor * 20);
+
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PRECURSOR " + to_string(precursorScaled));
+	m_txPreCursor[i - m_txChannelBase] = precursor;
 }
 
 float AntikernelLabsTriggerCrossbar::GetTxPostCursor(size_t i)
 {
-	//return m_txPostCursor[i];
-	return 1;
+	return m_txPostCursor[i - m_txChannelBase];
 }
 
 void AntikernelLabsTriggerCrossbar::SetTxPostCursor(size_t i, float postcursor)
 {
-	//m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POSTCURSOR " + to_string((int)(postcursor*100)));
-	//m_txPostCursor[i] = postcursor;
+	//postcursor values range from 0 to 31
+	int postcursorScaled = round(postcursor * 31);
+
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POSTCURSOR " + to_string(postcursorScaled));
+	m_txPostCursor[i - m_txChannelBase] = postcursor;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

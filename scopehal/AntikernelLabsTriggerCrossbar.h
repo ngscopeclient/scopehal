@@ -112,16 +112,16 @@ protected:
 	size_t m_txChannelBase;
 	size_t m_rxChannelBase;
 
-	/*
 	//Cached settings
 	Pattern m_txPattern[4];
-	Pattern m_rxPattern[4];
+	//Pattern m_rxPattern[4];
 	bool m_txInvert[4];
-	bool m_rxInvert[4];*/
-	float m_txDrive[4];/*
+	//bool m_rxInvert[4];
+	float m_txDrive[4];
 	bool m_txEnable[4];
 	float m_txPreCursor[4];
 	float m_txPostCursor[4];
+	/*
 	bool m_rxLock[4];
 	uint64_t m_txCustomPattern;
 	size_t m_refclkOutMux;
