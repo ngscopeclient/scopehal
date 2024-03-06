@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -235,13 +235,21 @@ void BERT::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable&
 	SetUseExternalRefclk(timebase["useExtRefclk"].as<bool>());
 	SetDataRate(timebase["dataRate"].as<int64_t>());
 
+	//no channel data in the file? nothing to do
+	if(!node["channels"])
+		return;
+
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_BERT))
 			continue;
 
 		auto key = "ch" + to_string(i);
+
+		//Skip if no data for this channe
 		auto channelNode = node["channels"][key];
+		if(!channelNode)
+			continue;
 
 		auto ichan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
 		auto ochan = dynamic_cast<BERTOutputChannel*>(GetChannel(i));
@@ -284,6 +292,10 @@ void BERT::DoPreLoadConfiguration(
 
 	Unit volts(Unit::UNIT_VOLTS);
 
+	//no channel data in the file? nothing to do
+	if(!node["channels"])
+		return;
+
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_BERT))
@@ -292,7 +304,11 @@ void BERT::DoPreLoadConfiguration(
 		auto ichan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
 		auto ochan = dynamic_cast<BERTOutputChannel*>(GetChannel(i));
 		auto key = "ch" + to_string(i);
+
+		//Skip if no data for this channe
 		auto channelNode = node["channels"][key];
+		if(!channelNode)
+			continue;
 
 		if(ichan)
 		{
