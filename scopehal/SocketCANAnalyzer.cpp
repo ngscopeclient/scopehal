@@ -47,7 +47,8 @@ SocketCANAnalyzer::SocketCANAnalyzer(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_appendingNext(false)
-	, m_tstart(0)
+	, m_startSec(0)
+	, m_startNsec(0)
 {
 	auto chan = new CANChannel(this, "CAN", "#808080", 0);
 	m_channels.push_back(chan);
@@ -221,38 +222,53 @@ bool SocketCANAnalyzer::AcquireData()
 	auto transport = dynamic_cast<SCPISocketCANTransport*>(m_transport);
 	if(!transport)
 		return false;
-	
+
 	//Get the existing waveform if we have one
 	//TODO: Start a new waveform only if a new trigger cycle
 
 	auto cap = new CANWaveform;
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = floor(m_tstart);
-	cap->m_startFemtoseconds = (m_tstart - cap->m_startTimestamp) * FS_PER_SECOND;
+	cap->m_startTimestamp = m_startSec;
+	cap->m_startFemtoseconds = m_startNsec * 1e6;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
+	//Add timeline samples (fake durations assuming 250 Kbps for now)
+	//TODO make this configurable
+	int64_t ui = 4 * 1000LL * 1000LL * 1000LL;
+
 	//Read frames until we run out or a timeout elapses
-	double tstart = GetTime();
 	size_t npackets = 0;
+	int64_t tLastEnd = 0;
 	while(true)
 	{
 		//Grab a frame and stop capturing if nothing shows up within the timeout window
 		can_frame frame;
-		int nbytes = transport->ReadPacket(&frame);
+		int64_t sec;
+		int64_t ns;
+		int nbytes = transport->ReadPacket(&frame, sec, ns);
 		if(nbytes < 0)
 			break;
 
-		double delta = GetTime();
-		delta -= m_tstart;
-		int64_t trel = delta * FS_PER_SECOND;
+		//Calculate delay since start of capture, wrapping properly around second boundaries
+		int64_t dsec = sec - m_startSec;
+		int64_t dnsec = ns - m_startNsec;
+		if(dnsec < 0)
+		{
+			dsec --;
+			dnsec += 1e9;
+		}
+
+		int64_t trel = dsec * FS_PER_SECOND + dnsec*1e6;
+
+		//if last packet hasnt ended, there was a timestamping roundoff
+		//bump our start to match
+		if(trel <= tLastEnd)
+			trel = tLastEnd + ui;
 
 		bool ext = (frame.can_id & CAN_EFF_MASK) > 2047;
 		bool rtr = (frame.can_id & CAN_RTR_FLAG) == CAN_RTR_FLAG;
 
-		//Add timeline samples (fake durations assuming 500 Kbps for now)
-		//TODO make this configurable
-		int64_t ui = 2 * 1000LL * 1000LL * 1000LL;
 		cap->m_offsets.push_back(trel);
 		cap->m_durations.push_back(ui);
 		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, 0));
@@ -285,12 +301,25 @@ bool SocketCANAnalyzer::AcquireData()
 			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DATA, frame.data[i]));
 		}
 
+		//Find end of the packet
+		tLastEnd = trel + (39 + (frame.can_dlc*8)) * ui;
+
 		//Every 100 packets check timeout, after 50ms of acquisition stop
 		npackets ++;
 		if( (npackets % 100) == 0)
 		{
-			double now = GetTime();
-			if( (now - tstart) > 0.05)
+			//get elapsed time
+			timespec t;
+			clock_gettime(CLOCK_REALTIME,&t);
+			dsec = t.tv_sec - m_startSec;
+			dnsec = t.tv_nsec - m_startNsec;
+			if(dnsec < 0)
+			{
+				dsec --;
+				dnsec += 1e9;
+			}
+
+			if( (dsec > 1) || (dnsec > 5e7) )
 				break;
 		}
 	}
@@ -314,16 +343,26 @@ void SocketCANAnalyzer::Start()
 {
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
-	m_tstart = GetTime();
+
 	m_appendingNext = false;
+
+	timespec t;
+	clock_gettime(CLOCK_REALTIME,&t);
+	m_startSec = t.tv_sec;
+	m_startNsec = t.tv_nsec;
 }
 
 void SocketCANAnalyzer::StartSingleTrigger()
 {
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
-	m_tstart = GetTime();
+
 	m_appendingNext = false;
+
+	timespec t;
+	clock_gettime(CLOCK_REALTIME,&t);
+	m_startSec = t.tv_sec;
+	m_startNsec = t.tv_nsec;
 }
 
 void SocketCANAnalyzer::Stop()
@@ -410,106 +449,9 @@ bool SocketCANAnalyzer::SetInterleaving(bool /*combine*/)
 
 void SocketCANAnalyzer::PullTrigger()
 {
-	/*
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	string resp = m_transport->SendCommandQueuedWithReply("TRIGGER1:TYPE?");
-
-	if (resp == "EDGE")
-		PullEdgeTrigger();
-	else
-	{
-		LogWarning("Unknown Trigger Type. Forcing Edge.\n");
-
-		delete m_trigger;
-
-		m_trigger = new EdgeTrigger(this);
-		EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
-
-		et->SetType(EdgeTrigger::EDGE_RISING);
-		et->SetInput(0, StreamDescriptor(GetChannelByHwName("CHAN1"), 0), true);
-		et->SetLevel(1.0);
-		PushTrigger();
-		PullTrigger();
-	}
-	*/
 }
 
-/**
-	@brief Reads settings for an edge trigger from the instrument
- *//*
-void SocketCANAnalyzer::PullEdgeTrigger()
-{
-	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
-	{
-		delete m_trigger;
-		m_trigger = NULL;
-	}
-
-	//Create a new trigger if necessary
-	if(m_trigger == NULL)
-		m_trigger = new EdgeTrigger(this);
-	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
-
-	string reply = m_transport->SendCommandQueuedWithReply("TRIGGER1:SOURCE?");
-	et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
-
-	reply = m_transport->SendCommandQueuedWithReply("TRIGGER1:EDGE:SLOPE?");
-	if (reply == "POS")
-		et->SetType(EdgeTrigger::EDGE_RISING);
-	else if (reply == "NEG")
-		et->SetType(EdgeTrigger::EDGE_FALLING);
-	else if (reply == "EITH")
-		et->SetType(EdgeTrigger::EDGE_ANY);
-	else
-	{
-		LogWarning("Unknown edge type\n");
-		et->SetType(EdgeTrigger::EDGE_ANY);
-	}
-
-	reply = m_transport->SendCommandQueuedWithReply("TRIGGER1:LEVEL?");
-	et->SetLevel(stof(reply));
-}
-*/
 void SocketCANAnalyzer::PushTrigger()
 {
-	/*
-	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	if(et)
-		PushEdgeTrigger(et);
-	else
-		LogWarning("Unknown trigger type (not an edge)\n");*/
 }
-
-/**
-	@brief Pushes settings for an edge trigger to the instrument
- *//*
-void SocketCANAnalyzer::PushEdgeTrigger(EdgeTrigger* trig)
-{
-
-	m_transport->SendCommandQueued("TRIGGER1:EVENT SINGLE");
-	m_transport->SendCommandQueued("TRIGGER1:TYPE EDGE");
-	m_transport->SendCommandQueued(string("TRIGGER1:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
-
-	switch(trig->GetType())
-	{
-		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommandQueued("TRIGGER1:EDGE:SLOPE POSITIVE");
-			break;
-
-		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommandQueued("TRIGGER1:EDGE:SLOPE NEGATIVE");
-			break;
-
-		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommandQueued("TRIGGER1:EDGE:SLOPE EITHER");
-			break;
-
-		default:
-			LogWarning("Unknown edge type\n");
-			break;
-	}
-}
-*/
-
 #endif

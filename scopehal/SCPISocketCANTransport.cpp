@@ -166,14 +166,14 @@ void SCPISocketCANTransport::SendRawData(size_t /*len*/, const unsigned char* /*
 /**
 	@brief Recommended interface w/ hardware timestamping
  */
-size_t SCPISocketCANTransport::ReadPacket(can_frame* frame)
+size_t SCPISocketCANTransport::ReadPacket(can_frame* frame, int64_t& sec, int64_t& ns)
 {
 	iovec iov;
 	iov.iov_base = frame;
 	iov.iov_len = sizeof(can_frame);
 
 	char ctrl[1536];
-	
+
 	msghdr msg;
 	msg.msg_name = nullptr;
 	msg.msg_namelen = 0;
@@ -191,12 +191,12 @@ size_t SCPISocketCANTransport::ReadPacket(can_frame* frame)
 		//normal timeout
 		if( (errno == EAGAIN) || (errno == EWOULDBLOCK) )
 			return 0;
-		
+
 		perror("ReadRawData failed\n");
 		return 0;
 	}
 
-	//no data 
+	//no data
 	else if(rlen == 0)
 		return 0;
 
@@ -207,21 +207,22 @@ size_t SCPISocketCANTransport::ReadPacket(can_frame* frame)
 			continue;
 		if(pmsg->cmsg_type != SCM_TIMESTAMPNS)
 			continue;
-		
+
 		scm_timestamping64 data;
 		memcpy(&data, CMSG_DATA(pmsg), sizeof(data));
 
-		/*
-		LogDebug("got valid timestamp\n");
-		for(int i=0; i<3; i++)
-			LogDebug("[%d] %lld.%lld\n", i, data.ts[i].tv_sec, data.ts[i].tv_nsec);
-		*/
-		
+		//LogDebug("got valid timestamp\n");
+		//for(int i=0; i<3; i++)
+		//	LogDebug("[%d] %lld.%lld\n", i, data.ts[i].tv_sec, data.ts[i].tv_nsec);
+
 		//got a timestamp, for now only use the first
 		//(there can be up to 3 and its not clear which to use, but the first looks to make the most sense)
-		break;		
+		sec = data.ts[0].tv_sec;
+		ns = data.ts[0].tv_nsec;
+
+		break;
 	}
-	
+
 	return rlen;
 }
 
@@ -235,7 +236,7 @@ size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf)
 	iov.iov_len = len;
 
 	char ctrl[1536];
-	
+
 	msghdr msg;
 	msg.msg_name = nullptr;
 	msg.msg_namelen = 0;
@@ -253,12 +254,12 @@ size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf)
 		//normal timeout
 		if( (errno == EAGAIN) || (errno == EWOULDBLOCK) )
 			return 0;
-		
+
 		perror("ReadRawData failed\n");
 		return 0;
 	}
 
-	//no data 
+	//no data
 	else if(rlen == 0)
 		return 0;
 

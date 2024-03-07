@@ -106,7 +106,8 @@ protected:
 
 	bool m_appendingNext;
 
-	double m_tstart;
+	int64_t m_startSec;
+	int64_t m_startNsec;
 
 public:
 	static std::string GetDriverNameInternal();

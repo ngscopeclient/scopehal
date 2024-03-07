@@ -59,7 +59,7 @@ public:
 	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
 	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
-	size_t ReadPacket(can_frame* frame);
+	size_t ReadPacket(can_frame* frame, int64_t& sec, int64_t& ns);
 
 	virtual bool IsCommandBatchingSupported() override;
 	virtual bool IsConnected() override;
