@@ -113,7 +113,18 @@ void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared
 			case STATE_IDLE:
 
 				if( (s.m_stype == CANSymbol::TYPE_ID) && pack)
-					pack->m_headers["ID"] = to_string_hex(s.m_data);
+				{
+					if(s.m_data & 0x80000000)
+					{
+						pack->m_headers["Format"] = "EXT";
+						pack->m_headers["ID"] = to_string_hex(s.m_data & 0x3fffffff, true, 8);
+					}
+					else
+					{
+						pack->m_headers["Format"] = "BASE";
+						pack->m_headers["ID"] = to_string_hex(s.m_data, true, 3);
+					}
+				}
 
 				if( (s.m_stype == CANSymbol::TYPE_DLC) && pack)
 				{
@@ -151,7 +162,6 @@ void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared
 			m_packets.push_back(pack);
 
 			//TODO: FD / RTR support etc?
-			pack->m_headers["Format"] = "BASE";
 			pack->m_headers["Mode"] = "CAN";
 
 			state = STATE_IDLE;

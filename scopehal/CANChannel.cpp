@@ -117,7 +117,10 @@ string CANWaveform::GetText(size_t i)
 			return "SOF";
 
 		case CANSymbol::TYPE_ID:
-			snprintf(tmp, sizeof(tmp), "ID %03x", s.m_data);
+			if(s.m_data & 0x80000000)
+				snprintf(tmp, sizeof(tmp), "ID %08x", s.m_data & 0x3fffffff);
+			else
+				snprintf(tmp, sizeof(tmp), "ID %03x", s.m_data);
 			break;
 
 		case CANSymbol::TYPE_FD:

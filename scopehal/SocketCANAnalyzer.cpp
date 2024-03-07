@@ -266,7 +266,7 @@ bool SocketCANAnalyzer::AcquireData()
 		if(trel <= tLastEnd)
 			trel = tLastEnd + ui;
 
-		bool ext = (frame.can_id & CAN_EFF_MASK) > 2047;
+		//bool ext = (frame.can_id & CAN_EFF_MASK) > 2047;
 		bool rtr = (frame.can_id & CAN_RTR_FLAG) == CAN_RTR_FLAG;
 
 		cap->m_offsets.push_back(trel);
