@@ -144,9 +144,8 @@ protected:
 		LO_DIV32_OR_80,	//div32 in low rate, div80 in high rate
 		SERDES
 	};
-
-	uint64_t m_dataRate;
 	*/
+	uint64_t m_dataRate;
 
 public:
 	static std::string GetDriverNameInternal();

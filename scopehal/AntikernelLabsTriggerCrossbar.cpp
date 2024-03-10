@@ -40,13 +40,9 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 {
-	/*
-	//Change the data rate
-	SetUseExternalRefclk(false);
+	//TODO: query data rate from instrument
+	//TODO: date rate needs to be a per channel setting, not global: have to extend the API for this
 	SetDataRate(10312500000LL);
-	*/
-
-	//TODO: add commands to firmware so we can query the existing config at startup
 
 	//Input-only channels
 	m_triggerInChannelBase = m_channels.size();
@@ -80,6 +76,8 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 			m_channels.size()));
 	}
 
+	//TODO: figure out mux config stuff
+
 	//Set up pattern generator channels
 	m_txChannelBase = m_channels.size();
 	for(int i=0; i<2; i++)
@@ -95,10 +93,26 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		//Read existing config once, then cache
 		//No need to ever flush cache as instrument has no front panel UI
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":PATTERN?"));
-		m_txPattern[i] = GetPatternOfName(reply);
+		if(reply == "PRBS7")
+			m_txPattern[i] = PATTERN_PRBS7;
+		else if(reply == "PRBS15")
+			m_txPattern[i] = PATTERN_PRBS15;
+		else if(reply == "PRBS23")
+			m_txPattern[i] = PATTERN_PRBS23;
+		else if(reply == "PRBS31")
+			m_txPattern[i] = PATTERN_PRBS31;
+		else if(reply == "USER")
+			m_txPattern[i] = PATTERN_CUSTOM;
+		else if(reply == "FASTSQUARE")
+			m_txPattern[i] = PATTERN_CLOCK_DIV2;
+		else if(reply == "SLOWSQUARE")
+			m_txPattern[i] = PATTERN_CLOCK_DIV32;
 
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":INVERT?"));
 		m_txInvert[i] = (atoi(reply.c_str()) == 1);
+
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":ENABLE?"));
+		m_txEnable[i] = (atoi(reply.c_str()) == 1);
 
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":SWING?"));
 		auto drives = AntikernelLabsTriggerCrossbar::GetAvailableTxDriveStrengths(m_txChannelBase+i);
@@ -110,40 +124,38 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		//precursor range is 0 to 20
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":PRECURSOR?"));
 		idx = atoi(reply.c_str());
-		m_txPreCursor[i] = 20.0f / idx;
+		m_txPreCursor[i] = idx / 20.0f;
 
 		//postcursor range is 0 to 31
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":POSTCURSOR?"));
 		idx = atoi(reply.c_str());
-		m_txPostCursor[i] = 20.0f / idx;
-
-		//TODO
-		SetTxEnable(m_txChannelBase + i, true);
+		m_txPostCursor[i] = idx / 31.0f;
 	}
-	/*
-	//Add pattern checker channels
-	for(int i=0; i<nchans; i++)
+
+	//Set up receiver channels
+	m_rxChannelBase = m_channels.size();
+	for(int i=0; i<2; i++)
 	{
-		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#4040c0", i+nchans));
+		auto hwname = string("RX") + to_string(i);
+
+		m_channels.push_back(new BERTInputChannel(
+			hwname,
+			this,
+			"#4040c0",
+			m_channels.size()));
+		/*
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
 		SetRxInvert(i+nchans, false);
 		SetRxCTLEGainStep(i+nchans, 4);
 		SetBERSamplingPoint(i+nchans, 0, 0);
+		*/
 	}
 
-	//Apply the deferred changes
-	//This results in a single API call instead of four for each channel, causing a massive speedup during initialization
-	transport->SendCommandQueued("APPLY");
-
 	//Set up default custom pattern
-	SetGlobalCustomPattern(0xff00);
-
-	//Set the output mux refclk to LO/32
-	SetRefclkOutMux(LO_DIV32_OR_80);
+	//SetGlobalCustomPattern(0xff00);
 
 	//Default integration is 10M UIs
-	SetBERIntegrationLength(1e7);
-	*/
+	//SetBERIntegrationLength(1e7);
 }
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
@@ -406,12 +418,11 @@ void AntikernelLabsTriggerCrossbar::SetTxDriveStrength(size_t i, float drive)
 
 void AntikernelLabsTriggerCrossbar::SetTxEnable(size_t i, bool enable)
 {
-	/*
 	if(enable)
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":ENABLE 1");
 	else
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":ENABLE 0");
-	*/
+
 	m_txEnable[i - m_txChannelBase] = enable;
 }
 
@@ -518,24 +529,22 @@ void AntikernelLabsTriggerCrossbar::GetBERSamplingPoint(size_t i, int64_t& dx, f
 
 int64_t AntikernelLabsTriggerCrossbar::GetDataRate()
 {
-	//return m_dataRate;
-	return 1;
+	return m_dataRate;
 }
 
 void AntikernelLabsTriggerCrossbar::SetDataRate(int64_t rate)
 {
-	/*
 	m_transport->SendCommandQueued(string("RATE ") + to_string(rate));
 	m_dataRate = rate;
-
-	//Reset refclk out mux
-	SetRefclkOutMux(m_refclkOutMux);
-	SetGlobalCustomPattern(m_txCustomPattern);*/
 }
 
 vector<int64_t> AntikernelLabsTriggerCrossbar::GetAvailableDataRates()
 {
 	vector<int64_t> ret;
+	ret.push_back(  644531250LL);
+	ret.push_back( 1289062500LL);
+	ret.push_back( 2578125000LL);
+	ret.push_back( 5156250000LL);
 	ret.push_back(10312500000LL);
 	return ret;
 }
@@ -563,7 +572,6 @@ bool AntikernelLabsTriggerCrossbar::GetRxCdrLockState(size_t i)
 
 void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 {
-	/*
 	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":HBATHTUB?");
 
 	//Parse the reply
@@ -573,124 +581,117 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 	for(auto num : data)
 	{
 		sscanf(num.c_str(), "%f", &tmp);
+
+		//clamp negative or zero values so log works
+		if(tmp <= 0)
+			tmp = 1e-20;
+
 		values.push_back(tmp);
 	}
 
-	if(values.size() < 256)
+	//TODO: this is rate dependent, 65 is correct for full-rate but subrate has more
+	ssize_t width		= 65;
+	ssize_t halfwidth	= (width-1)/2;
+	if(values.size() < (size_t)width)
 	{
-		LogError("not enough data came back\n");
+		LogError("not enough data came back (got %zu values expected %zu)\n", values.size(), width);
 		return;
 	}
 
+	auto rate = GetDataRate();
+	auto period = round(FS_PER_SECOND / rate);
+	auto stepsize = period / width;
+
 	//Create the output waveform
-	auto cap = dynamic_cast<SparseAnalogWaveform*>(GetChannel(i)->GetData(BERTInputChannel::STREAM_HBATHTUB));
+	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetChannel(i)->GetData(BERTInputChannel::STREAM_HBATHTUB));
 	if(!cap)
 	{
-		cap = new SparseAnalogWaveform;
+		cap = new UniformAnalogWaveform;
 		GetChannel(i)->SetData(cap, BERTInputChannel::STREAM_HBATHTUB);
 	}
 	cap->PrepareForCpuAccess();
-	cap->m_timescale = 1;
-	cap->clear();*/
+	cap->m_timescale = stepsize;
+	cap->m_triggerPhase = -stepsize * halfwidth;
+	cap->clear();
+	LogDebug("period = %s\n", Unit(Unit::UNIT_FS).PrettyPrint(period).c_str());
 
-	/*
-		Format of incoming data (if doing dual Dirac server side)
-			Timestamp (in ps relative to start of UI)
-			BER (raw, not logarithmic)
+	//Copy the samples
+	for(ssize_t j=0; j<width; j++)
+		cap->m_samples.push_back(log10(values[j]));
 
-		Up to 128 total pairs of points
-			Points coming from left side of bathtub
-			Dummy with timestamp of zero and BER of zero
-			Points coming from right side of bathtub
-			Zeroes as filler up to 128
-	 */
-	 /*
-	//int state = 0;
-	float last_time = 0;
-	for(size_t j=0; j<128; j++)
-	{
-		float time = values[j*2];
-		float ber = values[j*2 + 1];
-
-		//If time goes backwards, we're dealing with a bug in mlBert_CalculateBathtubDualDirac
-		//Discard this point
-		if(time < last_time)
-			continue;
-		last_time = time;
-
-		//If BER is invalid, we got hit by the bug also
-		if(isinf(ber) || isnan(ber))
-			continue;
-
-		//Log doesn't work for zero, so clamp to a very small value
-		if(ber < 1e-20)
-			ber = 1e-20;
-
-		{
-			cap->m_offsets.push_back(round(time * 1000));	//convert ps to fs
-			cap->m_samples.push_back(log10(ber));			//convert ber to logarithmic since display units are linear
-		}
-	}
-
-	//Calculate durations
-	for(size_t j=1; j<cap->m_offsets.size(); j++)
-		cap->m_durations.push_back(cap->m_offsets[j] - cap->m_offsets[j-1]);
-	cap->m_durations.push_back(1);
-
-	//Time-shift entire waveform so zero is at the eye midpoint
-	int64_t start = cap->m_offsets[0];
-	int64_t end = cap->m_offsets[cap->m_offsets.size() - 1];
-	cap->m_triggerPhase = -(start + end) / 2;
-	for(size_t j=0; j<cap->m_offsets.size(); j++)
-		cap->m_offsets[j] -= start;
-
-	cap->MarkModifiedFromCpu();*/
+	cap->MarkModifiedFromCpu();
 }
 
 void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 {
-	/*
-	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":EYE?");
 	auto chan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
 	if(!chan)
 		return;
 
-	//Parse the reply
-	auto data = explode(reply, ',');
-	vector<float> values;
-	float tmp;
-	for(auto num : data)
-	{
-		sscanf(num.c_str(), "%f", &tmp);
-		values.push_back(tmp);
-	}
+	//Lock while we read the lines
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	if(values.size() < 32770)	//expect 32k plus x and y spacing
-	{
-		LogError("not enough data came back\n");
-		return;
-	}
+	auto rate = GetDataRate();
+	auto period = round(FS_PER_SECOND / rate);
 
-	//Extract offsets
-	int64_t dx_fs = round(values[0] * 1e3);
-	float dy_v = values[1] * 1e-3;
+	//For now, expect -32 to +32 (65 values)
+	//Sub-rate modes have more
+	int32_t height = 64;
+	int32_t width = 65;
+	int32_t halfwidth = (width-1)/2;
+	int32_t tqwidth = halfwidth + width;
 
 	//Create the output waveform
-	//Always 128 phases x 256 ADC codes and centered at 0V (since the input is AC coupled)
-	//Make the texture 256 pixels wide due to normalization etc
-	auto cap = new EyeWaveform(256, 256, 0.0, EyeWaveform::EYE_BER);
-	cap->m_timescale = dx_fs;
+	//Make the texture double width due to normalization etc
+	auto cap = new EyeWaveform(2*width, height, 0.0, EyeWaveform::EYE_BER);
+	cap->m_timescale = period;
 	chan->SetData(cap, BERTInputChannel::STREAM_EYE);
 	cap->PrepareForCpuAccess();
 
 	//Set up metadata
-	auto vrange = dy_v * 256;
-	chan->SetVoltageRange(vrange, BERTInputChannel::STREAM_EYE);
-	cap->m_uiWidth = dx_fs * 128;
-	cap->m_saturationLevel = 3;
+	//For now, assume full rate height is 1.89 mV per code per Xilinx forum post
+	//This is 480 mV for +/- 127 codes (although we step by 4 codes per pixel to speed the scan for now)
+	chan->SetVoltageRange(0.48, BERTInputChannel::STREAM_EYE);
+	cap->m_uiWidth = period;
+	cap->m_saturationLevel = 1;
 
-	//Copy the actual data
+	//Read and process the eye
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":EYESCAN?");
+	m_transport->FlushCommandQueue();
 	auto accum = cap->GetAccumData();
+	for(int y=0; y<height; y++)
+	{
+		auto reply = m_transport->ReadReply();
+		auto data = explode(reply, ',');
+		vector<float> values;
+		float tmp;
+		for(auto num : data)
+		{
+			sscanf(num.c_str(), "%f", &tmp);
+			values.push_back(tmp);
+		}
+
+		//Validate width
+		if(values.size() < (size_t)width)
+		{
+			LogError("not enough data came back\n");
+			continue;
+		}
+
+		for(int x=0; x<width; x++)
+		{
+			//Rescale to generate hit count for eye test logic
+			//Also need to rearrange so that we get the render-friendly eye pattern scopehal wants
+			//(half a UI left and right of the center opening)
+			if(x <= halfwidth)
+				accum[y*width*2 + x + tqwidth] = values[x] * 1e15;
+			else
+				accum[y*width*2 + x + halfwidth] = values[x] * 1e15;
+		}
+	}
+
+
+	/*
 	for(int y=0; y<256; y++)
 	{
 		for(int x=0; x<128; x++)
@@ -707,11 +708,12 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 				accum[y*256 + x + 64] = ber * 1e15;
 		}
 	}
+	*/
 	cap->Normalize();
 	cap->IntegrateUIs(1);	//have to put something here, but we don't have the true count value
 
 	//Check against the eye pattern
-	auto rate = chan->GetMask().CalculateHitRate(
+	/*auto rate = chan->GetMask().CalculateHitRate(
 		cap,
 		256,
 		256,
@@ -719,10 +721,9 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 		256.0 / (2*cap->m_uiWidth),
 		-cap->m_uiWidth);
 	GetChannel(i)->SetScalarValue(BERTInputChannel::STREAM_MASKHITRATE, rate);
-	cap->SetMaskHitRate(rate);
+	cap->SetMaskHitRate(rate);*/
 
 	cap->MarkModifiedFromCpu();
-	*/
 }
 
 bool AntikernelLabsTriggerCrossbar::AcquireData()
