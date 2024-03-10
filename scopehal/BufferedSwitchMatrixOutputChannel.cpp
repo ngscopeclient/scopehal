@@ -28,32 +28,45 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
+#include "BufferedSwitchMatrixOutputChannel.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DigitalOutputChannel::DigitalOutputChannel(
+BufferedSwitchMatrixOutputChannel::BufferedSwitchMatrixOutputChannel(
 	const string& hwname,
 	Instrument* parent,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
-	, m_parent(parent)
+	: DigitalOutputChannel(hwname, parent, color, index)
 {
-	ClearStreams();
-	CreateInput("odata");
 }
 
-DigitalOutputChannel::~DigitalOutputChannel()
+BufferedSwitchMatrixOutputChannel::~BufferedSwitchMatrixOutputChannel()
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vertical scaling and stream management
 
-InstrumentChannel::PhysicalConnector DigitalOutputChannel::GetPhysicalConnector()
+bool BufferedSwitchMatrixOutputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	return CONNECTOR_SMA;
+	//Must be channel 0
+	if(i > 0)
+		return false;
+
+	//Digital input of same instrument? It's good
+	auto din = dynamic_cast<DigitalInputChannel*>(stream.m_channel);
+	if(din && (din->GetInstrument() == m_parent) )
+		return true;
+
+	//Nope, doesn't work
+	return false;
+}
+
+void BufferedSwitchMatrixOutputChannel::OnInputChanged(size_t i)
+{
+	LogDebug("input changed on switch matrix\n");
 }

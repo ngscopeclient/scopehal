@@ -21,7 +21,7 @@
 * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL *
 * THE AUTHORS BE HELD LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES        *
 * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR       *
-* BUSINESS INTERRUPTOutputN) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT *
+* BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT *
 * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE       *
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
@@ -31,7 +31,7 @@
 #define DigitalOutputChannel_h
 
 /**
-	@brief A digital output channel (GPOutput or similar)
+	@brief A digital output channel (GPIO or similar)
  */
 class DigitalOutputChannel : public InstrumentChannel
 {
@@ -39,6 +39,7 @@ public:
 
 	DigitalOutputChannel(
 		const std::string& hwname,
+		Instrument* parent,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
@@ -53,7 +54,7 @@ public:
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
 protected:
-	//todo instrument
+	Instrument* m_parent;
 };
 
 #endif

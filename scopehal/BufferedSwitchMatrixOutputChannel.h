@@ -21,39 +21,34 @@
 * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL *
 * THE AUTHORS BE HELD LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES        *
 * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR       *
-* BUSINESS INTERRUPTOutputN) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT *
+* BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT *
 * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE       *
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
+#ifndef BufferedSwitchMatrixOutputChannel_h
+#define BufferedSwitchMatrixOutputChannel_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-DigitalOutputChannel::DigitalOutputChannel(
-	const string& hwname,
-	Instrument* parent,
-	const string& color,
-	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
-	, m_parent(parent)
+/**
+	@brief An output channel of a buffered switch matrix
+ */
+class BufferedSwitchMatrixOutputChannel : public DigitalOutputChannel
 {
-	ClearStreams();
-	CreateInput("odata");
-}
+public:
 
-DigitalOutputChannel::~DigitalOutputChannel()
-{
-}
+	BufferedSwitchMatrixOutputChannel(
+		const std::string& hwname,
+		Instrument* parent,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Vertical scaling and stream management
+	virtual ~BufferedSwitchMatrixOutputChannel();
 
-InstrumentChannel::PhysicalConnector DigitalOutputChannel::GetPhysicalConnector()
-{
-	return CONNECTOR_SMA;
-}
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	virtual void OnInputChanged(size_t i) override;
+
+protected:
+};
+
+#endif

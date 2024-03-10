@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "AntikernelLabsTriggerCrossbar.h"
 #include "EyeWaveform.h"
+#include "BufferedSwitchMatrixOutputChannel.h"
 
 using namespace std;
 
@@ -50,6 +51,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	{
 		m_channels.push_back(new DigitalInputChannel(
 			string("IN") + to_string(i + m_triggerInChannelBase),
+			this,
 			"#808080",
 			m_channels.size()));
 	}
@@ -60,6 +62,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	{
 		m_channels.push_back(new DigitalIOChannel(
 			string("IO") + to_string(i + m_triggerBidirChannelBase),
+			//this,
 			"#808080",
 			m_channels.size()));
 	}
@@ -70,8 +73,9 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	m_triggerOutChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
 	{
-		m_channels.push_back(new DigitalInputChannel(
+		m_channels.push_back(new BufferedSwitchMatrixOutputChannel(
 			string("OUT") + to_string(i),
+			this,
 			"#808080",
 			m_channels.size()));
 	}
