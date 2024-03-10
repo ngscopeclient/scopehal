@@ -117,6 +117,30 @@ BERT::Pattern BERT::GetPatternOfName(string name)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scan depth
+
+bool BERT::HasConfigurableScanDepth()
+{
+	return false;
+}
+
+vector<int64_t> BERT::GetScanDepths([[maybe_unused]] size_t i)
+{
+	vector<int64_t> ret;
+	return ret;
+}
+
+int64_t BERT::GetScanDepth([[maybe_unused]] size_t i)
+{
+	return 0;
+}
+
+void BERT::SetScanDepth([[maybe_unused]] size_t i, [[maybe_unused]] int64_t depth)
+{
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
 void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
@@ -204,6 +228,13 @@ void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 			sampler["dy"] = dy;
 			sampler["ber"] = ichan->GetBERStream().GetScalarValue();
 			channelNode["sampler"] = sampler;
+
+			//Configurable scan depth
+			if(HasConfigurableScanDepth())
+			{
+				//TODO: list of depths?
+				channelNode["scanDepth"] = GetScanDepth(i);
+			}
 		}
 		else
 		{
@@ -274,6 +305,9 @@ void BERT::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable&
 
 			auto sampler = channelNode["sampler"];
 			SetBERSamplingPoint(i, sampler["dx"].as<int64_t>(), sampler["dy"].as<float>());
+
+			if(channelNode["scanDepth"])
+				SetScanDepth(i, channelNode["scanDepth"].as<int64_t>());
 		}
 		else if(ochan)
 		{

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -267,6 +267,31 @@ public:
 		@brief Get the sampling point for BER measurements
 	 */
 	virtual void GetBERSamplingPoint(size_t i, int64_t& dx, float& dy) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// RX integration depth control
+
+	/**
+		@brief Determines whether this instrument has configurable integration depth for eye / bathtub scans
+	 */
+	virtual bool HasConfigurableScanDepth();
+
+	/**
+		@brief Returns the list of integration depths for eye / bathtub scans.
+
+		Higher depths will give better resolution at low BER values, but increase scan time.
+	 */
+	virtual std::vector<int64_t> GetScanDepths(size_t i);
+
+	/**
+		@brief Get the configured scan depth for a channel
+	 */
+	virtual int64_t GetScanDepth(size_t i);
+
+	/**
+		@brief Set the configured scan depth for a channel
+	 */
+	virtual void SetScanDepth(size_t i, int64_t depth);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Reference clock control

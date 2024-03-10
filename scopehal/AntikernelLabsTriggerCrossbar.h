@@ -89,6 +89,10 @@ public:
 	virtual int64_t GetBERIntegrationLength() override;
 	virtual void SetBERSamplingPoint(size_t i, int64_t dx, float dy) override;
 	virtual void GetBERSamplingPoint(size_t i, int64_t& dx, float& dy) override;
+	virtual bool HasConfigurableScanDepth() override;
+	virtual std::vector<int64_t> GetScanDepths(size_t i) override;
+	virtual int64_t GetScanDepth(size_t i) override;
+	virtual void SetScanDepth(size_t i, int64_t depth) override;
 
 	//Reference clock output
 	virtual size_t GetRefclkOutMux() override;
@@ -113,14 +117,15 @@ protected:
 	size_t m_rxChannelBase;
 
 	//Cached settings
-	Pattern m_txPattern[4];
-	//Pattern m_rxPattern[4];
-	bool m_txInvert[4];
-	//bool m_rxInvert[4];
-	float m_txDrive[4];
-	bool m_txEnable[4];
-	float m_txPreCursor[4];
-	float m_txPostCursor[4];
+	Pattern m_txPattern[2];
+	//Pattern m_rxPattern[2];
+	bool m_txInvert[2];
+	//bool m_rxInvert[2];
+	float m_txDrive[2];
+	bool m_txEnable[2];
+	float m_txPreCursor[2];
+	float m_txPostCursor[2];
+	int64_t m_scanDepth[2];
 	/*
 	bool m_rxLock[4];
 	uint64_t m_txCustomPattern;

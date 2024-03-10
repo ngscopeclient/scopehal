@@ -143,6 +143,11 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 			this,
 			"#4040c0",
 			m_channels.size()));
+
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+			m_channels[m_rxChannelBase + i]->GetHwname() + ":PRESCALE?"));
+		m_scanDepth[i] = 1 << (17 + atoi(reply.c_str()));
+
 		/*
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
 		SetRxInvert(i+nchans, false);
@@ -570,6 +575,38 @@ bool AntikernelLabsTriggerCrossbar::GetRxCdrLockState(size_t i)
 	return true;
 }
 
+bool AntikernelLabsTriggerCrossbar::HasConfigurableScanDepth()
+{
+	return true;
+}
+
+vector<int64_t> AntikernelLabsTriggerCrossbar::GetScanDepths([[maybe_unused]] size_t i)
+{
+	vector<int64_t> ret;
+	int64_t base = 131072;
+	for(int j=0; j<12; j++)
+		ret.push_back(base * (1 << j));
+	return ret;
+}
+
+int64_t AntikernelLabsTriggerCrossbar::GetScanDepth(size_t i)
+{
+	if(i < m_rxChannelBase)
+		return 0;
+	return m_scanDepth[i - m_rxChannelBase];
+}
+
+void AntikernelLabsTriggerCrossbar::SetScanDepth(size_t i, int64_t depth)
+{
+	if(i < m_rxChannelBase)
+		return;
+
+	int logdepth = log2(depth);
+
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PRESCALE " + to_string(logdepth - 17));
+	m_scanDepth[i - m_rxChannelBase] = depth;
+}
+
 void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 {
 	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":HBATHTUB?");
@@ -613,7 +650,6 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 	cap->m_timescale = stepsize;
 	cap->m_triggerPhase = -stepsize * halfwidth;
 	cap->clear();
-	LogDebug("period = %s\n", Unit(Unit::UNIT_FS).PrettyPrint(period).c_str());
 
 	//Copy the samples
 	for(ssize_t j=0; j<width; j++)
