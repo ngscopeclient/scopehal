@@ -27,55 +27,28 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "BufferedSwitchMatrixOutputChannel.h"
+#ifndef BufferedSwitchMatrixIOChannel_h
+#define BufferedSwitchMatrixIOChannel_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-BufferedSwitchMatrixOutputChannel::BufferedSwitchMatrixOutputChannel(
-	const string& hwname,
-	SwitchMatrix* parent,
-	const string& color,
-	size_t index)
-	: DigitalOutputChannel(hwname, parent, color, index)
+/**
+	@brief An output channel of a buffered switch matrix
+ */
+class BufferedSwitchMatrixIOChannel : public DigitalIOChannel
 {
-}
+public:
 
-BufferedSwitchMatrixOutputChannel::~BufferedSwitchMatrixOutputChannel()
-{
-}
+	BufferedSwitchMatrixIOChannel(
+		const std::string& hwname,
+		SwitchMatrix* parent,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Vertical scaling and stream management
+	virtual ~BufferedSwitchMatrixIOChannel();
 
-bool BufferedSwitchMatrixOutputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//Must be channel 0
-	if(i > 0)
-		return false;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	virtual void OnInputChanged(size_t i) override;
 
-	//Digital input of same instrument? It's good
-	auto din = dynamic_cast<DigitalInputChannel*>(stream.m_channel);
-	if(din && (din->GetInstrument() == m_parent) )
-		return true;
+protected:
+};
 
-	//Nope, doesn't work
-	return false;
-}
-
-void BufferedSwitchMatrixOutputChannel::OnInputChanged(size_t i)
-{
-	//no null check needed because constructor takes a SwitchMatrix*
-	//but the base class variable is an Instrument*
-	auto parent = dynamic_cast<SwitchMatrix*>(m_parent);
-
-	//get the input channel and set the path appropriately
-	auto din = dynamic_cast<DigitalInputChannel*>(GetInput(i).m_channel);
-	if(!din)
-		parent->SetMuxPathOpen(GetIndex());
-	else
-		parent->SetMuxPath(GetIndex(), din->GetIndex());
-}
+#endif

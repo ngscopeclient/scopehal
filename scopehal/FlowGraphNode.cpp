@@ -166,9 +166,12 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 		if(stream == m_inputs[i])
 			return;
 
-		if(stream.m_channel == NULL)	//NULL is always legal
+		if(stream.m_channel == nullptr)	//NULL is always legal
 		{
-			m_inputs[i] = StreamDescriptor(NULL, 0);
+			m_inputs[i] = StreamDescriptor(nullptr, 0);
+
+			//Notify the derived class in case it wants to do anything
+			OnInputChanged(i);
 			return;
 		}
 
@@ -178,7 +181,10 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 			if(!ValidateChannel(i, stream))
 			{
 				LogError("Invalid channel for input %zu of node\n", i);
-				m_inputs[i] = StreamDescriptor(NULL, 0);
+				m_inputs[i] = StreamDescriptor(nullptr, 0);
+
+				//Notify the derived class in case it wants to do anything
+				OnInputChanged(i);
 				return;
 			}
 		}

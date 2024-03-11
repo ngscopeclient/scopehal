@@ -28,30 +28,30 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "BufferedSwitchMatrixOutputChannel.h"
+#include "BufferedSwitchMatrixIOChannel.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-BufferedSwitchMatrixOutputChannel::BufferedSwitchMatrixOutputChannel(
+BufferedSwitchMatrixIOChannel::BufferedSwitchMatrixIOChannel(
 	const string& hwname,
 	SwitchMatrix* parent,
 	const string& color,
 	size_t index)
-	: DigitalOutputChannel(hwname, parent, color, index)
+	: DigitalIOChannel(hwname, parent, color, index)
 {
 }
 
-BufferedSwitchMatrixOutputChannel::~BufferedSwitchMatrixOutputChannel()
+BufferedSwitchMatrixIOChannel::~BufferedSwitchMatrixIOChannel()
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vertical scaling and stream management
 
-bool BufferedSwitchMatrixOutputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+bool BufferedSwitchMatrixIOChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	//Must be channel 0
 	if(i > 0)
@@ -66,7 +66,7 @@ bool BufferedSwitchMatrixOutputChannel::ValidateChannel(size_t i, StreamDescript
 	return false;
 }
 
-void BufferedSwitchMatrixOutputChannel::OnInputChanged(size_t i)
+void BufferedSwitchMatrixIOChannel::OnInputChanged(size_t i)
 {
 	//no null check needed because constructor takes a SwitchMatrix*
 	//but the base class variable is an Instrument*

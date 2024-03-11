@@ -28,130 +28,33 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "PowerSupply.h"
+#include "SwitchMatrix.h"
 
 using namespace std;
 
-PowerSupply::PowerSupply()
+SwitchMatrix::SwitchMatrix()
 {
-	m_serializers.push_back(sigc::mem_fun(*this, &PowerSupply::DoSerializeConfiguration));
-	m_loaders.push_back(sigc::mem_fun(*this, &PowerSupply::DoLoadConfiguration));
-	m_preloaders.push_back(sigc::mem_fun(*this, &PowerSupply::DoPreLoadConfiguration));
+	m_serializers.push_back(sigc::mem_fun(*this, &SwitchMatrix::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(*this, &SwitchMatrix::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(*this, &SwitchMatrix::DoPreLoadConfiguration));
 }
 
-PowerSupply::~PowerSupply()
-{
-}
-
-
-unsigned int PowerSupply::GetInstrumentTypes() const
-{
-	return INST_PSU;
-}
-
-bool PowerSupply::SupportsSoftStart()
-{
-	return false;
-}
-
-bool PowerSupply::SupportsIndividualOutputSwitching()
-{
-	return false;
-}
-
-bool PowerSupply::SupportsMasterOutputSwitching()
-{
-	return false;
-}
-
-bool PowerSupply::SupportsOvercurrentShutdown()
-{
-	return false;
-}
-
-bool PowerSupply::SupportsVoltageCurrentControl(int /*chan*/)
-{
-	return true;
-}
-
-bool PowerSupply::GetPowerChannelActive(int /*chan*/)
-{
-	return true;
-}
-
-//Configuration
-bool PowerSupply::GetPowerOvercurrentShutdownEnabled(int /*chan*/)
-{
-	return false;
-}
-
-void PowerSupply::SetPowerOvercurrentShutdownEnabled(int /*chan*/, bool /*enable*/)
+SwitchMatrix::~SwitchMatrix()
 {
 }
 
-bool PowerSupply::GetPowerOvercurrentShutdownTripped(int /*chan*/)
+
+unsigned int SwitchMatrix::GetInstrumentTypes() const
 {
-	return false;
-}
-
-void PowerSupply::SetPowerChannelActive(int /*chan*/, bool /*on*/)
-{
-}
-
-bool PowerSupply::GetMasterPowerEnable()
-{
-	return true;
-}
-
-void PowerSupply::SetMasterPowerEnable(bool /*enable*/)
-{
-}
-
-//Soft start
-bool PowerSupply::IsSoftStartEnabled(int /*chan*/)
-{
-	return false;
-}
-
-void PowerSupply::SetSoftStartEnabled(int /*chan*/, bool /*enable*/)
-{
-}
-
-int64_t PowerSupply::GetSoftStartRampTime(int /*chan*/)
-{
-	return 0;
-}
-
-void PowerSupply::SetSoftStartRampTime(int /*chan*/, int64_t /*time*/)
-{
-
-}
-
-/**
-	@brief Pulls data from hardware and updates our measurements
- */
-bool PowerSupply::AcquireData()
-{
-	for(size_t i=0; i<m_channels.size(); i++)
-	{
-		auto pchan = dynamic_cast<PowerSupplyChannel*>(m_channels[i]);
-		if(!pchan)
-			continue;
-
-		pchan->SetScalarValue(PowerSupplyChannel::STREAM_VOLTAGE_MEASURED, GetPowerVoltageActual(i));
-		pchan->SetScalarValue(PowerSupplyChannel::STREAM_VOLTAGE_SET_POINT, GetPowerVoltageNominal(i));
-		pchan->SetScalarValue(PowerSupplyChannel::STREAM_CURRENT_MEASURED, GetPowerCurrentActual(i));
-		pchan->SetScalarValue(PowerSupplyChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
-	}
-
-	return true;
+	return INST_SWITCH_MATRIX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+void SwitchMatrix::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
+	/*
 	//Global capabilities/status
 	//(This info is only used if we're loading offline)
 	YAML::Node caps;
@@ -171,7 +74,7 @@ void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
 			continue;
 
-		auto chan = dynamic_cast<PowerSupplyChannel*>(GetChannel(i));
+		auto chan = dynamic_cast<SwitchMatrixChannel*>(GetChannel(i));
 
 		//Save basic info
 		auto key = "ch" + to_string(i);
@@ -203,14 +106,16 @@ void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 
 		node["channels"][key] = channelNode;
 	}
+	*/
 }
 
-void PowerSupply::DoPreLoadConfiguration(
+void SwitchMatrix::DoPreLoadConfiguration(
 	int /*version*/,
 	const YAML::Node& node,
 	IDTable& idmap,
 	ConfigWarningList& list)
 {
+	/*
 	Unit volts(Unit::UNIT_VOLTS);
 	Unit amps(Unit::UNIT_AMPS);
 
@@ -228,7 +133,7 @@ void PowerSupply::DoPreLoadConfiguration(
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
 			continue;
 
-		auto chan = dynamic_cast<PowerSupplyChannel*>(GetChannel(i));
+		auto chan = dynamic_cast<SwitchMatrixChannel*>(GetChannel(i));
 
 		//Save basic info
 		auto key = "ch" + to_string(i);
@@ -292,10 +197,12 @@ void PowerSupply::DoPreLoadConfiguration(
 				chan->GetDisplayName(), "Turning power on", "off", "on"));
 		}
 	}
+	*/
 }
 
-void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+void SwitchMatrix::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
 {
+	/*
 	//Master enable (if present)
 	if(SupportsMasterOutputSwitching())
 		SetMasterPowerEnable(node["globalSwitch"].as<bool>());
@@ -306,7 +213,7 @@ void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, I
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
 			continue;
 
-		//auto chan = dynamic_cast<PowerSupplyChannel*>(GetChannel(i));
+		//auto chan = dynamic_cast<SwitchMatrixChannel*>(GetChannel(i));
 
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
@@ -342,4 +249,5 @@ void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, I
 		if(en != GetPowerChannelActive(i))
 			SetPowerChannelActive(i, en);
 	}
+	*/
 }

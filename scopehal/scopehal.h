@@ -156,6 +156,7 @@ extern size_t g_maxComputeGroupCount[3];
 #include "SCPISDR.h"
 #include "SCPISpectrometer.h"
 #include "SCPIVNA.h"
+#include "SwitchMatrix.h"
 
 #include "SParameters.h"
 #include "TouchstoneParser.h"

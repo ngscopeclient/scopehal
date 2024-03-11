@@ -113,6 +113,7 @@ set(SCOPEHAL_SOURCES
 	BERT.cpp
 	BERTInputChannel.cpp
 	BERTOutputChannel.cpp
+	BufferedSwitchMatrixIOChannel.cpp
 	BufferedSwitchMatrixOutputChannel.cpp
 	CANChannel.cpp
 	DigitalIOChannel.cpp
@@ -144,6 +145,7 @@ set(SCOPEHAL_SOURCES
 	SCPIVNA.cpp
 	SocketCANAnalyzer.cpp
 	SpectrometerDarkFrameChannel.cpp
+	SwitchMatrix.cpp
 	RemoteBridgeOscilloscope.cpp
 
 	AgilentOscilloscope.cpp

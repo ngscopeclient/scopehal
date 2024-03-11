@@ -39,6 +39,7 @@ public:
 
 	DigitalIOChannel(
 		const std::string& hwname,
+		Instrument* parent,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
@@ -52,8 +53,11 @@ public:
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
+	Instrument* GetInstrument()
+	{ return m_parent; }
+
 protected:
-	//todo instrument
+	Instrument* m_parent;
 };
 
 #endif

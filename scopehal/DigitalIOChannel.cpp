@@ -36,9 +36,11 @@ using namespace std;
 
 DigitalIOChannel::DigitalIOChannel(
 	const string& hwname,
+	Instrument* parent,
 	const string& color,
 	size_t index)
 	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
+	, m_parent(parent)
 {
 	ClearStreams();
 

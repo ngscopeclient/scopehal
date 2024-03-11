@@ -27,107 +27,31 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef PowerSupply_h
-#define PowerSupply_h
+#ifndef SwitchMatrix_h
+#define SwitchMatrix_h
 
 /**
 	@brief A generic power supply
  */
-class PowerSupply : public virtual Instrument
+class SwitchMatrix : public virtual Instrument
 {
 public:
-	PowerSupply();
-	virtual ~PowerSupply();
+	SwitchMatrix();
+	virtual ~SwitchMatrix();
 
 	virtual unsigned int GetInstrumentTypes() const override;
 
-	//Device capabilities
 	/**
-		@brief Determines if the power supply supports soft start
-
-		If this function returns false, IsSoftStartEnabled() will always return false,
-		and SetSoftStartEnabled() is a no-op.
+		@brief Sets the mux selector for an output channel
 	 */
-	virtual bool SupportsSoftStart();
+	virtual void SetMuxPath(size_t dstchan, size_t srcchan) =0;
 
 	/**
-		@brief Determines if the power supply supports switching individual output channels
+		@brief Removes a mux path for an output channel
 
-		If this function returns false, GetPowerChannelActive() will always return true,
-		and SetPowerChannelActive() is a no-op.
+		Not all switch matrices or ports support this feature.
 	 */
-	virtual bool SupportsIndividualOutputSwitching();
-
-	/**
-		@brief Determines if the power supply supports ganged master switching of all outputs
-
-		If this function returns false, GetMasterPowerEnable() will always return true,
-		and SetMasterPowerEnable() is a no-op.
-	 */
-	virtual bool SupportsMasterOutputSwitching();
-
-	/**
-		@brief Determines if the power supply supports shutdown rather than constant-current mode on overcurrent
-
-		If this function returns false, GetPowerOvercurrentShutdownEnabled() and GetPowerOvercurrentShutdownTripped() will always return false,
-		and SetPowerOvercurrentShutdownEnabled() is a no-op.
-	 */
-	virtual bool SupportsOvercurrentShutdown();
-
-	/**
-		@brief Determines if the power supply supports voltage/current control for the given channel.
-
-		If this function returns false, GetPowerVoltage* and GetPowerCurrent* will always return zero,
-		and SetPowerCurrent*, and SetPowerVoltage* are no-ops.
-	 */
-	virtual bool SupportsVoltageCurrentControl(int chan);
-
-	virtual bool AcquireData() override;
-
-	//Read sensors
-	virtual double GetPowerVoltageActual(int chan) =0;				//actual voltage after current limiting
-	virtual double GetPowerVoltageNominal(int chan) =0;				//set point
-	virtual double GetPowerCurrentActual(int chan) =0;				//actual current drawn by the load
-	virtual double GetPowerCurrentNominal(int chan) =0;				//current limit
-	virtual bool GetPowerChannelActive(int chan);
-
-	//Configuration
-	virtual bool GetPowerOvercurrentShutdownEnabled(int chan);	//shut channel off entirely on overload,
-																//rather than current limiting
-	virtual void SetPowerOvercurrentShutdownEnabled(int chan, bool enable);
-	virtual bool GetPowerOvercurrentShutdownTripped(int chan);
-	virtual void SetPowerVoltage(int chan, double volts) =0;
-	virtual void SetPowerCurrent(int chan, double amps) =0;
-	virtual void SetPowerChannelActive(int chan, bool on);
-
-	virtual bool IsPowerConstantCurrent(int chan) =0;				//true = CC, false = CV
-
-	virtual bool GetMasterPowerEnable();
-	virtual void SetMasterPowerEnable(bool enable);
-
-	//Soft start
-	virtual bool IsSoftStartEnabled(int chan);
-	virtual void SetSoftStartEnabled(int chan, bool enable);
-
-	/**
-		@brief Gets the ramp time for use with soft-start mode
-
-		@param chan	Channel index
-
-		@return	Ramp time, in femtoseconds
-	 */
-	virtual int64_t GetSoftStartRampTime(int chan);
-
-	/**
-		@brief Sets the ramp time for use with soft-start mode
-
-		@param chan	Channel index
-		@param time	Ramp time, in femtoseconds
-	 */
-	virtual void SetSoftStartRampTime(int chan, int64_t time);
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Serialization
+	virtual void SetMuxPathOpen(size_t dstchan) =0;
 
 protected:
 	/**

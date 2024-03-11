@@ -31,6 +31,7 @@
 #include "AntikernelLabsTriggerCrossbar.h"
 #include "EyeWaveform.h"
 #include "BufferedSwitchMatrixOutputChannel.h"
+#include "BufferedSwitchMatrixIOChannel.h"
 
 using namespace std;
 
@@ -40,6 +41,7 @@ using namespace std;
 AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
+	, m_loadInProgress(true)
 {
 	//TODO: query data rate from instrument
 	//TODO: date rate needs to be a per channel setting, not global: have to extend the API for this
@@ -52,7 +54,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		m_channels.push_back(new DigitalInputChannel(
 			string("IN") + to_string(i + m_triggerInChannelBase),
 			this,
-			"#808080",
+			"#ffff00",	//yellow
 			m_channels.size()));
 	}
 
@@ -60,15 +62,15 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	m_triggerBidirChannelBase = m_channels.size();
 	for(size_t i=0; i<4; i++)
 	{
-		m_channels.push_back(new DigitalIOChannel(
+		m_channels.push_back(new BufferedSwitchMatrixIOChannel(
 			string("IO") + to_string(i + m_triggerBidirChannelBase),
-			//this,
-			"#808080",
+			this,
+			"#ff6abc",	//pink
 			m_channels.size()));
 	}
 
 	//Output-only channels
-	//TODO: 0-3 are unbuffered, 4-7 are buffered
+	//TODO: 0-3 are unbuffered, 4-7 are buffered, we need to note this somewhere
 	//For now we just want to reserve spaces in the channel list
 	m_triggerOutChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
@@ -76,7 +78,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		m_channels.push_back(new BufferedSwitchMatrixOutputChannel(
 			string("OUT") + to_string(i),
 			this,
-			"#808080",
+			"#00ffff",	//cyan
 			m_channels.size()));
 	}
 
@@ -91,7 +93,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		m_channels.push_back(new BERTOutputChannel(
 			hwname,
 			this,
-			"#808080",
+			"#808080",	//gray
 			m_channels.size()));
 
 		//Read existing config once, then cache
@@ -145,7 +147,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		m_channels.push_back(new BERTInputChannel(
 			hwname,
 			this,
-			"#4040c0",
+			"#4040c0",	//blue-purple
 			m_channels.size()));
 
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
@@ -165,6 +167,39 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 
 	//Default integration is 10M UIs
 	//SetBERIntegrationLength(1e7);
+
+	//Load existing mux config for output ports
+	for(int i=0; i<8; i++)
+	{
+		//Get the existing mux selector
+		auto hwname = string("OUT") + to_string(i);
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":MUX?"));
+		auto muxsel = stoi(reply);
+
+		//Set up the path
+		m_channels[m_triggerOutChannelBase + i]->SetInput(
+			0, StreamDescriptor(m_channels[m_triggerInChannelBase + muxsel]));
+	}
+
+	//Load existing mux config for bidir ports
+	for(int i=0; i<4; i++)
+	{
+		//Get the direction
+		auto hwname = string("IO") + to_string(i + 8);
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":DIR?"));
+		if(reply == "IN")
+			continue;
+
+		//Get the existing mux selector
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":MUX?"));
+		auto muxsel = stoi(reply);
+
+		//Set up the path
+		m_channels[m_triggerBidirChannelBase + i]->SetInput(
+			0, StreamDescriptor(m_channels[m_triggerInChannelBase + muxsel]));
+	}
+
+	m_loadInProgress = false;
 }
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
@@ -175,16 +210,43 @@ AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Instrument config
 
+void AntikernelLabsTriggerCrossbar::SetMuxPath(size_t dstchan, size_t srcchan)
+{
+	LogTrace("SetMuxPathOpen %zu %zu\n", dstchan, srcchan);
+
+	if(m_loadInProgress)
+		return;
+
+	m_transport->SendCommandQueued(
+		m_channels[dstchan]->GetHwname() + ":MUX " + to_string(srcchan - m_triggerInChannelBase));
+
+	//If the destination channel is a bidirectional port, make it an output
+	if( (dstchan >= m_triggerBidirChannelBase) && (dstchan < m_triggerOutChannelBase) )
+		m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":DIR OUT");
+}
+
+void AntikernelLabsTriggerCrossbar::SetMuxPathOpen(size_t dstchan)
+{
+	LogTrace("SetMuxPathOpen %zu\n", dstchan);
+
+	if( (dstchan >= m_triggerBidirChannelBase) && (dstchan < m_triggerOutChannelBase) )
+		m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":DIR IN");
+}
+
 string AntikernelLabsTriggerCrossbar::GetDriverNameInternal()
 {
 	return "akl.crossbar";
 }
 
+unsigned int AntikernelLabsTriggerCrossbar::GetInstrumentTypes() const
+{
+	return INST_SWITCH_MATRIX | INST_BERT;
+}
+
 uint32_t AntikernelLabsTriggerCrossbar::GetInstrumentTypesForChannel(size_t i) const
 {
-	//TODO: trigger types
 	if(i < m_txChannelBase)
-		return 0;
+		return INST_SWITCH_MATRIX;
 	else
 		return INST_BERT;
 }

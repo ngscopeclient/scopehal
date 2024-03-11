@@ -36,6 +36,7 @@
 class AntikernelLabsTriggerCrossbar
 	: public virtual SCPIBERT
 	, public virtual SCPIDevice
+	, public virtual SwitchMatrix
 {
 public:
 	AntikernelLabsTriggerCrossbar(SCPITransport* transport);
@@ -44,6 +45,7 @@ public:
 	virtual bool AcquireData() override;
 
 	//Device information
+	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//TX pattern generator configuration
@@ -108,6 +110,10 @@ public:
 	virtual void SetUseExternalRefclk(bool external) override;
 	virtual bool GetUseExternalRefclk() override;
 
+	//Switch matrix
+	virtual void SetMuxPath(size_t dstchan, size_t srcchan) override;
+	virtual void SetMuxPathOpen(size_t dstchan) override;
+
 protected:
 
 	size_t m_triggerInChannelBase;
@@ -151,6 +157,13 @@ protected:
 	};
 	*/
 	uint64_t m_dataRate;
+
+	/**
+		@brief True if in a constructor or similar initialization path (getting hardware state)
+
+		This prevents filter graph changes from being pushed to hardware if we've just pulled the same path.
+	 */
+	bool m_loadInProgress;
 
 public:
 	static std::string GetDriverNameInternal();

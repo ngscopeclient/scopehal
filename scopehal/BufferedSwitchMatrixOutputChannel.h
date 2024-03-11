@@ -39,7 +39,7 @@ public:
 
 	BufferedSwitchMatrixOutputChannel(
 		const std::string& hwname,
-		Instrument* parent,
+		SwitchMatrix* parent,
 		const std::string& color = "#808080",
 		size_t index = 0);
 

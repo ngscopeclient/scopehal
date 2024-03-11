@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -74,28 +74,31 @@ public:
 	enum InstrumentTypes
 	{
 		//An oscilloscope or logic analyzer
-		INST_OSCILLOSCOPE 		= 0x01,
+		INST_OSCILLOSCOPE 		=  0x01,
 
 		//A multimeter (query to see what measurements it supports)
-		INST_DMM 				= 0x02,
+		INST_DMM 				=  0x02,
 
 		//A power supply
-		INST_PSU				= 0x04,
+		INST_PSU				=  0x04,
 
 		//A function generator
-		INST_FUNCTION			= 0x08,
+		INST_FUNCTION			=  0x08,
 
 		//An RF signal generator
-		INST_RF_GEN				= 0x10,
+		INST_RF_GEN				=  0x10,
 
 		//An electronic load
-		INST_LOAD				= 0x20,
+		INST_LOAD				=  0x20,
 
 		//A bit error rate tester
-		INST_BERT				= 0x40,
+		INST_BERT				=  0x40,
 
 		//A miscellaneous instrument that doesn't fit any other category
-		INST_MISC				= 0x80
+		INST_MISC				=  0x80,
+
+		//A switch matrix
+		INST_SWITCH_MATRIX		= 0x100
 	};
 
 	/**
