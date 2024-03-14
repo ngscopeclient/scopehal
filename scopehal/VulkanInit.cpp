@@ -270,7 +270,9 @@ bool VulkanInit(bool skipGLFW)
 			auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
 			if(glfwExtensions == nullptr)
 			{
-				LogError("glfwGetRequiredInstanceExtensions failed\n");
+				const char* err = nullptr;
+				auto code = glfwGetError(&err);
+				LogError("glfwGetRequiredInstanceExtensions failed, code %d (%s)\n", code, err);
 				return false;
 			}
 			LogDebug("GLFW required extensions:\n");
