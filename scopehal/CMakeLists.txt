@@ -204,7 +204,7 @@ set(SCOPEHAL_SOURCES
 	QueueManager.cpp
 	)
 
-if(LINUX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	list(APPEND SCOPEHAL_SOURCES
 		# TMC is only supported on Linux for now.
 		# https://github.com/glscopeclient/scopehal/issues/519
