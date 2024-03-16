@@ -297,6 +297,16 @@ public:
 	// Reference clock control
 
 	/**
+		@brief Returns true if this instrument has a reference clock input port
+	 */
+	virtual bool HasRefclkIn() =0;
+
+	/**
+		@brief Returns true if this instrument has a reference clock output port
+	 */
+	virtual bool HasRefclkOut() =0;
+
+	/**
 		@brief Gets the currently selected reference clock output mux setting
 	 */
 	virtual size_t GetRefclkOutMux() =0;

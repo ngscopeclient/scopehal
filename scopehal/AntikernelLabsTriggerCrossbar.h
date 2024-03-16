@@ -109,6 +109,8 @@ public:
 	virtual std::vector<int64_t> GetAvailableDataRates() override;
 	virtual void SetUseExternalRefclk(bool external) override;
 	virtual bool GetUseExternalRefclk() override;
+	virtual bool HasRefclkIn() override;
+	virtual bool HasRefclkOut() override;
 
 	//Switch matrix
 	virtual void SetMuxPath(size_t dstchan, size_t srcchan) override;

@@ -533,6 +533,16 @@ void AntikernelLabsTriggerCrossbar::SetTxPostCursor(size_t i, float postcursor)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reference clock output: not present
 
+bool AntikernelLabsTriggerCrossbar::HasRefclkIn()
+{
+	return false;
+}
+
+bool AntikernelLabsTriggerCrossbar::HasRefclkOut()
+{
+	return false;
+}
+
 size_t AntikernelLabsTriggerCrossbar::GetRefclkOutMux()
 {
 	return 0;
