@@ -129,7 +129,7 @@ protected:
 	Pattern m_txPattern[2];
 	//Pattern m_rxPattern[2];
 	bool m_txInvert[2];
-	//bool m_rxInvert[2];
+	bool m_rxInvert[2];
 	float m_txDrive[2];
 	bool m_txEnable[2];
 	float m_txPreCursor[2];
@@ -138,29 +138,14 @@ protected:
 	/*
 	bool m_rxLock[4];
 	uint64_t m_txCustomPattern;
-	size_t m_refclkOutMux;
 	size_t m_rxCtleGainSteps[4];
 	int64_t m_integrationLength;
 	int64_t m_sampleX[4];
 	float m_sampleY[4];
-	bool m_useExternalRefclk;
-
-	enum RefclkMuxSelectors
-	{
-		RX0_DIV8,
-		RX0_DIV16,
-		RX1_DIV8,
-		RX1_DIV16,
-		RX2_DIV8,
-		RX2_DIV16,
-		RX3_DIV8,
-		RX3_DIV16,
-		LO_DIV32_OR_80,	//div32 in low rate, div80 in high rate
-		SERDES
-	};
 	*/
 	uint64_t m_txDataRate[2];
 	uint64_t m_rxDataRate[2];
+	int64_t m_rxClkDiv[2];
 
 	/**
 		@brief True if in a constructor or similar initialization path (getting hardware state)

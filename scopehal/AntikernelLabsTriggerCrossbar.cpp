@@ -160,16 +160,30 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 			"#4040c0",	//blue-purple
 			m_channels.size()));
 
+		//BER prescaler
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
 			m_channels[m_rxChannelBase + i]->GetHwname() + ":PRESCALE?"));
 		m_scanDepth[i] = 1 << (17 + atoi(reply.c_str()));
 
-		//TODO: actually support rx data rates etc
-		m_rxDataRate[i] = 10312500000LL;
+		//Inversion
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":INVERT?"));
+		m_rxInvert[i] = (atoi(reply.c_str()) == 1);
+
+		//Same as for TX, can we abstract this better?
+		int64_t pllLineRate = 10312500000LL;
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":CLKSEL?"));
+		if(reply == "CPLL")
+			pllLineRate = 5000000000LL;
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":CLKDIV?"));
+		auto clkdiv = stoi(reply);
+		if(clkdiv <= 0)		//0 means use OUT_DIV attribute, which is also set to 1 in the gateware
+			clkdiv = 1;
+		m_rxClkDiv[i] = clkdiv;
+		int64_t realClkDiv = 1 << (clkdiv - 1);
+		m_rxDataRate[i] = pllLineRate / realClkDiv;
 
 		/*
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
-		SetRxInvert(i+nchans, false);
 		SetRxCTLEGainStep(i+nchans, 4);
 		SetBERSamplingPoint(i+nchans, 0, 0);
 		*/
@@ -628,10 +642,10 @@ bool AntikernelLabsTriggerCrossbar::IsDataRatePerChannel()
 
 int64_t AntikernelLabsTriggerCrossbar::GetDataRate(size_t i)
 {
-	if(i >= m_txChannelBase)
-		return m_txDataRate[i - m_txChannelBase];
-	else if(i >= m_rxChannelBase)
+	if(i >= m_rxChannelBase)
 		return m_rxDataRate[i - m_rxChannelBase];
+	else if(i >= m_txChannelBase)
+		return m_txDataRate[i - m_txChannelBase];
 
 	//not a bert channel
 	return 0;
@@ -647,6 +661,10 @@ void AntikernelLabsTriggerCrossbar::SetDataRate(size_t i, int64_t rate)
 		return;
 	auto nrow = it - rates.begin();
 	bool qpll = ((nrow & 1) == 1);
+
+	//but last row is also QPLL
+	if(nrow == 8)
+		qpll = 1;
 
 	//Lowest numbered rows are highest divsors
 	size_t ndiv;
@@ -669,10 +687,13 @@ void AntikernelLabsTriggerCrossbar::SetDataRate(size_t i, int64_t rate)
 	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":CLKDIV " + to_string(ndiv));
 
 	//Update cache
-	if(i >= m_txChannelBase)
-		m_txDataRate[i - m_txChannelBase] = rate;
-	else if(i >= m_rxChannelBase)
+	if(i >= m_rxChannelBase)
+	{
 		m_rxDataRate[i - m_rxChannelBase] = rate;
+		m_rxClkDiv[i - m_rxChannelBase] = ndiv;
+	}
+	else if(i >= m_txChannelBase)
+		m_txDataRate[i - m_txChannelBase] = rate;
 }
 
 vector<int64_t> AntikernelLabsTriggerCrossbar::GetAvailableDataRates()
@@ -763,9 +784,10 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 		values.push_back(tmp);
 	}
 
-	//TODO: this is rate dependent, 65 is correct for full-rate but subrate has more
-	ssize_t width		= 65;
-	ssize_t halfwidth	= (width-1)/2;
+	//Sub-rate modes double the width of the eye for each halving of data rate
+	//since PLL step size is constant
+	ssize_t halfwidth = 16 << m_rxClkDiv[i - m_rxChannelBase];
+	ssize_t width = 2*halfwidth + 1;
 	if(values.size() < (size_t)width)
 	{
 		LogError("not enough data came back (got %zu values expected %zu)\n", values.size(), width);
@@ -807,11 +829,14 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 	auto rate = GetDataRate(i);
 	auto period = round(FS_PER_SECOND / rate);
 
+	//Sub-rate modes double the width of the eye for each halving of data rate
+	//since PLL step size is constant
+	int32_t halfwidth = 16 << m_rxClkDiv[i - m_rxChannelBase];
+
 	//For now, expect -32 to +32 (65 values)
 	//Sub-rate modes have more
 	int32_t height = 64;
-	int32_t width = 65;
-	int32_t halfwidth = (width-1)/2;
+	int32_t width = 2*halfwidth + 1;
 	int32_t tqwidth = halfwidth + width;
 
 	//Create the output waveform
@@ -863,25 +888,6 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 		}
 	}
 
-
-	/*
-	for(int y=0; y<256; y++)
-	{
-		for(int x=0; x<128; x++)
-		{
-			//Sample order coming off the BERT is right to left in X axis, then scanning bottom to top in Y
-			double ber = values[y*128 + (127-x) + 2];
-
-			//Rescale to generate fake hit count
-			//Also need to rearrange so that we get the render-friendly eye pattern scopehal wants
-			//(half a UI left and right of the center opening)
-			if(x < 64)
-				accum[y*256 + x + 192] = ber * 1e15;
-			else
-				accum[y*256 + x + 64] = ber * 1e15;
-		}
-	}
-	*/
 	cap->Normalize();
 	cap->IntegrateUIs(1);	//have to put something here, but we don't have the true count value
 

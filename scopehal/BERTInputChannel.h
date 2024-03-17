@@ -83,9 +83,6 @@ public:
 	void SetScanDepth(int64_t depth)
 	{ m_bert->SetScanDepth(GetIndex(), depth); }
 
-	int64_t GetDataRate()
-	{ return m_bert->GetDataRate(GetIndex()); }
-
 	enum StreamIDs
 	{
 		STREAM_HBATHTUB		= 0,
@@ -120,6 +117,12 @@ public:
 
 	void GetBERSamplingPoint(int64_t& dx, float& dy)
 	{ m_bert->GetBERSamplingPoint(GetIndex(), dx, dy); }
+
+	int64_t GetDataRate()
+	{ return m_bert->GetDataRate(GetIndex()); }
+
+	void SetDataRate(int64_t rate)
+	{ m_bert->SetDataRate(GetIndex(), rate); }
 
 	std::string GetMaskFile()
 	{ return m_maskFile; }
