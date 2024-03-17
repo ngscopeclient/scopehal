@@ -100,7 +100,7 @@ public:
 	virtual bool HasRefclkOut() override;
 
 	//Timebase
-	virtual bool IsDataRatePerChannel();
+	virtual bool IsDataRatePerChannel() override;
 	virtual int64_t GetDataRate(size_t i) override;
 	virtual void SetDataRate(size_t i, int64_t rate) override;
 	virtual std::vector<int64_t> GetAvailableDataRates() override;
