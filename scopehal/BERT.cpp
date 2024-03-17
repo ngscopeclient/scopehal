@@ -183,7 +183,8 @@ void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	node["refclkInFreq"] = GetRefclkInFrequency();
 
 	YAML::Node timebase;
-	timebase["dataRate"] = GetDataRate();
+	if(!IsDataRatePerChannel())
+		timebase["dataRate"] = GetDataRate(0);
 	YAML::Node availableRates;
 	auto rates = GetAvailableDataRates();
 	for(auto r : rates)
@@ -203,6 +204,11 @@ void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 
 		auto ichan = dynamic_cast<BERTInputChannel*>(chan);
 		auto ochan = dynamic_cast<BERTOutputChannel*>(chan);
+
+		if(IsDataRatePerChannel())
+		{
+			//TODO: serialize data rate
+		}
 
 		if(ichan)
 		{
@@ -274,7 +280,9 @@ void BERT::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable&
 	SetRefclkOutMux(node["berIntegrationLength"].as<int>());
 	auto timebase = node["timebase"];
 	SetUseExternalRefclk(timebase["useExtRefclk"].as<bool>());
-	SetDataRate(timebase["dataRate"].as<int64_t>());
+
+	if(!IsDataRatePerChannel() && timebase["dataRate"])
+		SetDataRate(0, timebase["dataRate"].as<int64_t>());
 
 	//no channel data in the file? nothing to do
 	if(!node["channels"])
@@ -294,6 +302,11 @@ void BERT::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable&
 
 		auto ichan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
 		auto ochan = dynamic_cast<BERTOutputChannel*>(GetChannel(i));
+
+		if(IsDataRatePerChannel())
+		{
+			//TODO: deserialize data rate
+		}
 
 		if(ichan)
 		{

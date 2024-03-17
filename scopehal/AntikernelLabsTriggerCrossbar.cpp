@@ -43,10 +43,6 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	, SCPIInstrument(transport)
 	, m_loadInProgress(true)
 {
-	//TODO: query data rate from instrument
-	//TODO: date rate needs to be a per channel setting, not global: have to extend the API for this
-	SetDataRate(10312500000LL);
-
 	//Input-only channels
 	m_triggerInChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
@@ -136,6 +132,20 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":POSTCURSOR?"));
 		idx = atoi(reply.c_str());
 		m_txPostCursor[i] = idx / 31.0f;
+
+		//Read data rate. This is two different fields for clock divider and PLL source
+		//In the current gateware, QPLL is always 10.31235 Gbps and CPLL is always 5 Gbps
+		//then we may sub-rate from that
+		int64_t pllLineRate = 10312500000LL;
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":CLKSEL?"));
+		if(reply == "CPLL")
+			pllLineRate = 5000000000LL;
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":CLKDIV?"));
+		auto clkdiv = stoi(reply);
+		if(clkdiv <= 0)		//0 means use OUT_DIV attribute, which is also set to 1 in the gateware
+			clkdiv = 1;
+		int64_t realClkDiv = 1 << (clkdiv - 1);
+		m_txDataRate[i] = pllLineRate / realClkDiv;
 	}
 
 	//Set up receiver channels
@@ -153,6 +163,9 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
 			m_channels[m_rxChannelBase + i]->GetHwname() + ":PRESCALE?"));
 		m_scanDepth[i] = 1 << (17 + atoi(reply.c_str()));
+
+		//TODO: actually support rx data rates etc
+		m_rxDataRate[i] = 10312500000LL;
 
 		/*
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
@@ -608,25 +621,73 @@ void AntikernelLabsTriggerCrossbar::GetBERSamplingPoint(size_t i, int64_t& dx, f
 	dy = 0;
 }
 
-int64_t AntikernelLabsTriggerCrossbar::GetDataRate()
+bool AntikernelLabsTriggerCrossbar::IsDataRatePerChannel()
 {
-	return m_dataRate;
+	return true;
 }
 
-void AntikernelLabsTriggerCrossbar::SetDataRate(int64_t rate)
+int64_t AntikernelLabsTriggerCrossbar::GetDataRate(size_t i)
 {
-	m_transport->SendCommandQueued(string("RATE ") + to_string(rate));
-	m_dataRate = rate;
+	if(i >= m_txChannelBase)
+		return m_txDataRate[i - m_txChannelBase];
+	else if(i >= m_rxChannelBase)
+		return m_rxDataRate[i - m_rxChannelBase];
+
+	//not a bert channel
+	return 0;
+}
+
+void AntikernelLabsTriggerCrossbar::SetDataRate(size_t i, int64_t rate)
+{
+	//Crack data rate into base clock and divisor
+	//Even numbered rows are CPLL, odd are QPLL
+	auto rates = GetAvailableDataRates();
+	auto it = find(rates.begin(), rates.end(), rate);
+	if(it == rates.end())
+		return;
+	auto nrow = it - rates.begin();
+	bool qpll = ((nrow & 1) == 1);
+
+	//Lowest numbered rows are highest divsors
+	size_t ndiv;
+	if(qpll)
+	{
+		if(nrow == 8)
+			ndiv = 1;
+		else
+			ndiv = 5 - ( (nrow - 1) / 2);
+	}
+	else
+		ndiv = 4 - (nrow/2);
+
+	//TODO: don't change clock source if we're only changing the divisor?
+
+	if(qpll)
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":CLKSEL QPLL");
+	else
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":CLKSEL CPLL");
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":CLKDIV " + to_string(ndiv));
+
+	//Update cache
+	if(i >= m_txChannelBase)
+		m_txDataRate[i - m_txChannelBase] = rate;
+	else if(i >= m_rxChannelBase)
+		m_rxDataRate[i - m_rxChannelBase] = rate;
 }
 
 vector<int64_t> AntikernelLabsTriggerCrossbar::GetAvailableDataRates()
 {
 	vector<int64_t> ret;
-	ret.push_back(  644531250LL);
-	ret.push_back( 1289062500LL);
-	ret.push_back( 2578125000LL);
-	ret.push_back( 5156250000LL);
-	ret.push_back(10312500000LL);
+
+	ret.push_back(  625000000LL);	//CPLL / 8
+	ret.push_back(  644531250LL);	//QPLL / 16
+	ret.push_back( 1250000000LL);	//CPLL / 4
+	ret.push_back( 1289062500LL);	//QPLL / 8
+	ret.push_back( 2500000000LL);	//CPLL / 2
+	ret.push_back( 2578125000LL);	//QPLL / 4
+	ret.push_back( 5000000000LL);	//CPLL
+	ret.push_back( 5156250000LL);	//QPLL / 2
+	ret.push_back(10312500000LL);	//QPLL
 	return ret;
 }
 
@@ -711,7 +772,7 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 		return;
 	}
 
-	auto rate = GetDataRate();
+	auto rate = GetDataRate(i);
 	auto period = round(FS_PER_SECOND / rate);
 	auto stepsize = period / width;
 
@@ -743,7 +804,7 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 	//Lock while we read the lines
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	auto rate = GetDataRate();
+	auto rate = GetDataRate(i);
 	auto period = round(FS_PER_SECOND / rate);
 
 	//For now, expect -32 to +32 (65 values)

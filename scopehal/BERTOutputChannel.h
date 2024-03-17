@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -94,6 +94,12 @@ public:
 
 	void SetPostCursor(float f)
 	{ m_bert->SetTxPostCursor(GetIndex(), f); }
+
+	int64_t GetDataRate()
+	{ return m_bert->GetDataRate(GetIndex()); }
+
+	void SetDataRate(int64_t rate)
+	{ m_bert->SetDataRate(GetIndex(), rate); }
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
 

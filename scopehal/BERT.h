@@ -337,17 +337,21 @@ public:
 	// Timebase
 
 	/**
-		@brief Gets the currently selected line rate (in bits/sec)
+		@brief Determines whether the TX/RX clock is a per-instrument or per-channel setting
 
-		TODO: this might need to be adjustable per channel in a future API revision
-		ML4039 only has global line rate
+		@return True if clock is a per-channel setting, false if global
 	 */
-	virtual int64_t GetDataRate() =0;
+	virtual bool IsDataRatePerChannel() =0;
+
+	/**
+		@brief Gets the currently selected line rate (in bits/sec)
+	 */
+	virtual int64_t GetDataRate(size_t i) =0;
 
 	/**
 		@brief Sets the data rate (in bits/sec)
 	 */
-	virtual void SetDataRate(int64_t rate) =0;
+	virtual void SetDataRate(size_t i, int64_t rate) =0;
 
 	/**
 		@brief Gets the list of available data rates

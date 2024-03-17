@@ -104,8 +104,9 @@ public:
 	virtual int64_t GetRefclkInFrequency() override;
 
 	//Timebase
-	virtual int64_t GetDataRate() override;
-	virtual void SetDataRate(int64_t rate) override;
+	virtual bool IsDataRatePerChannel();
+	virtual int64_t GetDataRate(size_t i) override;
+	virtual void SetDataRate(size_t i, int64_t rate) override;
 	virtual std::vector<int64_t> GetAvailableDataRates() override;
 	virtual void SetUseExternalRefclk(bool external) override;
 	virtual bool GetUseExternalRefclk() override;
@@ -158,7 +159,8 @@ protected:
 		SERDES
 	};
 	*/
-	uint64_t m_dataRate;
+	uint64_t m_txDataRate[2];
+	uint64_t m_rxDataRate[2];
 
 	/**
 		@brief True if in a constructor or similar initialization path (getting hardware state)

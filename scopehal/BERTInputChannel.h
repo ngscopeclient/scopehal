@@ -83,6 +83,9 @@ public:
 	void SetScanDepth(int64_t depth)
 	{ m_bert->SetScanDepth(GetIndex(), depth); }
 
+	int64_t GetDataRate()
+	{ return m_bert->GetDataRate(GetIndex()); }
+
 	enum StreamIDs
 	{
 		STREAM_HBATHTUB		= 0,

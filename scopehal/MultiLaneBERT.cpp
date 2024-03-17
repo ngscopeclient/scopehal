@@ -52,7 +52,7 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 
 	//Change the data rate
 	SetUseExternalRefclk(false);
-	SetDataRate(10312500000LL);
+	SetDataRate(0, 10312500000LL);
 
 	//Add and provide default configuration for pattern generator channels
 	int nchans = 4;
@@ -559,12 +559,17 @@ void MultiLaneBERT::GetBERSamplingPoint(size_t i, int64_t& dx, float& dy)
 	dy = m_sampleY[i - m_rxChannelBase];
 }
 
-int64_t MultiLaneBERT::GetDataRate()
+bool MultiLaneBERT::IsDataRatePerChannel()
+{
+	return false;
+}
+
+int64_t MultiLaneBERT::GetDataRate([[maybe_unused]] size_t i)
 {
 	return m_dataRate;
 }
 
-void MultiLaneBERT::SetDataRate(int64_t rate)
+void MultiLaneBERT::SetDataRate([[maybe_unused]] size_t i, int64_t rate)
 {
 	m_transport->SendCommandQueued(string("RATE ") + to_string(rate));
 	m_dataRate = rate;
