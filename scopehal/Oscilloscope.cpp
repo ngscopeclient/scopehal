@@ -403,6 +403,17 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 				continue;
 		}
 
+		//If there's no "type" parameter, this is likely a function generator channel
+		//or something else we don't support yet. Discard it.
+		if(!cnode["type"])
+		{
+			LogWarning(
+				"Channel %s doesn't have a type field but we think it's an oscilloscope channel, "
+				"not sure how to process it\n",
+				cnode["nick"].as<string>().c_str());
+			continue;
+		}
+
 		table.emplace(cnode["id"].as<int>(), chan);
 
 		//Ignore name/type.
