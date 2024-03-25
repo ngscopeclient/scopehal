@@ -4,7 +4,7 @@
 
 # Libraries specific to scopehal library not provided by root CMakeLists
 
-if(LINUX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	pkg_check_modules(LXI liblxi QUIET IMPORTED_TARGET)
 	#WORKAROUND LXI on Debian Bullseye lacks a pkgconfig file
 	if(NOT LXI_FOUND)
