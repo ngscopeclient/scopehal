@@ -392,11 +392,13 @@ void CSVImportFilter::OnFileNameChanged()
 				SetData(dense, i);
 			}
 			else
+			{
 				wfm->MarkModifiedFromCpu();
 
-			//If we end up with zero length samples due to invalid configuration, nuke the channel
-			if(wfm->m_durations[0] == 0)
-				SetData(nullptr, i);
+				//If we end up with zero length samples due to invalid configuration, nuke the channel
+				if(wfm->m_durations[0] == 0)
+					SetData(nullptr, i);
+			}
 		}
 	}
 }
