@@ -264,6 +264,7 @@ protected:
 
 	//Trigger config
 	void Pull8b10bTrigger();
+	void Pull64b66bTrigger();
 	void PullNRZTrigger();
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();

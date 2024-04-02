@@ -4066,6 +4066,8 @@ void LeCroyOscilloscope::PullTrigger()
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Type'"));
 	if (reply == "C8B10B")
 		Pull8b10bTrigger();
+	else if(reply == "C64B66B")
+		Pull64b66bTrigger();
 	else if(reply == "NRZPattern")
 		PullNRZTrigger();
 	else if (reply == "Dropout")
@@ -4089,9 +4091,11 @@ void LeCroyOscilloscope::PullTrigger()
 	else
 	{
 		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
-		m_trigger = NULL;
-		return;
+		m_trigger = nullptr;
 	}
+
+	if(!m_trigger)
+		return;
 
 	//Pull the source (same for all types of trigger)
 	PullTriggerSource(m_trigger);
@@ -4135,7 +4139,35 @@ void LeCroyOscilloscope::PullNRZTrigger()
 		trig->signal_calculateBitRate().connect(sigc::mem_fun(*this, &LeCroyOscilloscope::OnCDRTriggerAutoBaud));
 	}
 
-	LogWarning("LeCroyOscilloscope::Pull8b10bTrigger unimplemented\n");
+	LogWarning("LeCroyOscilloscope::PullNRZTrigger unimplemented\n");
+}
+
+/**
+	@brief Reads settings for a 64b66b pattern trigger from the instrument
+ */
+void LeCroyOscilloscope::Pull64b66bTrigger()
+{
+	/*
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != nullptr) && (dynamic_cast<CDRNRZPatternTrigger*>(m_trigger) != nullptr) )
+	{
+		delete m_trigger;
+		m_trigger = nullptr;
+	}
+
+	//Create a new trigger if necessary
+	auto trig = dynamic_cast<CDRNRZPatternTrigger*>(m_trigger);
+	if(trig == nullptr)
+	{
+		trig = new CDRNRZPatternTrigger(this);
+		m_trigger = trig;
+
+		trig->signal_calculateBitRate().connect(sigc::mem_fun(*this, &LeCroyOscilloscope::OnCDRTriggerAutoBaud));
+	}
+
+	//LogWarning("LeCroyOscilloscope::PullNRZTrigger unimplemented\n");
+	*/
+	m_trigger = nullptr;
 }
 
 /**
