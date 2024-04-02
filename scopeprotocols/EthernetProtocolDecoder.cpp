@@ -477,6 +477,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 						segment.m_type = EthernetFrameSegment::TYPE_FCS_BAD;
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 						pack->m_displayForegroundColor = "#ffffff";
+						LogTrace("Frame CRC is %08x, expected %08x\n", crc_actual, crc_expected);
 					}
 
 					cap->m_durations.push_back( (ends[i] - start)/ cap->m_timescale);
