@@ -4005,7 +4005,7 @@ bool LeCroyOscilloscope::IsDigitalThresholdConfigurable()
 
 float LeCroyOscilloscope::GetDigitalHysteresis(size_t channel)
 {
-	if(channel < m_digitalChannelBase)
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
 		return 0;
 
 	string reply;
@@ -4019,7 +4019,7 @@ float LeCroyOscilloscope::GetDigitalHysteresis(size_t channel)
 
 float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 {
-	if(channel < m_digitalChannelBase)
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
 		return 0;
 
 	string reply;
@@ -4033,7 +4033,7 @@ float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 
 void LeCroyOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 {
-	if(channel < m_digitalChannelBase)
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
 		return;
 
 	char tmp[128];
