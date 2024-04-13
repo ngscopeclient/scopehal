@@ -606,6 +606,9 @@ void AgilentOscilloscope::ProcessDigitalWaveforms(
 			cap->m_timescale = fs_per_sample;
 			cap->m_startFemtoseconds = 0;
 			cap->m_triggerPhase = 0;
+			double t = GetTime();
+			cap->m_startTimestamp = floor(t);
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
 			//Preallocate memory assuming no deduplication possible
 			cap->Resize(data.size());
@@ -677,8 +680,8 @@ bool AgilentOscilloscope::AcquireData()
 		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
+		cap->m_startTimestamp = floor(t);
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
 		// Format the capture
