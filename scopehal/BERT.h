@@ -283,6 +283,24 @@ public:
 	virtual void GetBERSamplingPoint(size_t i, int64_t& dx, float& dy) =0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// RX capture status
+
+	/**
+		@brief Returns true if a horizontal bathtub scan is in progress
+	 */
+	virtual bool IsHBathtubScanInProgress(size_t i);
+
+	/**
+		@brief Returns true if an eye scan is in progress
+	 */
+	virtual bool IsEyeScanInProgress(size_t i);
+
+	/**
+		@brief Gets the estimated completion status (0-1) of the current scan
+	 */
+	virtual float GetScanProgress(size_t i);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// RX integration depth control
 
 	/**

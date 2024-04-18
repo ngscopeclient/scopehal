@@ -150,6 +150,21 @@ int64_t BERT::GetExpectedEyeCaptureTime([[maybe_unused]] size_t i)
 	return 0;
 }
 
+bool BERT::IsHBathtubScanInProgress([[maybe_unused]] size_t i)
+{
+	return false;
+}
+
+bool BERT::IsEyeScanInProgress([[maybe_unused]] size_t i)
+{
+	return false;
+}
+
+float BERT::GetScanProgress([[maybe_unused]] size_t i)
+{
+	return 0;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 

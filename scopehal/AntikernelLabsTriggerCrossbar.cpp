@@ -42,6 +42,10 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 	, m_loadInProgress(true)
+	, m_bathtubScanInProgress(false)
+	, m_eyeScanInProgress(false)
+	, m_activeScanChannel(0)
+	, m_activeScanProgress(0)
 {
 	//Input-only channels
 	m_triggerInChannelBase = m_channels.size();
@@ -715,6 +719,24 @@ vector<int64_t> AntikernelLabsTriggerCrossbar::GetAvailableDataRates()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Data acquisition
 
+bool AntikernelLabsTriggerCrossbar::IsEyeScanInProgress(size_t i)
+{
+	return m_eyeScanInProgress && (i == m_activeScanChannel);
+}
+
+bool AntikernelLabsTriggerCrossbar::IsHBathtubScanInProgress(size_t i)
+{
+	return m_bathtubScanInProgress && (i == m_activeScanChannel);
+}
+
+float AntikernelLabsTriggerCrossbar::GetScanProgress(size_t i)
+{
+	if(i == m_activeScanChannel)
+		return m_activeScanProgress;
+	else
+		return 0;
+}
+
 void AntikernelLabsTriggerCrossbar::SetBERIntegrationLength(int64_t uis)
 {
 	/*m_transport->SendCommandQueued(string("INTEGRATION ") + to_string(uis));
@@ -782,7 +804,43 @@ int64_t AntikernelLabsTriggerCrossbar::GetExpectedEyeCaptureTime(size_t i)
 
 void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 {
-	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":HBATHTUB?");
+	ssize_t halfwidth = GetScanHalfWidth(i);
+	ssize_t width = 2*halfwidth + 1;
+
+	//Implement our own (inefficient, but that's fine because we're bottlenecked on data generation anyway)
+	//version of ReadReply here to get progress updates
+	string reply;
+	{
+		m_activeScanChannel = i;
+		m_activeScanProgress = 0;
+		m_bathtubScanInProgress = true;
+
+		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+		m_transport->FlushCommandQueue();
+		m_transport->SendCommandImmediate(m_channels[i]->GetHwname() + ":HBATHTUB?");
+
+		//Read the reply
+		char tmp = ' ';
+		size_t ncommas = 0;
+		while(true)
+		{
+			if(1 != m_transport->ReadRawData(1, (unsigned char*)&tmp))
+				break;
+			if(tmp == '\n')
+				break;
+			else
+				reply += tmp;
+
+			//update progress every comma
+			if(tmp == ',')
+			{
+				ncommas ++;
+				m_activeScanProgress = ncommas * 1.0 / width;
+			}
+		}
+
+		m_bathtubScanInProgress = false;
+	}
 
 	//Parse the reply
 	auto data = explode(reply, ',');
@@ -801,8 +859,6 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 
 	//Sub-rate modes double the width of the eye for each halving of data rate
 	//since PLL step size is constant
-	ssize_t halfwidth = GetScanHalfWidth(i);
-	ssize_t width = 2*halfwidth + 1;
 	if(values.size() < (size_t)width)
 	{
 		LogError("not enough data came back (got %zu values expected %zu)\n", values.size(), width);
@@ -837,6 +893,10 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 	auto chan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
 	if(!chan)
 		return;
+
+	m_activeScanChannel = i;
+	m_activeScanProgress = 0;
+	m_eyeScanInProgress = true;
 
 	//Lock while we read the lines
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
@@ -874,7 +934,30 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 	auto accum = cap->GetAccumData();
 	for(int y=0; y<height; y++)
 	{
-		auto reply = m_transport->ReadReply();
+		string reply;
+
+		//Implement our own (inefficient, but that's fine because we're bottlenecked on data generation anyway)
+		//version of ReadReply here to get progress updates
+		char ctmp = ' ';
+		size_t ncommas = 0;
+		while(true)
+		{
+			if(1 != m_transport->ReadRawData(1, (unsigned char*)&ctmp))
+				break;
+			if(ctmp == '\n')
+				break;
+			else
+				reply += ctmp;
+
+			//update progress every comma
+			if(ctmp == ',')
+			{
+				ncommas ++;
+				float rowProgress = ncommas * 1.0 / width;
+				m_activeScanProgress = (y + rowProgress) / height;
+			}
+		}
+
 		auto data = explode(reply, ',');
 		vector<float> values;
 		float tmp;
@@ -902,6 +985,8 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 				accum[y*width*2 + x + halfwidth] = values[x] * 1e15;
 		}
 	}
+
+	m_eyeScanInProgress = false;
 
 	cap->Normalize();
 	cap->IntegrateUIs(1);	//have to put something here, but we don't have the true count value

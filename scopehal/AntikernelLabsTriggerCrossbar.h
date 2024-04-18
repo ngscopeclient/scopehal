@@ -97,6 +97,9 @@ public:
 	virtual void SetScanDepth(size_t i, int64_t depth) override;
 	virtual int64_t GetExpectedBathtubCaptureTime(size_t i) override;
 	virtual int64_t GetExpectedEyeCaptureTime(size_t i) override;
+	virtual bool IsEyeScanInProgress(size_t i) override;
+	virtual float GetScanProgress(size_t i) override;
+	virtual bool IsHBathtubScanInProgress(size_t i) override;
 
 	//Reference clock output
 	virtual size_t GetRefclkOutMux() override;
@@ -163,6 +166,11 @@ protected:
 		This prevents filter graph changes from being pushed to hardware if we've just pulled the same path.
 	 */
 	bool m_loadInProgress;
+
+	std::atomic<bool> m_bathtubScanInProgress;
+	std::atomic<bool> m_eyeScanInProgress;
+	std::atomic<size_t> m_activeScanChannel;
+	std::atomic<float> m_activeScanProgress;
 
 public:
 	static std::string GetDriverNameInternal();

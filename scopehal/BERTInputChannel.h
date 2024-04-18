@@ -140,6 +140,15 @@ public:
 	int64_t GetExpectedEyeCaptureTime()
 	{ return m_bert->GetExpectedEyeCaptureTime(GetIndex()); }
 
+	bool IsEyeScanInProgress()
+	{ return m_bert->IsEyeScanInProgress(GetIndex()); }
+
+	float GetScanProgress()
+	{ return m_bert->GetScanProgress(GetIndex()); }
+
+	bool IsHBathtubScanInProgress()
+	{ return m_bert->IsHBathtubScanInProgress(GetIndex()); }
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
 
