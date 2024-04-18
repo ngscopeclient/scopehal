@@ -234,6 +234,20 @@ public:
 	// RX data readout
 
 	/**
+		@brief Returns the expected time, in femtoseconds, to complete a bathtub scan with the current settings.
+
+		The default implementation returns zero.
+	 */
+	virtual int64_t GetExpectedBathtubCaptureTime(size_t i);
+
+	/**
+		@brief Returns the expected time, in femtoseconds, to complete an eye scan with the current settings.
+
+		The default implementation returns zero.
+	 */
+	virtual int64_t GetExpectedEyeCaptureTime(size_t i);
+
+	/**
 		@brief Acquires a bathtub curve
 	 */
 	virtual void MeasureHBathtub(size_t i) =0;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -94,7 +94,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 		vector<uint8_t>& bytes,
 		vector<uint64_t>& starts,
 		vector<uint64_t>& ends,
-		EthernetWaveform* cap)
+		EthernetWaveform* cap,
+		bool suppressedPreambleAndFCS)
 {
 	//Look up the file name, if any
 	auto fname = m_parameters[m_outfile].GetFileName();
@@ -137,6 +138,11 @@ void EthernetProtocolDecoder::BytesToFrames(
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
+
+	//If we are suppressing the preamble, jump straight into the data
+	if(suppressedPreambleAndFCS)
+		segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
+
 	for(size_t i=0; i<len; i++)
 	{
 		switch(segment.m_type)
@@ -446,7 +452,16 @@ void EthernetProtocolDecoder::BytesToFrames(
 				pack->m_data.push_back(bytes[i]);
 
 				//If almost at end of packet, next 4 bytes are FCS
-				if(i == bytes.size() - 5)
+				if(suppressedPreambleAndFCS)
+				{
+					if(i == bytes.size()-1)
+					{
+						pack->m_len = ends[i] - pack->m_offset;
+						m_packets.push_back(pack);
+						return;
+					}
+				}
+				else if(i == bytes.size() - 5)
 				{
 					segment.m_data.clear();
 					segment.m_type = EthernetFrameSegment::TYPE_FCS_GOOD;

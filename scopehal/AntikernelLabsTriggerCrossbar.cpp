@@ -765,6 +765,21 @@ void AntikernelLabsTriggerCrossbar::SetScanDepth(size_t i, int64_t depth)
 	m_scanDepth[i - m_rxChannelBase] = depth;
 }
 
+int64_t AntikernelLabsTriggerCrossbar::GetExpectedBathtubCaptureTime(size_t i)
+{
+	ssize_t halfwidth = GetScanHalfWidth(i);
+	ssize_t width = 2*halfwidth + 1;
+
+	//Actual measured bathtub run times at 10.3125 Gbps (full rate so 65 points)
+	return width * GetScanDepth(i) * 4 * FS_PER_NANOSECOND;
+}
+
+int64_t AntikernelLabsTriggerCrossbar::GetExpectedEyeCaptureTime(size_t i)
+{
+	//rough estimate, we can probably refine this later
+	return 28 * GetExpectedBathtubCaptureTime(i);
+}
+
 void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 {
 	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":HBATHTUB?");
@@ -786,7 +801,7 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 
 	//Sub-rate modes double the width of the eye for each halving of data rate
 	//since PLL step size is constant
-	ssize_t halfwidth = 16 << m_rxClkDiv[i - m_rxChannelBase];
+	ssize_t halfwidth = GetScanHalfWidth(i);
 	ssize_t width = 2*halfwidth + 1;
 	if(values.size() < (size_t)width)
 	{

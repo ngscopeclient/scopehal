@@ -134,6 +134,12 @@ public:
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
+	int64_t GetExpectedBathtubCaptureTime()
+	{ return m_bert->GetExpectedBathtubCaptureTime(GetIndex()); }
+
+	int64_t GetExpectedEyeCaptureTime()
+	{ return m_bert->GetExpectedEyeCaptureTime(GetIndex()); }
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
 

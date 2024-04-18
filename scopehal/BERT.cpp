@@ -140,6 +140,16 @@ void BERT::SetScanDepth([[maybe_unused]] size_t i, [[maybe_unused]] int64_t dept
 
 }
 
+int64_t BERT::GetExpectedBathtubCaptureTime([[maybe_unused]] size_t i)
+{
+	return 0;
+}
+
+int64_t BERT::GetExpectedEyeCaptureTime([[maybe_unused]] size_t i)
+{
+	return 0;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 

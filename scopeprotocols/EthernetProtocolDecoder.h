@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -102,7 +102,8 @@ protected:
 		std::vector<uint8_t>& bytes,
 		std::vector<uint64_t>& starts,
 		std::vector<uint64_t>& ends,
-		EthernetWaveform* cap);
+		EthernetWaveform* cap,
+		bool suppressedPreambleAndFCS = false);
 
 	std::string m_outfile;
 	std::string m_cachedOutputFname;

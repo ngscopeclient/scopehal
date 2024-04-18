@@ -95,6 +95,8 @@ public:
 	virtual std::vector<int64_t> GetScanDepths(size_t i) override;
 	virtual int64_t GetScanDepth(size_t i) override;
 	virtual void SetScanDepth(size_t i, int64_t depth) override;
+	virtual int64_t GetExpectedBathtubCaptureTime(size_t i) override;
+	virtual int64_t GetExpectedEyeCaptureTime(size_t i) override;
 
 	//Reference clock output
 	virtual size_t GetRefclkOutMux() override;
@@ -124,6 +126,14 @@ protected:
 	size_t m_triggerOutChannelBase;
 	size_t m_txChannelBase;
 	size_t m_rxChannelBase;
+
+	/**
+		@brief Returns the number of points on either side of the center for a full eye/bathtub scan
+
+		The full scan width is 2*halfwidth + 1.
+	 */
+	ssize_t GetScanHalfWidth(size_t i)
+	{ return 16 << m_rxClkDiv[i - m_rxChannelBase]; }
 
 	//Cached settings
 	Pattern m_txPattern[2];
