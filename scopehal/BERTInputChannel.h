@@ -44,7 +44,7 @@ public:
 
 	BERTInputChannel(
 		const std::string& hwname,
-		BERT* bert,
+		std::weak_ptr<BERT> bert,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
@@ -53,35 +53,39 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	BERT* GetBERT() const
+	std::weak_ptr<BERT> GetBERT() const
 	{ return m_bert; }
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// All of these inline accessors don't null-check because the channel is contained by the parent BERT
+	// (and thus it's impossible for us to outlive it)
+
 	bool GetInvert()
-	{ return m_bert->GetRxInvert(GetIndex()); }
+	{ return m_bert.lock()->GetRxInvert(GetIndex()); }
 
 	void SetInvert(bool invert)
-	{ m_bert->SetRxInvert(GetIndex(), invert); }
+	{ m_bert.lock()->SetRxInvert(GetIndex(), invert); }
 
 	bool GetCdrLockState()
-	{ return m_bert->GetRxCdrLockState(GetIndex()); }
+	{ return m_bert.lock()->GetRxCdrLockState(GetIndex()); }
 
 	void SetPattern(BERT::Pattern pattern)
-	{ m_bert->SetRxPattern(GetIndex(), pattern); }
+	{ m_bert.lock()->SetRxPattern(GetIndex(), pattern); }
 
 	BERT::Pattern GetPattern()
-	{ return m_bert->GetRxPattern(GetIndex()); }
+	{ return m_bert.lock()->GetRxPattern(GetIndex()); }
 
 	std::vector<BERT::Pattern> GetAvailablePatterns()
-	{ return m_bert->GetAvailableRxPatterns(GetIndex()); }
+	{ return m_bert.lock()->GetAvailableRxPatterns(GetIndex()); }
 
 	int64_t GetScanDepth()
-	{ return m_bert->GetScanDepth(GetIndex()); }
+	{ return m_bert.lock()->GetScanDepth(GetIndex()); }
 
 	std::vector<int64_t> GetScanDepths()
-	{ return m_bert->GetScanDepths(GetIndex()); }
+	{ return m_bert.lock()->GetScanDepths(GetIndex()); }
 
 	void SetScanDepth(int64_t depth)
-	{ m_bert->SetScanDepth(GetIndex(), depth); }
+	{ m_bert.lock()->SetScanDepth(GetIndex(), depth); }
 
 	enum StreamIDs
 	{
@@ -101,28 +105,28 @@ public:
 	{ return StreamDescriptor(this, STREAM_BER); }
 
 	bool HasCTLE()
-	{ return m_bert->HasRxCTLE(); }
+	{ return m_bert.lock()->HasRxCTLE(); }
 
 	std::vector<float> GetCTLEGainSteps()
-	{ return m_bert->GetRxCTLEGainSteps(); }
+	{ return m_bert.lock()->GetRxCTLEGainSteps(); }
 
 	size_t GetCTLEGainStep()
-	{ return m_bert->GetRxCTLEGainStep(GetIndex()); }
+	{ return m_bert.lock()->GetRxCTLEGainStep(GetIndex()); }
 
 	void SetCTLEGainStep(size_t step)
-	{ m_bert->SetRxCTLEGainStep(GetIndex(), step); }
+	{ m_bert.lock()->SetRxCTLEGainStep(GetIndex(), step); }
 
 	void SetBERSamplingPoint(int64_t dx, float dy)
-	{ m_bert->SetBERSamplingPoint(GetIndex(), dx, dy); }
+	{ m_bert.lock()->SetBERSamplingPoint(GetIndex(), dx, dy); }
 
 	void GetBERSamplingPoint(int64_t& dx, float& dy)
-	{ m_bert->GetBERSamplingPoint(GetIndex(), dx, dy); }
+	{ m_bert.lock()->GetBERSamplingPoint(GetIndex(), dx, dy); }
 
 	int64_t GetDataRate()
-	{ return m_bert->GetDataRate(GetIndex()); }
+	{ return m_bert.lock()->GetDataRate(GetIndex()); }
 
 	void SetDataRate(int64_t rate)
-	{ m_bert->SetDataRate(GetIndex(), rate); }
+	{ m_bert.lock()->SetDataRate(GetIndex(), rate); }
 
 	std::string GetMaskFile()
 	{ return m_maskFile; }
@@ -135,19 +139,19 @@ public:
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
 	int64_t GetExpectedBathtubCaptureTime()
-	{ return m_bert->GetExpectedBathtubCaptureTime(GetIndex()); }
+	{ return m_bert.lock()->GetExpectedBathtubCaptureTime(GetIndex()); }
 
 	int64_t GetExpectedEyeCaptureTime()
-	{ return m_bert->GetExpectedEyeCaptureTime(GetIndex()); }
+	{ return m_bert.lock()->GetExpectedEyeCaptureTime(GetIndex()); }
 
 	bool IsEyeScanInProgress()
-	{ return m_bert->IsEyeScanInProgress(GetIndex()); }
+	{ return m_bert.lock()->IsEyeScanInProgress(GetIndex()); }
 
 	float GetScanProgress()
-	{ return m_bert->GetScanProgress(GetIndex()); }
+	{ return m_bert.lock()->GetScanProgress(GetIndex()); }
 
 	bool IsHBathtubScanInProgress()
-	{ return m_bert->IsHBathtubScanInProgress(GetIndex()); }
+	{ return m_bert.lock()->IsHBathtubScanInProgress(GetIndex()); }
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
@@ -170,7 +174,7 @@ protected:
 	EyeMask m_mask;
 
 protected:
-	BERT* m_bert;
+	std::weak_ptr<BERT> m_bert;
 };
 
 #endif

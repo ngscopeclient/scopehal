@@ -42,6 +42,8 @@ public:
 	AntikernelLabsTriggerCrossbar(SCPITransport* transport);
 	virtual ~AntikernelLabsTriggerCrossbar();
 
+	virtual void PostCtorInit() override;
+
 	virtual bool AcquireData() override;
 
 	//Device information

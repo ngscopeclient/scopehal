@@ -41,6 +41,8 @@ public:
 	MultiLaneBERT(SCPITransport* transport);
 	virtual ~MultiLaneBERT();
 
+	virtual void PostCtorInit() override;
+
 	virtual bool AcquireData() override;
 
 	//Device information

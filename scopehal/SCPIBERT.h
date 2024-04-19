@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,29 +35,35 @@
  */
 class SCPIBERT 	: public virtual BERT
 				, public virtual SCPIInstrument
+				, public std::enable_shared_from_this<SCPIBERT>
 {
 public:
 	SCPIBERT();
 	virtual ~SCPIBERT();
 
+	/**
+		@brief Does any initialization that can't happen during the constructor
+	 */
+	virtual void PostCtorInit() =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIBERT* (*BERTCreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPIBERT> (*BERTCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, BERTCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIBERT* CreateBERT(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIBERT> CreateBERT(std::string driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration
 	typedef std::map< std::string, BERTCreateProcType > BERTCreateMapType;
-	static BERTCreateMapType m_powercreateprocs;
+	static BERTCreateMapType m_bertcreateprocs;
 };
 
 #define BERT_INITPROC(T) \
-	static SCPIBERT* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPIBERT> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

@@ -47,6 +47,19 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	, m_activeScanChannel(0)
 	, m_activeScanProgress(0)
 {
+
+}
+
+AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
+{
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Instrument config
+
+void AntikernelLabsTriggerCrossbar::PostCtorInit()
+{
 	//Input-only channels
 	m_triggerInChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
@@ -160,7 +173,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 
 		m_channels.push_back(new BERTInputChannel(
 			hwname,
-			this,
+			weak_from_this(),
 			"#4040c0",	//blue-purple
 			m_channels.size()));
 
@@ -232,14 +245,6 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 
 	m_loadInProgress = false;
 }
-
-AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
-{
-
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Instrument config
 
 void AntikernelLabsTriggerCrossbar::SetMuxPath(size_t dstchan, size_t srcchan)
 {

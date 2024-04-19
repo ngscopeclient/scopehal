@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,7 +31,7 @@
 
 using namespace std;
 
-SCPIBERT::BERTCreateMapType SCPIBERT::m_powercreateprocs;
+SCPIBERT::BERTCreateMapType SCPIBERT::m_bertcreateprocs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -50,20 +50,24 @@ SCPIBERT::~SCPIBERT()
 
 void SCPIBERT::DoAddDriverClass(string name, BERTCreateProcType proc)
 {
-	m_powercreateprocs[name] = proc;
+	m_bertcreateprocs[name] = proc;
 }
 
 void SCPIBERT::EnumDrivers(vector<string>& names)
 {
-	for(auto it=m_powercreateprocs.begin(); it != m_powercreateprocs.end(); ++it)
+	for(auto it=m_bertcreateprocs.begin(); it != m_bertcreateprocs.end(); ++it)
 		names.push_back(it->first);
 }
 
-SCPIBERT* SCPIBERT::CreateBERT(string driver, SCPITransport* transport)
+shared_ptr<SCPIBERT> SCPIBERT::CreateBERT(string driver, SCPITransport* transport)
 {
-	if(m_powercreateprocs.find(driver) != m_powercreateprocs.end())
-		return m_powercreateprocs[driver](transport);
+	if(m_bertcreateprocs.find(driver) != m_bertcreateprocs.end())
+	{
+		auto ret = m_bertcreateprocs[driver](transport);
+		ret->PostCtorInit();
+		return ret;
+	}
 
 	LogError("Invalid driver name \"%s\"\n", driver.c_str());
-	return NULL;
+	return nullptr;
 }

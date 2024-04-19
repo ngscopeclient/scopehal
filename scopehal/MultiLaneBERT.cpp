@@ -53,7 +53,15 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	//Change the data rate
 	SetUseExternalRefclk(false);
 	SetDataRate(0, 10312500000LL);
+}
 
+MultiLaneBERT::~MultiLaneBERT()
+{
+
+}
+
+void MultiLaneBERT::PostCtorInit()
+{
 	//Add and provide default configuration for pattern generator channels
 	int nchans = 4;
 	m_rxChannelBase = nchans;
@@ -71,7 +79,7 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	//Add pattern checker channels
 	for(int i=0; i<nchans; i++)
 	{
-		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#4040c0", i+nchans));
+		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), weak_from_this(), "#4040c0", i+nchans));
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
 		SetRxInvert(i+nchans, false);
 		SetRxCTLEGainStep(i+nchans, 4);
@@ -80,7 +88,7 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 
 	//Apply the deferred changes
 	//This results in a single API call instead of four for each channel, causing a massive speedup during initialization
-	transport->SendCommandQueued("APPLY");
+	m_transport->SendCommandQueued("APPLY");
 
 	//Set up default custom pattern
 	SetGlobalCustomPattern(0xff00);
@@ -90,11 +98,6 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 
 	//Default integration is 10M UIs
 	SetBERIntegrationLength(1e7);
-}
-
-MultiLaneBERT::~MultiLaneBERT()
-{
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
