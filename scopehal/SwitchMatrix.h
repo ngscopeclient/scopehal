@@ -53,6 +53,21 @@ public:
 	 */
 	virtual void SetMuxPathOpen(size_t dstchan) =0;
 
+	/**
+		@brief Checks if an output channel has configurable voltage level
+	 */
+	virtual bool MuxHasConfigurableDrive(size_t dstchan) =0;
+
+	/**
+		@brief Gets the drive level of an output channel
+	 */
+	virtual float GetMuxOutputDrive(size_t dstchan) =0;
+
+	 /**
+		@brief Sets the drive level of an output channel
+	 */
+	virtual void SetMuxOutputDrive(size_t dstchan, float v) =0;
+
 protected:
 	/**
 		@brief Serializes this oscilloscope's configuration to a YAML node.

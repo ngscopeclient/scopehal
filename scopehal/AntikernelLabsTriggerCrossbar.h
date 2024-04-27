@@ -123,6 +123,9 @@ public:
 	//Switch matrix
 	virtual void SetMuxPath(size_t dstchan, size_t srcchan) override;
 	virtual void SetMuxPathOpen(size_t dstchan) override;
+	virtual bool MuxHasConfigurableDrive(size_t dstchan) override;
+	virtual float GetMuxOutputDrive(size_t dstchan) override;
+	virtual void SetMuxOutputDrive(size_t dstchan, float v) override;
 
 protected:
 
@@ -140,7 +143,10 @@ protected:
 	ssize_t GetScanHalfWidth(size_t i)
 	{ return 16 << m_rxClkDiv[i - m_rxChannelBase]; }
 
-	//Cached settings
+	//Cached settings for trigger channels
+	float m_trigDrive[12];
+
+	//Cached settings for bert channels
 	Pattern m_txPattern[2];
 	//Pattern m_rxPattern[2];
 	bool m_txInvert[2];

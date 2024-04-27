@@ -53,6 +53,9 @@ public:
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
+	Instrument* GetParent()
+	{ return m_parent; }
+
 protected:
 	Instrument* m_parent;
 };

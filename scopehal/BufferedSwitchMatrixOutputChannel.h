@@ -48,6 +48,15 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual void OnInputChanged(size_t i) override;
 
+	bool MuxHasConfigurableDrive()
+	{ return dynamic_cast<SwitchMatrix*>(m_parent)->MuxHasConfigurableDrive(GetIndex()); }
+
+	float GetMuxOutputDrive()
+	{ return dynamic_cast<SwitchMatrix*>(m_parent)->GetMuxOutputDrive(GetIndex()); }
+
+	void SetMuxOutputDrive(float v)
+	{ dynamic_cast<SwitchMatrix*>(m_parent)->SetMuxOutputDrive(GetIndex(), v); }
+
 protected:
 };
 

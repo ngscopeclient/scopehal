@@ -47,7 +47,6 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	, m_activeScanChannel(0)
 	, m_activeScanProgress(0)
 {
-
 }
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
@@ -64,10 +63,15 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 	m_triggerInChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
 	{
+		//high voltage channels are bright, low voltage dim
+		string color = "#ffff00";	//yellow
+		if(i < 7)
+			color = "#808000";		//dark yellow
+
 		m_channels.push_back(new DigitalInputChannel(
 			string("IN") + to_string(i + m_triggerInChannelBase),
 			this,
-			"#ffff00",	//yellow
+			color,
 			m_channels.size()));
 	}
 
@@ -75,27 +79,45 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 	m_triggerBidirChannelBase = m_channels.size();
 	for(size_t i=0; i<4; i++)
 	{
+		auto hwname = string("IO") + to_string(i + m_triggerBidirChannelBase);
+
+		//high voltage channels are bright, low voltage dim
+		string color = "#ff6abc";	//pink
+		if(i < 2)
+			color = "#80355e";		//dark pink
+
 		m_channels.push_back(new BufferedSwitchMatrixIOChannel(
-			string("IO") + to_string(i + m_triggerBidirChannelBase),
+			hwname,
 			this,
-			"#ff6abc",	//pink
+			color,
 			m_channels.size()));
+
+		//Get the output drive level
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":LEV?"));
+		m_trigDrive[i + m_triggerBidirChannelBase] = 0.001f * atoi(reply.c_str());
 	}
 
 	//Output-only channels
-	//TODO: 0-3 are unbuffered, 4-7 are buffered, we need to note this somewhere
 	//For now we just want to reserve spaces in the channel list
 	m_triggerOutChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
 	{
-		m_channels.push_back(new BufferedSwitchMatrixOutputChannel(
-			string("OUT") + to_string(i),
-			this,
-			"#00ffff",	//cyan
-			m_channels.size()));
-	}
+		auto hwname = string("OUT") + to_string(i);
 
-	//TODO: figure out mux config stuff
+		//high voltage channels are bright, low voltage dim
+		string color = "#00ffff";	//cyan
+		if(i < 4)
+			color = "#008080";	//dark cyan
+
+		m_channels.push_back(new BufferedSwitchMatrixOutputChannel(
+			hwname,
+			this,
+			color,
+			m_channels.size()));
+
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":LEV?"));
+		m_trigDrive[i] = 0.001f * atoi(reply.c_str());
+	}
 
 	//Set up pattern generator channels
 	m_txChannelBase = m_channels.size();
@@ -267,6 +289,37 @@ void AntikernelLabsTriggerCrossbar::SetMuxPathOpen(size_t dstchan)
 
 	if( (dstchan >= m_triggerBidirChannelBase) && (dstchan < m_triggerOutChannelBase) )
 		m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":DIR IN");
+}
+
+bool AntikernelLabsTriggerCrossbar::MuxHasConfigurableDrive(size_t dstchan)
+{
+	//Output channels 0-3 are unbuffered, 4-11 are buffered
+	size_t relchan = dstchan - m_triggerOutChannelBase;
+	if( (relchan < 4) || (relchan > 11) )
+		return false;
+
+	return true;
+}
+
+float AntikernelLabsTriggerCrossbar::GetMuxOutputDrive(size_t dstchan)
+{
+	size_t relchan = dstchan - m_triggerOutChannelBase;
+	if( (relchan < 4) || (relchan > 11) )
+		return 0;
+
+	return m_trigDrive[relchan];
+}
+
+void AntikernelLabsTriggerCrossbar::SetMuxOutputDrive(size_t dstchan, float v)
+{
+	size_t relchan = dstchan - m_triggerOutChannelBase;
+	if( (relchan < 4) || (relchan > 11) )
+		return;
+
+	m_trigDrive[relchan] = v;
+
+	int mv = round(v * 1000);
+	m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":LEV " + to_string(mv));
 }
 
 string AntikernelLabsTriggerCrossbar::GetDriverNameInternal()
