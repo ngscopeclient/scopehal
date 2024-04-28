@@ -51,6 +51,13 @@ public:
 	//void SetInvert(bool invert)
 	//{ m_bert->SetRxInvert(GetIndex(), invert); }
 
+	virtual void SetDisplayName(std::string name) override
+	{
+		if(m_parent)
+			m_parent->SetChannelDisplayName(m_index, name);
+		InstrumentChannel::SetDisplayName(name);
+	}
+
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
 	Instrument* GetParent()

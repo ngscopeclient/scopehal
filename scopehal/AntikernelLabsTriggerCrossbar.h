@@ -50,6 +50,8 @@ public:
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
+	virtual void SetChannelDisplayName(size_t i, std::string name) override;
+
 	//TX pattern generator configuration
 	virtual Pattern GetTxPattern(size_t i) override;
 	virtual void SetTxPattern(size_t i, Pattern pattern) override;
@@ -126,6 +128,9 @@ public:
 	virtual bool MuxHasConfigurableDrive(size_t dstchan) override;
 	virtual float GetMuxOutputDrive(size_t dstchan) override;
 	virtual void SetMuxOutputDrive(size_t dstchan, float v) override;
+	virtual bool MuxHasConfigurableThreshold(size_t dstchan) override;
+	virtual float GetMuxInputThreshold(size_t dstchan) override;
+	virtual void SetMuxInputThreshold(size_t dstchan, float v) override;
 
 protected:
 
@@ -145,6 +150,7 @@ protected:
 
 	//Cached settings for trigger channels
 	float m_trigDrive[12];
+	float m_trigThreshold[12];
 
 	//Cached settings for bert channels
 	Pattern m_txPattern[2];

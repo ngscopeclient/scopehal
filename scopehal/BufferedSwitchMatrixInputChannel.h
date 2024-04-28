@@ -27,77 +27,37 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SwitchMatrix_h
-#define SwitchMatrix_h
+#ifndef BufferedSwitchMatrixInputChannel_h
+#define BufferedSwitchMatrixInputChannel_h
 
 /**
-	@brief A generic power supply
+	@brief An input channel of a buffered switch matrix
  */
-class SwitchMatrix : public virtual Instrument
+class BufferedSwitchMatrixInputChannel : public DigitalInputChannel
 {
 public:
-	SwitchMatrix();
-	virtual ~SwitchMatrix();
 
-	virtual unsigned int GetInstrumentTypes() const override;
+	BufferedSwitchMatrixInputChannel(
+		const std::string& hwname,
+		SwitchMatrix* parent,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-	/**
-		@brief Sets the mux selector for an output channel
-	 */
-	virtual void SetMuxPath(size_t dstchan, size_t srcchan) =0;
+	virtual ~BufferedSwitchMatrixInputChannel();
 
-	/**
-		@brief Removes a mux path for an output channel
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	virtual void OnInputChanged(size_t i) override;
 
-		Not all switch matrices or ports support this feature.
-	 */
-	virtual void SetMuxPathOpen(size_t dstchan) =0;
+	bool MuxHasConfigurableThreshold()
+	{ return dynamic_cast<SwitchMatrix*>(m_parent)->MuxHasConfigurableThreshold(GetIndex()); }
 
-	/**
-		@brief Checks if an output channel has configurable voltage level
-	 */
-	virtual bool MuxHasConfigurableDrive(size_t dstchan) =0;
+	float GetMuxInputThreshold()
+	{ return dynamic_cast<SwitchMatrix*>(m_parent)->GetMuxInputThreshold(GetIndex()); }
 
-	/**
-		@brief Gets the drive level of an output channel
-	 */
-	virtual float GetMuxOutputDrive(size_t dstchan) =0;
-
-	 /**
-		@brief Sets the drive level of an output channel
-	 */
-	virtual void SetMuxOutputDrive(size_t dstchan, float v) =0;
-
-	/**
-		@brief Checks if an input channel has configurable voltage level
-	 */
-	virtual bool MuxHasConfigurableThreshold(size_t dstchan) =0;
-
-	/**
-		@brief Gets the threshold level of an input channel
-	 */
-	virtual float GetMuxInputThreshold(size_t dstchan) =0;
-
-	 /**
-		@brief Sets the threshold level of an input channel
-	 */
-	virtual void SetMuxInputThreshold(size_t dstchan, float v) =0;
+	void SetMuxInputThreshold(float v)
+	{ dynamic_cast<SwitchMatrix*>(m_parent)->SetMuxInputThreshold(GetIndex(), v); }
 
 protected:
-	/**
-		@brief Serializes this oscilloscope's configuration to a YAML node.
-	 */
-	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
-
-	/**
-		@brief Load instrument and channel configuration from a save file
-	 */
-	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
-
-	/**
-		@brief Validate instrument and channel configuration from a save file
-	 */
-	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
 };
 
 #endif

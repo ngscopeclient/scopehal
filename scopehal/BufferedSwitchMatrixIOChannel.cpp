@@ -59,7 +59,7 @@ bool BufferedSwitchMatrixIOChannel::ValidateChannel(size_t i, StreamDescriptor s
 
 	//Digital input of same instrument? It's good
 	auto din = dynamic_cast<DigitalInputChannel*>(stream.m_channel);
-	if(din && (din->GetInstrument() == m_parent) )
+	if(din && (din->GetParent() == m_parent) )
 		return true;
 
 	//Nope, doesn't work

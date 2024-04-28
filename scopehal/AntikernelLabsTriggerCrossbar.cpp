@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "AntikernelLabsTriggerCrossbar.h"
 #include "EyeWaveform.h"
+#include "BufferedSwitchMatrixInputChannel.h"
 #include "BufferedSwitchMatrixOutputChannel.h"
 #include "BufferedSwitchMatrixIOChannel.h"
 
@@ -68,11 +69,27 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		if(i < 7)
 			color = "#808000";		//dark yellow
 
-		m_channels.push_back(new DigitalInputChannel(
-			string("IN") + to_string(i + m_triggerInChannelBase),
+		auto hwname = string("IN") + to_string(i + m_triggerInChannelBase);
+
+		m_channels.push_back(new BufferedSwitchMatrixInputChannel(
+			hwname,
 			this,
 			color,
 			m_channels.size()));
+
+		//Get raw DAC threshold
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":THRESH?"));
+		auto thresh = 0.001f * atoi(reply.c_str());
+
+		//Scale to account for attenuator on channel 7
+		if(i == 7)
+			thresh *= 2;
+
+		m_trigThreshold[i] = thresh;
+
+		//Load the nickname
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NICK?"));
+		m_channels[m_channels.size()-1]->SetDisplayName(reply);
 	}
 
 	//Bidir channels
@@ -95,6 +112,17 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		//Get the output drive level
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":LEV?"));
 		m_trigDrive[i + m_triggerBidirChannelBase] = 0.001f * atoi(reply.c_str());
+
+		//Get input switching threshold, scale to account for attenuator on channels 10/11
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":THRESH?"));
+		auto thresh = 0.001f * atoi(reply.c_str());
+		if(i >= 2)
+			thresh *= 2;
+		m_trigThreshold[i + m_triggerBidirChannelBase] = thresh;
+
+		//Load the nickname
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NICK?"));
+		m_channels[m_channels.size()-1]->SetDisplayName(reply);
 	}
 
 	//Output-only channels
@@ -117,6 +145,10 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":LEV?"));
 		m_trigDrive[i] = 0.001f * atoi(reply.c_str());
+
+		//Load the nickname
+		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NICK?"));
+		m_channels[m_channels.size()-1]->SetDisplayName(reply);
 	}
 
 	//Set up pattern generator channels
@@ -293,7 +325,12 @@ void AntikernelLabsTriggerCrossbar::SetMuxPathOpen(size_t dstchan)
 
 bool AntikernelLabsTriggerCrossbar::MuxHasConfigurableDrive(size_t dstchan)
 {
-	//Output channels 0-3 are unbuffered, 4-11 are buffered
+	//Bidir channels all have configurable drive
+	size_t bichan = dstchan - m_triggerBidirChannelBase;
+	if(bichan < 4)
+		return true;
+
+	//Output channels 0-3 are fixed drive, 4-11 are configurable
 	size_t relchan = dstchan - m_triggerOutChannelBase;
 	if( (relchan < 4) || (relchan > 11) )
 		return false;
@@ -303,6 +340,11 @@ bool AntikernelLabsTriggerCrossbar::MuxHasConfigurableDrive(size_t dstchan)
 
 float AntikernelLabsTriggerCrossbar::GetMuxOutputDrive(size_t dstchan)
 {
+	//Bidirectional channels use separate indexing
+	size_t bichan = dstchan - m_triggerBidirChannelBase;
+	if(bichan < 4)
+		return m_trigDrive[bichan + 8];
+
 	size_t relchan = dstchan - m_triggerOutChannelBase;
 	if( (relchan < 4) || (relchan > 11) )
 		return 0;
@@ -312,14 +354,44 @@ float AntikernelLabsTriggerCrossbar::GetMuxOutputDrive(size_t dstchan)
 
 void AntikernelLabsTriggerCrossbar::SetMuxOutputDrive(size_t dstchan, float v)
 {
-	size_t relchan = dstchan - m_triggerOutChannelBase;
-	if( (relchan < 4) || (relchan > 11) )
-		return;
+	//Bidirectional channels use separate indexing
+	size_t bichan = dstchan - m_triggerBidirChannelBase;
+	if(bichan < 4)
+		m_trigDrive[bichan + 8] = v;
+	else
+	{
+		size_t relchan = dstchan - m_triggerOutChannelBase;
+		if( (relchan < 4) || (relchan > 11) )
+			return;
 
-	m_trigDrive[relchan] = v;
+		m_trigDrive[relchan] = v;
+	}
 
 	int mv = round(v * 1000);
 	m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":LEV " + to_string(mv));
+}
+
+bool AntikernelLabsTriggerCrossbar::MuxHasConfigurableThreshold(size_t dstchan)
+{
+	return true;
+}
+
+float AntikernelLabsTriggerCrossbar::GetMuxInputThreshold(size_t dstchan)
+{
+	if(dstchan < 12)
+		return m_trigThreshold[dstchan];
+	return 0;
+}
+
+void AntikernelLabsTriggerCrossbar::SetMuxInputThreshold(size_t dstchan, float v)
+{
+	if(dstchan < 12)
+	{
+		m_trigThreshold[dstchan] = v;
+
+		int mv = round(v * 1000);
+		m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":THRESH " + to_string(mv));
+	}
 }
 
 string AntikernelLabsTriggerCrossbar::GetDriverNameInternal()
@@ -338,6 +410,12 @@ uint32_t AntikernelLabsTriggerCrossbar::GetInstrumentTypesForChannel(size_t i) c
 		return INST_SWITCH_MATRIX;
 	else
 		return INST_BERT;
+}
+
+void AntikernelLabsTriggerCrossbar::SetChannelDisplayName(size_t i, string name)
+{
+	SCPIBERT::SetChannelDisplayName(i, name);
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":NICK " + name);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
