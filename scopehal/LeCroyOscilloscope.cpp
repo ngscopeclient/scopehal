@@ -1202,7 +1202,7 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 	}
 
 	//Digital channel
-	else if(i >= m_digitalChannelBase)
+	else if( (i >= m_digitalChannelBase) && (i < (m_digitalChannelBase + m_digitalChannelCount) ) )
 	{
 		//If we have NO digital channels enabled, enable the first digital bus
 		bool anyDigitalEnabled = false;
