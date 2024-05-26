@@ -128,8 +128,6 @@ protected:
 	void SendDataSocket(size_t n, const uint8_t* p);
 	bool ReadDataSocket(size_t n, uint8_t* p);
 
-	Socket* m_dataSocket;
-
 	Series m_series;
 
 	FilterParameter m_diag_hardwareWFMHz;
