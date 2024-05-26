@@ -417,7 +417,7 @@ bool DSLabsOscilloscope::AcquireData()
 			cap->PrepareForCpuAccess();
 
 			//Preallocate memory assuming no deduplication possible
-			cap->Resize(memdepth);
+			cap->Resize(memdepth * 8);
 
 			//First sample never gets deduplicated
 			bool last = (buf[0] & 1) ? true : false;
