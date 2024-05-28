@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -70,7 +70,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 			i);
 		m_channels.push_back(chan);
 
-		string nicename = "ch" + chname;
+		string nicename = "ch" + to_string(i+1);
 		chan->SetDisplayName(nicename);
 
 		//Set initial configuration so we have a well-defined instrument state
@@ -342,6 +342,33 @@ bool ThunderScopeOscilloscope::AcquireData()
 			cap->m_samples.size());
 		delete[] abufs[i];
 		cap->MarkModifiedFromCpu();
+	}
+
+	//DEBUG: implement clientside trigger interpolation
+	auto trig = GetTrigger();
+	if(trig)
+	{
+		size_t trigSampleIndex = GetTriggerOffset() / fs_per_sample;
+		auto chan = trig->GetInput(0).m_channel;
+		auto data = dynamic_cast<UniformAnalogWaveform*>(s[chan]);
+
+		//bounds check trigger against waveform size
+		if( (trigSampleIndex < 1) || (trigSampleIndex >= data->size()) )
+		{
+			//no interpolation possible, trigger sample isn't in the buffer
+		}
+
+		else
+		{
+			float fa = data->m_samples[trigSampleIndex - 1];
+			float fb = data->m_samples[trigSampleIndex];
+			float slope = (fb - fa);
+			float delta = trig->GetLevel() - fa;
+			float trigphase = delta / slope;
+
+			for(auto w : awfms)
+				w->m_triggerPhase = fs_per_sample * (1 - trigphase);
+		}
 	}
 
 	FilterParameter* param = &m_diag_totalWFMs;
