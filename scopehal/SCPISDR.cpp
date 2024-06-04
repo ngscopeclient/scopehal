@@ -63,13 +63,13 @@ void SCPISDR::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-SCPISDR* SCPISDR::CreateSDR(string driver, SCPITransport* transport)
+shared_ptr<SCPISDR> SCPISDR::CreateSDR(string driver, SCPITransport* transport)
 {
 	if(m_sdrcreateprocs.find(driver) != m_sdrcreateprocs.end())
 		return m_sdrcreateprocs[driver](transport);
 
-	LogError("Invalid spectrometer driver name \"%s\"\n", driver.c_str());
-	return NULL;
+	LogError("Invalid SDR driver name \"%s\"\n", driver.c_str());
+	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

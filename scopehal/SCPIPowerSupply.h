@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,6 +35,7 @@
  */
 class SCPIPowerSupply 	: public virtual PowerSupply
 						, public virtual SCPIInstrument
+						, public std::enable_shared_from_this<SCPIPowerSupply>
 {
 public:
 	SCPIPowerSupply();
@@ -43,11 +44,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIPowerSupply* (*PowerCreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPIPowerSupply> (*PowerCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, PowerCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIPowerSupply* CreatePowerSupply(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIPowerSupply> CreatePowerSupply(std::string driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration
@@ -56,8 +57,8 @@ protected:
 };
 
 #define POWER_INITPROC(T) \
-	static SCPIPowerSupply* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPIPowerSupply> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,7 +34,8 @@
 	@brief An SCPI-based function generator
  */
 class SCPIFunctionGenerator 	: public virtual FunctionGenerator
-						, public virtual SCPIInstrument
+								, public virtual SCPIInstrument
+								, public std::enable_shared_from_this<SCPIFunctionGenerator>
 {
 public:
 	SCPIFunctionGenerator();
@@ -43,11 +44,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIFunctionGenerator* (*GeneratorCreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPIFunctionGenerator> (*GeneratorCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, GeneratorCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIFunctionGenerator* CreateFunctionGenerator(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIFunctionGenerator> CreateFunctionGenerator(std::string driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration
@@ -57,8 +58,8 @@ protected:
 
 //Use this for function generators that are not also oscilloscopes
 #define GENERATOR_INITPROC(T) \
-	static SCPIFunctionGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPIFunctionGenerator> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

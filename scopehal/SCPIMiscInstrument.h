@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,11 +42,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIMiscInstrument* (*MiscCreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPIMiscInstrument> (*MiscCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, MiscCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIMiscInstrument* CreateInstrument(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIMiscInstrument> CreateInstrument(std::string driver, SCPITransport* transport);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage
@@ -58,8 +58,8 @@ protected:
 };
 
 #define MISC_INITPROC(T) \
-	static SCPIMiscInstrument* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPIMiscInstrument> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

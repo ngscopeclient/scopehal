@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,11 +59,11 @@ void SCPIMiscInstrument::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-SCPIMiscInstrument* SCPIMiscInstrument::CreateInstrument(string driver, SCPITransport* transport)
+shared_ptr<SCPIMiscInstrument> SCPIMiscInstrument::CreateInstrument(string driver, SCPITransport* transport)
 {
 	if(m_misccreateprocs.find(driver) != m_misccreateprocs.end())
 		return m_misccreateprocs[driver](transport);
 
 	LogError("Invalid miscellaneous driver name \"%s\"\n", driver.c_str());
-	return NULL;
+	return nullptr;
 }

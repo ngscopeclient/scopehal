@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,11 +59,11 @@ void SCPILoad::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-SCPILoad* SCPILoad::CreateLoad(string driver, SCPITransport* transport)
+shared_ptr<SCPILoad> SCPILoad::CreateLoad(string driver, SCPITransport* transport)
 {
 	if(m_loadcreateprocs.find(driver) != m_loadcreateprocs.end())
 		return m_loadcreateprocs[driver](transport);
 
 	LogError("Invalid driver name \"%s\"\n", driver.c_str());
-	return NULL;
+	return nullptr;
 }

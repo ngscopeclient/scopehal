@@ -86,11 +86,11 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIVNA* (*VNACreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPIVNA> (*VNACreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, VNACreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIVNA* CreateVNA(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIVNA> CreateVNA(std::string driver, SCPITransport* transport);
 
 	//Class enumeration
 	typedef std::map< std::string, VNACreateProcType > VNACreateMapType;
@@ -98,8 +98,8 @@ public:
 };
 
 #define VNA_INITPROC(T) \
-	static SCPIVNA* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPIVNA> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,13 +60,13 @@ void SCPIVNA::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-SCPIVNA* SCPIVNA::CreateVNA(string driver, SCPITransport* transport)
+shared_ptr<SCPIVNA> SCPIVNA::CreateVNA(string driver, SCPITransport* transport)
 {
 	if(m_vnacreateprocs.find(driver) != m_vnacreateprocs.end())
 		return m_vnacreateprocs[driver](transport);
 
 	LogError("Invalid VNA driver name \"%s\"\n", driver.c_str());
-	return NULL;
+	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

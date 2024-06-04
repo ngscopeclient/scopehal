@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,6 +35,7 @@
  */
 class SCPIMultimeter 	: public virtual Multimeter
 						, public virtual SCPIInstrument
+						, public std::enable_shared_from_this<SCPIMultimeter>
 {
 public:
 	SCPIMultimeter();
@@ -43,11 +44,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIMultimeter* (*MeterCreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPIMultimeter> (*MeterCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, MeterCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIMultimeter* CreateMultimeter(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIMultimeter> CreateMultimeter(std::string driver, SCPITransport* transport);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage
@@ -60,8 +61,8 @@ protected:
 
 //Use this for multimeters that are not also oscilloscopes
 #define METER_INITPROC(T) \
-	static SCPIMultimeter* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPIMultimeter> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

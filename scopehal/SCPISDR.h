@@ -107,11 +107,11 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPISDR* (*SDRCreateProcType)(SCPITransport*);
+	typedef std::shared_ptr<SCPISDR> (*SDRCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, SDRCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPISDR* CreateSDR(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPISDR> CreateSDR(std::string driver, SCPITransport* transport);
 
 	//Class enumeration
 	typedef std::map< std::string, SDRCreateProcType > SDRCreateMapType;
@@ -119,8 +119,8 @@ public:
 };
 
 #define SDR_INITPROC(T) \
-	static SCPISDR* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
+	static std::shared_ptr<SCPISDR> CreateInstance(SCPITransport* transport) \
+	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 

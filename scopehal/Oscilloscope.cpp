@@ -92,13 +92,13 @@ void Oscilloscope::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-Oscilloscope* Oscilloscope::CreateOscilloscope(string driver, SCPITransport* transport)
+shared_ptr<Oscilloscope> Oscilloscope::CreateOscilloscope(string driver, SCPITransport* transport)
 {
 	if(m_createprocs.find(driver) != m_createprocs.end())
 		return m_createprocs[driver](transport);
 
 	LogError("Invalid oscilloscope driver name \"%s\"\n", driver.c_str());
-	return NULL;
+	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
