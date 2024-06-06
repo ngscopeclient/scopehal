@@ -35,7 +35,6 @@
  */
 class SCPIPowerSupply 	: public virtual PowerSupply
 						, public virtual SCPIInstrument
-						, public std::enable_shared_from_this<SCPIPowerSupply>
 {
 public:
 	SCPIPowerSupply();

@@ -54,6 +54,7 @@
 	All channels regardless of type occupy a single zero-based namespace.
  */
 class Instrument
+	: public std::enable_shared_from_this<Instrument>
 {
 public:
 	virtual ~Instrument();

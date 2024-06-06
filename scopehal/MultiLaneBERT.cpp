@@ -62,6 +62,8 @@ MultiLaneBERT::~MultiLaneBERT()
 
 void MultiLaneBERT::PostCtorInit()
 {
+	auto sthis = dynamic_pointer_cast<SCPIBERT>(shared_from_this());
+
 	//Add and provide default configuration for pattern generator channels
 	int nchans = 4;
 	m_rxChannelBase = nchans;
@@ -79,7 +81,7 @@ void MultiLaneBERT::PostCtorInit()
 	//Add pattern checker channels
 	for(int i=0; i<nchans; i++)
 	{
-		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), weak_from_this(), "#4040c0", i+nchans));
+		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), sthis, "#4040c0", i+nchans));
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
 		SetRxInvert(i+nchans, false);
 		SetRxCTLEGainStep(i+nchans, 4);

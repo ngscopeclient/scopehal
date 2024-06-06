@@ -47,7 +47,6 @@ class Instrument;
 	An Oscilloscope contains triggering logic and one or more OscilloscopeChannel objects.
  */
 class Oscilloscope	: public virtual Instrument
-					, public std::enable_shared_from_this<Oscilloscope>
 {
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

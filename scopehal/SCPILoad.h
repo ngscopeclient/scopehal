@@ -35,7 +35,6 @@
  */
 class SCPILoad 	: public virtual Load
 				, public virtual SCPIInstrument
-				, public std::enable_shared_from_this<SCPILoad>
 {
 public:
 	SCPILoad();

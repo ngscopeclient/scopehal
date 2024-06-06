@@ -35,7 +35,6 @@
  */
 class SCPIBERT 	: public virtual BERT
 				, public virtual SCPIInstrument
-				, public std::enable_shared_from_this<SCPIBERT>
 {
 public:
 	SCPIBERT();

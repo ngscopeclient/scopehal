@@ -35,7 +35,6 @@
  */
 class SCPIMultimeter 	: public virtual Multimeter
 						, public virtual SCPIInstrument
-						, public std::enable_shared_from_this<SCPIMultimeter>
 {
 public:
 	SCPIMultimeter();

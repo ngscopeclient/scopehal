@@ -35,7 +35,6 @@
  */
 class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
 								, public virtual SCPIInstrument
-								, public std::enable_shared_from_this<SCPIRFSignalGenerator>
 {
 public:
 	SCPIRFSignalGenerator();
