@@ -1249,7 +1249,7 @@ bool AntikernelLabsTriggerCrossbar::AcquireData()
 	if(m_triggerOneShot)
 		m_triggerArmed = false;
 	else
-		m_transport->SendCommandQueued("LA:START");
+		m_transport->SendCommandQueued("LA:ARM");
 
 	return true;
 }
