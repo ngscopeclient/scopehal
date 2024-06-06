@@ -105,6 +105,46 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	m_diagnosticValues["% Received Waveforms Dropped"] = &m_diag_droppedPercent;
 
 	ResetPerCaptureDiagnostics();
+
+	//Initialize waveform buffers
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
+		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
+		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
+	}
+
+	//Create Vulkan objects for the waveform conversion
+	m_queue = g_vkQueueManager->GetComputeQueue("ThunderScopeOscilloscope.queue");
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		m_queue->m_family );
+	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
+	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
+		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+
+	if(g_hasDebugUtils)
+	{
+		string poolname = "ThunderScopeOscilloscope.pool";
+		string bufname = "ThunderScopeOscilloscope.cmdbuf";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandPool,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
+				poolname.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
+				bufname.c_str()));
+	}
+
+	m_conversionPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 }
 
 void ThunderScopeOscilloscope::ResetPerCaptureDiagnostics()
@@ -261,8 +301,8 @@ bool ThunderScopeOscilloscope::AcquireData()
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Analog channels get processed separately
-	vector<uint8_t*> abufs;
 	vector<UniformAnalogWaveform*> awfms;
+	vector<size_t> achans;
 	vector<float> scales;
 	vector<float> offsets;
 
@@ -274,12 +314,15 @@ bool ThunderScopeOscilloscope::AcquireData()
 		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
 
-		uint8_t* buf = new uint8_t[memdepth];
+		auto& abuf = m_analogRawWaveformBuffers[chnum];
+		abuf->resize(memdepth);
+		abuf->PrepareForCpuAccess();
+		achans.push_back(chnum);
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
 		{
-			abufs.push_back(buf);
+			auto buf = abuf->GetCpuPointer();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
@@ -298,6 +341,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 
 			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
 				return false;
+			abuf->MarkModifiedFromCpu();
 
 			for (uint64_t ii = 0; ii < memdepth; ii++)
 			{
@@ -323,25 +367,58 @@ bool ThunderScopeOscilloscope::AcquireData()
 			offsets.push_back(offset);
 
 			s[GetOscilloscopeChannel(chnum)] = cap;
-		} else {
+		}
+		else
+		{
 			LogFatal("???\n");
 		}
 	}
 
-	//Process analog captures in parallel
-	#pragma omp parallel for
-	for(size_t i=0; i<awfms.size(); i++)
+	//Prefer GPU path
+	if(g_hasShaderInt16 && g_hasPushDescriptor)
 	{
-		auto cap = awfms[i];
-		cap->PrepareForCpuAccess();
-		Convert8BitSamples(
-			(float*)&cap->m_samples[0],
-			(int8_t*)abufs[i],
-			scales[i],
-			offsets[i],
-			cap->m_samples.size());
-		delete[] abufs[i];
-		cap->MarkModifiedFromCpu();
+		m_cmdBuf->begin({});
+
+		m_conversionPipeline->Bind(*m_cmdBuf);
+
+		for(size_t i=0; i<awfms.size(); i++)
+		{
+			auto cap = awfms[i];
+
+			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scales[i];
+			args.offset = -offsets[i];
+
+			m_conversionPipeline->DispatchNoRebind(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
+
+			cap->MarkModifiedFromGpu();
+		}
+
+		m_cmdBuf->end();
+		m_queue->SubmitAndBlock(*m_cmdBuf);
+	}
+
+	//Fallback path if GPU doesn't have suitable integer support
+	else
+	{
+		//Process analog captures in parallel
+		#pragma omp parallel for
+		for(size_t i=0; i<awfms.size(); i++)
+		{
+			auto cap = awfms[i];
+			cap->PrepareForCpuAccess();
+			Convert8BitSamples(
+				(float*)&cap->m_samples[0],
+				(int8_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+				scales[i],
+				offsets[i],
+				cap->m_samples.size());
+			cap->MarkModifiedFromCpu();
+		}
 	}
 
 	//DEBUG: implement clientside trigger interpolation
@@ -351,6 +428,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 		size_t trigSampleIndex = GetTriggerOffset() / fs_per_sample;
 		auto chan = trig->GetInput(0).m_channel;
 		auto data = dynamic_cast<UniformAnalogWaveform*>(s[chan]);
+		data->PrepareForCpuAccess();
 
 		//bounds check trigger against waveform size
 		if( (trigSampleIndex < 1) || (trigSampleIndex >= data->size()) )
