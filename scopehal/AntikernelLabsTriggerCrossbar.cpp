@@ -33,6 +33,7 @@
 #include "BufferedSwitchMatrixInputChannel.h"
 #include "BufferedSwitchMatrixOutputChannel.h"
 #include "BufferedSwitchMatrixIOChannel.h"
+#include "BERTInputChannelWithDataCapture.h"
 
 using namespace std;
 
@@ -47,7 +48,11 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	, m_eyeScanInProgress(false)
 	, m_activeScanChannel(0)
 	, m_activeScanProgress(0)
+	, m_triggerArmed(false)
+	, m_triggerOneShot(true)
 {
+	m_laChannelEnabled[0] = false;
+	m_laChannelEnabled[1] = false;
 }
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
@@ -60,6 +65,8 @@ AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
 
 void AntikernelLabsTriggerCrossbar::PostCtorInit()
 {
+	auto sthis = dynamic_pointer_cast<SCPIBERT>(shared_from_this());
+
 	//Input-only channels
 	m_triggerInChannelBase = m_channels.size();
 	for(size_t i=0; i<8; i++)
@@ -225,9 +232,9 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 	{
 		auto hwname = string("RX") + to_string(i);
 
-		m_channels.push_back(new BERTInputChannel(
+		m_channels.push_back(new BERTInputChannelWithDataCapture(
 			hwname,
-			weak_from_this(),
+			sthis,
 			"#4040c0",	//blue-purple
 			m_channels.size()));
 
@@ -296,6 +303,10 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		m_channels[m_triggerBidirChannelBase + i]->SetInput(
 			0, StreamDescriptor(m_channels[m_triggerInChannelBase + muxsel]));
 	}
+
+	//Logic analyzer config
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply("LA:MEMDEPTH?"));
+	m_maxLogicDepth = stoi(reply) * 32;
 
 	m_loadInProgress = false;
 }
@@ -401,7 +412,7 @@ string AntikernelLabsTriggerCrossbar::GetDriverNameInternal()
 
 unsigned int AntikernelLabsTriggerCrossbar::GetInstrumentTypes() const
 {
-	return INST_SWITCH_MATRIX | INST_BERT;
+	return INST_SWITCH_MATRIX | INST_BERT | INST_OSCILLOSCOPE;
 }
 
 uint32_t AntikernelLabsTriggerCrossbar::GetInstrumentTypesForChannel(size_t i) const
@@ -409,7 +420,12 @@ uint32_t AntikernelLabsTriggerCrossbar::GetInstrumentTypesForChannel(size_t i) c
 	if(i < m_txChannelBase)
 		return INST_SWITCH_MATRIX;
 	else
-		return INST_BERT;
+	{
+		if(i >= m_rxChannelBase)
+			return INST_BERT | INST_OSCILLOSCOPE;
+		else
+			return INST_BERT;
+	}
 }
 
 void AntikernelLabsTriggerCrossbar::SetChannelDisplayName(size_t i, string name)
@@ -1167,5 +1183,292 @@ bool AntikernelLabsTriggerCrossbar::AcquireData()
 		GetChannel(i+m_rxChannelBase)->SetScalarValue(BERTInputChannel::STREAM_BER, bers[i]);
 	}
 	*/
+
+	//Grab the data
+	SequenceSet s;
+	double t = GetTime();
+	int64_t sec = floor(t);
+	int64_t fs = (t - sec) * FS_PER_SECOND;
+	for(size_t i=0; i<2; i++)
+	{
+		if(!m_laChannelEnabled[i])
+			continue;
+
+		//Read the data
+		auto nchan = m_rxChannelBase + i;
+		auto chan = GetOscilloscopeChannel(nchan);
+		auto data = m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":DATA?");
+
+		//Make the waveform
+		auto cap = new UniformDigitalWaveform(m_nickname + "." + chan->GetHwname() + ".data");
+		cap->Resize(m_maxLogicDepth);
+		cap->m_timescale = FS_PER_SECOND / GetDataRate(nchan);
+		cap->m_triggerPhase = 0;
+		cap->m_startTimestamp = sec;
+		cap->m_startFemtoseconds = fs;
+		cap->PrepareForCpuAccess();
+
+		//Parse data
+		auto fields = explode(data, ',');
+		size_t nrows = min(fields.size(), m_maxLogicDepth/32);
+		for(size_t j=0; j<nrows; j++)
+		{
+			uint32_t tmp;
+			sscanf(fields[j].c_str(), "%x", &tmp);
+
+			for(int nbit=0; nbit<32; nbit++)
+			{
+				bool b = ((tmp >> nbit) & 1) == 1;
+				cap->m_samples[j*32 + nbit] = b;
+			}
+		}
+		cap->MarkModifiedFromCpu();
+
+		s[StreamDescriptor(chan, BERTInputChannelWithDataCapture::STREAM_CDR_CAPTURE)] = cap;
+
+		//Synthesize a recovered clock
+		cap = new UniformDigitalWaveform(m_nickname + "." + chan->GetHwname() + ".clk");
+		cap->Resize(m_maxLogicDepth);
+		cap->m_timescale = FS_PER_SECOND / GetDataRate(nchan);
+		cap->m_triggerPhase = cap->m_timescale / 2;
+		cap->m_startTimestamp = sec;
+		cap->m_startFemtoseconds = fs;
+		cap->PrepareForCpuAccess();
+		for(size_t j=0; j<m_maxLogicDepth; j++)
+			cap->m_samples[j] = (j & 1) == 1;
+		cap->MarkModifiedFromCpu();
+		s[StreamDescriptor(chan, BERTInputChannelWithDataCapture::STREAM_CDR_RECCLK)] = cap;
+	}
+
+	//Save the waveforms to our queue
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(s);
+	m_pendingWaveformsMutex.unlock();
+
+	//If this was a one-shot trigger we're no longer armed
+	if(m_triggerOneShot)
+		m_triggerArmed = false;
+	else
+		m_transport->SendCommandQueued("LA:START");
+
 	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Oscilloscope / CDR LA mode: stubs for analog features we don't need
+// TODO: create LogicAnalyzer class with dummy stubs for all the analog methods?
+
+OscilloscopeChannel::CouplingType AntikernelLabsTriggerCrossbar::GetChannelCoupling([[maybe_unused]]size_t i)
+{
+	return OscilloscopeChannel::COUPLE_AC_50;
+}
+
+void AntikernelLabsTriggerCrossbar::SetChannelCoupling(
+	[[maybe_unused]]size_t i,
+	[[maybe_unused]]OscilloscopeChannel::CouplingType type)
+{
+}
+
+vector<OscilloscopeChannel::CouplingType> AntikernelLabsTriggerCrossbar::GetAvailableCouplings(
+	[[maybe_unused]] size_t i)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
+	return ret;
+}
+
+double AntikernelLabsTriggerCrossbar::GetChannelAttenuation([[maybe_unused]] size_t i)
+{
+	return 0;
+}
+
+void AntikernelLabsTriggerCrossbar::SetChannelAttenuation([[maybe_unused]] size_t i, [[maybe_unused]] double atten)
+{
+}
+
+unsigned int AntikernelLabsTriggerCrossbar::GetChannelBandwidthLimit([[maybe_unused]] size_t i)
+{
+	return 0;
+}
+
+void AntikernelLabsTriggerCrossbar::SetChannelBandwidthLimit(
+	[[maybe_unused]] size_t i,
+	[[maybe_unused]] unsigned int limit_mhz)
+{
+}
+
+OscilloscopeChannel* AntikernelLabsTriggerCrossbar::GetExternalTrigger()
+{
+	return nullptr;
+}
+
+float AntikernelLabsTriggerCrossbar::GetChannelVoltageRange([[maybe_unused]] size_t i, [[maybe_unused]] size_t stream)
+{
+	return 0;
+}
+
+void AntikernelLabsTriggerCrossbar::SetChannelVoltageRange(
+	[[maybe_unused]] size_t i,
+	[[maybe_unused]] size_t stream,
+	[[maybe_unused]] float range)
+{
+}
+
+float AntikernelLabsTriggerCrossbar::GetChannelOffset([[maybe_unused]] size_t i, [[maybe_unused]] size_t stream)
+{
+	return 0;
+}
+
+void AntikernelLabsTriggerCrossbar::SetChannelOffset(
+	[[maybe_unused]] size_t i,
+	[[maybe_unused]] size_t stream,
+	[[maybe_unused]] float offset)
+{
+}
+
+vector<uint64_t> AntikernelLabsTriggerCrossbar::GetSampleRatesInterleaved()
+{
+	return GetSampleRatesNonInterleaved();
+}
+
+bool AntikernelLabsTriggerCrossbar::IsInterleaving()
+{
+	return false;
+}
+
+bool AntikernelLabsTriggerCrossbar::SetInterleaving([[maybe_unused]] bool combine)
+{
+	return false;
+}
+
+bool AntikernelLabsTriggerCrossbar::CanInterleave()
+{
+	return false;
+}
+
+set<Oscilloscope::InterleaveConflict> AntikernelLabsTriggerCrossbar::GetInterleaveConflicts()
+{
+	set<InterleaveConflict> ret;
+	return ret;
+}
+
+vector<uint64_t> AntikernelLabsTriggerCrossbar::GetSampleDepthsInterleaved()
+{
+	return GetSampleDepthsNonInterleaved();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Oscilloscope / CDR LA mode: functions that actually do stuff
+
+bool AntikernelLabsTriggerCrossbar::IsChannelEnabled(size_t i)
+{
+	if(i < m_rxChannelBase)
+		return false;
+	return m_laChannelEnabled[i - m_rxChannelBase];
+}
+
+void AntikernelLabsTriggerCrossbar::EnableChannel(size_t i)
+{
+	if(i < m_rxChannelBase)
+		return;
+	m_laChannelEnabled[i - m_rxChannelBase] = true;
+}
+
+void AntikernelLabsTriggerCrossbar::DisableChannel(size_t i)
+{
+	if(i < m_rxChannelBase)
+		return;
+	m_laChannelEnabled[i - m_rxChannelBase] = false;
+}
+
+Oscilloscope::TriggerMode AntikernelLabsTriggerCrossbar::PollTrigger()
+{
+	auto state = Trim(m_transport->SendCommandQueuedWithReply("LA:TRIG?"));
+	if(state == "0")
+		return Oscilloscope::TRIGGER_MODE_RUN;
+	else if(m_triggerArmed)
+		return Oscilloscope::TRIGGER_MODE_TRIGGERED;
+	else
+		return Oscilloscope::TRIGGER_MODE_STOP;
+}
+
+void AntikernelLabsTriggerCrossbar::PullTrigger()
+{
+	//no-op for now
+}
+
+void AntikernelLabsTriggerCrossbar::PushTrigger()
+{
+	//no-op for now
+}
+
+void AntikernelLabsTriggerCrossbar::Start()
+{
+	m_transport->SendCommandQueued("LA:ARM");
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+}
+
+void AntikernelLabsTriggerCrossbar::StartSingleTrigger()
+{
+	m_transport->SendCommandQueued("LA:ARM");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+}
+
+bool AntikernelLabsTriggerCrossbar::IsTriggerArmed()
+{
+	return m_triggerArmed;
+}
+
+void AntikernelLabsTriggerCrossbar::ForceTrigger()
+{
+	//TODO
+}
+
+void AntikernelLabsTriggerCrossbar::Stop()
+{
+	m_triggerArmed = false;
+}
+
+vector<uint64_t> AntikernelLabsTriggerCrossbar::GetSampleRatesNonInterleaved()
+{
+	vector<uint64_t> ret;
+	ret.push_back(GetDataRate(0));
+	return ret;
+}
+
+uint64_t AntikernelLabsTriggerCrossbar::GetSampleRate()
+{
+	return GetDataRate(0);
+}
+
+vector<uint64_t> AntikernelLabsTriggerCrossbar::GetSampleDepthsNonInterleaved()
+{
+	vector<uint64_t> ret;
+	ret.push_back(m_maxLogicDepth);
+	return ret;
+}
+
+uint64_t AntikernelLabsTriggerCrossbar::GetSampleDepth()
+{
+	return m_maxLogicDepth;
+}
+
+void AntikernelLabsTriggerCrossbar::SetSampleDepth([[maybe_unused]] uint64_t depth)
+{
+}
+
+void AntikernelLabsTriggerCrossbar::SetSampleRate([[maybe_unused]] uint64_t rate)
+{
+}
+
+void AntikernelLabsTriggerCrossbar::SetTriggerOffset(int64_t offset)
+{
+	//TODO
+}
+
+int64_t AntikernelLabsTriggerCrossbar::GetTriggerOffset()
+{
+	return m_maxLogicDepth / 2;
 }

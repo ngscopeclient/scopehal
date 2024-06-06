@@ -37,6 +37,7 @@ class AntikernelLabsTriggerCrossbar
 	: public virtual SCPIBERT
 	, public virtual SCPIDevice
 	, public virtual SwitchMatrix
+	, public virtual SCPIOscilloscope
 {
 public:
 	AntikernelLabsTriggerCrossbar(SCPITransport* transport);
@@ -132,6 +133,45 @@ public:
 	virtual float GetMuxInputThreshold(size_t dstchan) override;
 	virtual void SetMuxInputThreshold(size_t dstchan, float v) override;
 
+	//Oscilloscope/LA
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual bool IsInterleaving() override;
+	virtual bool SetInterleaving(bool combine) override;
+	virtual bool CanInterleave() override;
+	virtual std::set< InterleaveConflict > GetInterleaveConflicts() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual void SetSampleRate(uint64_t rate) override;
+	virtual void SetTriggerOffset(int64_t offset) override;
+	virtual int64_t GetTriggerOffset() override;
+
 protected:
 
 	size_t m_triggerInChannelBase;
@@ -185,6 +225,12 @@ protected:
 	std::atomic<bool> m_eyeScanInProgress;
 	std::atomic<size_t> m_activeScanChannel;
 	std::atomic<float> m_activeScanProgress;
+
+	//Logic analyzer config
+	bool m_laChannelEnabled[2];
+	uint64_t m_maxLogicDepth;
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
 
 public:
 	static std::string GetDriverNameInternal();

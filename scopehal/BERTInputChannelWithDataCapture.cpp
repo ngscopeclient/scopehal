@@ -28,157 +28,25 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
+#include "BERTInputChannelWithDataCapture.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-BERTInputChannel::BERTInputChannel(
+BERTInputChannelWithDataCapture::BERTInputChannelWithDataCapture(
 	const string& hwname,
 	std::weak_ptr<BERT> bert,
 	const string& color,
 	size_t index)
-	: OscilloscopeChannel(nullptr, hwname, color, Unit(Unit::UNIT_FS), index)
-	, m_bert(bert)
+	: BERTInputChannel(hwname, bert, color, index)
 {
-	ClearStreams();
-
-	//If our parent is also a scope save the pointer to it
-	//TODO: proper smart pointer here
-	auto ptr = bert.lock();
-	if(ptr)
-	{
-		auto pscope = dynamic_pointer_cast<Oscilloscope>(ptr);
-		if(pscope)
-			m_scope = pscope.get();
-	}
-
-	//Make horizontal bathtub stream
-	AddStream(Unit::UNIT_LOG_BER, "HBathtub", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_INFREQUENTLY_USED);
-	SetVoltageRange(15, STREAM_HBATHTUB);
-	SetOffset(7.5, STREAM_HBATHTUB);
-
-	//Make eye pattern stream
-	AddStream(Unit::UNIT_VOLTS, "Eye", Stream::STREAM_TYPE_EYE, Stream::STREAM_INFREQUENTLY_USED);
-	SetVoltageRange(1, STREAM_EYE);	//default, will change when data is acquired
-	SetOffset(0, STREAM_EYE);
-
-	//Stream for current BER
-	AddStream(Unit(Unit::UNIT_LOG_BER), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
-
-	//Stream for mask hit rate
-	AddStream(Unit(Unit::UNIT_RATIO_SCI), "MaskHitRate", Stream::STREAM_TYPE_ANALOG_SCALAR);
-
-	//TODO: figure out how to handle vertical bathtubs since right now all streams share the same X axis units
-	//and we can't do that since we have X axis units in the time domain
+	//Add data capture channel
+	AddStream(Unit::UNIT_VOLTS, "CDRData", Stream::STREAM_TYPE_DIGITAL);
+	AddStream(Unit::UNIT_VOLTS, "CDRClock", Stream::STREAM_TYPE_DIGITAL);
 }
 
-BERTInputChannel::~BERTInputChannel()
+BERTInputChannelWithDataCapture::~BERTInputChannelWithDataCapture()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Vertical scaling and stream management
-
-InstrumentChannel::PhysicalConnector BERTInputChannel::GetPhysicalConnector()
-{
-	return CONNECTOR_K_DUAL;
-}
-
-//This section is mostly lifted from the Filter class since we don't have any of these settings in actual hardware
-
-void BERTInputChannel::ClearStreams()
-{
-	OscilloscopeChannel::ClearStreams();
-	m_ranges.clear();
-	m_offsets.clear();
-}
-
-size_t BERTInputChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
-{
-	m_ranges.push_back(0);
-	m_offsets.push_back(0);
-	return OscilloscopeChannel::AddStream(yunit, name, stype, flags);
-}
-
-float BERTInputChannel::GetVoltageRange(size_t stream)
-{
-	if(m_ranges[stream] == 0)
-	{
-		if(GetData(stream) == nullptr)
-			return 1;
-
-		//AutoscaleVertical(stream);
-	}
-
-	return m_ranges[stream];
-}
-
-void BERTInputChannel::SetVoltageRange(float range, size_t stream)
-{
-	m_ranges[stream] = range;
-}
-
-float BERTInputChannel::GetOffset(size_t stream)
-{
-	if(m_ranges[stream] == 0)
-	{
-		if(GetData(stream) == nullptr)
-			return 0;
-
-		//AutoscaleVertical(stream);
-	}
-
-	return m_offsets[stream];
-}
-
-void BERTInputChannel::SetOffset(float offset, size_t stream)
-{
-	m_offsets[stream] = offset;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Flow graph updates
-
-void BERTInputChannel::SetMaskFile(const string& fname)
-{
-	m_maskFile = fname;
-	m_mask.Load(fname);
-}
-
-bool BERTInputChannel::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	/*
-	if(i >= 2)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
-		return true;
-	*/
-
-	return false;
-}
-
-
-void BERTInputChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
-{
-	/*
-	auto voltageSetPointIn = GetInput(0);
-	if(voltageSetPointIn)
-	{
-		if(Unit(Unit::UNIT_VOLTS) == voltageSetPointIn.GetYAxisUnits())
-			m_bert->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
-	}
-
-	auto currentSetPointIn = GetInput(1);
-	if(currentSetPointIn)
-	{
-		if(Unit(Unit::UNIT_AMPS) == currentSetPointIn.GetYAxisUnits())
-			m_bert->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
-	}
-	*/
 }
