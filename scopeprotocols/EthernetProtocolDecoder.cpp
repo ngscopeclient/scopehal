@@ -383,6 +383,12 @@ void EthernetProtocolDecoder::BytesToFrames(
 								pack->m_displayForegroundColor = "#ffffff";
 								break;
 
+							case 0x88cc:
+								pack->m_headers["Ethertype"] = "LLDP";
+								pack->m_displayBackgroundColor = "#5e4fa2";
+								pack->m_displayForegroundColor = "#ffffff";
+								break;
+
 							default:
 								snprintf(tmp, sizeof(tmp), "%02x%02x",
 								segment.m_data[0],
