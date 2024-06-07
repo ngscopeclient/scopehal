@@ -57,7 +57,10 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
 {
-
+	//Detach all input references on the switch matrix nodes
+	//(since they still hold references to each other and will try to free them during destruction)
+	for(size_t i=0; i<m_txChannelBase; i++)
+		m_channels[i]->DetachInputs();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
