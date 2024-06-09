@@ -34,6 +34,7 @@
 #include "BufferedSwitchMatrixOutputChannel.h"
 #include "BufferedSwitchMatrixIOChannel.h"
 #include "BERTInputChannelWithDataCapture.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -310,6 +311,11 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 	//Logic analyzer config
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply("LA:MEMDEPTH?"));
 	m_maxLogicDepth = stoi(reply) * 32;
+
+	//Get the trigger position
+	PullTrigger();
+	reply = Trim(m_transport->SendCommandQueuedWithReply("LA:TRIGPOS?"));
+	m_triggerOffsetSamples = stoull(reply) * 32;
 
 	m_loadInProgress = false;
 }
@@ -1397,7 +1403,14 @@ Oscilloscope::TriggerMode AntikernelLabsTriggerCrossbar::PollTrigger()
 
 void AntikernelLabsTriggerCrossbar::PullTrigger()
 {
-	//no-op for now
+	if(m_trigger)
+		delete m_trigger;
+
+	//for now, set a default edge trigger
+	//(this is fake, but it'll do for starting out to enable control of trigger position)
+	auto trig = new EdgeTrigger(this);
+	trig->SetInput(0, GetOscilloscopeChannel(m_rxChannelBase));
+	m_trigger = trig;
 }
 
 void AntikernelLabsTriggerCrossbar::PushTrigger()
@@ -1468,10 +1481,15 @@ void AntikernelLabsTriggerCrossbar::SetSampleRate([[maybe_unused]] uint64_t rate
 
 void AntikernelLabsTriggerCrossbar::SetTriggerOffset(int64_t offset)
 {
-	//TODO
+	int64_t timescale = FS_PER_SECOND / m_rxDataRate[0];
+	m_triggerOffsetSamples = offset / timescale;
+
+	m_transport->SendCommandQueued(string("LA:TRIGPOS ") + to_string(m_triggerOffsetSamples / 32));
 }
 
 int64_t AntikernelLabsTriggerCrossbar::GetTriggerOffset()
 {
-	return m_maxLogicDepth / 2;
+	//for now assume both LA channels use the same data rate
+	int64_t timescale = FS_PER_SECOND / m_rxDataRate[0];
+	return m_triggerOffsetSamples * timescale;
 }
