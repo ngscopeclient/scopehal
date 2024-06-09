@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -3608,6 +3608,9 @@ int64_t TektronixOscilloscope::GetSpan()
 
 void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 {
+	if(channel < m_spectrumChannelBase)
+		return;
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -3623,6 +3626,9 @@ void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 
 int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
 {
+	if(channel < m_spectrumChannelBase)
+		return 0;
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
