@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,17 +40,26 @@ SCPITwinLanTransport::SCPITwinLanTransport(const string& args)
 	, m_secondarysocket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 {
 	//Figure out the data port number
-	char hostname[128];
+	char hostname[128] = "";
+	char hostname2[128] = "";
 	unsigned int port = 0;
 	unsigned int dport;
-	if(3 == sscanf(args.c_str(), "%127[^:]:%u:%u", hostname, &port, &dport))
+	if(4 == sscanf(args.c_str(), "%127[^:]:%u:%127[^:]%u", hostname, &port, hostname2, &dport))
 		m_dataport = dport;
+	else if(3 == sscanf(args.c_str(), "%127[^:]:%u:%u", hostname, &port, &dport))
+	{
+		m_dataport = dport;
+		strncpy(hostname2, hostname, sizeof(hostname));
+	}
 	else if(2 == sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
+	{
 		m_dataport = port+1;
+		strncpy(hostname2, hostname, sizeof(hostname));
+	}
 
 	//Connect the secondary socket
 	LogDebug("Connecting to data plane socket\n");
-	m_secondarysocket.Connect(hostname, m_dataport);
+	m_secondarysocket.Connect(hostname2, m_dataport);
 	m_secondarysocket.DisableNagle();
 }
 

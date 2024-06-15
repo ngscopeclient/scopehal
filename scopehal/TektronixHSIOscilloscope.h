@@ -27,44 +27,35 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SCPITwinLanTransport
- */
+#ifndef TektronixHSIOscilloscope_h
+#define TektronixHSIOscilloscope_h
 
-#ifndef SCPITwinLanTransport_h
-#define SCPITwinLanTransport_h
+#include <TektronixOscilloscope.h>
 
 /**
-	@brief A SCPISocketTransport plus a second socket for waveform data
-
-	Read/WriteRawData methods are directed at the secondary stream, rather than the SCPI socket.
+	   @brief TektronixHSIOscilloscope
  */
-class SCPITwinLanTransport : public SCPISocketTransport
+class TektronixHSIOscilloscope : public TektronixOscilloscope
 {
 public:
-	SCPITwinLanTransport(const std::string& args);
-	virtual ~SCPITwinLanTransport();
+	   TektronixHSIOscilloscope(SCPITransport* transport);
+	   virtual ~TektronixHSIOscilloscope();
 
-	virtual std::string GetConnectionString() override;
-	static std::string GetTransportName();
+	   //not copyable or assignable
+	   TektronixHSIOscilloscope(const TektronixHSIOscilloscope& rhs) =delete;
+	   TektronixHSIOscilloscope& operator=(const TektronixHSIOscilloscope& rhs) =delete;
 
-	unsigned short GetDataPort()
-	{ return m_dataport; }
+public:
 
-	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
-	virtual void SendRawData(size_t len, const unsigned char* buf) override;
+	   virtual Oscilloscope::TriggerMode PollTrigger() override;
+	   virtual bool AcquireData() override;
+	   virtual void Start() override;
+	   virtual void StartSingleTrigger() override;
+	   virtual void Stop() override;
 
-	TRANSPORT_INITPROC(SCPITwinLanTransport)
+public:
 
-	const Socket& GetSecondarySocket()
-	{ return m_secondarysocket; }
-
-protected:
-	unsigned short m_dataport;
-
-	Socket m_secondarysocket;
+	   static std::string GetDriverNameInternal();
+	   OSCILLOSCOPE_INITPROC(TektronixHSIOscilloscope);
 };
-
 #endif

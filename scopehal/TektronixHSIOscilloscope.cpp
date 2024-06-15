@@ -27,44 +27,125 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SCPITwinLanTransport
- */
+#include "scopehal.h"
+#include "TektronixHSIOscilloscope.h"
 
-#ifndef SCPITwinLanTransport_h
-#define SCPITwinLanTransport_h
+using namespace std;
 
-/**
-	@brief A SCPISocketTransport plus a second socket for waveform data
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-	Read/WriteRawData methods are directed at the secondary stream, rather than the SCPI socket.
- */
-class SCPITwinLanTransport : public SCPISocketTransport
+TektronixHSIOscilloscope::TektronixHSIOscilloscope(SCPITransport* transport)
+	   : SCPIDevice(transport)
+	   , SCPIInstrument(transport)
+	   , TektronixOscilloscope(transport)
 {
-public:
-	SCPITwinLanTransport(const std::string& args);
-	virtual ~SCPITwinLanTransport();
+	if (m_family != FAMILY_MSO5)
+		LogWarning("TektronixHSIOscilloscope only tested on MSO5\n");
 
-	virtual std::string GetConnectionString() override;
-	static std::string GetTransportName();
+	auto csock = dynamic_cast<SCPITwinLanTransport*>(m_transport);
+	if(!csock)
+		LogFatal("TektronixHSIOscilloscope expects a SCPITwinLanTransport\n");
 
-	unsigned short GetDataPort()
-	{ return m_dataport; }
+	// greeting = transport.ReadRawData()
+}
 
-	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
-	virtual void SendRawData(size_t len, const unsigned char* buf) override;
+TektronixHSIOscilloscope::~TektronixHSIOscilloscope()
+{
+}
 
-	TRANSPORT_INITPROC(SCPITwinLanTransport)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	const Socket& GetSecondarySocket()
-	{ return m_secondarysocket; }
+string TektronixHSIOscilloscope::GetDriverNameInternal()
+{
+	return "tektronix.hsi";
+}
 
-protected:
-	unsigned short m_dataport;
+Oscilloscope::TriggerMode TektronixHSIOscilloscope::PollTrigger()
+{
+	return m_triggerArmed ? TRIGGER_MODE_TRIGGERED : TRIGGER_MODE_STOP;
+}
 
-	Socket m_secondarysocket;
-};
+bool TektronixHSIOscilloscope::AcquireData()
+{
+	if (!m_triggerArmed)
+		return true;
 
-#endif
+	//uint8_t r = 'K';
+	//m_transport->SendRawData(1, &r);
+
+	/*
+	uint64_t num_samples;
+	m_transport->ReadRawData(sizeof(num_samples), (uint8_t*)&num_samples);
+
+	uint64_t sr_fs;
+	m_transport->ReadRawData(sizeof(sr_fs), (uint8_t*)&sr_fs);
+
+	LogTrace("About to recv %ld floats\n", num_samples);
+
+	SequenceSet s;
+	UniformAnalogWaveform* cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(0)->GetHwname());
+	cap->m_timescale = sr_fs;
+	cap->m_triggerPhase = 0;
+	cap->m_startTimestamp = time(NULL);
+	cap->m_startFemtoseconds = 0;
+
+	cap->Resize(num_samples);
+	cap->PrepareForCpuAccess();
+	m_transport->ReadRawData(num_samples * sizeof(float), (uint8_t*)&cap->m_samples[0]);
+	cap->MarkModifiedFromCpu();
+
+	s[GetOscilloscopeChannel(0)] = cap;
+
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(s);
+
+	while (m_pendingWaveforms.size() > 2)
+	{
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+			delete it.second;
+		m_pendingWaveforms.pop_front();
+	}
+
+	m_pendingWaveformsMutex.unlock();
+
+	if (m_triggerOneShot)
+		m_triggerArmed = false;
+	*/
+	return true;
+}
+
+void TektronixHSIOscilloscope::Start()
+{
+	//Flush enable states with the cache mutex locked.
+	//This is necessary to ensure the scope's view of what's enabled is consistent with ours at trigger time.
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	FlushChannelEnableStates();
+
+	m_transport->SendCommandQueued("ACQ:STOPA RUNST");
+	m_transport->SendCommandQueued("ACQ:STATE ON");
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+}
+
+void TektronixHSIOscilloscope::StartSingleTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	FlushChannelEnableStates();
+
+	m_transport->SendCommandQueued("ACQ:STOPA SEQ");
+	m_transport->SendCommandQueued("ACQ:STATE ON");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+}
+
+void TektronixHSIOscilloscope::Stop()
+{
+	m_triggerArmed = false;
+	m_transport->SendCommandQueued("ACQ:STATE STOP");
+	m_triggerOneShot = true;
+}

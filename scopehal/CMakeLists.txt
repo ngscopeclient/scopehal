@@ -176,6 +176,7 @@ set(SCOPEHAL_SOURCES
 	SiglentSCPIOscilloscope.cpp
 	SiglentVectorSignalGenerator.cpp
 	TektronixOscilloscope.cpp
+	TektronixHSIOscilloscope.cpp
 	ThunderScopeOscilloscope.cpp
 	UHDBridgeSDR.cpp
 	HP662xAPowerSupply.cpp
