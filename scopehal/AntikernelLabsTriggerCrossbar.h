@@ -228,7 +228,7 @@ protected:
 
 	//Logic analyzer config
 	bool m_laChannelEnabled[2];
-	uint64_t m_maxLogicDepth;
+	size_t m_maxLogicDepth;
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 	int64_t m_triggerOffsetSamples;
