@@ -1970,7 +1970,15 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					cap->MarkSamplesModifiedFromCpu();
 					ret.push_back(cap);
 				}
+#if (defined(__GNUC__) && !defined(__clang__))
+//WORKAROUND likely GCC bug in newer versions
+#pragma GCC diagnostic push
+#pragma GCC diagnostic warning "-Warray-bounds"
+#endif
 				waveforms[i] = ret;
+#if (defined(__GNUC__) && !defined(__clang__))
+#pragma GCC diagnostic pop
+#endif
 			}
 
 			//Save analog waveform data
