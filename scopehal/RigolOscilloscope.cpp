@@ -52,75 +52,85 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
-	if(1 != sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
-	{
-		if(1 != sscanf(m_model.c_str(), "MSO%d", &m_modelNumber))
-		{
-			LogError("Bad model number\n");
-			return;
-		}
-		else
-		{
-			m_protocol = MSO5;
-			// Hacky workaround since :SYST:OPT:STAT doesn't work properly on some scopes
-			// Only enable chan 1
-			m_transport->SendCommandQueued("CHAN1:DISP 1\n");
-			m_transport->SendCommandQueued("CHAN2:DISP 0\n");
-			if(m_modelNumber % 10 > 2)
-			{
-				m_transport->SendCommandQueued("CHAN3:DISP 0\n");
-				m_transport->SendCommandQueued("CHAN4:DISP 0\n");
-			}
-			// Set in run mode to be able to set memory depth
-			m_transport->SendCommandQueued("RUN\n");
-
-			m_transport->SendCommandQueued("ACQ:MDEP 200M\n");
-			auto reply = Trim(m_transport->SendCommandQueuedWithReply("ACQ:MDEP?\n"));
-			m_opt200M = reply == "2.0000E+08" ?
-							  true :
-							  false;	  // Yes, it actually returns a stringified float, manual says "scientific notation"
-
-			// Reset memory depth
-			m_transport->SendCommandQueued("ACQ:MDEP 1M\n");
-			string originalBandwidthLimit = m_transport->SendCommandQueuedWithReply("CHAN1:BWL?");
-
-			// Figure out its actual bandwidth since :SYST:OPT:STAT is practically useless
-			m_transport->SendCommandQueued("CHAN1:BWL 200M\n");
-			reply = Trim(m_transport->SendCommandQueuedWithReply("CHAN1:BWL?\n"));
-
-			// A bit of a tree, maybe write more beautiful code
-			if(reply == "200M")
-				m_bandwidth = 350;
-			else
-			{
-				m_transport->SendCommandQueued("CHAN1:BWL 100M\n");
-				reply = Trim(m_transport->SendCommandQueuedWithReply("CHAN1:BWL?\n"));
-				if(reply == "100M")
-					m_bandwidth = 200;
-				else
-				{
-					if(m_modelNumber % 1000 - m_modelNumber % 10 == 100)
-						m_bandwidth = 100;
-					else
-						m_bandwidth = 70;
-				}
-			}
-
-			m_transport->SendCommandQueued("CHAN1:BWL " + originalBandwidthLimit);
-		}
-	}
-	else
+	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
 	{
 		if(m_model.size() >= 7 && (m_model[6] == 'D' || m_model[6] == 'E'))
 			m_protocol = DS_OLD;
 		else
 			m_protocol = DS;
 	}
+	else if(1 == sscanf(m_model.c_str(), "MSO%d", &m_modelNumber))
+	{
+		m_protocol = MSO5;
+		// Hacky workaround since :SYST:OPT:STAT doesn't work properly on some scopes
+		// Only enable chan 1
+		m_transport->SendCommandQueued("CHAN1:DISP 1\n");
+		m_transport->SendCommandQueued("CHAN2:DISP 0\n");
+		if(m_modelNumber % 10 > 2)
+		{
+			m_transport->SendCommandQueued("CHAN3:DISP 0\n");
+			m_transport->SendCommandQueued("CHAN4:DISP 0\n");
+		}
+		// Set in run mode to be able to set memory depth
+		m_transport->SendCommandQueued("RUN\n");
+
+		m_transport->SendCommandQueued("ACQ:MDEP 200M\n");
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply("ACQ:MDEP?\n"));
+		m_opt200M = reply == "2.0000E+08" ?
+						true :
+						false;	  // Yes, it actually returns a stringified float, manual says "scientific notation"
+
+		// Reset memory depth
+		m_transport->SendCommandQueued("ACQ:MDEP 1M\n");
+		string originalBandwidthLimit = m_transport->SendCommandQueuedWithReply("CHAN1:BWL?");
+
+		// Figure out its actual bandwidth since :SYST:OPT:STAT is practically useless
+		m_transport->SendCommandQueued("CHAN1:BWL 200M\n");
+		reply = Trim(m_transport->SendCommandQueuedWithReply("CHAN1:BWL?\n"));
+
+		// A bit of a tree, maybe write more beautiful code
+		if(reply == "200M")
+			m_bandwidth = 350;
+		else
+		{
+			m_transport->SendCommandQueued("CHAN1:BWL 100M\n");
+			reply = Trim(m_transport->SendCommandQueuedWithReply("CHAN1:BWL?\n"));
+			if(reply == "100M")
+				m_bandwidth = 200;
+			else
+			{
+				if(m_modelNumber % 1000 - m_modelNumber % 10 == 100)
+					m_bandwidth = 100;
+				else
+					m_bandwidth = 70;
+			}
+		}
+
+		m_transport->SendCommandQueued("CHAN1:BWL " + originalBandwidthLimit);
+	}
+	else if(1 == sscanf(m_model.c_str(), "DHO%d", &m_modelNumber) && (m_modelNumber < 1000))
+	{
+		m_protocol = DHO;
+
+		int model_multiplicator = 100;
+		if(m_modelNumber > 900)	   // special handling of DHO900 series
+		{
+			model_multiplicator = 125;
+		}
+		m_bandwidth = m_modelNumber % 100 / 10 * model_multiplicator;	 // should also work for DHO1000/DHO4000
+
+		m_opt200M = false;	  // does not exist in 800/900 series
+	}
+	else
+	{
+		LogError("Bad model number\n");
+		return;
+	}
 
 	// Maybe fix this in a similar manner to bandwidth
 	int nchans = m_modelNumber % 10;
 
-	if(m_protocol != MSO5)
+	if((m_protocol != MSO5) && (m_protocol != DHO))
 		m_bandwidth = m_modelNumber % 1000 - nchans;
 
 	for(int i = 0; i < nchans; i++)
@@ -184,12 +194,12 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		m_transport->SendCommandQueued(":WAV:FORM BYTE");
 		m_transport->SendCommandQueued(":WAV:MODE RAW");
 	}
-	if(m_protocol == MSO5 || m_protocol == DS_OLD)
+	if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
 	{
 		for(size_t i = 0; i < m_analogChannelCount; i++)
 			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":VERN ON");
 	}
-	if(m_protocol == MSO5 || m_protocol == DS)
+	if(m_protocol == MSO5 || m_protocol == DS || m_protocol == DHO)
 		m_transport->SendCommandQueued(":TIM:VERN ON");
 	FlushConfigCache();
 
@@ -487,7 +497,7 @@ vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/
 	}
 
 	//For now, all known DS series models only support 20 MHz or off
-	else if(m_protocol == DS)
+	else if(m_protocol == DS || m_protocol == DHO)
 	{
 		ret = {20, 0};
 	}
@@ -554,7 +564,7 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 				valid = false;
 		}
 	}
-	else if(m_protocol == DS)
+	else if(m_protocol == DS || m_protocol == DHO)
 	{
 		if((limit_mhz <= 20) & (limit_mhz != 0))
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
@@ -593,13 +603,13 @@ float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 	string reply;
 	if(m_protocol == DS)
 		reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":RANGE?"));
-	else if(m_protocol == MSO5 || m_protocol == DS_OLD)
+	else if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
 		reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":SCALE?"));
 
 	float range;
 	sscanf(reply.c_str(), "%f", &range);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	if(m_protocol == MSO5)
+	if(m_protocol == MSO5 || m_protocol == DHO)
 		range = 8 * range;
 	if(m_protocol == DS_OLD)
 		range = 10 * range;
@@ -617,8 +627,8 @@ void RigolOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, floa
 
 	if(m_protocol == DS)
 		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":RANGE " + to_string(range));
-	else if(m_protocol == MSO5 || m_protocol == DS_OLD)
-		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":SCALE " + to_string(range/8));
+	else if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
+		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":SCALE " + to_string(range / 8));
 }
 
 OscilloscopeChannel* RigolOscilloscope::GetExternalTrigger()
@@ -778,7 +788,7 @@ bool RigolOscilloscope::AcquireData()
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
 		{
-			if(m_protocol == MSO5)
+			if(m_protocol == MSO5 || m_protocol == DHO)
 			{
 				//Ask for the data block
 				m_transport->SendCommandQueued("*WAI");
@@ -954,7 +964,7 @@ void RigolOscilloscope::Stop()
 
 void RigolOscilloscope::ForceTrigger()
 {
-	if(m_protocol == DS)
+	if(m_protocol == DS || m_protocol == DHO)
 		m_transport->SendCommandQueued(":TFOR");
 	else
 		LogError("RigolOscilloscope::ForceTrigger not implemented for this model\n");
