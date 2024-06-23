@@ -678,13 +678,27 @@ string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLoc
 		default:
 			//Default to 4 sig figs for now
 			{
-				int64_t value1 = value * 10000;
-				if(scaleFactor > 1)
-					value1 *= mulFactor;
+				//Normal pretty printing routine for small values
+				int64_t value1;
+				int64_t value2;
+				if(scaleFactor > 1e-6)
+				{
+					value1 = value * 10000;
+					if(scaleFactor > 1)
+						value1 *= mulFactor;
+					else
+						value1 /= divFactor;
+					value2 = value1 % 10000;
+					value1 /= 10000;
+				}
+
+				//For really big values, prescale first to avoid overflow
 				else
-					value1 /= divFactor;
-				int64_t value2 = value1 % 10000;
-				value1 /= 10000;
+				{
+					value1 = value / (divFactor / 10000);
+					value2 = value1 % 10000;
+					value1 /= 10000;
+				}
 
 				snprintf(tmp, sizeof(tmp), "%" PRId64 ".%04" PRId64, value1, value2);
 
