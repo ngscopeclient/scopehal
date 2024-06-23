@@ -61,8 +61,6 @@ bool PhaseNonlinearityFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
 		return false;
-	if(stream.m_channel->GetXAxisUnits().GetType() != Unit::UNIT_HZ)
-		return false;
 	if(i == 0)
 		return (stream.GetYAxisUnits().GetType() == Unit::UNIT_DEGREES);
 
@@ -93,6 +91,10 @@ void PhaseNonlinearityFilter::Refresh()
 	auto uang = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sang = dynamic_cast<SparseAnalogWaveform*>(din);
 	din->PrepareForCpuAccess();
+
+	m_xAxisUnit = GetInput(0).GetXAxisUnits();
+	m_parameters[m_refLowName].SetUnit(m_xAxisUnit);
+	m_parameters[m_refHighName].SetUnit(m_xAxisUnit);
 
 	//We need meaningful data
 	size_t len = din->size();

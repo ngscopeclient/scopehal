@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,11 +49,9 @@ UnwrappedPhaseFilter::UnwrappedPhaseFilter(const string& color)
 
 bool UnwrappedPhaseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
-		return false;
-	if(stream.m_channel->GetXAxisUnits().GetType() != Unit::UNIT_HZ)
 		return false;
 	if(i == 0)
 		return (stream.GetYAxisUnits().GetType() == Unit::UNIT_DEGREES);
@@ -85,6 +83,8 @@ void UnwrappedPhaseFilter::Refresh()
 	auto uang = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sang = dynamic_cast<SparseAnalogWaveform*>(din);
 	din->PrepareForCpuAccess();
+
+	m_xAxisUnit = GetInput(0).GetXAxisUnits();
 
 	//We need meaningful data
 	size_t len = din->size();

@@ -101,10 +101,13 @@ void PhaseMeasurement::Refresh()
 	float vmin = GetBaseVoltage(sdin, udin);
 	float vavg = (vmax + vmin) / 2;
 	vector<int64_t> edges;
-	FindZeroCrossings(sdin, udin, vavg, edges);
+	if(sdin)
+		FindRisingEdges(sdin, vavg, edges);
+	else
+		FindRisingEdges(udin, vavg, edges);
 	size_t edgelen = edges.size();
 
-	//Auto: use median of interval between pairs of zero crossings
+	//Auto: use median of interval between pairs of rising edges
 	int64_t period = 0;
 	if(m_parameters[m_freqModeName].GetIntVal() == MODE_AUTO)
 	{
@@ -132,7 +135,7 @@ void PhaseMeasurement::Refresh()
 	cap->m_triggerPhase = 1;
 	cap->Resize(outlen);
 
-	//Main measurement loop, update once per cycle at the zero crossing.
+	//Main measurement loop, update once per cycle at the rising edge
 	//This isn't quite as nice as the original implementation measuring instantaneous phase within a single cycle,
 	//but is MUCH more robust in the presence of amplitude noise or variation (e.g. pulse shaping as seen in PSK31)
 	for(size_t i=0; i<outlen; i++)
@@ -141,14 +144,16 @@ void PhaseMeasurement::Refresh()
 		int64_t tnow = edges[i*2];
 		float theta = fmodf(tnow, period) / period;
 		theta = (theta - 0.5) * 2 * M_PI;
-		if(theta < -M_PI)
-			theta += 2*M_PI;
-		if(theta > M_PI)
-			theta -= 2*M_PI;
+		float finalPhase = (360 * theta / M_PI) + 180;
+
+		if(finalPhase < -180)
+			finalPhase += 360;
+		if(finalPhase > 180)
+			finalPhase -= 360;
 
 		cap->m_offsets[i] = tnow;
 		cap->m_durations[i] = 1;
-		cap->m_samples[i] = 180 * theta / M_PI;
+		cap->m_samples[i] = finalPhase;
 
 		//Resize last sample
 		if(i > 0)
