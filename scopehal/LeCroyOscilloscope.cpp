@@ -1923,6 +1923,9 @@ int LeCroyOscilloscope::GetMeterChannelCount()
 
 int LeCroyOscilloscope::GetCurrentMeterChannel()
 {
+	if(!m_hasDVM)
+		return 0;
+
 	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.DvmSource'");
 	int i;
 	sscanf(str.c_str(), "C%d", &i);
