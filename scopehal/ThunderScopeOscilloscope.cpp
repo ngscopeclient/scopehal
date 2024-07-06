@@ -604,6 +604,8 @@ vector<OscilloscopeChannel::CouplingType> ThunderScopeOscilloscope::GetAvailable
 	vector<OscilloscopeChannel::CouplingType> ret;
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
 	return ret;
 }
 
