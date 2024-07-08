@@ -30,6 +30,7 @@ add_compute_shaders(
 	halshaders
 	SOURCES
 		Convert8BitSamples.glsl
+		Convert8BitSamplesWithClipDetection.glsl
 		Convert16BitSamples.glsl
 	)
 

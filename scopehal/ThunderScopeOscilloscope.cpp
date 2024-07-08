@@ -145,6 +145,8 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 
 	m_conversionPipeline = make_unique<ComputePipeline>(
 		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+
+	m_clippingBuffer.resize(1);
 }
 
 void ThunderScopeOscilloscope::ResetPerCaptureDiagnostics()
@@ -343,15 +345,6 @@ bool ThunderScopeOscilloscope::AcquireData()
 				return false;
 			abuf->MarkModifiedFromCpu();
 
-			for (uint64_t ii = 0; ii < memdepth; ii++)
-			{
-				int8_t* p = (int8_t*)&buf[ii];
-				if ((*p == -128) || (*p == 127))
-				{
-					clipping = 1;
-				}
-			}
-
 			//Create our waveform
 			UniformAnalogWaveform* cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
@@ -375,7 +368,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 	}
 
 	//Prefer GPU path
-	if(g_hasShaderInt16 && g_hasPushDescriptor)
+	if(g_hasShaderInt8 && g_hasPushDescriptor)
 	{
 		m_cmdBuf->begin({});
 

@@ -27,90 +27,42 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef ThunderScopeOscilloscope_h
-#define ThunderScopeOscilloscope_h
+#version 430
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_8bit_storage : require
 
-#include "RemoteBridgeOscilloscope.h"
-#include "../xptools/HzClock.h"
-
-/**
-	@brief ThunderScopeOscilloscope - driver for talking to the TS.NET daemons
- */
-class ThunderScopeOscilloscope : public RemoteBridgeOscilloscope
+layout(std430, binding=0) restrict writeonly buffer buf_pout
 {
-public:
-	ThunderScopeOscilloscope(SCPITransport* transport);
-	virtual ~ThunderScopeOscilloscope();
-
-	//not copyable or assignable
-	ThunderScopeOscilloscope(const ThunderScopeOscilloscope& rhs) =delete;
-	ThunderScopeOscilloscope& operator=(const ThunderScopeOscilloscope& rhs) =delete;
-
-public:
-
-	//Device information
-	virtual unsigned int GetInstrumentTypes() const override;
-	virtual void FlushConfigCache() override;
-
-	//Channel configuration
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
-	virtual double GetChannelAttenuation(size_t i) override;
-	virtual void SetChannelAttenuation(size_t i, double atten) override;
-	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
-	virtual OscilloscopeChannel* GetExternalTrigger() override;
-	virtual bool CanEnableChannel(size_t i) override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
-
-	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger() override;
-	virtual bool AcquireData() override;
-
-	// Captures
-	virtual void Start() override;
-	virtual void StartSingleTrigger() override;
-	virtual void ForceTrigger() override;
-
-	//Timebase
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
-	virtual bool IsInterleaving() override;
-	virtual bool SetInterleaving(bool combine) override;
-
-protected:
-	void ResetPerCaptureDiagnostics();
-
-	std::string GetChannelColor(size_t i);
-
-	size_t m_analogChannelCount;
-
-	// Cache
-	std::map<size_t, double> m_channelAttenuations;
-
-	FilterParameter m_diag_hardwareWFMHz;
-	FilterParameter m_diag_receivedWFMHz;
-	FilterParameter m_diag_totalWFMs;
-	FilterParameter m_diag_droppedWFMs;
-	FilterParameter m_diag_droppedPercent;
-	HzClock m_receiveClock;
-
-	///@brief Buffers for storing raw ADC samples before converting to fp32
-	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
-
-	std::shared_ptr<QueueHandle> m_queue;
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
-	std::unique_ptr<ComputePipeline> m_conversionPipeline;
-
-	AcceleratorBuffer<uint32_t> m_clippingBuffer;
-
-public:
-
-	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC(ThunderScopeOscilloscope);
+	float pout[];
 };
 
-#endif
+layout(std430, binding=1) restrict readonly buffer buf_pin
+{
+	int8_t pin[];
+};
+
+layout(std430, binding=2) buffer buf_pclip
+{
+	uint pclip[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+	float gain;
+	float offset;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	if(gl_GlobalInvocationID.x >= size)
+		return;
+
+	int rawsamp = int(pin[gl_GlobalInvocationID.x]);
+	if( (rawsamp == -128) || (rawsamp == 127) )
+		atomicMax(pclip[0], 1);
+
+	pout[gl_GlobalInvocationID.x] = gain*float(rawsamp) - offset;
+}
