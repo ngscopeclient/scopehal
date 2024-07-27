@@ -2176,7 +2176,7 @@ void SiglentSCPIOscilloscope::Start()
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":TRIGGER:MODE STOP");
+			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
 			break;
 		// --------------------------------------------------
@@ -2208,7 +2208,7 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":TRIGGER:MODE STOP");
+			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");
 			break;
 
@@ -2240,7 +2240,7 @@ void SiglentSCPIOscilloscope::Stop()
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			m_transport->SendCommandImmediate(":TRIGGER:MODE STOP");
+			m_transport->SendCommandImmediate(":TRIGGER:STOP");
 			break;
 		// --------------------------------------------------
 		default:
