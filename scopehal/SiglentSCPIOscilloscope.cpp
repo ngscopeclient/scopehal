@@ -340,30 +340,37 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			if(m_model.compare(4, 1, "5") == 0)
 				m_maxBandwidth = 500;
 
-			//Check if version requires size workaround (1.3.9R6 and older)
-			int ubootMajorVersion;
-			int ubootMinorVersion;
-			int fwMajorVersion;
-			int fwMinorVersion;
-			int fwPatchVersion;
-			int fwPatchRevision;
+			//Firmware 1.6.2R5 (and newer) has 7 digits in version string whereas
+			//older firmware has 6 digits.
+			if(m_fwVersion.size() == 11)
+			{
+				//Check if version requires size workaround (1.3.9R6 and older)
+				int ubootMajorVersion = 0;
+				int ubootMinorVersion = 0;
+				int fwMajorVersion = 0;
+				int fwMinorVersion = 0;
+				int fwPatchVersion = 0;
+				int fwPatchRevision = 0;
 
-			sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%dR%d",
-				&ubootMajorVersion,
-				&ubootMinorVersion,
-				&fwMajorVersion,
-				&fwMinorVersion,
-				&fwPatchVersion,
-				&fwPatchRevision);
-			//Firmware 1.3.9R6 and older require size workaround.
-			if(fwMajorVersion < 1)
-				m_requireSizeWorkaround = true;
-			else if((fwMajorVersion == 1) && (fwMinorVersion < 3))
-				m_requireSizeWorkaround = true;
-			else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion < 9))
-				m_requireSizeWorkaround = true;
-			else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion == 9) && (fwPatchRevision <= 6))
-				m_requireSizeWorkaround = true;
+				//Version format for 1.5.2R3 and older
+				sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%dR%d",
+					&ubootMajorVersion,
+					&ubootMinorVersion,
+					&fwMajorVersion,
+					&fwMinorVersion,
+					&fwPatchVersion,
+					&fwPatchRevision);
+
+				//Firmware 1.3.9R6 and older require size workaround.
+				if(fwMajorVersion < 1)
+					m_requireSizeWorkaround = true;
+				else if((fwMajorVersion == 1) && (fwMinorVersion < 3))
+					m_requireSizeWorkaround = true;
+				else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion < 9))
+					m_requireSizeWorkaround = true;
+				else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion == 9) && (fwPatchRevision <= 6))
+					m_requireSizeWorkaround = true;
+			}
 
 			if(m_requireSizeWorkaround)
 				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
@@ -2176,7 +2183,7 @@ void SiglentSCPIOscilloscope::Start()
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":TRIGGER:MODE STOP");
+			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
 			break;
 		// --------------------------------------------------
@@ -2208,7 +2215,7 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":TRIGGER:MODE STOP");
+			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");
 			break;
 
@@ -2240,7 +2247,7 @@ void SiglentSCPIOscilloscope::Stop()
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			m_transport->SendCommandImmediate(":TRIGGER:MODE STOP");
+			m_transport->SendCommandImmediate(":TRIGGER:STOP");
 			break;
 		// --------------------------------------------------
 		default:
