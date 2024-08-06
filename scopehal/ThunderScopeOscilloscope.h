@@ -61,6 +61,7 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual bool CanEnableChannel(size_t i) override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
