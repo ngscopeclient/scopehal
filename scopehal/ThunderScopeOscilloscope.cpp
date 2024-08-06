@@ -57,7 +57,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		//Hardware name of the channel
-		string chname = to_string(i);
+		string chname = "CHAN" + to_string(i + 1);
 
 		//Create the channel
 		auto chan = new OscilloscopeChannel(
@@ -74,7 +74,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 		chan->SetDisplayName(nicename);
 
 		//Set initial configuration so we have a well-defined instrument state
-		m_channelAttenuations[i] = 10;
+		m_channelAttenuations[i] = 1;
 		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_DC_1M);
 		SetChannelOffset(i, 0,  0);
 		SetChannelVoltageRange(i, 0, 5);
@@ -96,7 +96,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
 	SetTrigger(trig);
 	PushTrigger();
-	SetTriggerOffset(1000000000000); //1ms to allow trigphase interpolation
+	SetTriggerOffset(1000000000); //1us to allow trigphase interpolation
 
 	m_diagnosticValues["Hardware WFM/s"] = &m_diag_hardwareWFMHz;
 	m_diagnosticValues["Received WFM/s"] = &m_diag_receivedWFMHz;
@@ -331,7 +331,8 @@ bool ThunderScopeOscilloscope::AcquireData()
 				return false;
 			float scale = config[0];
 			float offset = config[1];
-			float trigphase = -config[2] * fs_per_sample;
+			//float trigphase = -config[2] * fs_per_sample;
+			float trigphase = config[2];
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
 
@@ -411,34 +412,6 @@ bool ThunderScopeOscilloscope::AcquireData()
 				offsets[i],
 				cap->m_samples.size());
 			cap->MarkModifiedFromCpu();
-		}
-	}
-
-	//DEBUG: implement clientside trigger interpolation
-	auto trig = GetTrigger();
-	if(trig)
-	{
-		size_t trigSampleIndex = GetTriggerOffset() / fs_per_sample;
-		auto chan = trig->GetInput(0).m_channel;
-		auto data = dynamic_cast<UniformAnalogWaveform*>(s[chan]);
-		data->PrepareForCpuAccess();
-
-		//bounds check trigger against waveform size
-		if( (trigSampleIndex < 1) || (trigSampleIndex >= data->size()) )
-		{
-			//no interpolation possible, trigger sample isn't in the buffer
-		}
-
-		else
-		{
-			float fa = data->m_samples[trigSampleIndex - 1];
-			float fb = data->m_samples[trigSampleIndex];
-			float slope = (fb - fa);
-			float delta = trig->GetLevel() - fa;
-			float trigphase = delta / slope;
-
-			for(auto w : awfms)
-				w->m_triggerPhase = fs_per_sample * (1 - trigphase);
 		}
 	}
 
@@ -600,6 +573,49 @@ vector<OscilloscopeChannel::CouplingType> ThunderScopeOscilloscope::GetAvailable
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
 	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
 	return ret;
+}
+
+void ThunderScopeOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
+{
+	vector<OscilloscopeChannel::CouplingType> available = GetAvailableCouplings(i);
+
+	if (!count(available.begin(), available.end(), type))
+	{
+		return;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(type)
+	{
+		case OscilloscopeChannel::COUPLE_AC_1M:
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 1M");
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_1M:
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 1M");
+			break;
+
+		case OscilloscopeChannel::COUPLE_AC_50:
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 50");
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_50:
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 50");
+			break;
+
+		default:
+			LogError("Coupling not supported in ThunderScopeOscilloscope: %d\n", type);
+			return;
+	}
+
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_channelCouplings[i] = type;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
