@@ -70,8 +70,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 			i);
 		m_channels.push_back(chan);
 
-		string nicename = "ch" + to_string(i+1);
-		chan->SetDisplayName(nicename);
+		chan->SetDisplayName(chname);
 
 		//Set initial configuration so we have a well-defined instrument state
 		m_channelAttenuations[i] = 1;
