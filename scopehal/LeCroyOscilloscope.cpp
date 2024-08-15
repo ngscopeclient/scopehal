@@ -2889,6 +2889,18 @@ bool LeCroyOscilloscope::AcquireData()
 			//cppcheck-suppress invalidPointerCast
 			analog_hoff = *reinterpret_cast<double*>(pdesc + 180) * FS_PER_SECOND;
 
+			///Handle units
+			auto pvunit = reinterpret_cast<const char*>(pdesc + 196);
+			int pvlen = 1;
+			while( (pvlen < 48) && (pvunit[pvlen] != '\0'))
+				pvlen ++;
+			string vunit(pvunit, pvlen);
+			if(vunit == "V")
+				m_channels[i]->SetYAxisUnits(Unit(Unit::UNIT_VOLTS), 0);
+			else if(vunit == "A")
+				m_channels[i]->SetYAxisUnits(Unit(Unit::UNIT_AMPS), 0);
+			//else unknown unit, ignore for now
+
 			waveforms[i] = ProcessAnalogWaveform(
 				&analogWaveformData[i][16],			//skip 16-byte SCPI header DATA,\n#9xxxxxxxx
 				analogWaveformData[i].size() - 17,	//skip header plus \n at end
