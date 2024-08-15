@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -86,6 +86,9 @@ void DownsampleFilter::Refresh()
 	//Get the input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	size_t len = din->m_samples.size();
+
+	//Propagate units
+	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
 
 	//Set up output waveform and get configuration
 	int64_t factor = m_parameters[m_factorname].GetIntVal();
