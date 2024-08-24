@@ -30,15 +30,15 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ToneGeneratorFilter
+	@brief Declaration of NCOFilter
  */
-#ifndef ToneGeneratorFilter_h
-#define ToneGeneratorFilter_h
+#ifndef NCOFilter_h
+#define NCOFilter_h
 
-class ToneGeneratorFilter : public Filter
+class NCOFilter : public Filter
 {
 public:
-	ToneGeneratorFilter(const std::string& color);
+	NCOFilter(const std::string& color);
 
 	virtual void Refresh() override;
 
@@ -46,11 +46,10 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	PROTOCOL_DECODER_INITPROC(ToneGeneratorFilter)
+	PROTOCOL_DECODER_INITPROC(NCOFilter)
 
 protected:
 	std::string m_ratename;
-	std::string m_freqname;
 	std::string m_biasname;
 	std::string m_amplitudename;
 	std::string m_depthname;

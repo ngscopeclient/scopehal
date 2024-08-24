@@ -150,6 +150,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MinimumFilter);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultiplyFilter);
+	AddDecoderClass(NCOFilter);
 	AddDecoderClass(NoiseFilter);
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);

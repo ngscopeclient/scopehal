@@ -150,6 +150,7 @@
 #include "MinimumFilter.h"
 #include "MovingAverageFilter.h"
 #include "MultiplyFilter.h"
+#include "NCOFilter.h"
 #include "NoiseFilter.h"
 #include "OneWireDecoder.h"
 #include "OvershootMeasurement.h"
