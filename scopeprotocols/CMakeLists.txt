@@ -140,6 +140,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp
 	RMSMeasurement.cpp
+	SawtoothGeneratorFilter.cpp
 	ScalarPulseDelayFilter.cpp
 	ScalarStairstepFilter.cpp
 	ScaleFilter.cpp

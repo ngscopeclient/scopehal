@@ -179,6 +179,7 @@
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"
 #include "RiseMeasurement.h"
+#include "SawtoothGeneratorFilter.h"
 #include "ScalarPulseDelayFilter.h"
 #include "ScalarStairstepFilter.h"
 #include "ScaleFilter.h"
