@@ -56,6 +56,9 @@ protected:
 	std::string m_amplitudename;
 	std::string m_depthname;
 	std::string m_phasename;
+	std::string m_unitname;
+
+	void OnUnitChanged();
 };
 
 #endif

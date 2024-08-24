@@ -43,6 +43,7 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 	, m_amplitudename("Amplitude")
 	, m_depthname("Depth")
 	, m_phasename("Starting Phase")
+	, m_unitname("Unit")
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
@@ -63,6 +64,10 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 
 	m_parameters[m_phasename] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DEGREES));
 	m_parameters[m_phasename].SetFloatVal(0);
+
+	m_parameters[m_unitname] = FilterParameter::UnitSelector();
+	m_parameters[m_unitname].SetIntVal(Unit::UNIT_VOLTS);
+	m_parameters[m_unitname].signal_changed().connect(sigc::mem_fun(*this, &ToneGeneratorFilter::OnUnitChanged));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,6 +95,15 @@ void ToneGeneratorFilter::SetDefaultName()
 	snprintf(hwname, sizeof(hwname), "Sine(%s)", hz.PrettyPrint(m_parameters[m_freqname].GetIntVal()).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
+}
+
+void ToneGeneratorFilter::OnUnitChanged()
+{
+	Unit unit(static_cast<Unit::UnitType>(m_parameters[m_unitname].GetIntVal()));
+
+	SetYAxisUnits(unit, 0);
+	m_parameters[m_amplitudename].SetUnit(unit);
+	m_parameters[m_biasname].SetUnit(unit);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
