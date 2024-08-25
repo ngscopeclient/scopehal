@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -88,6 +88,17 @@ public:
 		auto value = m_reverseMap[key];
 		m_reverseMap.erase(key);
 		m_forwardMap.erase(value);
+	}
+
+	/**
+		@brief Replaces one value with another, keeping the keys identical
+	 */
+	void replace(T2 oldval, T2 newval)
+	{
+		T1 key = m_reverseMap[oldval];
+		m_reverseMap.erase(oldval);
+		m_forwardMap[key] = newval;
+		m_reverseMap[newval] = key;
 	}
 
 	size_t size()
