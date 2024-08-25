@@ -73,6 +73,9 @@ public:
 		FILTER_TYPE_NOTCH
 	};
 
+	FilterType GetFilterType()
+	{ return static_cast<FilterType>(m_parameters[m_filterTypeName].GetIntVal()); }
+
 	void SetFilterType(FilterType type)
 	{ m_parameters[m_filterTypeName].SetIntVal(type); }
 
