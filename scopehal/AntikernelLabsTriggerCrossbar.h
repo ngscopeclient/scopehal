@@ -132,8 +132,6 @@ public:
 	virtual bool MuxHasConfigurableThreshold(size_t dstchan) override;
 	virtual float GetMuxInputThreshold(size_t dstchan) override;
 	virtual void SetMuxInputThreshold(size_t dstchan, float v) override;
-	virtual bool IsChannelInUse(size_t chan) override
-	{ return IsChannelEnabled(chan); }
 
 	//Oscilloscope/LA
 	virtual bool IsChannelEnabled(size_t i) override;
@@ -227,9 +225,6 @@ protected:
 	std::atomic<bool> m_eyeScanInProgress;
 	std::atomic<size_t> m_activeScanChannel;
 	std::atomic<float> m_activeScanProgress;
-
-	//Input channel enables (just controls if they're displayed in the filter graph or not)
-	bool m_inputEnabled[8];
 
 	//Logic analyzer config
 	bool m_laChannelEnabled[2];

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,6 +46,7 @@ InstrumentChannel::InstrumentChannel(
 	Unit xunit,
 	size_t index)
 	: m_displaycolor(color)
+	, m_visibilityMode(VIS_AUTO)
 	, m_hwname(hwname)
 	, m_displayname(hwname)
 	, m_index(index)
@@ -61,6 +62,7 @@ InstrumentChannel::InstrumentChannel(
 	Stream::StreamType stype,
 	size_t index)
 	: m_displaycolor(color)
+	, m_visibilityMode(VIS_AUTO)
 	, m_hwname(hwname)
 	, m_displayname(hwname)
 	, m_index(index)

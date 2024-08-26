@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -224,6 +224,16 @@ public:
 		@brief Determine whether the channel's waveform(s) should be persisted to a session file
 	 */
 	virtual bool ShouldPersistWaveform();
+
+	/**
+		@brief Selects how the channel should be displayed in e.g. the ngscopeclient filter graph editor
+	 */
+	enum VisibilityMode
+	{
+		VIS_HIDE,
+		VIS_AUTO,	//decide based on whether it's enabled etc
+		VIS_SHOW,
+	} m_visibilityMode;
 
 protected:
 
