@@ -61,6 +61,7 @@ protected:
 
 	bool LoadLinuxCooked(FILE* fp);
 	bool LoadCANLinuxCooked(FILE* fp);
+	bool LoadSocketCAN(FILE* fp);
 
 	enum LinkType
 	{
@@ -68,6 +69,7 @@ protected:
 		LINK_TYPE_CAN,
 		LINK_TYPE_USB,
 		LINK_TYPE_LINUX_COOKED,
+		LINK_TYPE_SOCKETCAN,
 		LINK_TYPE_UNKNOWN
 	} m_linkType;
 

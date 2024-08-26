@@ -172,6 +172,10 @@ void PcapngImportFilter::OnFileNameChanged()
 
 	switch(m_linkType)
 	{
+		case LINK_TYPE_SOCKETCAN:
+			LoadSocketCAN(fp);
+			break;
+
 		case LINK_TYPE_LINUX_COOKED:
 			//Linux cooked encapsulation is special: we don't know the output data format initially
 			//and there can be a mix of several which we don't currently implement!
@@ -183,6 +187,219 @@ void PcapngImportFilter::OnFileNameChanged()
 	}
 
 	fclose(fp);
+}
+
+//TODO: this shares a lot in common with LoadCANLinuxCooked, how can we share more?
+bool PcapngImportFilter::LoadSocketCAN(FILE* fp)
+{
+	LogTrace("Loading SocketCAN packets\n");
+	LogIndenter li;
+
+	//Create output waveform
+	auto cap = new CANWaveform;
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
+	SetData(cap, 0);
+
+	bool first = true;
+	int64_t baseTimestamp = 0;
+
+	//Calculate length of a single bit on the bus
+	int64_t baud = m_parameters[m_datarate].GetIntVal();
+	int64_t ui = FS_PER_SECOND / baud;
+
+	uint32_t blocktype;
+	uint32_t blocklen;
+	int64_t tend = 0;
+	while(!feof(fp))
+	{
+		auto blockstart = ftell(fp);
+
+		if(1 != fread(&blocktype, sizeof(blocktype), 1, fp))
+			return false;
+		if(1 != fread(&blocklen, sizeof(blocklen), 1, fp))
+			return false;
+
+		//Should be an EPB, ignore anything else
+		switch(blocktype)
+		{
+			case 5:
+				LogTrace("Found Block Statistics (%d bytes)\n", blocklen);
+				fseek(fp, blockstart + blocklen, SEEK_SET);
+				continue;
+
+			case 6:
+				//LogTrace("Found EPB (%d bytes)\n", blocklen);
+				break;
+
+			default:
+				//unknown type, wut?
+				LogWarning("unknown block type %d\n", blocktype);
+				fseek(fp, blockstart + blocklen, SEEK_SET);
+				continue;
+		}
+		LogIndenter li2;
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// PCAPNG EPB headers
+
+		//For now, ignore interface number since we don't support mixed captures or multiple output streams yet
+		uint32_t ifacenum;
+		if(1 != fread(&ifacenum, sizeof(ifacenum), 1, fp))
+			return false;
+		//LogTrace("Interface %u\n", ifacenum);
+
+		//Timestamp
+		uint32_t tstamp[2];
+		if(2 != fread(tstamp, sizeof(uint32_t), 2, fp))
+			return false;
+
+		//Convert from packed format in native units to a single 64-bit integer
+		int64_t stamp = tstamp[0];
+		stamp = (stamp << 32) | tstamp[1];
+
+		//If this is the FIRST packet in the capture, it's the base timestamp and we measure offsets from that
+		if(first)
+		{
+			baseTimestamp = stamp;
+			stamp = 0;
+			first = false;
+
+			//Convert base timestamp to seconds and fs
+			int64_t ticks_per_fs = FS_PER_SECOND / m_timestampScale;
+			cap->m_startTimestamp = baseTimestamp / ticks_per_fs;
+			cap->m_startFemtoseconds = m_timestampScale * (baseTimestamp % ticks_per_fs);
+		}
+
+		//Not first, use relative offset
+		else
+			stamp -= baseTimestamp;
+
+		//Convert from native units to fs
+		stamp *= m_timestampScale;
+
+		//Actual as-captured packet length
+		uint32_t packlen;
+		if(1 != fread(&packlen, sizeof(packlen), 1, fp))
+			return false;
+		if(packlen < 16)
+		{
+			LogWarning("Invalid packet length %d (should be >= 16 to allow room for cooked headers)\n", packlen);
+			fseek(fp, blockstart + blocklen, SEEK_SET);
+			continue;
+		}
+
+		//Original packet length (might have been truncated, but ignore this)
+		uint32_t origlen;
+		if(1 != fread(&origlen, sizeof(origlen), 1, fp))
+			return false;
+
+		//Timestamps sometimes have some jitter due to USB dongles combining several into one transaction,
+		//without logging actual arrival timestamps. So they can appear to be coming at too high a baud rate.
+		//Fudge the timestamp if it claims to have come before the previous frame ended
+		if(stamp < tend)
+			stamp = tend;
+
+		//Read CAN ID (32 bit on wire)
+		uint32_t id;
+		if(1 != fread(&id, sizeof(id), 1, fp))
+			return false;
+		id = ntohl(id);
+
+		//Read frame length
+		uint8_t nbytes;
+		if(1 != fread(&nbytes, sizeof(nbytes), 1, fp))
+			return false;
+		if(nbytes > 8)
+		{
+			LogWarning("Invalid DLC %d (should be <= 8)\n", nbytes);
+			fseek(fp, blockstart + blocklen, SEEK_SET);
+			continue;
+		}
+
+		//Skip 3 bytes of FD flags / reserved before the payload
+		fseek(fp, 3, SEEK_CUR);
+
+		//Read payload
+		uint8_t data[8];
+		if(nbytes != fread(data, 1, nbytes, fp))
+			return false;
+
+		//Extract header bits (packed in with ID)
+		bool ext = (id & 0x80000000);
+		bool rtr = (id & 0x40000000);
+		bool err = (id & 0x20000000);
+		id &= 0x1fffffff;
+		bool fd = false;//(proto == 0x0d);
+
+		//Add timeline samples
+		cap->m_offsets.push_back(stamp);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, 0));
+
+		cap->m_offsets.push_back(stamp + ui);
+		cap->m_durations.push_back(31 * ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ID, id));
+
+		cap->m_offsets.push_back(stamp + 32*ui);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, rtr));
+
+		cap->m_offsets.push_back(stamp + 33*ui);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_FD, fd));
+
+		cap->m_offsets.push_back(stamp + 34*ui);
+		cap->m_durations.push_back(ui);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_R0, 0));
+
+		cap->m_offsets.push_back(stamp + 35*ui);
+		cap->m_durations.push_back(ui*4);
+		cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DLC, nbytes));
+
+		//Data
+		for(size_t i=0; i<nbytes; i++)
+		{
+			cap->m_offsets.push_back(stamp + 39*ui + i*8*ui);
+			cap->m_durations.push_back(ui*8);
+			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DATA, data[i]));
+		}
+
+		tend = stamp + 39*ui + nbytes*8*ui;
+
+		//CRC TODO
+		//CRC delim TODO
+		//ACK TODO
+		//ACK delim TODO
+
+		//Add the packet
+		//Fake the duration for now: assume 8 bytes payload, extended format, and no stuffing
+		//Leave format/type/ack blank, this doesn't seem to be saved in this capture format
+		auto pack = new Packet;
+		if(err)
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+		else if(rtr)
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+		else
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+		pack->m_headers["Format"] = ext ? "EXT" : "BASE";
+		pack->m_headers["ID"] = to_string_hex(id);
+		pack->m_headers["Mode"] = fd ? "CAN-FD" : "CAN";
+		pack->m_headers["Len"] = to_string(nbytes);
+		if(err)
+			pack->m_headers["Format"] = "ERR";
+		for(size_t i=0; i<nbytes; i++)
+			pack->m_data.push_back(data[i]);
+		pack->m_offset = stamp;
+		pack->m_len = 128 * ui;
+		m_packets.push_back(pack);
+
+		//End of the EPB, skip any unread contents
+		fseek(fp, blockstart + blocklen, SEEK_SET);
+	}
+
+	return true;
 }
 
 bool PcapngImportFilter::LoadLinuxCooked(FILE* fp)
@@ -524,6 +741,11 @@ bool PcapngImportFilter::ReadIDB(FILE* fp)
 		case 190:
 			LogWarning("PcapNG contains CAN 2.0b data (not yet implemented)\n");
 			m_linkType = LINK_TYPE_CAN;
+			break;
+
+		case 227:
+			LogTrace("SocketCAN data\n");
+			m_linkType = LINK_TYPE_SOCKETCAN;
 			break;
 
 		default:
