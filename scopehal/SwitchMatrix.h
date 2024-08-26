@@ -83,6 +83,13 @@ public:
 	 */
 	virtual void SetMuxInputThreshold(size_t dstchan, float v) =0;
 
+	/**
+		@brief Checks if a channel is in use (output, or selected input)
+
+		Normally used just for display
+	 */
+	virtual bool IsChannelInUse(size_t chan) =0;
+
 protected:
 	/**
 		@brief Serializes this oscilloscope's configuration to a YAML node.

@@ -54,6 +54,9 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 {
 	m_laChannelEnabled[0] = false;
 	m_laChannelEnabled[1] = false;
+
+	for(int i=0; i<8; i++)
+		m_inputEnabled[i] = false;
 }
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
@@ -285,6 +288,10 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":MUX?"));
 		auto muxsel = stoi(reply);
 
+		//Mark the input as active
+		if(muxsel < 8)
+			m_inputEnabled[muxsel] = true;
+
 		//Set up the path
 		m_channels[m_triggerOutChannelBase + i]->SetInput(
 			0, StreamDescriptor(m_channels[m_triggerInChannelBase + muxsel]));
@@ -302,6 +309,10 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		//Get the existing mux selector
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":MUX?"));
 		auto muxsel = stoi(reply);
+
+		//Mark the input as active
+		if(muxsel < 8)
+			m_inputEnabled[muxsel] = true;
 
 		//Set up the path
 		m_channels[m_triggerBidirChannelBase + i]->SetInput(
@@ -1371,21 +1382,30 @@ vector<uint64_t> AntikernelLabsTriggerCrossbar::GetSampleDepthsInterleaved()
 
 bool AntikernelLabsTriggerCrossbar::IsChannelEnabled(size_t i)
 {
-	if(i < m_rxChannelBase)
-		return false;
-	return m_laChannelEnabled[i - m_rxChannelBase];
+	if( (i >= m_triggerInChannelBase) && (i < m_triggerBidirChannelBase) )
+		return m_inputEnabled[i - m_triggerInChannelBase];
+	else if(i < m_txChannelBase)	//bidir and output ports always enabled so we can show mux paths to them
+		return true;
+	else if(i < m_rxChannelBase)
+		return true;
+	else
+		return m_laChannelEnabled[i - m_rxChannelBase];
 }
 
 void AntikernelLabsTriggerCrossbar::EnableChannel(size_t i)
 {
-	if(i < m_rxChannelBase)
+	if( (i >= m_triggerInChannelBase) && (i < m_triggerBidirChannelBase) )
+		m_inputEnabled[i - m_triggerInChannelBase] = true;
+	else if(i < m_rxChannelBase)
 		return;
 	m_laChannelEnabled[i - m_rxChannelBase] = true;
 }
 
 void AntikernelLabsTriggerCrossbar::DisableChannel(size_t i)
 {
-	if(i < m_rxChannelBase)
+	if( (i >= m_triggerInChannelBase) && (i < m_triggerBidirChannelBase) )
+		m_inputEnabled[i - m_triggerInChannelBase] = false;
+	else if(i < m_rxChannelBase)
 		return;
 	m_laChannelEnabled[i - m_rxChannelBase] = false;
 }
