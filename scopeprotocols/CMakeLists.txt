@@ -111,6 +111,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MinimumFilter.cpp
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
+	NCOFilter.cpp
 	NoiseFilter.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
@@ -140,6 +141,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp
 	RMSMeasurement.cpp
+	SawtoothGeneratorFilter.cpp
 	ScalarPulseDelayFilter.cpp
 	ScalarStairstepFilter.cpp
 	ScaleFilter.cpp

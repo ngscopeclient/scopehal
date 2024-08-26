@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -72,6 +72,9 @@ void CSVImportFilter::OnFileNameChanged()
 	if(fname.empty())
 		return;
 
+	LogTrace("Loading CSV file %s\n", fname.c_str());
+	LogIndenter li;
+
 	//Set unit
 	SetXAxisUnits(Unit(static_cast<Unit::UnitType>(m_parameters[m_xunit].GetIntVal())));
 
@@ -113,7 +116,10 @@ void CSVImportFilter::OnFileNameChanged()
 		if(s[0] == '#')
 		{
 			if(s == "#Digilent WaveForms Oscilloscope Acquisition")
+			{
 				digilentFormat = true;
+				LogTrace("Found Digilent metadata header\n");
+			}
 
 			else if(digilentFormat)
 			{
@@ -176,19 +182,21 @@ void CSVImportFilter::OnFileNameChanged()
 					{
 						auto c = line[j];
 						if(	!isdigit(c) && !isspace(c) &&
-							(c != ',') && (c != '.') && (c != '-') && (c != 'e'))
+							(c != ',') && (c != '.') && (c != '-') && (c != 'e') && (c != '+'))
 						{
 							headerRow = true;
+							LogTrace("Found header row: %s\n", line);
 							break;
 						}
 					}
 
 					//Save the header values
-					fields.push_back(tmp);
+					if(headerRow)
+						fields.push_back(tmp);
 				}
 
 				//Load timestamp
-				else if(!foundTimestamp)
+				if(!foundTimestamp)
 				{
 					foundTimestamp = true;
 
@@ -237,23 +245,20 @@ void CSVImportFilter::OnFileNameChanged()
 		else if(ncols != fields.size())
 		{
 			LogError("Malformed file (line %zu contains %zu fields, but file started with %zu fields)\n",
-				nrow, ncols, fields.size()
-				);
+				nrow, fields.size(), ncols);
 			break;
 		}
 
 		lines.push_back(fields);
 	}
 
-	//Assign default names to channels if there's no header row
-	if(names.empty())
+	//Assign default names to channels if there's no header row or not enough names
+	LogTrace("Initial parsing completed, %zu lines, %zu columns, %zu names, %zu timestamps\n",
+		lines.size(), ncols, names.size(), timestamps.size());
+	for(size_t i=0; i<ncols; i++)
 	{
-		char tmp[32];
-		for(size_t i=0; i<ncols; i++)
-		{
-			snprintf(tmp, sizeof(tmp), "Field%zu", i);
-			names.push_back(tmp);
-		}
+		if(names.size() <= i)
+			names.push_back(string("Field") + to_string(i));
 	}
 
 	//Figure out if channels are analog or digital and create output streams/waveforms
@@ -261,7 +266,7 @@ void CSVImportFilter::OnFileNameChanged()
 	vector<SparseAnalogWaveform*> anwaves;
 	for(size_t i=0; i<ncols; i++)
 	{
-		LogIndenter li;
+		LogIndenter li2;
 
 		//Assume digital, then change to analog if we see anything other than a 0/1 in the first 10 lines
 		bool digital = true;
@@ -324,7 +329,8 @@ void CSVImportFilter::OnFileNameChanged()
 			auto wfm = digwaves[i];
 
 			//Read the sample data
-			for(size_t j=0; j<lines.size(); j++)
+			auto nlines = min(lines.size(), timestamps.size());
+			for(size_t j=0; j<nlines; j++)
 			{
 				wfm->m_offsets[j] = timestamps[j];
 
@@ -365,7 +371,8 @@ void CSVImportFilter::OnFileNameChanged()
 			auto wfm = anwaves[i];
 
 			//Read the sample data
-			for(size_t j=0; j<lines.size(); j++)
+			auto nlines = min(lines.size(), timestamps.size());
+			for(size_t j=0; j<nlines; j++)
 			{
 				wfm->m_offsets[j] = timestamps[j];
 

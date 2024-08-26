@@ -28,14 +28,14 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ToneGeneratorFilter.h"
+#include "SawtoothGeneratorFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
+SawtoothGeneratorFilter::SawtoothGeneratorFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
 	, m_ratename("Sample Rate")
 	, m_freqname("Frequency")
@@ -44,6 +44,7 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 	, m_depthname("Depth")
 	, m_phasename("Starting Phase")
 	, m_unitname("Unit")
+	, m_rampname("Direction")
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
@@ -67,13 +68,19 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 
 	m_parameters[m_unitname] = FilterParameter::UnitSelector();
 	m_parameters[m_unitname].SetIntVal(Unit::UNIT_VOLTS);
-	m_parameters[m_unitname].signal_changed().connect(sigc::mem_fun(*this, &ToneGeneratorFilter::OnUnitChanged));
+	m_parameters[m_unitname].signal_changed().connect(sigc::mem_fun(*this, &SawtoothGeneratorFilter::OnUnitChanged));
+
+	m_parameters[m_rampname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));;
+	m_parameters[m_rampname].AddEnumValue("Up", RAMP_UP);
+	m_parameters[m_rampname].AddEnumValue("Down", RAMP_DOWN);
+	m_parameters[m_rampname].AddEnumValue("Both", RAMP_BOTH);
+	m_parameters[m_rampname].SetIntVal(RAMP_UP);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ToneGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool SawtoothGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
 {
 	//no inputs
 	return false;
@@ -82,12 +89,12 @@ bool ToneGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*strea
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string ToneGeneratorFilter::GetProtocolName()
+string SawtoothGeneratorFilter::GetProtocolName()
 {
-	return "Sine";
+	return "Sawtooth";
 }
 
-void ToneGeneratorFilter::OnUnitChanged()
+void SawtoothGeneratorFilter::OnUnitChanged()
 {
 	Unit unit(static_cast<Unit::UnitType>(m_parameters[m_unitname].GetIntVal()));
 
@@ -99,7 +106,7 @@ void ToneGeneratorFilter::OnUnitChanged()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ToneGeneratorFilter::Refresh()
+void SawtoothGeneratorFilter::Refresh()
 {
 	int64_t samplerate = m_parameters[m_ratename].GetIntVal();
 	int64_t freq = m_parameters[m_freqname].GetIntVal();
@@ -108,7 +115,7 @@ void ToneGeneratorFilter::Refresh()
 	float amplitude = m_parameters[m_amplitudename].GetFloatVal();
 	size_t depth = m_parameters[m_depthname].GetIntVal();
 	float startphase_deg = m_parameters[m_phasename].GetFloatVal();
-	float startphase = startphase_deg * 2 * M_PI / 360;
+	float startphase_frac = startphase_deg / 360;
 
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
@@ -127,13 +134,35 @@ void ToneGeneratorFilter::Refresh()
 	cap->PrepareForCpuAccess();
 
 	double samples_per_cycle = samplerate * 1.0 / freq;
-	double radians_per_sample = 2 * M_PI / samples_per_cycle;
+	double cycles_per_sample = 1.0 / samples_per_cycle;
+	float vmin = bias - amplitude/2;
 
-	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
-	float scale = amplitude / 2;
+	auto dir = m_parameters[m_rampname].GetIntVal();
 
-	for(size_t i=0; i<depth; i++)
-		cap->m_samples[i] = bias + (scale * sin(i*radians_per_sample + startphase));
+	size_t i = 0;
+	switch(dir)
+	{
+		case RAMP_UP:
+			for(i=0; i<depth; i++)
+				cap->m_samples[i] = vmin + amplitude*fmodf(i*cycles_per_sample + startphase_frac, 1);
+			break;
+
+		case RAMP_DOWN:
+			for(i=0; i<depth; i++)
+				cap->m_samples[i] = vmin + amplitude*(1 - fmodf(i*cycles_per_sample + startphase_frac, 1));
+			break;
+
+		case RAMP_BOTH:
+			for(i=0; i<depth; i++)
+			{
+				float pos = fabs(1 - fmodf(i*(cycles_per_sample*2) + startphase_frac, 2));
+				cap->m_samples[i] = vmin + amplitude*pos;
+			}
+			break;
+
+		default:
+			break;
+	}
 
 	cap->MarkModifiedFromCpu();
 }

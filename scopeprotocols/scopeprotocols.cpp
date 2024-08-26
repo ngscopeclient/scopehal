@@ -150,6 +150,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MinimumFilter);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultiplyFilter);
+	AddDecoderClass(NCOFilter);
 	AddDecoderClass(NoiseFilter);
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);
@@ -179,6 +180,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(RiseMeasurement);
 	AddDecoderClass(RMSMeasurement);
 	AddDecoderClass(RjBUjFilter);
+	AddDecoderClass(SawtoothGeneratorFilter);
 	AddDecoderClass(ScalarPulseDelayFilter);
 	AddDecoderClass(ScalarStairstepFilter);
 	AddDecoderClass(ScaleFilter);

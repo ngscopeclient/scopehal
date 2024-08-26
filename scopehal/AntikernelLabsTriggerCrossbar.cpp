@@ -82,11 +82,15 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 
 		auto hwname = string("IN") + to_string(i + m_triggerInChannelBase);
 
-		m_channels.push_back(new BufferedSwitchMatrixInputChannel(
+		auto chan = new BufferedSwitchMatrixInputChannel(
 			hwname,
 			this,
 			color,
-			m_channels.size()));
+			m_channels.size());
+		m_channels.push_back(chan);
+
+		//Default to not being displayed to avoid clutter
+		chan->m_visibilityMode = InstrumentChannel::VIS_HIDE;
 
 		//Get raw DAC threshold
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":THRESH?"));
@@ -100,7 +104,7 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 
 		//Load the nickname
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NICK?"));
-		m_channels[m_channels.size()-1]->SetDisplayName(reply);
+		chan->SetDisplayName(reply);
 	}
 
 	//Bidir channels
@@ -114,11 +118,15 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		if(i < 2)
 			color = "#80355e";		//dark pink
 
-		m_channels.push_back(new BufferedSwitchMatrixIOChannel(
+		auto chan = new BufferedSwitchMatrixIOChannel(
 			hwname,
 			this,
 			color,
-			m_channels.size()));
+			m_channels.size());
+		m_channels.push_back(chan);
+
+		//Default to not being displayed to avoid clutter
+		chan->m_visibilityMode = InstrumentChannel::VIS_HIDE;
 
 		//Get the output drive level
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":LEV?"));
@@ -133,7 +141,7 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 
 		//Load the nickname
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NICK?"));
-		m_channels[m_channels.size()-1]->SetDisplayName(reply);
+		chan->SetDisplayName(reply);
 	}
 
 	//Output-only channels
@@ -148,18 +156,22 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		if(i < 4)
 			color = "#008080";	//dark cyan
 
-		m_channels.push_back(new BufferedSwitchMatrixOutputChannel(
+		auto chan = new BufferedSwitchMatrixOutputChannel(
 			hwname,
 			this,
 			color,
-			m_channels.size()));
+			m_channels.size());
+		m_channels.push_back(chan);
+
+		//Default to being displayed since it's always outputting a signal
+		chan->m_visibilityMode = InstrumentChannel::VIS_SHOW;
 
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":LEV?"));
 		m_trigDrive[i] = 0.001f * atoi(reply.c_str());
 
 		//Load the nickname
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NICK?"));
-		m_channels[m_channels.size()-1]->SetDisplayName(reply);
+		chan->SetDisplayName(reply);
 	}
 
 	//Set up pattern generator channels
@@ -168,11 +180,12 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 	{
 		auto hwname = string("TX") + to_string(i);
 
-		m_channels.push_back(new BERTOutputChannel(
+		auto chan = new BERTOutputChannel(
 			hwname,
 			this,
 			"#808080",	//gray
-			m_channels.size()));
+			m_channels.size());
+		m_channels.push_back(chan);
 
 		//Read existing config once, then cache
 		//No need to ever flush cache as instrument has no front panel UI
@@ -197,6 +210,12 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":ENABLE?"));
 		m_txEnable[i] = (atoi(reply.c_str()) == 1);
+
+		//Default to being shown if transmitting
+		if(m_txEnable[i])
+			chan->m_visibilityMode = InstrumentChannel::VIS_SHOW;
+		else
+			chan->m_visibilityMode = InstrumentChannel::VIS_HIDE;
 
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":SWING?"));
 		auto drives = AntikernelLabsTriggerCrossbar::GetAvailableTxDriveStrengths(m_txChannelBase+i);
@@ -236,11 +255,15 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 	{
 		auto hwname = string("RX") + to_string(i);
 
-		m_channels.push_back(new BERTInputChannelWithDataCapture(
+		auto chan = new BERTInputChannelWithDataCapture(
 			hwname,
 			sthis,
 			"#4040c0",	//blue-purple
-			m_channels.size()));
+			m_channels.size());
+		m_channels.push_back(chan);
+
+		//Default to not being shown
+		chan->m_visibilityMode = InstrumentChannel::VIS_HIDE;
 
 		//BER prescaler
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
@@ -285,9 +308,12 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":MUX?"));
 		auto muxsel = stoi(reply);
 
+		//Mark the input as active
+		auto from = m_channels[m_triggerInChannelBase + muxsel];
+		from->m_visibilityMode = InstrumentChannel::VIS_SHOW;
+
 		//Set up the path
-		m_channels[m_triggerOutChannelBase + i]->SetInput(
-			0, StreamDescriptor(m_channels[m_triggerInChannelBase + muxsel]));
+		m_channels[m_triggerOutChannelBase + i]->SetInput(0, StreamDescriptor(from));
 	}
 
 	//Load existing mux config for bidir ports
@@ -303,9 +329,16 @@ void AntikernelLabsTriggerCrossbar::PostCtorInit()
 		reply = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":MUX?"));
 		auto muxsel = stoi(reply);
 
+		//If in output mode, show the channel
+		auto to = m_channels[m_triggerBidirChannelBase + i];
+		to->m_visibilityMode = InstrumentChannel::VIS_SHOW;
+
+		//Mark the input as active
+		auto from = m_channels[m_triggerInChannelBase + muxsel];
+		from->m_visibilityMode = InstrumentChannel::VIS_SHOW;
+
 		//Set up the path
-		m_channels[m_triggerBidirChannelBase + i]->SetInput(
-			0, StreamDescriptor(m_channels[m_triggerInChannelBase + muxsel]));
+		to->SetInput(0, StreamDescriptor(from));
 	}
 
 	//Logic analyzer config

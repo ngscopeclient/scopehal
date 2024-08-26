@@ -571,6 +571,7 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 		auto trig = Trigger::CreateTrigger(tnode["type"].as<string>(), this);
 		trig->LoadParameters(tnode, table);
 		trig->LoadInputs(tnode, table);
+		table.emplace(tnode["id"].as<uintptr_t>(), trig);
 		SetTrigger(trig);
 	}
 }
