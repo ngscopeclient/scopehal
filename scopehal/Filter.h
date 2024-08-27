@@ -85,7 +85,7 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Construction and enumeration
 
-	//Add new categories to the end of this list to maintain ABI compatibility with existing plugins
+	//Add new categories to the end of this list before CAT_COUNT to maintain ABI compatibility with existing plugins
 	enum Category
 	{
 		CAT_ANALYSIS,		//Signal integrity analysis
@@ -100,7 +100,9 @@ public:
 		CAT_RF,				//Frequency domain analysis (FFT etc) and other RF stuff
 		CAT_GENERATION,		//Waveform generation and synthesis
 		CAT_EXPORT,			//Waveform export
-		CAT_OPTICAL			//Optics
+		CAT_OPTICAL,		//Optics
+
+		CAT_COUNT			//current max number of categories (will increase over time as more are added)
 	};
 
 	Filter(
