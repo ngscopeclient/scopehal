@@ -228,7 +228,10 @@ void J1939PDUDecoder::Refresh()
 					//Are we done with the frame?
 					bytesleft --;
 					if(bytesleft == 0)
+					{
 						state = STATE_IDLE;
+						pack->m_len = tend - pack->m_offset;
+					}
 				}
 
 				//Discard anything else
