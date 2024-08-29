@@ -233,7 +233,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 
 		case MODEL_SIGLENT_SDS2000X_HD:
 			sendOnly("CHDR SHORT");
-			sendOnly(":WAVEFORM:WIDTH WORD");
+			sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
 			break;
 
 		case MODEL_SIGLENT_SDS5000X:
@@ -274,6 +274,26 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 		default:
 			break;
 	}
+}
+
+void SiglentSCPIOscilloscope::ParseFirmwareVersion()
+{
+	//Check if version requires size workaround (1.3.9R6 and older)
+	m_ubootMajorVersion = 0;
+	m_ubootMinorVersion = 0;
+	m_fwMajorVersion = 0;
+	m_fwMinorVersion = 0;
+	m_fwPatchVersion = 0;
+	m_fwPatchRevision = 0;
+
+	//Version format for 1.5.2R3 and older
+	sscanf(m_fwVersion.c_str(), (m_fwVersion.find('R') != std::string::npos) ? "%d.%d.%d.%d.%dR%d" : "%d.%d.%d.%d.%d.%d",
+		&m_ubootMajorVersion,
+		&m_ubootMinorVersion,
+		&m_fwMajorVersion,
+		&m_fwMinorVersion,
+		&m_fwPatchVersion,
+		&m_fwPatchRevision);
 }
 
 void SiglentSCPIOscilloscope::IdentifyHardware()
@@ -344,31 +364,15 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			//older firmware has 6 digits.
 			if(m_fwVersion.size() == 11)
 			{
-				//Check if version requires size workaround (1.3.9R6 and older)
-				int ubootMajorVersion = 0;
-				int ubootMinorVersion = 0;
-				int fwMajorVersion = 0;
-				int fwMinorVersion = 0;
-				int fwPatchVersion = 0;
-				int fwPatchRevision = 0;
-
-				//Version format for 1.5.2R3 and older
-				sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%dR%d",
-					&ubootMajorVersion,
-					&ubootMinorVersion,
-					&fwMajorVersion,
-					&fwMinorVersion,
-					&fwPatchVersion,
-					&fwPatchRevision);
-
+				ParseFirmwareVersion();
 				//Firmware 1.3.9R6 and older require size workaround.
-				if(fwMajorVersion < 1)
+				if(m_fwMajorVersion < 1)
 					m_requireSizeWorkaround = true;
-				else if((fwMajorVersion == 1) && (fwMinorVersion < 3))
+				else if((m_fwMajorVersion == 1) && (m_fwMinorVersion < 3))
 					m_requireSizeWorkaround = true;
-				else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion < 9))
+				else if((m_fwMajorVersion == 1) && (m_fwMinorVersion == 3) && (m_fwPatchVersion < 9))
 					m_requireSizeWorkaround = true;
-				else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion == 9) && (fwPatchRevision <= 6))
+				else if((m_fwMajorVersion == 1) && (m_fwMinorVersion == 3) && (m_fwPatchVersion == 9) && (m_fwPatchRevision <= 6))
 					m_requireSizeWorkaround = true;
 			}
 
@@ -385,16 +389,25 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 200;
 			else if(m_model.compare(4, 1, "3") == 0)
 				m_maxBandwidth = 350;
-			//no 500 MHz HD model
+			else if(m_model.compare(4, 1, "5") == 0) // No 500 MHz HD model but one can have BW update option
+				m_maxBandwidth = 500;
 
 			//TODO: check for whether we actually have the license
 			//(no SCPI command for this yet)
 			m_hasFunctionGen = true;
 
-			//2000X+ HD is native 12 bit resolution (and has no 8 bit mode)
+			//2000X+ HD is native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
+			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
 
 			m_modelid = MODEL_SIGLENT_SDS2000X_HD;
+
+			ParseFirmwareVersion();
+			if(m_fwMajorVersion>=1 && m_fwMinorVersion >= 2)
+			{	// Only pre-production firmware version (e.g. 1.1.7) uses SCPI standard size reporting
+				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
+				m_requireSizeWorkaround = true;
+			}
 		}
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
@@ -5379,4 +5392,16 @@ void SiglentSCPIOscilloscope::SetFunctionChannelOutputImpedance(int chan, Functi
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgImpedance[chan] = z;
+}
+
+/**
+	@brief Forces 16-bit transfer mode on/off when for HD models
+ */
+void SiglentSCPIOscilloscope::ForceHDMode(bool mode)
+{
+	if(m_modelid == MODEL_SIGLENT_SDS2000X_HD && mode != m_highDefinition)
+	{
+		m_highDefinition = mode;
+		sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
+	}
 }
