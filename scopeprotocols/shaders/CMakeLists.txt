@@ -42,7 +42,6 @@ add_compute_shaders(
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
 		FIRFilter.glsl
-		RectangularWindow.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl

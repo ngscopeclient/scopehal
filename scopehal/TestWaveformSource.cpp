@@ -42,6 +42,7 @@ using namespace std;
 
 TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
+	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 {
 #ifndef _APPLE_SILICON
 	m_forwardPlan = NULL;
@@ -49,14 +50,13 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 
 	m_cachedNumPoints = 0;
 	m_cachedRawSize = 0;
-
-	m_forwardInBuf = NULL;
-	m_forwardOutBuf = NULL;
-	m_reverseOutBuf = NULL;
+#endif
 
 	TouchstoneParser sxp;
 	sxp.Load(FindDataFile("channels/300mm-s2000m.s2p"), m_sparams);
-#endif
+
+	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_forwardInBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 TestWaveformSource::~TestWaveformSource()
@@ -67,15 +67,8 @@ TestWaveformSource::~TestWaveformSource()
 	if(m_reversePlan)
 		ffts_free(m_reversePlan);
 
-	m_allocator.deallocate(m_forwardInBuf);
-	m_allocator.deallocate(m_forwardOutBuf);
-	m_allocator.deallocate(m_reverseOutBuf);
-
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
-	m_forwardInBuf = NULL;
-	m_forwardOutBuf = NULL;
-	m_reverseOutBuf = NULL;
 #endif
 }
 
@@ -173,6 +166,8 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 }
 
 WaveformBase* TestWaveformSource::GeneratePRBS31(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
@@ -223,12 +218,14 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude, cmdBuf, queue);
 
 	return ret;
 }
 
 WaveformBase* TestWaveformSource::Generate8b10b(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
@@ -285,7 +282,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude, cmdBuf, queue);
 
 	return ret;
 }
@@ -300,8 +297,13 @@ void TestWaveformSource::DegradeSerialData(
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_amplitude)
+	float noise_amplitude,
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
 {
+	//assume input came from CPU
+	cap->MarkModifiedFromCpu();
+
 	//RNGs
 	normal_distribution<> noise(0, noise_amplitude);
 
@@ -320,22 +322,43 @@ void TestWaveformSource::DegradeSerialData(
 			ffts_free(m_reversePlan);
 		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
 
-		m_forwardInBuf = m_allocator.allocate(npoints);
-		m_forwardOutBuf = m_allocator.allocate(2*nouts);
-		m_reverseOutBuf = m_allocator.allocate(npoints);
+		m_forwardInBuf.resize(npoints);
+		m_forwardOutBuf.resize(2*nouts);
+		m_reverseOutBuf.resize(npoints);
 
 		m_cachedNumPoints = npoints;
 	}
 
 	if(lpf)
 	{
-		//Copy the input, then fill any extra space with zeroes
-		memcpy(m_forwardInBuf, &cap->m_samples[0], depth*sizeof(float));
-		for(size_t i=depth; i<npoints; i++)
-			m_forwardInBuf[i] = 0;
+		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+		cmdBuf.begin({});
+
+		//Copy and zero-pad the input as needed
+		WindowFunctionArgs args;
+		args.numActualSamples = depth;
+		args.npoints = npoints;
+		args.scale = 0;
+		args.alpha0 = 0;
+		args.alpha1 = 0;
+		args.offsetIn = 0;
+		args.offsetOut = 0;
+		m_rectangularComputePipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+		m_rectangularComputePipeline.BindBufferNonblocking(1, m_forwardInBuf, cmdBuf, true);
+		m_rectangularComputePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+		m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		m_forwardInBuf.MarkModifiedFromGpu();
+
+		//Done, block until the compute operations finish
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+		//cap->MarkModifiedFromGpu();
+
+		//Pull the input buffer out to do a software FFT
+		m_forwardInBuf.PrepareForCpuAccess();
 
 		//Do the forward FFT
-		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
+		ffts_execute(m_forwardPlan, m_forwardInBuf.GetCpuPointer(), &m_forwardOutBuf[0]);
 
 		auto& s21 = m_sparams[SPair(2, 1)];
 

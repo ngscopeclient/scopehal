@@ -36,7 +36,8 @@
 #ifndef TestWaveformSource_h
 #define TestWaveformSource_h
 
-#include "../scopehal/AlignedAllocator.h"
+#include "VulkanFFTPlan.h"
+
 #ifndef _APPLE_SILICON
 #include <ffts.h>
 #endif
@@ -75,6 +76,8 @@ public:
 		float noise_amplitude = 0.01);
 
 	WaveformBase* GeneratePRBS31(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
@@ -83,6 +86,8 @@ public:
 		float noise_amplitude = 0.01);
 
 	WaveformBase* Generate8b10b(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
@@ -96,24 +101,32 @@ public:
 		int64_t sampleperiod,
 		size_t depth);
 
-	void DegradeSerialData(UniformAnalogWaveform* cap, int64_t sampleperiod, size_t depth,  bool lpf, float noise_amplitude);
+	void DegradeSerialData(
+		UniformAnalogWaveform* cap,
+		int64_t sampleperiod,
+		size_t depth,
+		bool lpf,
+		float noise_amplitude,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue);
 
 protected:
 	std::minstd_rand& m_rng;
 
+	AcceleratorBuffer<float> m_forwardInBuf;
+	AcceleratorBuffer<float> m_forwardOutBuf;
+	AcceleratorBuffer<float> m_reverseOutBuf;
+
+	ComputePipeline m_rectangularComputePipeline;
+
+	SParameters m_sparams;
+
 #ifndef _APPLE_SILICON
 	//FFT stuff
-	AlignedAllocator<float, 32> m_allocator;
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;
 	size_t m_cachedNumPoints;
 	size_t m_cachedRawSize;
-
-	float* m_forwardInBuf;
-	float* m_forwardOutBuf;
-	float* m_reverseOutBuf;
-
-	SParameters m_sparams;
 #endif
 };
 

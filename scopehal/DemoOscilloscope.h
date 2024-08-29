@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -135,8 +135,13 @@ protected:
 	uint64_t m_rate;
 
 	std::random_device m_rd;
-	std::minstd_rand* m_rng[5];
-	TestWaveformSource* m_source[5];
+	std::minstd_rand* m_rng[4];
+	TestWaveformSource* m_source[4];
+
+	//Vulkan waveform conversion
+	std::shared_ptr<QueueHandle> m_queue[4];
+	std::unique_ptr<vk::raii::CommandPool> m_pool[4];
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf[4];
 
 public:
 	static std::string GetDriverNameInternal();

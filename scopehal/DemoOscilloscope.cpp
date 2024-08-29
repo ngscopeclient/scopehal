@@ -49,7 +49,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-	for(int i=0; i<5; i++)
+	for(int i=0; i<4; i++)
 	{
 		m_rng[i] = new minstd_rand(m_rd());
 		m_source[i] = new TestWaveformSource(*m_rng[i]);
@@ -96,6 +96,38 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_channels[1]->SetDisplayName("Ramp");
 	m_channels[2]->SetDisplayName("PRBS31");
 	m_channels[3]->SetDisplayName("8B10B");
+
+	//Create Vulkan objects for the waveform conversion
+	for(int i=0; i<4; i++)
+	{
+		m_queue[i] = g_vkQueueManager->GetComputeQueue(string("DemoOscilloscope.queue") + to_string(i));
+
+		vk::CommandPoolCreateInfo poolInfo(
+			vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+			m_queue[i]->m_family );
+		m_pool[i] = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+		vk::CommandBufferAllocateInfo bufinfo(**m_pool[i], vk::CommandBufferLevel::ePrimary, 1);
+		m_cmdBuf[i] = make_unique<vk::raii::CommandBuffer>(
+			std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+
+		if(g_hasDebugUtils)
+		{
+			string bufname = string("DemoOscilloscope.cmdbuf") + to_string(i);
+			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+				vk::DebugUtilsObjectNameInfoEXT(
+					vk::ObjectType::eCommandBuffer,
+					reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf[i])),
+					bufname.c_str()));
+
+			string poolname = string("DemoOscilloscope.pool") + to_string(i);
+			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+				vk::DebugUtilsObjectNameInfoEXT(
+					vk::ObjectType::eCommandPool,
+					reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool[i])),
+					poolname.c_str()));
+		}
+	}
 }
 
 DemoOscilloscope::~DemoOscilloscope()
@@ -487,9 +519,9 @@ bool DemoOscilloscope::AcquireData()
 
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	WaveformBase* waveforms[5] = {NULL};
+	WaveformBase* waveforms[4] = {NULL};
 	#pragma omp parallel for
-	for(int i=0; i<5; i++)
+	for(int i=0; i<4; i++)
 	{
 		if(!m_channelsEnabled[i])
 			continue;
@@ -497,19 +529,23 @@ bool DemoOscilloscope::AcquireData()
 		switch(i)
 		{
 			case 0:
-				waveforms[i] = m_source[i]->GenerateNoisySinewave(0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+				waveforms[i] = m_source[i]->GenerateNoisySinewave(
+					0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
 				break;
 
 			case 1:
-				waveforms[i] = m_source[i]->GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
+				waveforms[i] = m_source[i]->GenerateNoisySinewaveMix(
+					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
 				break;
 
 			case 2:
-				waveforms[i] = m_source[i]->GeneratePRBS31(0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
+				waveforms[i] = m_source[i]->GeneratePRBS31(
+					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
 				break;
 
 			case 3:
-				waveforms[i] = m_source[i]->Generate8b10b(0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
+				waveforms[i] = m_source[i]->Generate8b10b(
+					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
 				break;
 
 			default:
