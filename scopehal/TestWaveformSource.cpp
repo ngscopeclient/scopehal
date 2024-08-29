@@ -337,7 +337,11 @@ void TestWaveformSource::DegradeSerialData(
 		//Do the forward FFT
 		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
-		auto& s21 = m_sparams[SPair(2, 1)];;
+		auto& s21 = m_sparams[SPair(2, 1)];
+
+		//Calculate the group delay of the channel at the middle frequency bin
+		int64_t groupDelay = s21.GetGroupDelay(s21.size() / 2) * FS_PER_SECOND;
+		int64_t groupDelaySamples = groupDelay / cap->m_timescale;
 
 		//Apply the channel
 		double sample_ghz = 1e6 / sampleperiod;
@@ -362,10 +366,18 @@ void TestWaveformSource::DegradeSerialData(
 		//Calculate the inverse FFT
 		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
 
+		//Calculate the actual start and end of the samples, accounting for garbage at the beginning of the channel
+		size_t istart = groupDelaySamples;
+		size_t iend = depth;
+		size_t finalLen = iend - istart;
+
 		//Rescale the FFT output and copy to the output, then add noise
 		float fftscale = 1.0f / npoints;
-		for(size_t i=0; i<depth; i++)
-			cap->m_samples[i] = m_reverseOutBuf[i] * fftscale + noise(m_rng);
+		for(size_t i=0; i<finalLen; i++)
+			cap->m_samples[i] = m_reverseOutBuf[i + istart] * fftscale + noise(m_rng);
+
+		//Resize the waveform to truncate garbage at the end
+		cap->Resize(finalLen);
 	}
 
 	else

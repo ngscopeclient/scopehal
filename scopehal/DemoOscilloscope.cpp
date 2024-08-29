@@ -413,7 +413,7 @@ vector<string> DemoOscilloscope::GetADCModeNames(size_t /*channel*/)
 	vector<string> ret;
 	ret.push_back("Ideal");
 	ret.push_back("10 mV noise");
-	ret.push_back("10 mV noise + 5 GHz LPF");
+	ret.push_back("10 mV noise + 300mm ISI channel");
 	return ret;
 }
 
