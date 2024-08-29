@@ -100,6 +100,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	IPv4Decoder.cpp
 	IQSquelchFilter.cpp
 	ISIMeasurement.cpp
+	J1939PDUDecoder.cpp
 	JitterFilter.cpp
 	JitterSpectrumFilter.cpp
 	JtagDecoder.cpp
