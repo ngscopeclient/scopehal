@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,6 +53,9 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	m_forwardInBuf = NULL;
 	m_forwardOutBuf = NULL;
 	m_reverseOutBuf = NULL;
+
+	TouchstoneParser sxp;
+	sxp.Load(FindDataFile("channels/300mm-s2000m.s2p"), m_sparams);
 #endif
 }
 
@@ -291,8 +294,6 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	@brief Takes an idealized serial data stream and turns it into something less pretty
 
 	by adding noise and a band-limiting filter
-
-	TODO: apply a more realistic channel model, maybe a hard coded table of S-parameters or something?
  */
 void TestWaveformSource::DegradeSerialData(
 	UniformAnalogWaveform* cap,
@@ -328,7 +329,6 @@ void TestWaveformSource::DegradeSerialData(
 
 	if(lpf)
 	{
-
 		//Copy the input, then fill any extra space with zeroes
 		memcpy(m_forwardInBuf, &cap->m_samples[0], depth*sizeof(float));
 		for(size_t i=depth; i<npoints; i++)
@@ -337,19 +337,26 @@ void TestWaveformSource::DegradeSerialData(
 		//Do the forward FFT
 		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
-		//Simple channel response model
+		auto& s21 = m_sparams[SPair(2, 1)];;
+
+		//Apply the channel
 		double sample_ghz = 1e6 / sampleperiod;
 		double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-		complex<float> pole(0, -FreqToPhase(5e9));
-		float prescale = abs(pole);
 		for(size_t i = 0; i<nouts; i++)
 		{
-			complex<float> s(0, FreqToPhase(bin_hz * i));
-			complex<float> h = prescale * complex<float>(1, 0) / (s - pole);
+			float freq = bin_hz * i;
+			auto pt = s21.InterpolatePoint(freq);
+			float mag = pt.m_amplitude;
+			float ang = pt.m_phase;
 
-			float binscale = abs(h);
-			m_forwardOutBuf[i*2] *= binscale;		//real
-			m_forwardOutBuf[i*2 + 1] *= binscale;	//imag
+			float sinval = sin(ang) * mag;
+			float cosval = cos(ang) * mag;
+
+			auto real_orig = m_forwardOutBuf[i*2];
+			auto imag_orig = m_forwardOutBuf[i*2 + 1];
+
+			m_forwardOutBuf[i*2] = real_orig * cosval - imag_orig * sinval;
+			m_forwardOutBuf[i*2 + 1] = real_orig * sinval + imag_orig * cosval;
 		}
 
 		//Calculate the inverse FFT

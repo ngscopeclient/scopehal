@@ -298,4 +298,6 @@ PUBLIC
 
 install(TARGETS scopehal LIBRARY)
 
+install(FILES channels/300mm-s2000m.s2p DESTINATION share/ngscopeclient/channels)
+
 add_subdirectory(shaders)
