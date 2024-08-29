@@ -105,7 +105,7 @@ void J1939PDUDecoder::Refresh()
 	auto cap = new J1939PDUWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = 0;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
