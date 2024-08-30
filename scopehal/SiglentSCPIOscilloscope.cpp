@@ -221,6 +221,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
 
 			//This is the default behavior, but it's safer to explicitly specify it
 			//TODO: save bandwidth and simplify parsing by doing OFF
@@ -229,13 +230,8 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			//Desired format for waveform data
 			//Only use increased bit depth if the scope actually puts content there!
 			sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
+			
 			break;
-
-		case MODEL_SIGLENT_SDS2000X_HD:
-			sendOnly("CHDR SHORT");
-			sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
-			break;
-
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
 			sendOnly("CHDR SHORT");
