@@ -78,6 +78,7 @@ protected:
 	virtual void DetectAnalogChannels();
 	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
+	void ParseFirmwareVersion();
 
 public:
 	//Device information
@@ -86,6 +87,8 @@ public:
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	virtual void FlushConfigCache() override;
+
+	void ForceHDMode(bool mode);
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i) override;
@@ -274,6 +277,14 @@ protected:
 	size_t m_digitalChannelBase;
 
 	Model m_modelid;
+
+	// Firmware version
+	int m_ubootMajorVersion;
+	int m_ubootMinorVersion;
+	int m_fwMajorVersion;
+	int m_fwMinorVersion;
+	int m_fwPatchVersion;
+	int m_fwPatchRevision;
 
 	//set of SW/HW options we have
 	bool m_hasLA;
