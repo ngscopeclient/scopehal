@@ -29,41 +29,64 @@
 
 #include "../scopehal/scopehal.h"
 #include "J1939PDUDecoder.h"
-#include "J1939BitmaskDecoder.h"
+#include "J1939AnalogDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-J1939BitmaskDecoder::J1939BitmaskDecoder(const string& color)
+J1939AnalogDecoder::J1939AnalogDecoder(const string& color)
 	: Filter(color, CAT_BUS)
 	, m_initValue("Initial Value")
 	, m_pgn("PGN")
-	, m_bitmask("Pattern Bitmask")
-	, m_pattern("Pattern Target")
+	, m_bitpos("Starting Bit")
+	, m_unit("Unit")
+	, m_scale("Scale")
+	, m_offset("Offset")
+	, m_format("Format")
+	, m_scalemode("Scale mode")
 {
-	AddDigitalStream("data");
+	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	CreateInput("j1939");
 
-	m_parameters[m_initValue] = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_initValue] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_initValue].SetIntVal(0);
 
 	m_parameters[m_pgn] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_pgn].SetIntVal(0);
 
-	m_parameters[m_bitmask] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_bitmask].SetIntVal(0);
+	m_parameters[m_bitpos] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_bitpos].SetIntVal(0);
 
-	m_parameters[m_pattern] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_pattern].SetIntVal(0);
+	m_parameters[m_offset] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_offset].SetFloatVal(0);
+
+	m_parameters[m_scale] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_scale].SetFloatVal(1);
+
+	m_parameters[m_unit] = FilterParameter::UnitSelector();
+	m_parameters[m_unit].SetIntVal(Unit::UNIT_COUNTS);
+	m_parameters[m_unit].signal_changed().connect(sigc::mem_fun(*this, &J1939AnalogDecoder::OnUnitChanged));
+
+	m_parameters[m_format] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_format].AddEnumValue("Unsigned 16-bit", FORMAT_UINT16);
+	m_parameters[m_format].AddEnumValue("Signed 16-bit", FORMAT_INT16);
+	m_parameters[m_format].AddEnumValue("Unsigned 8-bit", FORMAT_UINT8);
+	m_parameters[m_format].AddEnumValue("Signed 8-bit", FORMAT_INT8);
+	m_parameters[m_format].SetIntVal(FORMAT_UINT16);
+
+	m_parameters[m_scalemode] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_scalemode].AddEnumValue("Multiply", SCALE_MULT);
+	m_parameters[m_scalemode].AddEnumValue("Divide", SCALE_DIV);
+	m_parameters[m_scalemode].SetIntVal(FORMAT_UINT16);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool J1939BitmaskDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
+bool J1939AnalogDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -77,15 +100,24 @@ bool J1939BitmaskDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string J1939BitmaskDecoder::GetProtocolName()
+string J1939AnalogDecoder::GetProtocolName()
 {
-	return "J1939 Bitmask";
+	return "J1939 Analog";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void J1939BitmaskDecoder::Refresh()
+void J1939AnalogDecoder::OnUnitChanged()
+{
+	Unit unit(static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal()));
+
+	SetYAxisUnits(unit, 0);
+	m_parameters[m_offset].SetUnit(unit);
+	m_parameters[m_scale].SetUnit(unit);
+}
+
+void J1939AnalogDecoder::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
@@ -102,7 +134,7 @@ void J1939BitmaskDecoder::Refresh()
 	auto len = din->size();
 
 	//Make output waveform
-	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
 	cap->PrepareForCpuAccess();
 
 	enum
@@ -114,15 +146,20 @@ void J1939BitmaskDecoder::Refresh()
 	//Initial sample at time zero
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(0);
-	cap->m_samples.push_back(static_cast<bool>(m_parameters[m_initValue].GetIntVal()));
+	cap->m_samples.push_back(m_parameters[m_initValue].GetFloatVal());
 
-	int64_t mask = m_parameters[m_bitmask].GetIntVal();
-	int64_t pattern = m_parameters[m_pattern].GetIntVal();
-	auto targetaddr = m_parameters[m_pgn].GetIntVal() ;
+	auto format = static_cast<format_t>(m_parameters[m_format].GetIntVal());
+	auto scalemode = static_cast<scalemode_t>(m_parameters[m_scalemode].GetIntVal());
+	auto bitpos = m_parameters[m_bitpos].GetIntVal();
+	auto scale = m_parameters[m_scale].GetFloatVal();
+	auto offset = m_parameters[m_offset].GetFloatVal();
+	auto targetaddr = m_parameters[m_pgn].GetIntVal();
+	if(scalemode == SCALE_DIV)
+		scale = 1.0 / scale;
 
-	//TODO: support >8 byte packetds
+	//TODO: support >8 byte packets
 	int64_t framestart = 0;
-	int64_t payload = 0;
+	uint64_t payload = 0;
 	for(size_t i=0; i<len; i++)
 	{
 		auto& s = din->m_samples[i];
@@ -160,14 +197,33 @@ void J1939BitmaskDecoder::Refresh()
 				//Starting a new frame? This one is over, add the new sample
 				else if(s.m_stype == J1939PDUSymbol::TYPE_PRI)
 				{
-					//Check the bitmask and add a new sample
+					//Set up timing
 					cap->m_offsets.push_back(framestart);
 					cap->m_durations.push_back(0);
 
-					if( (payload & mask) == pattern )
-						cap->m_samples.push_back(true);
-					else
-						cap->m_samples.push_back(false);
+					//Cast appropriately
+					float v = 0;
+					auto bitval = payload >> bitpos;
+					switch(format)
+					{
+						case FORMAT_UINT16:
+							v = bitval & 0xffff;
+							break;
+
+						case FORMAT_UINT8:
+							v = bitval & 0xff;
+							break;
+
+						case FORMAT_INT16:
+							v = static_cast<int16_t>(bitval & 0xffff);
+							break;
+
+						case FORMAT_INT8:
+							v = static_cast<int8_t>(bitval & 0xff);
+							break;
+					}
+
+					cap->m_samples.push_back((v * scale) + offset);
 
 					state = STATE_IDLE;
 				}
@@ -190,7 +246,7 @@ void J1939BitmaskDecoder::Refresh()
 
 	//Add three padding samples (do we still have this rendering bug??)
 	int64_t tlast = cap->m_offsets[nlast];
-	bool vlast = cap->m_samples[nlast];
+	auto vlast = cap->m_samples[nlast];
 	for(size_t i=0; i<2; i++)
 	{
 		cap->m_offsets.push_back(tlast + i);
