@@ -100,7 +100,8 @@ void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared
 	enum
 	{
 		STATE_IDLE,
-		STATE_DATA
+		STATE_DATA,
+		STATE_GARBAGE
 	} state = STATE_IDLE;
 
 	Packet* pack = nullptr;
@@ -124,6 +125,21 @@ void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared
 						pack->m_headers["Format"] = "BASE";
 						pack->m_headers["ID"] = to_string_hex(s.m_data, true, 3);
 					}
+
+					if(s.m_data & 0x20000000)
+					{
+						pack->m_headers["Format"] = "ERR";
+						pack->m_headers["ID"] = "";
+
+						pack->m_len =
+							din->m_triggerPhase +
+							din->m_timescale * (din->m_offsets[i] + din->m_durations[i]) -
+							pack->m_offset;
+
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+						state = STATE_GARBAGE;
+					}
+
 				}
 
 				if( (s.m_stype == CANSymbol::TYPE_DLC) && pack)
