@@ -37,10 +37,6 @@
 #define TestWaveformSource_h
 
 #include "VulkanFFTPlan.h"
-
-#ifndef _APPLE_SILICON
-#include <ffts.h>
-#endif
 #include <random>
 
 /**
@@ -120,17 +116,19 @@ protected:
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
 	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
 
+	double m_cachedBinSize;
+	AcceleratorBuffer<float> m_resampledSparamSines;
+	AcceleratorBuffer<float> m_resampledSparamCosines;
+
 	ComputePipeline m_rectangularComputePipeline;
+	ComputePipeline m_channelEmulationComputePipeline;
 
 	SParameters m_sparams;
 
 	size_t m_cachedNumPoints;
 	size_t m_cachedRawSize;
 
-#ifndef _APPLE_SILICON
-	//FFT stuff
-	ffts_plan_t* m_reversePlan;
-#endif
+	void InterpolateSparameters(float bin_hz, size_t nouts);
 };
 
 #endif
