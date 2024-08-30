@@ -117,16 +117,19 @@ protected:
 	AcceleratorBuffer<float> m_forwardOutBuf;
 	AcceleratorBuffer<float> m_reverseOutBuf;
 
+	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
+	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
+
 	ComputePipeline m_rectangularComputePipeline;
 
 	SParameters m_sparams;
 
-#ifndef _APPLE_SILICON
-	//FFT stuff
-	ffts_plan_t* m_forwardPlan;
-	ffts_plan_t* m_reversePlan;
 	size_t m_cachedNumPoints;
 	size_t m_cachedRawSize;
+
+#ifndef _APPLE_SILICON
+	//FFT stuff
+	ffts_plan_t* m_reversePlan;
 #endif
 };
 

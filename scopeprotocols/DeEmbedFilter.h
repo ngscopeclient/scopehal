@@ -35,15 +35,7 @@
 #ifndef DeEmbedFilter_h
 #define DeEmbedFilter_h
 
-#include "../scopehal/AlignedAllocator.h"
 #include "FFTFilter.h"
-
-struct DeEmbedNormalizationArgs
-{
-	uint32_t outlen;
-	uint32_t istart;
-	float scale;
-};
 
 class DeEmbedFilter : public Filter
 {

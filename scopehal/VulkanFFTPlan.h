@@ -60,6 +60,13 @@ struct WindowFunctionArgs
 	float alpha1;
 };
 
+struct DeEmbedNormalizationArgs
+{
+	uint32_t outlen;
+	uint32_t istart;
+	float scale;
+};
+
 /**
 	@brief RAII wrapper around a VkFFTApplication and VkFFTConfiguration
  */

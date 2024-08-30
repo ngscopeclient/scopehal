@@ -45,29 +45,30 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 {
 #ifndef _APPLE_SILICON
-	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
+#endif
 
 	m_cachedNumPoints = 0;
 	m_cachedRawSize = 0;
-#endif
 
 	TouchstoneParser sxp;
 	sxp.Load(FindDataFile("channels/300mm-s2000m.s2p"), m_sparams);
 
 	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_forwardInBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_forwardOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_forwardOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_reverseOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_reverseOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 TestWaveformSource::~TestWaveformSource()
 {
 #ifndef _APPLE_SILICON
-	if(m_forwardPlan)
-		ffts_free(m_forwardPlan);
 	if(m_reversePlan)
 		ffts_free(m_reversePlan);
-
-	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
 #endif
 }
@@ -314,10 +315,6 @@ void TestWaveformSource::DegradeSerialData(
 	size_t nouts = npoints/2 + 1;
 	if(m_cachedNumPoints != npoints)
 	{
-		if(m_forwardPlan)
-			ffts_free(m_forwardPlan);
-		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-
 		if(m_reversePlan)
 			ffts_free(m_reversePlan);
 		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
@@ -328,6 +325,24 @@ void TestWaveformSource::DegradeSerialData(
 
 		m_cachedNumPoints = npoints;
 	}
+
+	//Invalidate old vkFFT plans if size has changed
+	if(m_vkForwardPlan)
+	{
+		if(m_vkForwardPlan->size() != npoints)
+			m_vkForwardPlan = nullptr;
+	}
+	if(m_vkReversePlan)
+	{
+		if(m_vkReversePlan->size() != npoints)
+			m_vkReversePlan = nullptr;
+	}
+
+	//Set up new FFT plans
+	if(!m_vkForwardPlan)
+		m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+	if(!m_vkReversePlan)
+		m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 
 	if(lpf)
 	{
@@ -349,16 +364,17 @@ void TestWaveformSource::DegradeSerialData(
 		m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 		m_forwardInBuf.MarkModifiedFromGpu();
 
+		//Do the actual FFT operation
+		m_vkForwardPlan->AppendForward(m_forwardInBuf, m_forwardOutBuf, cmdBuf);
+		m_forwardOutBuf.MarkModifiedFromGpu();
+
 		//Done, block until the compute operations finish
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 		//cap->MarkModifiedFromGpu();
 
-		//Pull the input buffer out to do a software FFT
-		m_forwardInBuf.PrepareForCpuAccess();
-
-		//Do the forward FFT
-		ffts_execute(m_forwardPlan, m_forwardInBuf.GetCpuPointer(), &m_forwardOutBuf[0]);
+		//Next step on the CPU
+		m_forwardOutBuf.PrepareForCpuAccess();
 
 		auto& s21 = m_sparams[SPair(2, 1)];
 
