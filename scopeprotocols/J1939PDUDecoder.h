@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,99 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of VulkanFFTPlan
+	@brief Declaration of J1939PDUDecoder
  */
-#ifndef VulkanFFTPlan_h
-#define VulkanFFTPlan_h
+#ifndef J1939PDUDecoder_h
+#define J1939PDUDecoder_h
 
-//Lots of warnings here, disable them
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#pragma GCC diagnostic ignored "-Wshadow"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#include <vkFFT.h>
-#pragma GCC diagnostic pop
-
-#include "AcceleratorBuffer.h"
-#include "PipelineCacheManager.h"
-
-struct WindowFunctionArgs
-{
-	uint32_t numActualSamples;
-	uint32_t npoints;
-	uint32_t offsetIn;
-	uint32_t offsetOut;
-	float scale;
-	float alpha0;
-	float alpha1;
-};
-
-struct DeEmbedNormalizationArgs
-{
-	uint32_t outlen;
-	uint32_t istart;
-	float scale;
-};
-
-/**
-	@brief RAII wrapper around a VkFFTApplication and VkFFTConfiguration
- */
-class VulkanFFTPlan
+class J1939PDUSymbol
 {
 public:
-
-	enum VulkanFFTPlanDirection
+	enum stype
 	{
-		DIRECTION_FORWARD,
-		DIRECTION_REVERSE
+		TYPE_PRI,
+		TYPE_PGN,
+		TYPE_DEST,
+		TYPE_SRC,
+		TYPE_DATA
 	};
 
-	enum VulkanFFTDataType
+	J1939PDUSymbol()
+	{}
+
+	J1939PDUSymbol(stype t, uint32_t data)
+	 : m_stype(t)
+	 , m_data(data)
 	{
-		TYPE_REAL,
-		TYPE_COMPLEX
-	};
+	}
 
-	VulkanFFTPlan(
-		size_t npoints,
-		size_t nouts,
-		VulkanFFTPlanDirection dir,
-		size_t numBatches = 1,
-		VulkanFFTDataType timeDomainType = VulkanFFTPlan::TYPE_REAL);
-	~VulkanFFTPlan();
+	stype m_stype;
+	uint32_t m_data;
 
-	void AppendForward(
-		AcceleratorBuffer<float>& dataIn,
-		AcceleratorBuffer<float>& dataOut,
-		vk::raii::CommandBuffer& cmdBuf);
+	bool operator== (const J1939PDUSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
 
-	void AppendReverse(
-		AcceleratorBuffer<float>& dataIn,
-		AcceleratorBuffer<float>& dataOut,
-		vk::raii::CommandBuffer& cmdBuf);
+class J1939PDUWaveform : public SparseWaveform<J1939PDUSymbol>
+{
+public:
+	J1939PDUWaveform () : SparseWaveform<J1939PDUSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
+};
 
-	size_t size() const
-	{ return m_size; }
+class J1939PDUDecoder : public PacketDecoder
+{
+public:
+	J1939PDUDecoder(const std::string& color);
+
+	virtual void Refresh() override;
+	std::vector<std::string> GetHeaders() override;
+
+	static std::string GetProtocolName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	PROTOCOL_DECODER_INITPROC(J1939PDUDecoder)
 
 protected:
-	VkFFTApplication m_app;
-	VkFFTConfiguration m_config;
-	size_t m_size;
-
-	//this is ugly but apparently we can't take a pointer to the underlying vk:: c++ wrapper objects?
-	VkPhysicalDevice m_physicalDevice;
-	VkDevice m_device;
-	VkPipelineCache m_pipelineCache;
-
-	vk::raii::Fence m_fence;
-	VkFence m_rawfence;
-
-	uint64_t m_bsize;
-	uint64_t m_tsize;
-	uint64_t m_isize;
 };
 
 #endif

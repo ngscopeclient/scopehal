@@ -247,7 +247,7 @@ bool SocketCANAnalyzer::AcquireData()
 		int64_t sec;
 		int64_t ns;
 		int nbytes = transport->ReadPacket(&frame, sec, ns);
-		if(nbytes < 0)
+		if(nbytes <= 0)
 			break;
 
 		//Calculate delay since start of capture, wrapping properly around second boundaries
@@ -268,6 +268,11 @@ bool SocketCANAnalyzer::AcquireData()
 
 		//bool ext = (frame.can_id & CAN_EFF_MASK) > 2047;
 		bool rtr = (frame.can_id & CAN_RTR_FLAG) == CAN_RTR_FLAG;
+
+		//If the packet is an error, discard and move on
+		bool err = (frame.can_id & CAN_ERR_FLAG);
+		if(err)
+			continue;
 
 		cap->m_offsets.push_back(trel);
 		cap->m_durations.push_back(ui);

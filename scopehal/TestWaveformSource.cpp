@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,38 +42,27 @@ using namespace std;
 
 TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
+	, m_cachedBinSize(0)
+	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_channelEmulationComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
+	, m_cachedNumPoints(0)
+	, m_cachedRawSize(0)
 {
-#ifndef _APPLE_SILICON
-	m_forwardPlan = NULL;
-	m_reversePlan = NULL;
+	TouchstoneParser sxp;
+	sxp.Load(FindDataFile("channels/300mm-s2000m.s2p"), m_sparams);
 
-	m_cachedNumPoints = 0;
-	m_cachedRawSize = 0;
+	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_forwardInBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-	m_forwardInBuf = NULL;
-	m_forwardOutBuf = NULL;
-	m_reverseOutBuf = NULL;
-#endif
+	m_forwardOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_forwardOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_reverseOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_reverseOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 TestWaveformSource::~TestWaveformSource()
 {
-#ifndef _APPLE_SILICON
-	if(m_forwardPlan)
-		ffts_free(m_forwardPlan);
-	if(m_reversePlan)
-		ffts_free(m_reversePlan);
-
-	m_allocator.deallocate(m_forwardInBuf);
-	m_allocator.deallocate(m_forwardOutBuf);
-	m_allocator.deallocate(m_reverseOutBuf);
-
-	m_forwardPlan = NULL;
-	m_reversePlan = NULL;
-	m_forwardInBuf = NULL;
-	m_forwardOutBuf = NULL;
-	m_reverseOutBuf = NULL;
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,6 +159,8 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 }
 
 WaveformBase* TestWaveformSource::GeneratePRBS31(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
@@ -220,12 +211,14 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude, cmdBuf, queue);
 
 	return ret;
 }
 
 WaveformBase* TestWaveformSource::Generate8b10b(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
@@ -282,7 +275,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude, cmdBuf, queue);
 
 	return ret;
 }
@@ -291,80 +284,158 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	@brief Takes an idealized serial data stream and turns it into something less pretty
 
 	by adding noise and a band-limiting filter
-
-	TODO: apply a more realistic channel model, maybe a hard coded table of S-parameters or something?
  */
 void TestWaveformSource::DegradeSerialData(
 	UniformAnalogWaveform* cap,
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_amplitude)
+	float noise_amplitude,
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
 {
+	//assume input came from CPU
+	cap->MarkModifiedFromCpu();
+
 	//RNGs
 	normal_distribution<> noise(0, noise_amplitude);
 
-	// ffts is not available on apple silicon, so for now we only apply noise there
-#ifndef _APPLE_SILICON
 	//Prepare for second pass: reallocate FFT buffer if sample depth changed
 	const size_t npoints = next_pow2(depth);
 	size_t nouts = npoints/2 + 1;
+	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
-		if(m_forwardPlan)
-			ffts_free(m_forwardPlan);
-		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-
-		if(m_reversePlan)
-			ffts_free(m_reversePlan);
-		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
-
-		m_forwardInBuf = m_allocator.allocate(npoints);
-		m_forwardOutBuf = m_allocator.allocate(2*nouts);
-		m_reverseOutBuf = m_allocator.allocate(npoints);
+		m_forwardInBuf.resize(npoints);
+		m_forwardOutBuf.resize(2*nouts);
+		m_reverseOutBuf.resize(npoints);
 
 		m_cachedNumPoints = npoints;
+		sizechange = true;
 	}
+
+	//Invalidate old vkFFT plans if size has changed
+	if(m_vkForwardPlan)
+	{
+		if(m_vkForwardPlan->size() != npoints)
+			m_vkForwardPlan = nullptr;
+	}
+	if(m_vkReversePlan)
+	{
+		if(m_vkReversePlan->size() != npoints)
+			m_vkReversePlan = nullptr;
+	}
+
+	//Set up new FFT plans
+	if(!m_vkForwardPlan)
+		m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+	if(!m_vkReversePlan)
+		m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 
 	if(lpf)
 	{
-
-		//Copy the input, then fill any extra space with zeroes
-		memcpy(m_forwardInBuf, &cap->m_samples[0], depth*sizeof(float));
-		for(size_t i=depth; i<npoints; i++)
-			m_forwardInBuf[i] = 0;
-
-		//Do the forward FFT
-		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
-
-		//Simple channel response model
 		double sample_ghz = 1e6 / sampleperiod;
 		double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-		complex<float> pole(0, -FreqToPhase(5e9));
-		float prescale = abs(pole);
-		for(size_t i = 0; i<nouts; i++)
-		{
-			complex<float> s(0, FreqToPhase(bin_hz * i));
-			complex<float> h = prescale * complex<float>(1, 0) / (s - pole);
 
-			float binscale = abs(h);
-			m_forwardOutBuf[i*2] *= binscale;		//real
-			m_forwardOutBuf[i*2 + 1] *= binscale;	//imag
+		//Resample our parameter to our FFT bin size if needed.
+		//Cache trig function output because there's no AVX instructions for this.
+		if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange)
+		{
+			m_resampledSparamCosines.clear();
+			m_resampledSparamSines.clear();
+			InterpolateSparameters(bin_hz, nouts);
 		}
 
-		//Calculate the inverse FFT
-		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
+		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+		cmdBuf.begin({});
+
+		//Copy and zero-pad the input as needed
+		WindowFunctionArgs args;
+		args.numActualSamples = depth;
+		args.npoints = npoints;
+		args.scale = 0;
+		args.alpha0 = 0;
+		args.alpha1 = 0;
+		args.offsetIn = 0;
+		args.offsetOut = 0;
+		m_rectangularComputePipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+		m_rectangularComputePipeline.BindBufferNonblocking(1, m_forwardInBuf, cmdBuf, true);
+		m_rectangularComputePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+		m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		m_forwardInBuf.MarkModifiedFromGpu();
+
+		//Do the actual FFT operation
+		m_vkForwardPlan->AppendForward(m_forwardInBuf, m_forwardOutBuf, cmdBuf);
+		m_forwardOutBuf.MarkModifiedFromGpu();
+
+		//Apply the interpolated S-parameters
+		m_channelEmulationComputePipeline.BindBufferNonblocking(0, m_forwardOutBuf, cmdBuf);
+		m_channelEmulationComputePipeline.BindBufferNonblocking(1, m_resampledSparamSines, cmdBuf);
+		m_channelEmulationComputePipeline.BindBufferNonblocking(2, m_resampledSparamCosines, cmdBuf);
+		m_channelEmulationComputePipeline.Dispatch(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+		m_channelEmulationComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		m_forwardOutBuf.MarkModifiedFromGpu();
+
+		//Do the actual FFT operation
+		m_vkReversePlan->AppendReverse(m_forwardOutBuf, m_reverseOutBuf, cmdBuf);
+		m_reverseOutBuf.MarkModifiedFromGpu();
+
+		//Done, block until the compute operations finish
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Next step on the CPU
+		m_reverseOutBuf.PrepareForCpuAccess();
+
+		//Calculate the group delay of the channel at the middle frequency bin
+		auto& s21 = m_sparams[SPair(2, 1)];
+		int64_t groupDelay = s21.GetGroupDelay(s21.size() / 2) * FS_PER_SECOND;
+		int64_t groupDelaySamples = groupDelay / cap->m_timescale;
+
+		//Calculate the actual start and end of the samples, accounting for garbage at the beginning of the channel
+		size_t istart = groupDelaySamples;
+		size_t iend = depth;
+		size_t finalLen = iend - istart;
 
 		//Rescale the FFT output and copy to the output, then add noise
 		float fftscale = 1.0f / npoints;
-		for(size_t i=0; i<depth; i++)
-			cap->m_samples[i] = m_reverseOutBuf[i] * fftscale + noise(m_rng);
+		for(size_t i=0; i<finalLen; i++)
+			cap->m_samples[i] = m_reverseOutBuf[i + istart] * fftscale + noise(m_rng);
+
+		//Resize the waveform to truncate garbage at the end
+		cap->Resize(finalLen);
 	}
 
 	else
-#endif
 	{
 		for(size_t i=0; i<depth; i++)
 			cap->m_samples[i] += noise(m_rng);
 	}
+}
+
+/**
+	@brief Recalculate the cached S-parameters
+ */
+void TestWaveformSource::InterpolateSparameters(float bin_hz, size_t nouts)
+{
+	m_cachedBinSize = bin_hz;
+
+	auto& s21 = m_sparams[SPair(2, 1)];
+
+	m_resampledSparamSines.resize(nouts);
+	m_resampledSparamCosines.resize(nouts);
+
+	for(size_t i=0; i<nouts; i++)
+	{
+		float freq = bin_hz * i;
+		auto pt = s21.InterpolatePoint(freq);
+		float mag = pt.m_amplitude;
+		float ang = pt.m_phase;
+
+		m_resampledSparamSines[i] = sin(ang) * mag;
+		m_resampledSparamCosines[i] = cos(ang) * mag;
+	}
+
+	m_resampledSparamSines.MarkModifiedFromCpu();
+	m_resampledSparamCosines.MarkModifiedFromCpu();
 }

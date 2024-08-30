@@ -38,11 +38,9 @@ add_compute_shaders(
 		ComplexToLogMagnitude.glsl
 		ComplexToMagnitude.glsl
 		CosineSumWindow.glsl
-		DeEmbedFilter.glsl
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
 		FIRFilter.glsl
-		RectangularWindow.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl

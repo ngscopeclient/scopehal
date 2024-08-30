@@ -267,17 +267,6 @@ SYSTEM PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
 )
 
-if(NOT APPLE_SILICON)
-	target_link_libraries(scopehal
-		${LIBFFTS_LIBRARIES}
-	)
-
-	target_include_directories(scopehal
-		PUBLIC
-		${LIBFFTS_INCLUDE_DIRS}
-	)
-endif()
-
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
 	target_compile_definitions(scopehal
 		PRIVATE
@@ -297,5 +286,7 @@ PUBLIC
 	)
 
 install(TARGETS scopehal LIBRARY)
+
+install(FILES channels/300mm-s2000m.s2p DESTINATION share/ngscopeclient/channels)
 
 add_subdirectory(shaders)

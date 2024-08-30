@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,10 +36,7 @@
 #ifndef TestWaveformSource_h
 #define TestWaveformSource_h
 
-#include "../scopehal/AlignedAllocator.h"
-#ifndef _APPLE_SILICON
-#include <ffts.h>
-#endif
+#include "VulkanFFTPlan.h"
 #include <random>
 
 /**
@@ -75,6 +72,8 @@ public:
 		float noise_amplitude = 0.01);
 
 	WaveformBase* GeneratePRBS31(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
@@ -83,6 +82,8 @@ public:
 		float noise_amplitude = 0.01);
 
 	WaveformBase* Generate8b10b(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
@@ -96,23 +97,38 @@ public:
 		int64_t sampleperiod,
 		size_t depth);
 
-	void DegradeSerialData(UniformAnalogWaveform* cap, int64_t sampleperiod, size_t depth,  bool lpf, float noise_amplitude);
+	void DegradeSerialData(
+		UniformAnalogWaveform* cap,
+		int64_t sampleperiod,
+		size_t depth,
+		bool lpf,
+		float noise_amplitude,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue);
 
 protected:
 	std::minstd_rand& m_rng;
 
-#ifndef _APPLE_SILICON
-	//FFT stuff
-	AlignedAllocator<float, 32> m_allocator;
-	ffts_plan_t* m_forwardPlan;
-	ffts_plan_t* m_reversePlan;
+	AcceleratorBuffer<float> m_forwardInBuf;
+	AcceleratorBuffer<float> m_forwardOutBuf;
+	AcceleratorBuffer<float> m_reverseOutBuf;
+
+	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
+	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
+
+	double m_cachedBinSize;
+	AcceleratorBuffer<float> m_resampledSparamSines;
+	AcceleratorBuffer<float> m_resampledSparamCosines;
+
+	ComputePipeline m_rectangularComputePipeline;
+	ComputePipeline m_channelEmulationComputePipeline;
+
+	SParameters m_sparams;
+
 	size_t m_cachedNumPoints;
 	size_t m_cachedRawSize;
 
-	float* m_forwardInBuf;
-	float* m_forwardOutBuf;
-	float* m_reverseOutBuf;
-#endif
+	void InterpolateSparameters(float bin_hz, size_t nouts);
 };
 
 #endif
