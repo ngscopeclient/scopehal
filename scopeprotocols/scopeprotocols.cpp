@@ -138,6 +138,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(IQDemuxFilter);
 	AddDecoderClass(IQSquelchFilter);
+	AddDecoderClass(J1939BitmaskDecoder);
 	AddDecoderClass(J1939PDUDecoder);
 	AddDecoderClass(ISIMeasurement);
 	AddDecoderClass(JitterFilter);

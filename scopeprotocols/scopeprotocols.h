@@ -139,6 +139,7 @@
 #include "IQDemuxFilter.h"
 #include "IQSquelchFilter.h"
 #include "ISIMeasurement.h"
+#include "J1939BitmaskDecoder.h"
 #include "J1939PDUDecoder.h"
 #include "JitterFilter.h"
 #include "JitterSpectrumFilter.h"

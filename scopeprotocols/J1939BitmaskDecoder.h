@@ -30,66 +30,29 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of J1939PDUDecoder
+	@brief Declaration of J1939BitmaskDecoder
  */
-#ifndef J1939PDUDecoder_h
-#define J1939PDUDecoder_h
+#ifndef J1939BitmaskDecoder_h
+#define J1939BitmaskDecoder_h
 
-#include "CANDecoder.h"
-
-class J1939PDUSymbol
+class J1939BitmaskDecoder : public Filter
 {
 public:
-	enum stype
-	{
-		TYPE_PRI,
-		TYPE_PGN,
-		TYPE_DEST,
-		TYPE_SRC,
-		TYPE_DATA
-	};
-
-	J1939PDUSymbol()
-	{}
-
-	J1939PDUSymbol(stype t, uint32_t data)
-	 : m_stype(t)
-	 , m_data(data)
-	{
-	}
-
-	stype m_stype;
-	uint32_t m_data;
-
-	bool operator== (const J1939PDUSymbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
-	}
-};
-
-class J1939PDUWaveform : public SparseWaveform<J1939PDUSymbol>
-{
-public:
-	J1939PDUWaveform () : SparseWaveform<J1939PDUSymbol>() {};
-	virtual std::string GetText(size_t) override;
-	virtual std::string GetColor(size_t) override;
-};
-
-class J1939PDUDecoder : public PacketDecoder
-{
-public:
-	J1939PDUDecoder(const std::string& color);
+	J1939BitmaskDecoder(const std::string& color);
 
 	virtual void Refresh() override;
-	std::vector<std::string> GetHeaders() override;
 
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	PROTOCOL_DECODER_INITPROC(J1939PDUDecoder)
+	PROTOCOL_DECODER_INITPROC(J1939BitmaskDecoder)
 
 protected:
+	std::string m_initValue;
+	std::string m_pgn;
+	std::string m_bitmask;
+	std::string m_pattern;
 };
 
 #endif
