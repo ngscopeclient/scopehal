@@ -107,16 +107,27 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 
 		m_transport->SendCommandQueued("CHAN1:BWL " + originalBandwidthLimit);
 	}
-	else if(1 == sscanf(m_model.c_str(), "DHO%d", &m_modelNumber) && (m_modelNumber < 1000))
-	{
+	else if(1 == sscanf(m_model.c_str(), "DHO%d", &m_modelNumber) && (m_modelNumber < 5000))
+	{	// Model numbers are :
+		// - DHO802 (70MHz), DHO804 (70Mhz), DHO812 (100MHz),DHO814 (100MHz)
+	    // - DHO914/DHO914S (125MHz), DHO924/DHO924S (250MHz)
+		// - DHO1072 (70MHz), DHO1074 (70MHz), DHO1102 (100MHz), DHO1104 (100MHz), DHO1202 (200MHz), DHO1204 (200MHz)
+		// - DHO4204 (200MHz), DHO4404 (400 MHz), DHO4804 (800MHz)
 		m_protocol = DHO;
 
 		int model_multiplicator = 100;
-		if(m_modelNumber > 900)	   // special handling of DHO900 series
-		{
+		int model_modulo = 100;
+		if(m_modelNumber > 1000)
+		{	// DHO1000 and 4000
+			model_multiplicator = 10;
+			model_modulo = 1000;
+		}
+		else if(m_modelNumber > 900)
+		{	// special handling of DHO900 series
 			model_multiplicator = 125;
 		}
-		m_bandwidth = m_modelNumber % 100 / 10 * model_multiplicator;	 // should also work for DHO1000/DHO4000
+		m_bandwidth = m_modelNumber % model_modulo / 10 * model_multiplicator;
+		if(m_bandwidth == 0) m_bandwidth = 70; // Fallback for DHO80x models
 
 		m_opt200M = false;	  // does not exist in 800/900 series
 	}
