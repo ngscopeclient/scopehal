@@ -49,6 +49,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerWasLive(false)
 	, m_triggerOneShot(false)
+	, m_liveMode(false)
 {
 	//Last digit of the model number is the number of channels
 	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
@@ -664,6 +665,9 @@ void RigolOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offs
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
+	if(m_liveMode)
+		return TRIGGER_MODE_TRIGGERED;
+
 	auto stat = Trim(m_transport->SendCommandQueuedWithReply(":TRIG:STAT?"));
 
 	if(stat != "STOP")
@@ -719,6 +723,11 @@ bool RigolOscilloscope::AcquireData()
 		maxpoints = 8192;	 // FIXME
 	else if(m_protocol == MSO5)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
+	else if(m_protocol == DHO && !m_liveMode)
+	{	// DHO models need to set raw mode off and on again to reset the number of points according to the current memory depth
+		m_transport->SendCommandQueued(":WAV:MODE NORM");
+		m_transport->SendCommandQueued(":WAV:MODE RAW");
+	}
 	unsigned char* temp_buf = new unsigned char[maxpoints + 1];
 	map<int, vector<UniformAnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
@@ -765,8 +774,12 @@ bool RigolOscilloscope::AcquireData()
 				&yincrement,
 				&yorigin,
 				&yreference);
+			if(sec_per_sample == 0)
+			{	// Sometimes the scope might return a null value for xincrement => replace it with a dummy value to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+				sec_per_sample = 0.001;
+			}
 			fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
-			//LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", npoints, xorigin, xreference, fs_per_sample);
+			//LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", (int) npoints, xorigin, xreference, (long int) fs_per_sample);
 			//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 		}
 
@@ -786,7 +799,7 @@ bool RigolOscilloscope::AcquireData()
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
 		{
-			if(m_protocol == MSO5 || m_protocol == DHO)
+			if(m_protocol == MSO5)
 			{
 				//Ask for the data block
 				m_transport->SendCommandQueued("*WAI");
@@ -910,8 +923,11 @@ bool RigolOscilloscope::AcquireData()
 		}
 		else
 		{
-			m_transport->SendCommandQueued(":SING");
-			m_transport->SendCommandQueued("*WAI");
+			if(!m_liveMode)
+			{
+				m_transport->SendCommandQueued(":SING");
+				m_transport->SendCommandQueued("*WAI");
+			}
 		}
 		m_triggerArmed = true;
 	}
@@ -921,6 +937,15 @@ bool RigolOscilloscope::AcquireData()
 	return true;
 }
 
+void RigolOscilloscope::StopLiveMode()
+{
+	if(m_liveMode)
+	{	// Stop live mode
+		m_transport->SendCommandQueued(":WAV:MODE RAW");
+		m_liveMode = false;
+	}
+}
+
 void RigolOscilloscope::Start()
 {
 	//LogDebug("Start single trigger\n");
@@ -928,6 +953,24 @@ void RigolOscilloscope::Start()
 	{
 		m_transport->SendCommandQueued(":TRIG:EDGE:SWE SING");
 		m_transport->SendCommandQueued(":RUN");
+	}
+	else if(m_protocol == DHO)
+	{	// Check for memory depth : if it is 1k, switch to live mode for better performance
+		m_mdepthValid = false;
+		GetSampleDepth();
+		m_liveMode = (m_mdepth == 1000);
+		if(m_liveMode)
+		{
+			m_transport->SendCommandQueued(":WAV:MODE NORM");
+			m_transport->SendCommandQueued(":RUN");
+			m_transport->SendCommandQueued("*WAI");
+		}
+		else
+		{
+			m_transport->SendCommandQueued(":WAV:MODE RAW");
+			m_transport->SendCommandQueued(":SING");
+			m_transport->SendCommandQueued("*WAI");
+		}
 	}
 	else
 	{
@@ -947,6 +990,7 @@ void RigolOscilloscope::StartSingleTrigger()
 	}
 	else
 	{
+		StopLiveMode();
 		m_transport->SendCommandQueued(":SING");
 		m_transport->SendCommandQueued("*WAI");
 	}
@@ -957,6 +1001,7 @@ void RigolOscilloscope::StartSingleTrigger()
 void RigolOscilloscope::Stop()
 {
 	m_transport->SendCommandQueued(":STOP");
+	StopLiveMode();
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
@@ -964,7 +1009,10 @@ void RigolOscilloscope::Stop()
 void RigolOscilloscope::ForceTrigger()
 {
 	if(m_protocol == DS || m_protocol == DHO)
+	{
+		StopLiveMode();
 		m_transport->SendCommandQueued(":TFOR");
+	}
 	else
 		LogError("RigolOscilloscope::ForceTrigger not implemented for this model\n");
 }
