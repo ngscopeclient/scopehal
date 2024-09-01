@@ -772,6 +772,7 @@ bool RigolOscilloscope::AcquireData()
 				&yreference);
 			if(sec_per_sample == 0)
 			{	// Sometimes the scope might return a null value for xincrement => replace it with a dummy value to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+				LogWarning("Got null sec_per_sample value from the scope, forcing it to a dummy non null value to prevent Arithmetic exception.\n");
 				sec_per_sample = 0.001;
 			}
 			fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
@@ -1014,9 +1015,7 @@ void RigolOscilloscope::ForceTrigger()
 	m_mdepthValid = false; // Memory depth might have been changed on scope
 	PrepareStart();
 	if(m_protocol == DS || m_protocol == DHO)
-	{
 		m_transport->SendCommandQueued(":TFOR");
-	}
 	else
 		LogError("RigolOscilloscope::ForceTrigger not implemented for this model\n");
 }
