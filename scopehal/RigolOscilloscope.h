@@ -135,7 +135,7 @@ protected:
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullEdgeTrigger();
 
-	void StopLiveMode();
+	void PrepareStart();
 
 public:
 	static std::string GetDriverNameInternal();
