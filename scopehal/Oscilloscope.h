@@ -133,6 +133,13 @@ public:
 	virtual void DisableChannel(size_t i) =0;
 
 	/**
+		@brief Returns the number of enabled channels for this oscilloscope.
+
+		@return the number of enabled channels for this oscilloscope.
+	 */
+	int GetEnabledChannelCount();
+
+	/**
 		@brief Gets a channel given the hardware name
 	 */
 	OscilloscopeChannel* GetOscilloscopeChannelByHwName(const std::string& name)

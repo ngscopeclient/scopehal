@@ -119,6 +119,18 @@ bool Oscilloscope::CanEnableChannel(size_t /*i*/)
 	return true;
 }
 
+int Oscilloscope::GetEnabledChannelCount()
+{
+	int result = 0;
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(IsChannelEnabled(i))
+			result++;
+	}
+	return result;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering helpers
 

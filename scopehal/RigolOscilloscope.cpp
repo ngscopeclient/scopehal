@@ -966,9 +966,17 @@ void RigolOscilloscope::Start()
 	}
 	else if(m_protocol == DHO)
 	{	// Check for memory depth : if it is 1k, switch to live mode for better performance
-		m_mdepthValid = false;
-		GetSampleDepth();
-		m_liveMode = (m_mdepth == 1000);
+		// Limit live mode to one channel setup to prevent grabbing waveforms from to different triggers on seperate channels
+		if(GetEnabledChannelCount()==1)
+		{
+			m_mdepthValid = false;
+			GetSampleDepth();
+			m_liveMode = (m_mdepth == 1000);
+		}
+		else
+		{
+			m_liveMode = false;
+		}
 		PrepareStart();
 		m_transport->SendCommandQueued(m_liveMode ? ":RUN" : ":SING");
 		m_transport->SendCommandQueued("*WAI");
