@@ -161,6 +161,9 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 				"#808080",
 				m_channels.size());
 			m_channels.push_back(m_awgChannel);
+
+			//Default to not showing in the filter graph to avoid clutter
+			m_awgChannel->m_visibilityMode = InstrumentChannel::VIS_HIDE;
 			break;
 
 		//no AWG
