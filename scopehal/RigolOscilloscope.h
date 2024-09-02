@@ -125,6 +125,8 @@ protected:
 	bool m_triggerWasLive;
 	bool m_triggerOneShot;
 
+	bool m_liveMode;
+
 	int m_modelNumber;
 	unsigned int m_bandwidth;
 	bool m_opt200M;
@@ -132,6 +134,8 @@ protected:
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullEdgeTrigger();
+
+	void PrepareStart();
 
 public:
 	static std::string GetDriverNameInternal();

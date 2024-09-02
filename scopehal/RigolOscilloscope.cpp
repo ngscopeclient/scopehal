@@ -49,6 +49,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerWasLive(false)
 	, m_triggerOneShot(false)
+	, m_liveMode(false)
 {
 	//Last digit of the model number is the number of channels
 	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
@@ -107,16 +108,27 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 
 		m_transport->SendCommandQueued("CHAN1:BWL " + originalBandwidthLimit);
 	}
-	else if(1 == sscanf(m_model.c_str(), "DHO%d", &m_modelNumber) && (m_modelNumber < 1000))
-	{
+	else if(1 == sscanf(m_model.c_str(), "DHO%d", &m_modelNumber) && (m_modelNumber < 5000))
+	{	// Model numbers are :
+		// - DHO802 (70MHz), DHO804 (70Mhz), DHO812 (100MHz),DHO814 (100MHz)
+	    // - DHO914/DHO914S (125MHz), DHO924/DHO924S (250MHz)
+		// - DHO1072 (70MHz), DHO1074 (70MHz), DHO1102 (100MHz), DHO1104 (100MHz), DHO1202 (200MHz), DHO1204 (200MHz)
+		// - DHO4204 (200MHz), DHO4404 (400 MHz), DHO4804 (800MHz)
 		m_protocol = DHO;
 
 		int model_multiplicator = 100;
-		if(m_modelNumber > 900)	   // special handling of DHO900 series
-		{
+		int model_modulo = 100;
+		if(m_modelNumber > 1000)
+		{	// DHO1000 and 4000
+			model_multiplicator = 10;
+			model_modulo = 1000;
+		}
+		else if(m_modelNumber > 900)
+		{	// special handling of DHO900 series
 			model_multiplicator = 125;
 		}
-		m_bandwidth = m_modelNumber % 100 / 10 * model_multiplicator;	 // should also work for DHO1000/DHO4000
+		m_bandwidth = m_modelNumber % model_modulo / 10 * model_multiplicator;
+		if(m_bandwidth == 0) m_bandwidth = 70; // Fallback for DHO80x models
 
 		m_opt200M = false;	  // does not exist in 800/900 series
 	}
@@ -653,6 +665,9 @@ void RigolOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offs
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
+	if(m_liveMode)
+		return TRIGGER_MODE_TRIGGERED;
+
 	auto stat = Trim(m_transport->SendCommandQueuedWithReply(":TRIG:STAT?"));
 
 	if(stat != "STOP")
@@ -708,6 +723,7 @@ bool RigolOscilloscope::AcquireData()
 		maxpoints = 8192;	 // FIXME
 	else if(m_protocol == MSO5)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
+
 	unsigned char* temp_buf = new unsigned char[maxpoints + 1];
 	map<int, vector<UniformAnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
@@ -754,8 +770,17 @@ bool RigolOscilloscope::AcquireData()
 				&yincrement,
 				&yorigin,
 				&yreference);
+			if(sec_per_sample == 0)
+			{	// Sometimes the scope might return a null value for xincrement => replace it with a dummy value to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+				LogWarning("Got null sec_per_sample value from the scope, forcing it to a dummy non null value to prevent Arithmetic exception.\n");
+				sec_per_sample = 0.001;
+			}
 			fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
-			//LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", npoints, xorigin, xreference, fs_per_sample);
+			if(m_protocol == DHO)
+			{	// DHO models return page size instead of memory depth when paginating
+				npoints = GetSampleDepth();
+			}
+			//LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", (int) npoints, xorigin, xreference, (long int) fs_per_sample);
 			//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 		}
 
@@ -775,7 +800,7 @@ bool RigolOscilloscope::AcquireData()
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
 		{
-			if(m_protocol == MSO5 || m_protocol == DHO)
+			if(m_protocol == MSO5)
 			{
 				//Ask for the data block
 				m_transport->SendCommandQueued("*WAI");
@@ -899,8 +924,11 @@ bool RigolOscilloscope::AcquireData()
 		}
 		else
 		{
-			m_transport->SendCommandQueued(":SING");
-			m_transport->SendCommandQueued("*WAI");
+			if(!m_liveMode)
+			{
+				m_transport->SendCommandQueued(":SING");
+				m_transport->SendCommandQueued("*WAI");
+			}
 		}
 		m_triggerArmed = true;
 	}
@@ -910,6 +938,24 @@ bool RigolOscilloscope::AcquireData()
 	return true;
 }
 
+void RigolOscilloscope::PrepareStart()
+{
+	if(m_protocol == DHO)
+	{
+		// DHO models need to set raw mode off and on again or vice versa to reset the number of points according to the current memory depth
+		if(m_liveMode)
+		{
+			m_transport->SendCommandQueued(":WAV:MODE RAW");
+			m_transport->SendCommandQueued(":WAV:MODE NORM");
+		}
+		else
+		{
+			m_transport->SendCommandQueued(":WAV:MODE NORM");
+			m_transport->SendCommandQueued(":WAV:MODE RAW");
+		}
+	}
+}
+
 void RigolOscilloscope::Start()
 {
 	//LogDebug("Start single trigger\n");
@@ -917,6 +963,23 @@ void RigolOscilloscope::Start()
 	{
 		m_transport->SendCommandQueued(":TRIG:EDGE:SWE SING");
 		m_transport->SendCommandQueued(":RUN");
+	}
+	else if(m_protocol == DHO)
+	{	// Check for memory depth : if it is 1k, switch to live mode for better performance
+		// Limit live mode to one channel setup to prevent grabbing waveforms from to different triggers on seperate channels
+		if(GetEnabledChannelCount()==1)
+		{
+			m_mdepthValid = false;
+			GetSampleDepth();
+			m_liveMode = (m_mdepth == 1000);
+		}
+		else
+		{
+			m_liveMode = false;
+		}
+		PrepareStart();
+		m_transport->SendCommandQueued(m_liveMode ? ":RUN" : ":SING");
+		m_transport->SendCommandQueued("*WAI");
 	}
 	else
 	{
@@ -929,6 +992,9 @@ void RigolOscilloscope::Start()
 
 void RigolOscilloscope::StartSingleTrigger()
 {
+	m_liveMode = false;
+	m_mdepthValid = false; // Memory depth might have been changed on scope
+	PrepareStart();
 	if(m_protocol == DS_OLD)
 	{
 		m_transport->SendCommandQueued(":TRIG:EDGE:SWE SING");
@@ -946,12 +1012,16 @@ void RigolOscilloscope::StartSingleTrigger()
 void RigolOscilloscope::Stop()
 {
 	m_transport->SendCommandQueued(":STOP");
+	m_liveMode = false;
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
 
 void RigolOscilloscope::ForceTrigger()
 {
+	m_liveMode = false;
+	m_mdepthValid = false; // Memory depth might have been changed on scope
+	PrepareStart();
 	if(m_protocol == DS || m_protocol == DHO)
 		m_transport->SendCommandQueued(":TFOR");
 	else
