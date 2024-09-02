@@ -132,6 +132,8 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 
 DemoOscilloscope::~DemoOscilloscope()
 {
+	LogTrace("Shutting down demo scope\n");
+
 	for(int i=0; i<4; i++)
 	{
 		delete m_source[i];
@@ -486,6 +488,9 @@ Oscilloscope::AnalogBank DemoOscilloscope::GetAnalogBank(size_t channel)
 
 bool DemoOscilloscope::AcquireData()
 {
+	if(!m_triggerArmed)
+		return false;
+
 	//cap waveform rate at 50 wfm/s to avoid saturating cpu
 	std::this_thread::sleep_for(std::chrono::microseconds(20 * 1000));
 

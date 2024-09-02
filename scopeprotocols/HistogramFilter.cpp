@@ -138,7 +138,7 @@ void HistogramFilter::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -164,14 +164,15 @@ void HistogramFilter::Refresh()
 	//Calculate min/max of the input data
 	float nmin = GetMinVoltage(sdin, udin);
 	float nmax = GetMaxVoltage(sdin, udin);
+	LogTrace("nmin = %s, nmax = %s\n", xunit.PrettyPrint(nmin).c_str(), xunit.PrettyPrint(nmax).c_str());
 
 	//Calculate bin count
 	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
 
 	bool reallocate = false;
 	float range = m_max - m_min;
-
-	if (m_parameters[m_autorangeName].GetIntVal())
+	bool autorange = (m_parameters[m_autorangeName].GetIntVal() != 0);
+	if(autorange)
 	{
 		//If the signal is outside our current range, extend our range
 		if( (nmin < m_min) || (nmax > m_max) )
@@ -210,17 +211,29 @@ void HistogramFilter::Refresh()
 
 	bool didClipRange = (nmin < m_min) || (nmax > m_max);
 
-	size_t bins = ceil(range) / m_parameters[m_binSizeName].GetFloatVal();
+	//Automatically choose a plausible bin size if autoranging, otherwise use what the user chose.
+	float requestedBinSize = m_parameters[m_binSizeName].GetFloatVal();
+	if(autorange)
+		requestedBinSize = range / 500;
+	size_t bins = ceil(range) / requestedBinSize;
 
 	// arbitrary sanity-check bounds
 	if (bins < 1) bins = 1;
 	if (bins > 10000) bins = 10000;
+	LogTrace("Calculated: %zu bins\n", bins);
+
+	//Calculate bin configuration
+	//If we calculate zero bin size, force bin size to 1
+	float binsize = range / bins;
+	if(static_cast<int64_t>(binsize) == 0)
+	{
+		binsize = 1;
+		bins = range;
+	}
+	LogTrace("Final configuration: %zu bins of %s\n", bins, xunit.PrettyPrint(binsize).c_str());
 
 	//Calculate histogram for our incoming data
 	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
-
-	//Calculate bin configuration.
-	float binsize = range / bins;
 
 	//Reallocate the histogram if we changed it
 	if(reallocate)
