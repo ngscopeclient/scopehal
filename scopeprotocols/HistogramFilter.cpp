@@ -138,7 +138,7 @@ void HistogramFilter::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -219,8 +219,14 @@ void HistogramFilter::Refresh()
 	//Calculate histogram for our incoming data
 	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
 
-	//Calculate bin configuration.
+	//Calculate bin configuration
+	//If we calculate zero bin size, set null output waveform rather than creating an invalid waveform
 	float binsize = range / bins;
+	if(static_cast<int64_t>(binsize) == 0)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
 
 	//Reallocate the histogram if we changed it
 	if(reallocate)
