@@ -142,6 +142,7 @@
 #include "J1939AnalogDecoder.h"
 #include "J1939BitmaskDecoder.h"
 #include "J1939PDUDecoder.h"
+#include "J1939SourceMatchFilter.h"
 #include "JitterFilter.h"
 #include "JitterSpectrumFilter.h"
 #include "JtagDecoder.h"

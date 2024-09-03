@@ -103,6 +103,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	J1939AnalogDecoder.cpp
 	J1939BitmaskDecoder.cpp
 	J1939PDUDecoder.cpp
+	J1939SourceMatchFilter.cpp
 	JitterFilter.cpp
 	JitterSpectrumFilter.cpp
 	JtagDecoder.cpp
