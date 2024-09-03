@@ -131,6 +131,26 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		if(m_bandwidth == 0) m_bandwidth = 70; // Fallback for DHO80x models
 
 		m_opt200M = false;	  // does not exist in 800/900 series
+		m_opt500M = false;
+
+		if (m_modelNumber > 4000 && m_modelNumber < 5000) {
+			/* probe for bandwidth upgrades and memory upgrades on DHO4000 series; similar tactics would work on DHO1000 */
+			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n"));
+			if (reply == "1")
+				m_opt500M = true;
+			
+			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T4\n"));
+			if (reply == "1")
+				m_bandwidth = 400;
+
+			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T8\n"));
+			if (reply == "1")
+				m_bandwidth = 800;
+
+			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW4T8\n"));
+			if (reply == "1")
+				m_bandwidth = 800;
+		}
 	}
 	else
 	{
@@ -705,6 +725,9 @@ bool RigolOscilloscope::AcquireData()
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	LogIndenter li;
 
+	// Rigol scopes do not have a capture time so we fake it
+	double now = GetTime();
+
 	//Grab the analog waveform data
 	int unused1;
 	int unused2;
@@ -793,9 +816,15 @@ bool RigolOscilloscope::AcquireData()
 		cap->Resize(0);
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+		cap->m_startTimestamp = floor(now);
+		cap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
+		
+		if (m_protocol == DHO) {
+			/* XXX: maybe other scopes, too? */
+			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":WAV:XOR?")); /* :WAV:XREF? is always 0 on DHO4000 */
+			sscanf(reply.c_str(), "%lf", &xorigin);
+			cap->m_triggerPhase = xorigin * FS_PER_SECOND;
+		}
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
