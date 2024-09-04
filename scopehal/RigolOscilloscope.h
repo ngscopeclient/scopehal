@@ -130,6 +130,7 @@ protected:
 	int m_modelNumber;
 	unsigned int m_bandwidth;
 	bool m_opt200M;
+	bool m_opt500M; /* 500M memory option on DHO4000, option RLU */
 	protocol_version m_protocol;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
