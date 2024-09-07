@@ -273,6 +273,15 @@ string FlowGraphNode::GetInputDisplayName(size_t i)
 		return in.m_channel->GetDisplayName();
 }
 
+/**
+	@brief Creates and names an input signal
+ */
+void FlowGraphNode::CreateInput(const string& name)
+{
+	m_signalNames.push_back(name);
+	m_inputs.push_back(StreamDescriptor(NULL, 0));
+}
+
 bool FlowGraphNode::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
 {
 	return true;

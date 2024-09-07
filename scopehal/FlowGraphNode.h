@@ -37,53 +37,11 @@
 
 class OscilloscopeChannel;
 class WaveformBase;
+class StreamDescriptor;
 
 #include "FilterParameter.h"
 #include "Waveform.h"
 #include "Stream.h"
-
-class InstrumentChannel;
-
-/**
-	@brief Descriptor for a single stream coming off a channel
- */
-class StreamDescriptor
-{
-public:
-	StreamDescriptor()
-	: m_channel(NULL)
-	, m_stream(0)
-	{}
-
-	StreamDescriptor(InstrumentChannel* channel, size_t stream = 0)
-		: m_channel(channel)
-		, m_stream(stream)
-	{}
-
-	operator bool() const
-	{ return (m_channel != NULL); }
-
-	std::string GetName() const;
-
-	InstrumentChannel* m_channel;
-	size_t m_stream;
-
-	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
-	//See StreamDescriptor_inlines.h for implementations
-	Unit GetXAxisUnits();
-	Unit GetYAxisUnits();
-	WaveformBase* GetData() const;
-	bool operator==(const StreamDescriptor& rhs) const;
-	bool operator!=(const StreamDescriptor& rhs) const;
-	bool operator<(const StreamDescriptor& rhs) const;
-	uint8_t GetFlags() const;
-	float GetVoltageRange();
-	float GetOffset();
-	void SetVoltageRange(float v);
-	void SetOffset(float v);
-	Stream::StreamType GetType();
-	float GetScalarValue();
-};
 
 /**
 	@brief Abstract base class for a node in the signal flow graph.
@@ -194,14 +152,7 @@ protected:
 	SparseDigitalBusWaveform* GetSparseDigitalBusInputWaveform(size_t i)
 	{ return dynamic_cast<SparseDigitalBusWaveform*>(GetInputWaveform(i)); }
 
-	/**
-		@brief Creates and names an input signal
-	 */
-	void CreateInput(const std::string& name)
-	{
-		m_signalNames.push_back(name);
-		m_inputs.push_back(StreamDescriptor(NULL, 0));
-	}
+	void CreateInput(const std::string& name);
 
 	std::string GetInputDisplayName(size_t i);
 

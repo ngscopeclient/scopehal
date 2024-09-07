@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -70,8 +70,8 @@ public:
 		size_t index = 0);
 	virtual ~OscilloscopeChannel();
 
-	Oscilloscope* GetScope()
-	{ return m_scope; }
+	//implemented in Oscilloscope.h
+	Oscilloscope* GetScope();
 
 	size_t GetRefCount()
 	{ return m_refcount; }
@@ -117,7 +117,7 @@ public:
 	virtual int64_t GetDeskew();
 
 	bool IsPhysicalChannel()
-	{ return (m_scope != nullptr); }
+	{ return (m_instrument != nullptr); }
 
 	virtual float GetVoltageRange(size_t stream);
 	virtual void SetVoltageRange(float range, size_t stream);
@@ -147,13 +147,6 @@ public:
 	void SetDefaultDisplayName();
 protected:
 	void SharedCtorInit(Unit unit);
-
-	/**
-		@brief The oscilloscope (if any) we are part of.
-
-		Note that filters and other special channels are not attached to a scope.
-	 */
-	Oscilloscope* m_scope;
 
 	///Number of references (channel is disabled when last ref is released)
 	size_t m_refcount;

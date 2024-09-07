@@ -48,7 +48,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Unit xunit,
 	size_t index)
 	: InstrumentChannel(scope, hwname, color, xunit, index)
-	, m_scope(scope)
 	, m_refcount(0)
 {
 }
@@ -62,7 +61,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Stream::StreamType stype,
 	size_t index)
 	: InstrumentChannel(scope, hwname, color, xunit, yunit, stype, index)
-	, m_scope(scope)
 	, m_refcount(0)
 {
 }
@@ -77,11 +75,11 @@ void OscilloscopeChannel::SetDefaultDisplayName()
 	//If we have a scope, m_displayname is ignored.
 	//Start out by pulling the name from hardware.
 	//If it's not set, use our hardware name as the default.
-	if(m_scope)
+	if(m_instrument)
 	{
-		auto name = m_scope->GetChannelDisplayName(m_index);
+		auto name = GetScope()->GetChannelDisplayName(m_index);
 		if(name == "")
-			m_scope->SetChannelDisplayName(m_index, m_hwname);
+			GetScope()->SetChannelDisplayName(m_index, m_hwname);
 	}
 }
 
@@ -108,50 +106,50 @@ void OscilloscopeChannel::Release()
 
 float OscilloscopeChannel::GetOffset(size_t stream)
 {
-	if(m_scope != NULL)
-		return m_scope->GetChannelOffset(m_index, stream);
+	if(GetScope() != NULL)
+		return GetScope()->GetChannelOffset(m_index, stream);
 	else
 		return 0;
 }
 
 void OscilloscopeChannel::SetOffset(float offset, size_t stream)
 {
-	if(m_scope != NULL)
-		m_scope->SetChannelOffset(m_index, stream, offset);
+	if(GetScope() != NULL)
+		GetScope()->SetChannelOffset(m_index, stream, offset);
 }
 
 bool OscilloscopeChannel::IsEnabled()
 {
-	if(m_scope != NULL)
-		return m_scope->IsChannelEnabled(m_index);
+	if(GetScope() != NULL)
+		return GetScope()->IsChannelEnabled(m_index);
 	else
 		return true;
 }
 
 void OscilloscopeChannel::Enable()
 {
-	if(m_scope != NULL)
-		m_scope->EnableChannel(m_index);
+	if(GetScope() != NULL)
+		GetScope()->EnableChannel(m_index);
 }
 
 void OscilloscopeChannel::Disable()
 {
-	if(m_scope != NULL)
-		m_scope->DisableChannel(m_index);
+	if(GetScope() != NULL)
+		GetScope()->DisableChannel(m_index);
 }
 
 OscilloscopeChannel::CouplingType OscilloscopeChannel::GetCoupling()
 {
-	if(m_scope)
-		return m_scope->GetChannelCoupling(m_index);
+	if(m_instrument)
+		return GetScope()->GetChannelCoupling(m_index);
 	else
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 }
 
 vector<OscilloscopeChannel::CouplingType> OscilloscopeChannel::GetAvailableCouplings()
 {
-	if(m_scope)
-		return m_scope->GetAvailableCouplings(m_index);
+	if(m_instrument)
+		return GetScope()->GetAvailableCouplings(m_index);
 	else
 	{
 		vector<OscilloscopeChannel::CouplingType> ret;
@@ -162,87 +160,87 @@ vector<OscilloscopeChannel::CouplingType> OscilloscopeChannel::GetAvailableCoupl
 
 void OscilloscopeChannel::SetCoupling(CouplingType type)
 {
-	if(m_scope)
-		m_scope->SetChannelCoupling(m_index, type);
+	if(m_instrument)
+		GetScope()->SetChannelCoupling(m_index, type);
 }
 
 double OscilloscopeChannel::GetAttenuation()
 {
-	if(m_scope)
-		return m_scope->GetChannelAttenuation(m_index);
+	if(m_instrument)
+		return GetScope()->GetChannelAttenuation(m_index);
 	else
 		return 1;
 }
 
 void OscilloscopeChannel::SetAttenuation(double atten)
 {
-	if(m_scope)
-		m_scope->SetChannelAttenuation(m_index, atten);
+	if(m_instrument)
+		GetScope()->SetChannelAttenuation(m_index, atten);
 }
 
 int OscilloscopeChannel::GetBandwidthLimit()
 {
-	if(m_scope)
-		return m_scope->GetChannelBandwidthLimit(m_index);
+	if(m_instrument)
+		return GetScope()->GetChannelBandwidthLimit(m_index);
 	else
 		return 0;
 }
 
 void OscilloscopeChannel::SetBandwidthLimit(int mhz)
 {
-	if(m_scope)
-		m_scope->SetChannelBandwidthLimit(m_index, mhz);
+	if(m_instrument)
+		GetScope()->SetChannelBandwidthLimit(m_index, mhz);
 }
 
 float OscilloscopeChannel::GetVoltageRange(size_t stream)
 {
-	if(m_scope)
-		return m_scope->GetChannelVoltageRange(m_index, stream);
+	if(m_instrument)
+		return GetScope()->GetChannelVoltageRange(m_index, stream);
 	else
 		return 1;	//TODO: get from input
 }
 
 void OscilloscopeChannel::SetVoltageRange(float range, size_t stream)
 {
-	if(m_scope)
-		return m_scope->SetChannelVoltageRange(m_index, stream, range);
+	if(m_instrument)
+		return GetScope()->SetChannelVoltageRange(m_index, stream, range);
 }
 
 void OscilloscopeChannel::SetDeskew(int64_t skew)
 {
-	if(m_scope)
-		m_scope->SetDeskewForChannel(m_index, skew);
+	if(m_instrument)
+		GetScope()->SetDeskewForChannel(m_index, skew);
 }
 
 int64_t OscilloscopeChannel::GetDeskew()
 {
-	if(m_scope)
-		return m_scope->GetDeskewForChannel(m_index);
+	if(m_instrument)
+		return GetScope()->GetDeskewForChannel(m_index);
 	return 0;
 }
 
 void OscilloscopeChannel::SetDigitalHysteresis(float level)
 {
-	if(m_scope)
-		m_scope->SetDigitalHysteresis(m_index, level);
+	if(m_instrument)
+		GetScope()->SetDigitalHysteresis(m_index, level);
 }
 
 void OscilloscopeChannel::SetDigitalThreshold(float level)
 {
-	if(m_scope)
-		m_scope->SetDigitalThreshold(m_index, level);
+	if(m_instrument)
+		GetScope()->SetDigitalThreshold(m_index, level);
 }
 
 void OscilloscopeChannel::SetCenterFrequency(int64_t freq)
 {
-	if(m_scope)
-		m_scope->SetCenterFrequency(m_index, freq);
+	if(m_instrument)
+		GetScope()->SetCenterFrequency(m_index, freq);
 }
 
 void OscilloscopeChannel::SetDisplayName(string name)
 {
-	if(m_scope)
-		m_scope->SetChannelDisplayName(m_index, name);
+	if(m_instrument)
+		GetScope()->SetChannelDisplayName(m_index, name);
 	InstrumentChannel::SetDisplayName(name);
 }
 
@@ -254,9 +252,9 @@ string OscilloscopeChannel::GetDisplayName()
 		return cached;
 
 	//If not, pull from hardware
-	if(m_scope)
+	if(m_instrument)
 	{
-		auto tmp = m_scope->GetChannelDisplayName(m_index);
+		auto tmp = GetScope()->GetChannelDisplayName(m_index);
 		InstrumentChannel::SetDisplayName(tmp);
 		return tmp;
 	}
@@ -268,78 +266,78 @@ string OscilloscopeChannel::GetDisplayName()
 
 bool OscilloscopeChannel::CanInvert()
 {
-	if(m_scope)
-		return m_scope->CanInvert(m_index);
+	if(m_instrument)
+		return GetScope()->CanInvert(m_index);
 	else
 		return false;
 }
 
 void OscilloscopeChannel::Invert(bool invert)
 {
-	if(m_scope)
-		m_scope->Invert(m_index, invert);
+	if(m_instrument)
+		GetScope()->Invert(m_index, invert);
 }
 
 bool OscilloscopeChannel::IsInverted()
 {
-	if(m_scope)
-		return m_scope->IsInverted(m_index);
+	if(m_instrument)
+		return GetScope()->IsInverted(m_index);
 	else
 		return false;
 }
 
 void OscilloscopeChannel::AutoZero()
 {
-	if(m_scope)
-		m_scope->AutoZero(m_index);
+	if(m_instrument)
+		GetScope()->AutoZero(m_index);
 }
 
 bool OscilloscopeChannel::CanAutoZero()
 {
-	if(m_scope)
-		return m_scope->CanAutoZero(m_index);
+	if(m_instrument)
+		return GetScope()->CanAutoZero(m_index);
 	else
 		return false;
 }
 
 void OscilloscopeChannel::Degauss()
 {
-	if(m_scope)
-		m_scope->Degauss(m_index);
+	if(m_instrument)
+		GetScope()->Degauss(m_index);
 }
 
 bool OscilloscopeChannel::CanDegauss()
 {
-	if(m_scope)
-		return m_scope->CanDegauss(m_index);
+	if(m_instrument)
+		return GetScope()->CanDegauss(m_index);
 	else
 		return false;
 }
 
 string OscilloscopeChannel::GetProbeName()
 {
-	if(m_scope)
-		return m_scope->GetProbeName(m_index);
+	if(m_instrument)
+		return GetScope()->GetProbeName(m_index);
 	else
 		return "";
 }
 
 bool OscilloscopeChannel::HasInputMux()
 {
-	if(m_scope)
-		return m_scope->HasInputMux(m_index);
+	if(m_instrument)
+		return GetScope()->HasInputMux(m_index);
 	return false;
 }
 
 size_t OscilloscopeChannel::GetInputMuxSetting()
 {
-	if(m_scope)
-		return m_scope->GetInputMuxSetting(m_index);
+	if(m_instrument)
+		return GetScope()->GetInputMuxSetting(m_index);
 	return 0;
 }
 
 void OscilloscopeChannel::SetInputMux(size_t select)
 {
-	if(m_scope)
-		m_scope->SetInputMux(m_index, select);
+	if(m_instrument)
+		GetScope()->SetInputMux(m_index, select);
 }

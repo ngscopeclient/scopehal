@@ -121,12 +121,14 @@ extern size_t g_maxComputeGroupCount[3];
 #endif
 
 #include "FlowGraphNode.h"
+#include "Instrument.h"
+#include "StreamDescriptor.h"
+
 #include "OscilloscopeChannel.h"
 #include "StreamDescriptor_inlines.h"
 #include "FlowGraphNode_inlines.h"
 #include "Trigger.h"
 
-#include "Instrument.h"
 #include "BERT.h"
 #include "DigitalIOChannel.h"
 #include "DigitalInputChannel.h"
