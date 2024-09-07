@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,6 +46,7 @@ CSVStreamInstrument::CSVStreamInstrument(SCPITransport* transport)
 
 	//Create initial stream
 	m_channels.push_back(new InstrumentChannel(
+		this,
 		"CH1",
 		"#808080",
 		Unit(Unit::UNIT_COUNTS),
@@ -101,6 +102,7 @@ void CSVStreamInstrument::DoPreLoadConfiguration(
 		while(m_channels.size() <= (size_t)index)
 		{
 			m_channels.push_back(new InstrumentChannel(
+				this,
 				string("CH") + to_string(index),
 				"#808080",
 				Unit(Unit::UNIT_COUNTS),
@@ -141,6 +143,7 @@ bool CSVStreamInstrument::AcquireData()
 			if(m_channels.size() < i)
 			{
 				m_channels.push_back(new InstrumentChannel(
+					this,
 					fields[i],
 					"#808080",
 					Unit(Unit::UNIT_COUNTS),
@@ -166,6 +169,7 @@ bool CSVStreamInstrument::AcquireData()
 			if(m_channels.size() < i)
 			{
 				m_channels.push_back(new InstrumentChannel(
+					this,
 					string("CH") + to_string(i),
 					"#808080",
 					Unit(Unit::UNIT_COUNTS),
@@ -189,6 +193,7 @@ bool CSVStreamInstrument::AcquireData()
 			if(m_channels.size() < i)
 			{
 				m_channels.push_back(new InstrumentChannel(
+					this,
 					string("CH") + to_string(i),
 					"#808080",
 					Unit(Unit::UNIT_COUNTS),

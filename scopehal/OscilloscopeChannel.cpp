@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,7 +47,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	const string& color,
 	Unit xunit,
 	size_t index)
-	: InstrumentChannel(hwname, color, xunit, index)
+	: InstrumentChannel(scope, hwname, color, xunit, index)
 	, m_scope(scope)
 	, m_refcount(0)
 {
@@ -61,7 +61,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Unit yunit,
 	Stream::StreamType stype,
 	size_t index)
-	: InstrumentChannel(hwname, color, xunit, yunit, stype, index)
+	: InstrumentChannel(scope, hwname, color, xunit, yunit, stype, index)
 	, m_scope(scope)
 	, m_refcount(0)
 {

@@ -39,8 +39,7 @@ BERTOutputChannel::BERTOutputChannel(
 	BERT* bert,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
-	, m_bert(bert)
+	: InstrumentChannel(bert, hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
 	ClearStreams();
 	/*AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -90,14 +89,14 @@ void BERTOutputChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<
 	if(voltageSetPointIn)
 	{
 		if(Unit(Unit::UNIT_VOLTS) == voltageSetPointIn.GetYAxisUnits())
-			m_bert->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
+			GetBERT()->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
 	}
 
 	auto currentSetPointIn = GetInput(1);
 	if(currentSetPointIn)
 	{
 		if(Unit(Unit::UNIT_AMPS) == currentSetPointIn.GetYAxisUnits())
-			m_bert->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
+			GetBERT()->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
 	}
 	*/
 }

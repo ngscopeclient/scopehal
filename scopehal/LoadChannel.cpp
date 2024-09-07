@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,8 +40,7 @@ LoadChannel::LoadChannel(
 	Load* load,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
-	, m_load(load)
+	: InstrumentChannel(load, hwname, color, Unit(Unit::UNIT_FS), index)
 {
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -80,7 +79,7 @@ void LoadChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueH
 	{
 		//Validate that set point has the correct units
 		Unit expectedUnit(Unit::UNIT_COUNTS);
-		switch(m_load->GetLoadMode(m_index))
+		switch(GetLoad()->GetLoadMode(m_index))
 		{
 			case Load::MODE_CONSTANT_CURRENT:
 				expectedUnit = Unit(Unit::UNIT_AMPS);
@@ -100,6 +99,6 @@ void LoadChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueH
 		}
 
 		if(expectedUnit == setPointIn.GetYAxisUnits())
-			m_load->SetLoadSetPoint(m_index, setPointIn.GetScalarValue());
+			GetLoad()->SetLoadSetPoint(m_index, setPointIn.GetScalarValue());
 	}
 }

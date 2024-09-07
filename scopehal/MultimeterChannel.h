@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,13 +42,17 @@ class MultimeterChannel : public InstrumentChannel
 public:
 
 	MultimeterChannel(
+		Multimeter* parent,
 		const std::string& hwname,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
 	virtual ~MultimeterChannel();
 
-	void Update(Multimeter* meter);
+	Multimeter* GetMeter()
+	{ return dynamic_cast<Multimeter*>(m_instrument); }
+
+	void Update();
 
 	float GetPrimaryValue()
 	{ return GetScalarValue(m_primaryStream); }

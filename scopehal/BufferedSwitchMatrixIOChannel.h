@@ -48,23 +48,26 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual void OnInputChanged(size_t i) override;
 
+	SwitchMatrix* GetSwitchMatrix()
+	{ return dynamic_cast<SwitchMatrix*>(m_instrument); }
+
 	bool MuxHasConfigurableThreshold()
-	{ return dynamic_cast<SwitchMatrix*>(m_parent)->MuxHasConfigurableThreshold(GetIndex()); }
+	{ return GetSwitchMatrix()->MuxHasConfigurableThreshold(GetIndex()); }
 
 	float GetMuxInputThreshold()
-	{ return dynamic_cast<SwitchMatrix*>(m_parent)->GetMuxInputThreshold(GetIndex()); }
+	{ return GetSwitchMatrix()->GetMuxInputThreshold(GetIndex()); }
 
 	void SetMuxInputThreshold(float v)
-	{ dynamic_cast<SwitchMatrix*>(m_parent)->SetMuxInputThreshold(GetIndex(), v); }
+	{ GetSwitchMatrix()->SetMuxInputThreshold(GetIndex(), v); }
 
 	bool MuxHasConfigurableDrive()
-	{ return dynamic_cast<SwitchMatrix*>(m_parent)->MuxHasConfigurableDrive(GetIndex()); }
+	{ return GetSwitchMatrix()->MuxHasConfigurableDrive(GetIndex()); }
 
 	float GetMuxOutputDrive()
-	{ return dynamic_cast<SwitchMatrix*>(m_parent)->GetMuxOutputDrive(GetIndex()); }
+	{ return GetSwitchMatrix()->GetMuxOutputDrive(GetIndex()); }
 
 	void SetMuxOutputDrive(float v)
-	{ dynamic_cast<SwitchMatrix*>(m_parent)->SetMuxOutputDrive(GetIndex(), v); }
+	{ GetSwitchMatrix()->SetMuxOutputDrive(GetIndex(), v); }
 
 protected:
 };

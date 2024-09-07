@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,7 +30,7 @@
 #ifndef SpectrometerDarkFrameChannel_h
 #define SpectrometerDarkFrameChannel_h
 
-class SCPISpectrometer;
+#include "SCPISpectrometer.h"
 
 /**
 	@brief A dark frame input for a spectrometer
@@ -45,15 +45,15 @@ public:
 		const std::string& color = "#808080",
 		size_t index = 0);
 
+	SCPISpectrometer* GetSpectrometer()
+	{ return dynamic_cast<SCPISpectrometer*>(m_instrument); }
+
 	virtual ~SpectrometerDarkFrameChannel();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
-
-protected:
-	SCPISpectrometer* m_spec;
 };
 
 #endif

@@ -59,7 +59,7 @@ bool BufferedSwitchMatrixOutputChannel::ValidateChannel(size_t i, StreamDescript
 
 	//Digital input of same instrument? It's good
 	auto din = dynamic_cast<DigitalInputChannel*>(stream.m_channel);
-	if(din && (din->GetParent() == m_parent) )
+	if(din && (din->GetInstrument() == m_instrument) )
 		return true;
 
 	//Nope, doesn't work
@@ -70,7 +70,7 @@ void BufferedSwitchMatrixOutputChannel::OnInputChanged(size_t i)
 {
 	//no null check needed because constructor takes a SwitchMatrix*
 	//but the base class variable is an Instrument*
-	auto parent = dynamic_cast<SwitchMatrix*>(m_parent);
+	auto parent = dynamic_cast<SwitchMatrix*>(m_instrument);
 
 	//get the input channel and set the path appropriately
 	auto din = dynamic_cast<DigitalInputChannel*>(GetInput(i).m_channel);

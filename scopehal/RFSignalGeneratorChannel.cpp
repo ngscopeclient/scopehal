@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,8 +39,7 @@ RFSignalGeneratorChannel::RFSignalGeneratorChannel(
 	const string& hwname,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
-	, m_gen(gen)
+	: InstrumentChannel(gen, hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
 	ClearStreams();
 
@@ -82,5 +81,5 @@ void RFSignalGeneratorChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shar
 	//Frequency
 	auto freqIn = GetInput(STREAM_FREQUENCY);
 	if(freqIn && (freqIn.GetYAxisUnits() == Unit(Unit::UNIT_HZ)))
-		m_gen->SetChannelCenterFrequency(m_index, freqIn.GetScalarValue());
+		GetRFSignalGenerator()->SetChannelCenterFrequency(m_index, freqIn.GetScalarValue());
 }

@@ -39,8 +39,7 @@ DigitalIOChannel::DigitalIOChannel(
 	Instrument* parent,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
-	, m_parent(parent)
+	: InstrumentChannel(parent, hwname, color, Unit(Unit::UNIT_FS), index)
 {
 	ClearStreams();
 

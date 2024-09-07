@@ -55,16 +55,10 @@ public:
 
 	virtual void SetDisplayName(std::string name) override
 	{
-		if(m_parent)
-			m_parent->SetChannelDisplayName(m_index, name);
+		if(m_instrument)
+			m_instrument->SetChannelDisplayName(m_index, name);
 		InstrumentChannel::SetDisplayName(name);
 	}
-
-	Instrument* GetParent()
-	{ return m_parent; }
-
-protected:
-	Instrument* m_parent;
 };
 
 #endif
