@@ -88,6 +88,7 @@ void PkPkMeasurement::Refresh()
 
 	//Copy Y axis units from input
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
 
 	//Figure out the nominal midpoint of the waveform
 	float top = GetTopVoltage(sdin, udin);
