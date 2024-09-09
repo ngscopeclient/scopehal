@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,6 +50,7 @@ XYSweepFilter::XYSweepFilter(const string& color)
 
 	CreateInput("x");
 	CreateInput("y");
+	CreateInput("gate");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,7 +61,7 @@ bool XYSweepFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
+	if( (i < 3) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
 		return true;
 
 	return false;
@@ -95,6 +96,15 @@ void XYSweepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr
 
 	auto x = wx.GetScalarValue();
 	auto y = wy.GetScalarValue();
+
+	//See if we have a gating input and, if so, don't update if it's low
+	auto gate = GetInput(2);
+	if(gate)
+	{
+		auto gateval = gate.GetScalarValue();
+		if(gateval < 0.1)
+			return;
+	}
 
 	//Make an output waveform
 	auto cap = dynamic_cast<SparseAnalogWaveform*>(GetData(0));
