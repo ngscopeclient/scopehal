@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -82,6 +82,26 @@ bool ScalarStairstepFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*str
 string ScalarStairstepFilter::GetProtocolName()
 {
 	return "Scalar Stairstep";
+}
+
+vector<string> ScalarStairstepFilter::EnumActions()
+{
+	vector<string> ret;
+	ret.push_back("Restart");
+	return ret;
+}
+
+bool ScalarStairstepFilter::PerformAction(const string& id)
+{
+	if(id == "Restart")
+	{
+		//Trigger an update immediately and set our output
+		m_lastUpdate = GetTime();
+		m_streams[1].m_value = 1;
+		m_streams[0].m_value = m_parameters[m_start].GetFloatVal();
+	}
+
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
