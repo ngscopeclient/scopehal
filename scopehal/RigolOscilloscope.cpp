@@ -1473,7 +1473,8 @@ void RigolOscilloscope::PullTrigger()
 	else
 	{
 		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
-		m_trigger = NULL;
+		// Pull Edge trigger anyway to prevent looping on this method call
+		PullEdgeTrigger();
 		return;
 	}
 }
