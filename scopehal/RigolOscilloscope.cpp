@@ -826,9 +826,9 @@ bool RigolOscilloscope::AcquireData()
 				&yorigin,
 				&yreference);
 			if(sec_per_sample == 0)
-			{	// Sometimes the scope might return a null value for xincrement => replace it with a dummy value to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
-				LogWarning("Got null sec_per_sample value from the scope, forcing it to a dummy non null value to prevent Arithmetic exception.\n");
-				sec_per_sample = 0.001;
+			{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+				LogWarning("Got null sec_per_sample value from the scope, ignoring this waveform.\n");
+				continue;
 			}
 			fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
 			if(m_protocol == DHO)
