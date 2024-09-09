@@ -119,7 +119,8 @@ void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_
 
 	//See how long it's been since our last update and set update flag accordingly
 	double now = GetTime();
-	double timeOfNextUpdate = m_lastUpdate + m_parameters[m_interval].GetFloatVal()*SECONDS_PER_FS;
+	double dt = m_parameters[m_interval].GetFloatVal()*SECONDS_PER_FS;
+	double timeOfNextUpdate = m_lastUpdate + dt;
 	if(timeOfNextUpdate > now)
 	{
 		m_streams[1].m_value = 0;
@@ -129,8 +130,13 @@ void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_
 
 	//Time to update!
 	//Backdate our nominal update time to the exact interval
-	//so graph execution times don't cause skew of future updates
-	m_lastUpdate = timeOfNextUpdate;
+	//so graph execution times don't cause skew of future updates.
+	//(but don't allow shifting by more than one delta)
+	double tlate = timeOfNextUpdate - now;
+	if(tlate > (2*dt))
+		m_lastUpdate = now;
+	else
+		m_lastUpdate = timeOfNextUpdate;
 
 	float start = m_parameters[m_start].GetFloatVal();
 	float end = m_parameters[m_end].GetFloatVal();
