@@ -851,13 +851,6 @@ bool RigolOscilloscope::AcquireData()
 		cap->m_startTimestamp = floor(now);
 		cap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
 		
-		if (m_protocol == DHO) {
-			/* XXX: maybe other scopes, too? */
-			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":WAV:XOR?")); /* :WAV:XREF? is always 0 on DHO4000 */
-			sscanf(reply.c_str(), "%lf", &xorigin);
-			cap->m_triggerPhase = xorigin * FS_PER_SECOND;
-		}
-
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
 		{
@@ -1290,9 +1283,9 @@ uint64_t RigolOscilloscope::GetSampleRate()
 
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:SRAT?"));
 
-	uint64_t rate;
-	sscanf(ret.c_str(), "%" PRIu64, &rate);
-	m_srate = rate;
+	double rate;
+	sscanf(ret.c_str(), "%lf", &rate);
+	m_srate = (uint64_t)rate;
 	m_srateValid = true;
 	return rate;
 }
@@ -1433,23 +1426,41 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 
 void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	double offsetval = (double)offset / FS_PER_SECOND;
-
-	m_transport->SendCommandQueued(string(":TIM:MAIN:OFFS ") + to_string(offsetval));
+	//Rigol standard has the offset being from the midpoint of the capture.
+	//Scopehal has offset from the start.
+	int64_t rate = GetSampleRate();
+	int64_t halfdepth = GetSampleDepth() / 2;
+	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
+	m_transport->SendCommandQueued(string(":TIM:MAIN:OFFS ") + to_string((halfwidth - offset) * SECONDS_PER_FS));
 }
 
 int64_t RigolOscilloscope::GetTriggerOffset()
 {
-	if(m_triggerOffsetValid)
-		return m_triggerOffset;
+	//Early out if the value is in cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_triggerOffsetValid)
+			return m_triggerOffset;
+	}
 
-	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":TIM:MAIN:OFFS?"));
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(":TIM:MAIN:OFFS?"));
 
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	//Result comes back in scientific notation
 	double offsetval;
-	sscanf(ret.c_str(), "%lf", &offsetval);
-	m_triggerOffset = (uint64_t)(offsetval * FS_PER_SECOND);
+	sscanf(reply.c_str(), "%lf", &offsetval);
+	m_triggerOffset = static_cast<int64_t>(round(offsetval * FS_PER_SECOND));
+
+	//Convert from midpoint to start point
+	int64_t rate = GetSampleRate();
+	int64_t halfdepth = GetSampleDepth() / 2;
+	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
+	m_triggerOffset = halfwidth - m_triggerOffset;
+
 	m_triggerOffsetValid = true;
-	return m_triggerOffset;
+
+	return m_triggerOffset;	
 }
 
 bool RigolOscilloscope::IsInterleaving()
