@@ -228,7 +228,7 @@ protected:
 	void PullSlewRateTrigger();
 	void PullUartTrigger();
 	void PullWindowTrigger();
-	void PullTriggerSource(Trigger* trig, std::string triggerModeName);
+	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
 
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);

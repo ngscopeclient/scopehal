@@ -3686,6 +3686,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 {
 	std::string reply;
 
+	bool isUart = false;
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -3740,7 +3741,10 @@ void SiglentSCPIOscilloscope::PullTrigger()
 			else if(reply == "SLOPe")
 				PullSlewRateTrigger();
 			else if(reply == "UART")
+			{
 				PullUartTrigger();
+				isUart = true;
+			}
 			else if(reply == "INTerval")
 				PullPulseWidthTrigger();
 			else if(reply == "WINDow")
@@ -3755,7 +3759,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 			}
 
 			//Pull the source (same for all types of trigger)
-			PullTriggerSource(m_trigger, reply);
+			PullTriggerSource(m_trigger, reply,isUart);
 
 			//TODO: holdoff
 			break;
@@ -3771,9 +3775,9 @@ void SiglentSCPIOscilloscope::PullTrigger()
 /**
 	@brief Reads the source of a trigger from the instrument
  */
-void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName)
+void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
 {
-	string reply = Trim(converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
+	string reply = Trim(isUart ? converse(":TRIGGER:UART:RXS?") : converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
 	auto chan = GetOscilloscopeChannelByHwName(reply);
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
@@ -4123,7 +4127,7 @@ void SiglentSCPIOscilloscope::PullUartTrigger()
 			ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
 
 			//Level
-			ut->SetLevel(stof(converse(":TRIGGER:UART:LIMIT?")));
+			ut->SetLevel(stof(converse(":TRIGGER:UART:RXT?")));
 
 			//Parity
 			reply = Trim(converse(":TRIGGER:UART:PARITY?"));
