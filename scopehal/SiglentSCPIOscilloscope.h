@@ -74,6 +74,7 @@ private:
 
 protected:
 	void IdentifyHardware();
+	void DetectBandwidth();
 	void SharedCtorInit();
 	virtual void DetectAnalogChannels();
 	void AddDigitalChannels(unsigned int count);
@@ -127,6 +128,17 @@ public:
 	virtual void EnableTriggerOutput() override;
 	virtual std::vector<std::string> GetTriggerTypes() override;
 
+	//Scope communication protocol.
+	enum Protocol
+	{
+		PROTOCOL_SPO,
+		PROTOCOL_ESERIES,
+		// Refers to E11 Siglent Programming Guide :
+		// https://www.siglenteu.com/wp-content/uploads/dlm_uploads/2024/03/ProgrammingGuide_EN11F.pdf
+		PROTOCOL_E11,
+		PROTOCOL_UNKNOWN
+	};
+
 	//Scope models.
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
 	enum Model
@@ -135,9 +147,14 @@ public:
 		MODEL_SIGLENT_SDS1000,
 		MODEL_SIGLENT_SDS2000XE,
 		MODEL_SIGLENT_SDS2000XP,
+		MODEL_SIGLENT_SDS1000X_HD,
 		MODEL_SIGLENT_SDS2000X_HD,
+		MODEL_SIGLENT_SDS3000X_HD,
 		MODEL_SIGLENT_SDS5000X,
+		MODEL_SIGLENT_SDS6000L,
 		MODEL_SIGLENT_SDS6000A,
+		MODEL_SIGLENT_SDS6000PRO,
+		MODEL_SIGLENT_SDS7000A,
 		MODEL_UNKNOWN
 	};
 
@@ -278,6 +295,7 @@ protected:
 	size_t m_digitalChannelBase;
 
 	Model m_modelid;
+	Protocol m_protocolId;
 
 	// Firmware version
 	int m_ubootMajorVersion;

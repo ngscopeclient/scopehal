@@ -137,6 +137,7 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	//standard initialization
 	FlushConfigCache();
 	IdentifyHardware();
+	DetectBandwidth();
 	DetectAnalogChannels();
 	SharedCtorInit();
 	DetectOptions();
@@ -314,7 +315,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 
 	//Look up model info
 	m_modelid = MODEL_UNKNOWN;
-	m_maxBandwidth = 0;
+	m_protocolId = PROTOCOL_UNKNOWN;
 	m_requireSizeWorkaround = false;
 
 	if(m_vendor.compare("Siglent Technologies") == 0)
@@ -325,38 +326,28 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 		// SDS1000X-E/X-C. But I only have a SDS1004X-E so we should only check for that
 		if(m_model.compare(0, 4, "SDS1") == 0)
 		{
-			m_modelid = MODEL_SIGLENT_SDS1000;
-			m_maxBandwidth = 100;
-			if(m_model.compare(4, 1, "2") == 0)
-				m_maxBandwidth = 200;
-			if(m_fwVersion != "8.2.6.1.37R9")
-				LogWarning("Siglent firmware \"%s\" is not tested\n", m_fwVersion.c_str());
-			return;
+			if((m_model.find("HD") != string::npos))
+			{
+				m_modelid = MODEL_SIGLENT_SDS1000X_HD;
+				m_protocolId = PROTOCOL_E11;
+			}
+			else
+			{
+				m_modelid = MODEL_SIGLENT_SDS1000;
+				m_protocolId = (m_model.back() == 'E') ? PROTOCOL_ESERIES : PROTOCOL_SPO;
+				if(m_fwVersion != "8.2.6.1.37R9")
+					LogWarning("Siglent firmware \"%s\" is not tested\n", m_fwVersion.c_str());
+			}
 		}
 		else if(m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 'E')
 		{
 			m_modelid = MODEL_SIGLENT_SDS2000XE;
-
-			m_maxBandwidth = 100;
-			if(m_model.compare(4, 1, "2") == 0)
-				m_maxBandwidth = 200;
-			else if(m_model.compare(4, 1, "3") == 0)
-				m_maxBandwidth = 350;
-			if(m_model.compare(4, 1, "5") == 0)
-				m_maxBandwidth = 500;
-			return;
+			m_protocolId = PROTOCOL_ESERIES;
 		}
-		else if(m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 's')
+		else if(m_model.compare(0, 4, "SDS2") == 0 && ((m_model.back() == 's')||(m_model.back() == '+'))
 		{
 			m_modelid = MODEL_SIGLENT_SDS2000XP;
-
-			m_maxBandwidth = 100;
-			if(m_model.compare(4, 1, "2") == 0)
-				m_maxBandwidth = 200;
-			else if(m_model.compare(4, 1, "3") == 0)
-				m_maxBandwidth = 350;
-			if(m_model.compare(4, 1, "5") == 0)
-				m_maxBandwidth = 500;
+			m_protocolId = PROTOCOL_E11;
 
 			//Firmware 1.6.2R5 (and newer) has 7 digits in version string whereas
 			//older firmware has 6 digits.
@@ -380,16 +371,8 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			//TODO: check for whether we actually have the license
 			m_hasFunctionGen = true;
 		}
-		else if( (m_model.compare(0, 4, "SDS2") == 0) && (m_model.find("HD") != string::npos) )
+		else if( (m_model.compare(0, 4, "SDS2") == 0) && (m_model.find("HD") != string::npos))
 		{
-			m_maxBandwidth = 100;
-			if(m_model.compare(4, 1, "2") == 0)
-				m_maxBandwidth = 200;
-			else if(m_model.compare(4, 1, "3") == 0)
-				m_maxBandwidth = 350;
-			else if(m_model.compare(4, 1, "5") == 0) // No 500 MHz HD model but one can have BW update option
-				m_maxBandwidth = 500;
-
 			//TODO: check for whether we actually have the license
 			//(no SCPI command for this yet)
 			m_hasFunctionGen = true;
@@ -399,6 +382,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			m_highDefinition = true;
 
 			m_modelid = MODEL_SIGLENT_SDS2000X_HD;
+			m_protocolId = PROTOCOL_E11;
 
 			ParseFirmwareVersion();
 			if(m_fwMajorVersion>=1 && m_fwMinorVersion >= 2)
@@ -410,40 +394,21 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
 			m_modelid = MODEL_SIGLENT_SDS5000X;
-
-			m_maxBandwidth = 350;
-			if(m_model.compare(5, 1, "5") == 0)
-				m_maxBandwidth = 500;
-			if(m_model.compare(5, 1, "0") == 0)
-				m_maxBandwidth = 1000;
+			m_protocolId = PROTOCOL_E11;
 		}
 		else if(m_model.compare(0, 4, "SDS6") == 0)
 		{
 			m_modelid = MODEL_SIGLENT_SDS6000A;
-
-			m_maxBandwidth = 500;
-			if(m_model.compare(4, 1, "1") == 0)
-				m_maxBandwidth = 1000;
-			if(m_model.compare(4, 2, "2") == 0)
-				m_maxBandwidth = 2000;
+			m_protocolId = PROTOCOL_E11;
 		}
-
 		else if(m_model.compare(0, 4, "SDS8") == 0)
 		{
-			m_maxBandwidth = 70;
-			if(m_model.compare(4, 1, "1") == 0)
-				m_maxBandwidth = 100;
-			else if(m_model.compare(4, 1, "2") == 0)
-				m_maxBandwidth = 200;
-
+			m_modelid = MODEL_SIGLENT_SDS800X_HD;
+			m_protocolId = PROTOCOL_E11;
 			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
-
-			m_modelid = MODEL_SIGLENT_SDS800X_HD;
 		}
-
-
 		else
 		{
 			LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
@@ -453,6 +418,65 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 	else
 	{
 		LogWarning("Vendor \"%s\" is unknown\n", m_vendor.c_str());
+	}
+}
+
+void SiglentSCPIOscilloscope::DetectBandwidth()
+{
+	m_maxBandwidth = 0;
+	switch(m_modelid)
+	{
+		case MODEL_SIGLENT_SDS800X_HD:
+			m_maxBandwidth = 70;
+			if(m_model.compare(4, 1, "1") == 0)
+				m_maxBandwidth = 100;
+			else if(m_model.compare(4, 1, "2") == 0)
+				m_maxBandwidth = 200;
+			break;
+		case MODEL_SIGLENT_SDS1000:
+			m_maxBandwidth = 100;
+			if(m_model.compare(4, 1, "2") == 0)
+				m_maxBandwidth = 200;
+			break;
+		case MODEL_SIGLENT_SDS1000X_HD:
+			// TODO
+			break;
+		case MODEL_SIGLENT_SDS2000XE:
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+			m_maxBandwidth = 100;
+			if(m_model.compare(4, 1, "2") == 0)
+				m_maxBandwidth = 200;
+			else if(m_model.compare(4, 1, "3") == 0)
+				m_maxBandwidth = 350;
+			else if(m_model.compare(4, 1, "5") == 0) // No 500 MHz HD model but one can have BW update option
+				m_maxBandwidth = 500;
+			break;
+		case MODEL_SIGLENT_SDS3000X_HD:
+			// TODO
+			break;
+		case MODEL_SIGLENT_SDS5000X:
+			m_maxBandwidth = 350;
+			if(m_model.compare(5, 1, "5") == 0)
+				m_maxBandwidth = 500;
+			if(m_model.compare(5, 1, "0") == 0)
+				m_maxBandwidth = 1000;
+			break;
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000PRO:
+			m_maxBandwidth = 500;
+			if(m_model.compare(4, 1, "1") == 0)
+				m_maxBandwidth = 1000;
+			if(m_model.compare(4, 2, "2") == 0)
+				m_maxBandwidth = 2000;
+			break;
+		case MODEL_SIGLENT_SDS6000A:
+			// TODO
+			break;
+		default:
+			LogWarning("No bandwidth detected for model \"%s\".\n", m_vendor.c_str());
+			break;
 	}
 }
 
