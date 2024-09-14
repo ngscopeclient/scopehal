@@ -5213,7 +5213,7 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 
 	if(m_modelid == MODEL_DDA_5K)
 	{
-		auto src = m_trigger->GetInput(0).m_channel->GetHwname().c_str();
+		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
 		m_transport->SendCommandQueued(
 			string("VBS? 'app.Acquisition.trigger.") + src + ".Slope = \"" + slope + "\"'");
 	}
