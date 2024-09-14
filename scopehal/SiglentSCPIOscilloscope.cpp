@@ -199,11 +199,11 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 	else
 		m_awgChannel = nullptr;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_ESERIES:
+		case PROTOCOL_SPO:
 			// Omit header and units in numbers for responses to queries.
 			sendOnly("CHDR OFF");
 			// change momory size to 14K. less data on the network
@@ -221,10 +221,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-
+		case PROTOCOL_E11:
 			//This is the default behavior, but it's safer to explicitly specify it
 			//TODO: save bandwidth and simplify parsing by doing OFF
 			sendOnly("CHDR SHORT");
@@ -232,15 +229,10 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			//Desired format for waveform data
 			//Only use increased bit depth if the scope actually puts content there!
 			sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
-			
-			break;
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
-			sendOnly("CHDR SHORT");
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -253,19 +245,15 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 	PollTrigger();
 
 	//Enable deduplication for vertical axis commands once we know what we're dealing with
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_ESERIES:
+		case PROTOCOL_SPO:
 			m_transport->DeduplicateCommand("OFST");
 			m_transport->DeduplicateCommand("VOLT_DIV");
 			break;
 
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			m_transport->DeduplicateCommand("OFFSET");
 			m_transport->DeduplicateCommand("SCALE");
 			break;
@@ -344,7 +332,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			m_modelid = MODEL_SIGLENT_SDS2000XE;
 			m_protocolId = PROTOCOL_ESERIES;
 		}
-		else if(m_model.compare(0, 4, "SDS2") == 0 && ((m_model.back() == 's')||(m_model.back() == '+'))
+		else if(m_model.compare(0, 4, "SDS2") == 0 && ((m_model.back() == 's')||(m_model.back() == '+')))
 		{
 			m_modelid = MODEL_SIGLENT_SDS2000XP;
 			m_protocolId = PROTOCOL_E11;
@@ -471,7 +459,7 @@ void SiglentSCPIOscilloscope::DetectBandwidth()
 			if(m_model.compare(4, 2, "2") == 0)
 				m_maxBandwidth = 2000;
 			break;
-		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS7000A:
 			// TODO
 			break;
 		default:
@@ -527,13 +515,7 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 	// Either character 6 or 7 of the model name is the number of channels,
 	// depending on number of  digits in model name - SDSnnn vs SDSnnnn.
 	// Currently only SDS800X_HD is the outlier..
-	unsigned int chanoffset;
-
-	if(m_model.compare(0, 4, "SDS8") == 0) {
-		chanoffset = 5;
-	} else {
-		chanoffset = 6;
-	}
+	unsigned int chanoffset = (m_modelid == MODEL_SIGLENT_SDS800X_HD) ? 5 : 6;
 
 	if(m_model.length() > chanoffset)
 	{
@@ -691,11 +673,11 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 		//See if the channel is enabled, hide it if not
 		string reply;
 
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				reply = converse("C%d:TRACE?", i + 1);
 
 				{
@@ -704,11 +686,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 				}
 				break;
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				reply = converse(":CHANNEL%d:SWITCH?", i + 1);
 				{
 					lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -717,7 +695,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -747,24 +725,20 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
 	{
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				sendOnly(":C%d:TRACE ON", i + 1);
 				break;
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				sendOnly(":CHANNEL%d:SWITCH ON", i + 1);
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -807,26 +781,22 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 
 	if(i < m_analogChannelCount)
 	{
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				sendOnly("C%d:TRACE OFF", i + 1);
 				break;
 			// -------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				//If this is an analog channel, just toggle it
 				if(i < m_analogChannelCount)
 					sendOnly(":CHANNEL%d:SWITCH OFF", i + 1);
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -869,6 +839,7 @@ vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableC
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
 		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000XE:
 			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
@@ -877,6 +848,7 @@ vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableC
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
@@ -887,6 +859,9 @@ vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableC
 
 		//SDS6000A does not support 50 ohm AC coupling
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
 			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
@@ -912,11 +887,11 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 
 	m_probeIsActive[i] = false;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			replyType = Trim(converse("C%d:COUPLING?", i + 1));
 			if(replyType == "A50")
 				return OscilloscopeChannel::COUPLE_AC_50;
@@ -930,11 +905,7 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 				return OscilloscopeChannel::COUPLE_GND;
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			replyType = Trim(converse(":CHANNEL%d:COUPLING?", i + 1).substr(0, 2));
 			replyImp = Trim(converse(":CHANNEL%d:IMPEDANCE?", i + 1).substr(0, 3));
 
@@ -947,7 +918,7 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -972,11 +943,11 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 	if(m_probeIsActive[i])
 		return;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_AC_50:
@@ -1003,11 +974,7 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 			}
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:  // todo: 50 ohm not supported, any implications?
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:  // todo: 50 ohm not supported on SDS800X HD, any implications?
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_AC_1M:
@@ -1039,7 +1006,7 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1056,24 +1023,20 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = converse("C%d:ATTENUATION?", i + 1);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			reply = converse(":CHANNEL%d:PROBE?", i + 1);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1099,11 +1062,11 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			return;
 	}
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			// Values larger than 1x should be sent as integers, and values smaller
 			// should be sent as floating point numbers with one decimal.
 			if(atten >= 1)
@@ -1117,17 +1080,13 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			break;
 
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":CHANNEL%d:PROBE VALUE,%lf", i + 1, atten);
 			break;
 
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1152,9 +1111,14 @@ vector<unsigned int> SiglentSCPIOscilloscope::GetChannelBandwidthLimiters(size_t
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 			//"no limit"
 			ret.push_back(0);
 
@@ -1181,11 +1145,11 @@ unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = converse("C%d:BANDWIDTH_LIMIT?", i + 1);
 			if(reply == "OFF")
 				return 0;
@@ -1193,11 +1157,7 @@ unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 				return 20;
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			reply = converse(":CHANNEL%d:BWLIMIT?", i + 1);
 			if(reply == "FULL")
 				return 0;
@@ -1208,7 +1168,7 @@ unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1219,11 +1179,11 @@ unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			switch(limit_mhz)
 			{
 				case 0:
@@ -1239,11 +1199,7 @@ void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int li
 			}
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			switch(limit_mhz)
 			{
 				case 0:
@@ -1264,7 +1220,7 @@ void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int li
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1281,24 +1237,20 @@ void SiglentSCPIOscilloscope::Invert(size_t i, bool invert)
 	if(i >= m_analogChannelCount)
 		return;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sendOnly("C%d:INVERTSET %s", i + 1, invert ? "ON" : "OFF");
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":CHANNEL%d:INVERT %s", i + 1, invert ? "ON" : "OFF");
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1311,24 +1263,20 @@ bool SiglentSCPIOscilloscope::IsInverted(size_t i)
 
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = Trim(converse("C%d:INVERTSET?", i + 1));
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			reply = Trim(converse(":CHANNEL%d:INVERT?", i + 1));
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			reply = "";
 			break;
 			// --------------------------------------------------
@@ -1348,18 +1296,14 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 		return;
 
 	//Update in hardware
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			if(i < m_analogChannelCount)
 			{
 				sendOnly(":CHANNEL%zu:LABEL:TEXT \"%s\"", i + 1, name.c_str());
@@ -1372,7 +1316,7 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1393,19 +1337,15 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 	//Because clean, orthogonal APIs are apparently for losers?
 	string name = "";
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			break;
 
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			if(i < m_analogChannelCount)
 			{
 				name = converse(":CHANNEL%d:LABEL:TEXT?", i + 1);
@@ -1424,7 +1364,7 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1457,24 +1397,20 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sinr = converse("SAMPLE_STATUS?");
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sinr = converse(":TRIGGER:STATUS?");
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -1993,11 +1929,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	unsigned int firstEnabledChannel = UINT_MAX;
 	bool any_enabled = true;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			m_sampleRateValid = false;
 			GetSampleRate();
 
@@ -2079,11 +2015,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			break;
 
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			if(!ReadWavedescs(m_wavedescs, enabled, firstEnabledChannel, any_enabled))
 				return false;
 
@@ -2210,7 +2142,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2247,28 +2179,24 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 void SiglentSCPIOscilloscope::Start()
 {
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			//sendOnly("START");
 			//sendOnly("MEMORY_SIZE 7K");
 			sendOnly("STOP");
 			sendOnly("TRIG_MODE SINGLE");
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2281,28 +2209,24 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 {
 	//LogDebug("Start single trigger\n");
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sendOnly("STOP");
 			sendOnly("TRIG_MODE SINGLE");
 			break;
 
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");
 			break;
 
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2316,24 +2240,20 @@ void SiglentSCPIOscilloscope::Stop()
 	if(!m_triggerArmed)
 		return;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			m_transport->SendCommandImmediate("STOP");
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			m_transport->SendCommandImmediate(":TRIGGER:STOP");
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2353,28 +2273,24 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 
 	m_triggerForced = true;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sendOnly("TRIG_MODE SINGLE");
 			if(!m_triggerArmed)
 				sendOnly("TRIG_MODE SINGLE");
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":TRIGGER:MODE SINGLE");
 			if(!m_triggerArmed)
 				sendOnly(":TRIGGER:MODE SINGLE");
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2398,24 +2314,20 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = converse("C%zu:OFST?", i + 1);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			reply = converse(":CHANNEL%zu:OFFSET?", i + 1);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2435,24 +2347,20 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, floa
 		return;
 
 	{
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				sendOnly("C%zu:OFST %1.2E", i + 1, offset);
 				break;
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				sendOnly(":CHANNEL%zu:OFFSET %1.2E", i + 1, offset);
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -2476,24 +2384,20 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = converse("C%d:VOLT_DIV?", i + 1);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			reply = converse(":CHANNEL%d:SCALE?", i + 1);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2512,24 +2416,20 @@ void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/
 	float vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sendOnly("C%zu:VOLT_DIV %.4f", i + 1, vdiv);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":CHANNEL%zu:SCALE %.4f", i + 1, vdiv);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown prtocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -2571,7 +2471,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
 			ret = {10 * 1000,
 				20 * k,
 				50 * k,
@@ -2615,6 +2517,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 			ret = {10 * k,
 				20 * k,
 				50 * k,
@@ -2671,7 +2576,10 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
+			// TODO: dynamic calculation based on bandwidth (cf. Rigol driver)
 			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
 
@@ -2730,6 +2638,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 			break;
 
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 
 			if(m_maxBandwidth == 2000)
 			{
@@ -2824,25 +2735,21 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 	if(!m_sampleRateValid)
 	{
 		string reply;
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				reply = converse("SAMPLE_RATE?");
 				break;
 
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				reply = converse(":ACQUIRE:SRATE?");
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -2864,24 +2771,20 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 
 		// What you see below is the only observed method that seems to reliably get the *actual* memory depth.
 		string reply;
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				reply = converse("MEMORY_SIZE?");
 				break;
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				reply = converse(":ACQUIRE:MDEPTH?");
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -2952,8 +2855,10 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
-		
+		case MODEL_SIGLENT_SDS3000X_HD:
+			// TODO : dynamically rework this based on mdepth attribute
 			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
 
@@ -3103,6 +3008,9 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 			break;
 
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 
 			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
@@ -3214,13 +3122,18 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
 			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
 			break;
 
 		//Timebase must be multiples of 1-2-5 so truncate any fractional component
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 			{
 				char tmp[128];
 				snprintf(tmp, sizeof(tmp), "%1.0E", scale);
@@ -3253,8 +3166,13 @@ void SiglentSCPIOscilloscope::SetUseExternalRefclk(bool /*external*/)
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 			break;
 
 		case MODEL_SIGLENT_SDS5000X:
@@ -3276,24 +3194,20 @@ void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sendOnly("TRIG_DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":TIMEBASE:DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -3314,24 +3228,20 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 	}
 	string reply;
 	{
-		switch(m_modelid)
+		switch(m_protocolId)
 		{
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS1000:
-			case MODEL_SIGLENT_SDS2000XE:
+			case PROTOCOL_SPO:
+			case PROTOCOL_ESERIES:
 				reply = converse("TRIG_DELAY?");
 				break;
 			// --------------------------------------------------
-			case MODEL_SIGLENT_SDS800X_HD:
-			case MODEL_SIGLENT_SDS2000XP:
-			case MODEL_SIGLENT_SDS2000X_HD:
-			case MODEL_SIGLENT_SDS5000X:
-			case MODEL_SIGLENT_SDS6000A:
+			case PROTOCOL_E11:
 				reply = converse(":TIMEBASE:DELAY?");
 				break;
 			// --------------------------------------------------
 			default:
-				LogError("Unknown scope type\n");
+				LogError("Unknown protocol\n");
 				break;
 				// --------------------------------------------------
 		}
@@ -3361,24 +3271,20 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	if(channel >= m_analogChannelCount)
 		return;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			sendOnly("C%zu:SKEW %1.2E", channel + 1, skew * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			sendOnly(":CHANNEL%zu:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -3404,24 +3310,20 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 	//Read the deskew
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = converse("C%zu:SKEW?", channel + 1);
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			reply = converse(":CHANNEL%zu:SKEW?", channel + 1);
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -3462,7 +3364,9 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
 		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS3000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 			if((m_channelsEnabled[0] == true) && (m_channelsEnabled[1] == true))
 			{
@@ -3476,6 +3380,9 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 			}
 			return true;
 		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+		case MODEL_SIGLENT_SDS7000A:
 			return false;
 
 		// --------------------------------------------------
@@ -3711,11 +3618,11 @@ void SiglentSCPIOscilloscope::PullTrigger()
 	std::string reply;
 
 	bool isUart = false;
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			reply = Trim(converse("TRIG_SELECT?"));
 			// <trig_type>,SR,<source>,HT,<hold_type>,HV,<hold_value1>[,HV2,<hold_value2>]
 			//EDGE,SR,C1,HT,OFF
@@ -3749,11 +3656,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 			}
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			//Figure out what kind of trigger is active.
 			reply = Trim(converse(":TRIGGER:TYPE?"));
 			if(reply == "DROPout")
@@ -3790,7 +3693,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown prtocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -3827,19 +3730,15 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 
 	Unit fs(Unit::UNIT_FS);
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 	    // --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			//Level
 			dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
 		
@@ -3860,7 +3759,7 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -3883,11 +3782,11 @@ void SiglentSCPIOscilloscope::PullEdgeTrigger()
 		m_trigger = new EdgeTrigger(this);
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			// Level
 			{
 				string level = converse("C1:TRIG_LEVEL?");
@@ -3899,11 +3798,7 @@ void SiglentSCPIOscilloscope::PullEdgeTrigger()
 			}
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			//Level
 			et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
 
@@ -3914,7 +3809,7 @@ void SiglentSCPIOscilloscope::PullEdgeTrigger()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -3938,11 +3833,11 @@ void SiglentSCPIOscilloscope::PullPulseWidthTrigger()
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	Unit fs(Unit::UNIT_FS);
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 
 			// Level
 			pt->SetLevel(stof(converse("C1:TRIG_LEVEL?"))); //,pt->GetInput(0).m_channel->GetHwname().c_str())));
@@ -3951,11 +3846,7 @@ void SiglentSCPIOscilloscope::PullPulseWidthTrigger()
 			GetTriggerSlope(pt, Trim(converse("C1:TRIG_SLOPE?")));
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 
 			//Level
 			pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
@@ -3975,7 +3866,7 @@ void SiglentSCPIOscilloscope::PullPulseWidthTrigger()
 
 	    // --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown prtocol\n");
 			break;
 			// ----
 	}
@@ -4002,19 +3893,15 @@ void SiglentSCPIOscilloscope::PullRuntTrigger()
 	Unit fs(Unit::UNIT_FS);
 	string reply;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 
 			//Lower bound
 			rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LLEVEL?")));
@@ -4040,7 +3927,7 @@ void SiglentSCPIOscilloscope::PullRuntTrigger()
 			break;
 			// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4067,19 +3954,15 @@ void SiglentSCPIOscilloscope::PullSlewRateTrigger()
 	Unit fs(Unit::UNIT_FS);
 	string reply ;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 
 			//Lower bound
 	        st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:LLEVEL?")));
@@ -4107,7 +3990,7 @@ void SiglentSCPIOscilloscope::PullSlewRateTrigger()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4133,19 +4016,15 @@ void SiglentSCPIOscilloscope::PullUartTrigger()
     string reply;
 	string p1;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 
 			//Bit rate
 			ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
@@ -4199,7 +4078,7 @@ void SiglentSCPIOscilloscope::PullUartTrigger()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4224,19 +4103,15 @@ void SiglentSCPIOscilloscope::PullWindowTrigger()
     
 	Unit v(Unit::UNIT_VOLTS);
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 	    // --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 
 			//Lower bound
 			wt->SetLowerBound(v.ParseString(converse(":TRIGGER:WINDOW:LLEVEL?")));
@@ -4246,7 +4121,7 @@ void SiglentSCPIOscilloscope::PullWindowTrigger()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4260,11 +4135,11 @@ void SiglentSCPIOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 {
 	reply = Trim(reply);
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			if(reply == "POS")
 				trig->SetType(EdgeTrigger::EDGE_RISING);
 			else if(reply == "NEG")
@@ -4275,11 +4150,7 @@ void SiglentSCPIOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 				LogWarning("SDS1000:Unknown trigger slope %s\n", reply.c_str());
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			if(reply == "RISing")
 				trig->SetType(EdgeTrigger::EDGE_RISING);
 			else if(reply == "FALLing")
@@ -4291,7 +4162,7 @@ void SiglentSCPIOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4327,10 +4198,10 @@ void SiglentSCPIOscilloscope::PushTrigger()
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			if(dt)
 			{
 				PushDropoutTrigger(dt);
@@ -4368,11 +4239,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 				LogWarning("Unknown trigger type (not an edge)\n");
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			if(dt)
 			{
 				sendOnly(":TRIGGER:TYPE DROPOUT");
@@ -4426,7 +4293,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4438,19 +4305,15 @@ void SiglentSCPIOscilloscope::PushTrigger()
 void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
 	
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
            //TODO
 		   break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			PushFloat(":TRIGGER:DROPOUT:LEVEL", trig->GetLevel());
 			PushFloat(":TRIGGER:DROPOUT:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
 			sendOnly(":TRIGGER:DROPOUT:SLOPE %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISING" : "FALLING");
@@ -4458,7 +4321,7 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 		    break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4469,11 +4332,11 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
 {
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			{
 				auto chan = trig->GetInput(0).m_channel;
 				if(chan == NULL)
@@ -4508,11 +4371,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 			}
 
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			switch(trig->GetType())
 			{
 				case EdgeTrigger::EDGE_RISING:
@@ -4537,7 +4396,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4549,19 +4408,15 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
 	
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			PushEdgeTrigger(trig, "INTERVAL");
 			PushCondition(":TRIGGER:INTERVAL", trig->GetCondition());
 			PushFloat(":TRIGGER:INTERVAL:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
@@ -4569,7 +4424,7 @@ void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4581,19 +4436,15 @@ void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
 	
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			PushCondition(":TRIGGER:RUNT", trig->GetCondition());
 			PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
 			PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
@@ -4604,7 +4455,7 @@ void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 		    break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}		
@@ -4635,19 +4486,15 @@ void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
     float nstop;
 	string pattern1;
 
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			//TODO
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			//Special parameter for trigger level
 			PushFloat(":TRIGGER:UART:LIMIT", trig->GetLevel());
 
@@ -4727,7 +4574,7 @@ void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
 			// --------------------------------------------------
 			break;
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4738,25 +4585,21 @@ void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
             //TODO
 		    break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			PushFloat(":TRIGGER:WINDOW:LLEVEL", trig->GetLowerBound());
 			PushFloat(":TRIGGER:WINDOW:HLEVEL", trig->GetUpperBound());
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
@@ -4799,21 +4642,17 @@ void SiglentSCPIOscilloscope::PushFloat(string path, float f)
 vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
-	switch(m_modelid)
+	switch(m_protocolId)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
+		case PROTOCOL_SPO:
+		case PROTOCOL_ESERIES:
 			ret.push_back(EdgeTrigger::GetTriggerName());
 			ret.push_back(PulseWidthTrigger::GetTriggerName());
 			//TODO add more
 			break;
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
+		case PROTOCOL_E11:
 			ret.push_back(DropoutTrigger::GetTriggerName());
 			ret.push_back(EdgeTrigger::GetTriggerName());
 			ret.push_back(PulseWidthTrigger::GetTriggerName());
@@ -4825,7 +4664,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 			break;
 		// --------------------------------------------------
 		default:
-			LogError("Unknown scope type\n");
+			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
 	}
