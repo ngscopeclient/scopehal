@@ -422,12 +422,10 @@ void SiglentSCPIOscilloscope::DetectBandwidth()
 				m_maxBandwidth = 200;
 			break;
 		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS1000X_HD:
 			m_maxBandwidth = 100;
 			if(m_model.compare(4, 1, "2") == 0)
 				m_maxBandwidth = 200;
-			break;
-		case MODEL_SIGLENT_SDS1000X_HD:
-			// TODO
 			break;
 		case MODEL_SIGLENT_SDS2000XE:
 		case MODEL_SIGLENT_SDS2000XP:
@@ -440,10 +438,8 @@ void SiglentSCPIOscilloscope::DetectBandwidth()
 			else if(m_model.compare(4, 1, "5") == 0) // No 500 MHz HD model but one can have BW update option
 				m_maxBandwidth = 500;
 			break;
-		case MODEL_SIGLENT_SDS3000X_HD:
-			// TODO
-			break;
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS3000X_HD:
 			m_maxBandwidth = 350;
 			if(m_model.compare(5, 1, "5") == 0)
 				m_maxBandwidth = 500;
@@ -456,11 +452,13 @@ void SiglentSCPIOscilloscope::DetectBandwidth()
 			m_maxBandwidth = 500;
 			if(m_model.compare(4, 1, "1") == 0)
 				m_maxBandwidth = 1000;
-			if(m_model.compare(4, 2, "2") == 0)
+			if(m_model.compare(4, 1, "2") == 0)
 				m_maxBandwidth = 2000;
 			break;
 		case MODEL_SIGLENT_SDS7000A:
-			// TODO
+			m_maxBandwidth = 3000;
+			if(m_model.compare(4, 1, "4") == 0)
+				m_maxBandwidth = 4000;
 			break;
 		default:
 			LogWarning("No bandwidth detected for model \"%s\".\n", m_vendor.c_str());
@@ -472,7 +470,7 @@ void SiglentSCPIOscilloscope::DetectOptions()
 {
 	//AddDigitalChannels(16);
 
-	//TODO: support feature checking for SDS2000XP
+	//TODO HD: support feature checking for SDS2000XP
 	//SDS2000XP supports optional feature checking via LCISL? <OPT> on all firmware
 	//Valid OPT choices: AWG, MSO, FLX, CFD, I2S, 1553, PWA, MANC, SENT
 	return;
@@ -2579,7 +2577,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS3000X_HD:
-			// TODO: dynamic calculation based on bandwidth (cf. Rigol driver)
+			// TODO HD: dynamic calculation based on bandwidth (cf. Rigol driver)
 			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
 
@@ -2858,7 +2856,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS3000X_HD:
-			// TODO : dynamically rework this based on mdepth attribute
+			// TODO HD : dynamically rework this based on mdepth attribute
 			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
 
