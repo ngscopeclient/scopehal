@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -32,10 +32,13 @@
 	@author Andrew D. Zonenberg
 	@brief Declaration of EyeMask, EyeMaskPoint, and EyeMaskPolygon
  */
+
+#ifdef CAIRO
+#include <cairomm/cairomm.h>
+#endif
+
 #ifndef EyeMask_h
 #define EyeMask_h
-
-#include <cairomm/cairomm.h>
 
 class EyeDecoder2;
 class EyeWaveform;
@@ -87,24 +90,15 @@ public:
 
 	float GetAllowedHitRate() const
 	{ return m_hitrate; }
-
-	void RenderForDisplay(
-		Cairo::RefPtr<Cairo::Context> cr,
-		EyeWaveform* waveform,
-		float xscale,
-		float xoff,
-		float yscale,
-		float yoff,
-		float height) const;
-
+/* 
 	void RenderForAnalysis(
-		Cairo::RefPtr<Cairo::Context> cr,
+		// Cairo::RefPtr<Cairo::Context> cr,
 		EyeWaveform* waveform,
 		float xscale,
 		float xoff,
 		float yscale,
 		float yoff,
-		float height) const;
+		float height) const; */
 
 	float CalculateHitRate(
 		EyeWaveform* cap,
@@ -124,14 +118,14 @@ public:
 	{ return m_polygons; }
 
 protected:
-	void RenderInternal(
-		Cairo::RefPtr<Cairo::Context> cr,
+	/* void RenderInternal(
+		// Cairo::RefPtr<Cairo::Context> cr,
 		EyeWaveform* waveform,
 		float xscale,
 		float xoff,
 		float yscale,
 		float yoff,
-		float height) const;
+		float height) const; */
 
 	std::string m_fname;
 	std::vector<EyeMaskPolygon> m_polygons;
@@ -143,6 +137,7 @@ protected:
 	bool m_timebaseIsRelative;
 
 	std::string m_maskname;
+
 };
 
 #endif
