@@ -228,7 +228,6 @@ target_link_libraries(scopehal
 	xptools
 	log
 	PkgConfig::SIGCXX
-	PkgConfig::CAIROMM
 	yaml-cpp::yaml-cpp
 	OpenMP::OpenMP_CXX
 	Vulkan::Loader

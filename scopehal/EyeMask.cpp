@@ -42,6 +42,67 @@
 #include "../canvas_ity/src/canvas_ity.hpp"
 #endif
 
+#include <time.h>
+
+/* ----------------------------------------------------------------------- */
+/*
+  Easy embeddable cross-platform high resolution timer function. For each 
+  platform we select the high resolution timer. You can call the 'ns()' 
+  function in your file after embedding this. 
+*/
+#include <stdint.h>
+#if defined(__linux)
+#  define HAVE_POSIX_TIMER
+#  include <time.h>
+#  ifdef CLOCK_MONOTONIC
+#     define CLOCKID CLOCK_MONOTONIC
+#  else
+#     define CLOCKID CLOCK_REALTIME
+#  endif
+#elif defined(__APPLE__)
+#  define HAVE_MACH_TIMER
+#  include <mach/mach_time.h>
+#elif defined(_WIN32)
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#endif
+static uint64_t ns() {
+  static uint64_t is_init = 0;
+#if defined(__APPLE__)
+    static mach_timebase_info_data_t info;
+    if (0 == is_init) {
+      mach_timebase_info(&info);
+      is_init = 1;
+    }
+    uint64_t now;
+    now = mach_absolute_time();
+    now *= info.numer;
+    now /= info.denom;
+    return now;
+#elif defined(__linux)
+    static struct timespec linux_rate;
+    if (0 == is_init) {
+      clock_getres(CLOCKID, &linux_rate);
+      is_init = 1;
+    }
+    uint64_t now;
+    struct timespec spec;
+    clock_gettime(CLOCKID, &spec);
+    now = spec.tv_sec * 1.0e9 + spec.tv_nsec;
+    return now;
+#elif defined(_WIN32)
+    static LARGE_INTEGER win_frequency;
+    if (0 == is_init) {
+      QueryPerformanceFrequency(&win_frequency);
+      is_init = 1;
+    }
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    return (uint64_t) ((1e9 * now.QuadPart)  / win_frequency.QuadPart);
+#endif
+}
+/* ----------------------------------------------------------------------- */
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,11 +239,21 @@ float EyeMask::CalculateHitRate(
 {
 	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
 
+	auto time1 = ns();
+	printf("Start time: %f µs\n", time1/1e3);
+
 	canvas_ity::canvas canvas( width, height ); // width and height could be reversed
+
+
+	auto time11 = ns();
+	printf("%f µs\n", (time11-time1)/1e3);
 
 	canvas.set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
     canvas.fill();
 	
+	auto time12 = ns();
+	printf("%f µs\n", (time12-time1)/1e3);
+
 	//Software rendering
 	float yscale = height / fullscalerange;
 	float yoff = 0.0f;
@@ -195,9 +266,16 @@ float EyeMask::CalculateHitRate(
 	canvas.line_to( 1e5, height );
 	canvas.line_to(-1e5, height);
 
+
+	auto time13 = ns();
+	printf("%f µs\n", (time13-time1)/1e3);
+
 	canvas.fill();
 
 	canvas.set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
+
+	auto time2 = ns();
+	printf("%f µs\n", (time2-time1)/1e3);
 
 	//Draw each polygon
 	for(auto poly : m_polygons)
@@ -223,6 +301,9 @@ float EyeMask::CalculateHitRate(
 		canvas.fill(); // fill the resultant line defined polygon with the current color (white)
 	}
 
+	auto time3 = ns();
+	printf("%f µs\n", (time3-time2)/1e3);
+
 	//Test each pixel of the eye pattern against the mask
 	float nmax = 0;
 	int stride = sizeof(unsigned char) * 4; // TODO: Check this for correctness
@@ -231,6 +312,10 @@ float EyeMask::CalculateHitRate(
 
 	canvas.get_image_data(image_data.data(), width, height, stride, 0,0);
 
+	auto time4 = ns();
+	printf("%f µs\n", (time4-time3)/1e3);
+
+
 	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
 	{
 		auto accum = cap->GetAccumData();
@@ -238,6 +323,9 @@ float EyeMask::CalculateHitRate(
 		auto data = &image_data[0];
 		for(size_t y=0; y<height; y++)
 		{
+
+			auto timey = ns();
+			//printf("%ld %f µs\n", y, (timey-time4)/1e3);
 			auto row = data + (y*stride);
 			auto eyerow = accum + (y*width);
 			for(size_t x=0; x<width; x++)

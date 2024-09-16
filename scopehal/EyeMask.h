@@ -33,10 +33,6 @@
 	@brief Declaration of EyeMask, EyeMaskPoint, and EyeMaskPolygon
  */
 
-#ifdef CAIRO
-#include <cairomm/cairomm.h>
-#endif
-
 #ifndef EyeMask_h
 #define EyeMask_h
 
@@ -90,15 +86,6 @@ public:
 
 	float GetAllowedHitRate() const
 	{ return m_hitrate; }
-/* 
-	void RenderForAnalysis(
-		// Cairo::RefPtr<Cairo::Context> cr,
-		EyeWaveform* waveform,
-		float xscale,
-		float xoff,
-		float yscale,
-		float yoff,
-		float height) const; */
 
 	float CalculateHitRate(
 		EyeWaveform* cap,
@@ -118,23 +105,11 @@ public:
 	{ return m_polygons; }
 
 protected:
-	/* void RenderInternal(
-		// Cairo::RefPtr<Cairo::Context> cr,
-		EyeWaveform* waveform,
-		float xscale,
-		float xoff,
-		float yscale,
-		float yoff,
-		float height) const; */
-
 	std::string m_fname;
 	std::vector<EyeMaskPolygon> m_polygons;
 
 	float m_hitrate;
-
-	//true = time measured in UIs
-	//false = time measured in ps
-	bool m_timebaseIsRelative;
+	bool m_timebaseIsRelative;	// true = time measured in UIs || false = time measured in ps
 
 	std::string m_maskname;
 
