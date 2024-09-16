@@ -48,6 +48,7 @@ class WindowTrigger;
  */
 
 #define MAX_ANALOG 4
+#define MAX_DIGITAL 16
 #define WAVEDESC_SIZE 346
 
 // These SDS2000/SDS5000 scopes will actually sample 200MPoints, but the maximum it can transfer in one
@@ -80,6 +81,8 @@ protected:
 	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
 	void ParseFirmwareVersion();
+	uint64_t GetMaxPoints();
+	uint64_t GetAcqPoints();
 
 public:
 	//Device information
@@ -325,13 +328,6 @@ protected:
 	bool m_triggerOneShot;
 	bool m_triggerForced;
 
-	// Transfer buffer. This is a bit hacky
-	char m_analogWaveformData[MAX_ANALOG][WAVEFORM_SIZE];
-	int m_analogWaveformDataSize[MAX_ANALOG];
-	char m_wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
-	char m_digitalWaveformDataBytes[WAVEFORM_SIZE];
-	std::string m_digitalWaveformData;
-
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;
@@ -342,6 +338,10 @@ protected:
 	int64_t m_memoryDepth;
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
+	bool m_maxPointsValid;
+	uint64_t m_maxPoints;
+	bool m_acqPointsValid;
+	uint64_t m_acqPoints;
 	std::map<size_t, int64_t> m_channelDeskew;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;

@@ -128,6 +128,8 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_memoryDepth(1)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
+	, m_maxPointsValid(false)
+	, m_acqPointsValid(false)
 	, m_highDefinition(false)
 {
 	//Enable command rate limiting
@@ -473,6 +475,8 @@ void SiglentSCPIOscilloscope::DetectOptions()
 	//TODO HD: support feature checking for SDS2000XP
 	//SDS2000XP supports optional feature checking via LCISL? <OPT> on all firmware
 	//Valid OPT choices: AWG, MSO, FLX, CFD, I2S, 1553, PWA, MANC, SENT
+	// E11 protocol supports "*OPT?" command (undocumented) which returns a comma seperated list of active otions
+	// Available options for SDS2000X HD are : FG,FlexRay,CANFD,I2S,1553B,PA,SENT,Manch,ARINC
 	return;
 }
 
@@ -1904,6 +1908,13 @@ map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform
 
 bool SiglentSCPIOscilloscope::AcquireData()
 {
+	// Transfer buffers
+	char* analogWaveformData[MAX_ANALOG];
+	int analogWaveformDataSize[MAX_ANALOG];
+	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
+	char* digitalWaveformDataBytes[MAX_DIGITAL];
+	std::string digitalWaveformData;
+
 	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*>> pending_waveforms;
@@ -1945,10 +1956,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
 				if(enabled[i])
-				{
+				{	// Allocate buffer
+					analogWaveformData[i] = new char[WAVEFORM_SIZE];
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
-					m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i]);
+					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i]);
 					// This is the 0x0a0a at the end
 					m_transport->ReadRawData(2, (unsigned char*)tmp);
 				}
@@ -1977,15 +1989,15 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					// Fixme
 					cap->m_startFemtoseconds = (start - floor(start)) * FS_PER_SECOND;
 
-					cap->Resize(m_analogWaveformDataSize[i]);
+					cap->Resize(analogWaveformDataSize[i]);
 					cap->PrepareForCpuAccess();
 
 					Convert8BitSamples(
 						cap->m_samples.GetCpuPointer(),
-						(int8_t*)m_analogWaveformData[i],
+						(int8_t*)analogWaveformData[i],
 						m_channelVoltageRanges[i] / (8 * 25),
 						m_channelOffsets[i],
-						m_analogWaveformDataSize[i]);
+						analogWaveformDataSize[i]);
 					cap->MarkSamplesModifiedFromCpu();
 					ret.push_back(cap);
 				}
@@ -2014,7 +2026,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			if(!ReadWavedescs(m_wavedescs, enabled, firstEnabledChannel, any_enabled))
+			if(!ReadWavedescs(wavedescs, enabled, firstEnabledChannel, any_enabled))
 				return false;
 
 			//Grab the WAVEDESC from the first enabled channel
@@ -2022,7 +2034,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			{
 				if(enabled[i] || (!any_enabled && i == 0))
 				{
-					pdesc = (unsigned char*)(&m_wavedescs[i][0]);
+					pdesc = (unsigned char*)(&wavedescs[i][0]);
 					break;
 				}
 			}
@@ -2082,9 +2094,13 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
 					if(enabled[i])
-					{
+					{	// Allocate buffer
+						analogWaveformData[i] = new char[WAVEFORM_SIZE];
+						// TODO chuck reading logic
+						//string reply = converse("ACQ:POIN?");
+						//LogDebug("Got acq point %s\n",reply.c_str());
 						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
-						m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i], hdWorkaround);
+						analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i], hdWorkaround);
 						// This is the 0x0a0a at the end
 						m_transport->ReadRawData(2, (unsigned char*)tmp);
 					}
@@ -2093,11 +2109,12 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 			//Read the data from the digital waveforms, if enabled
 			if(denabled)
-			{
-				if(!ReadWaveformBlock(WAVEFORM_SIZE, m_digitalWaveformDataBytes))
+			{	// TODO : fix this, should iterate across active digital channels
+				// Allocate buffer
+				digitalWaveformDataBytes[0] = new char[WAVEFORM_SIZE];
+				if(!ReadWaveformBlock(WAVEFORM_SIZE, digitalWaveformDataBytes[0]))
 				{
 					LogDebug("failed to download digital waveform\n");
-					return false;
 				}
 			}
 
@@ -2115,9 +2132,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			{
 				if(enabled[i])
 				{
-					waveforms[i] = ProcessAnalogWaveform(&m_analogWaveformData[i][0],
-						m_analogWaveformDataSize[i],
-						&m_wavedescs[i][0],
+					waveforms[i] = ProcessAnalogWaveform(&analogWaveformData[i][0],
+						analogWaveformDataSize[i],
+						&wavedescs[i][0],
 						num_sequences,
 						ttime,
 						basetime,
@@ -2149,7 +2166,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	// if(denabled)
 	// {
 	// 	//This is a weird XML-y format but I can't find any other way to get it :(
-	// 	map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(m_digitalWaveformData);
+	// 	map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData);
 
 	// 	//Done, update the data
 	// 	for(auto it : digwaves)
@@ -2170,6 +2187,18 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	}
 	m_pendingWaveformsMutex.unlock();
 
+	//Clean up
+	for(int i = 0; i < MAX_ANALOG; i++)
+	{
+		if(analogWaveformData[i])
+			delete[] analogWaveformData[i];
+	}
+	for(int i = 0; i < MAX_DIGITAL; i++)
+	{
+		if(digitalWaveformDataBytes[i])
+			delete[] digitalWaveformDataBytes[i];
+	}
+
 	double dt = GetTime() - start;
 	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
 	return true;
@@ -2189,6 +2218,7 @@ void SiglentSCPIOscilloscope::Start()
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
+			m_acqPointsValid = false;
 			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
 			break;
@@ -2218,6 +2248,7 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 
 		// --------------------------------------------------
 		case PROTOCOL_E11:
+			m_acqPointsValid = false;
 			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");
 			break;
@@ -2282,6 +2313,7 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
+			m_acqPointsValid = false;
 			sendOnly(":TRIGGER:MODE SINGLE");
 			if(!m_triggerArmed)
 				sendOnly(":TRIGGER:MODE SINGLE");
@@ -2758,6 +2790,55 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 	}
 	return m_sampleRate;
 }
+
+uint64_t SiglentSCPIOscilloscope::GetMaxPoints()
+{
+	double f;
+	if(!m_maxPointsValid)
+	{
+		string reply;
+		switch(m_protocolId)
+		{
+			case PROTOCOL_E11:
+				reply = converse(":WAV:MAXP?");
+				break;
+			// --------------------------------------------------
+			default:
+				LogError("Max points only supported by E11 protocol\n");
+				break;
+				// --------------------------------------------------
+		}
+		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+		m_maxPoints = static_cast<int64_t>(f);
+		m_maxPointsValid = true;
+	}
+	return m_maxPoints;
+}
+
+uint64_t SiglentSCPIOscilloscope::GetAcqPoints()
+{
+	double f;
+	if(!m_acqPointsValid)
+	{
+		string reply;
+		switch(m_protocolId)
+		{
+			case PROTOCOL_E11:
+				reply = converse(":ACQ:POIN?");
+				break;
+			// --------------------------------------------------
+			default:
+				LogError("Acq points only supported by E11 protocol\n");
+				break;
+				// --------------------------------------------------
+		}
+		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+		m_acqPoints = static_cast<int64_t>(f);
+		m_acqPointsValid = true;
+	}
+	return m_acqPoints;
+}
+
 
 uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 {
