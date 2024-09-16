@@ -1909,10 +1909,10 @@ map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform
 bool SiglentSCPIOscilloscope::AcquireData()
 {
 	// Transfer buffers
-	char* analogWaveformData[MAX_ANALOG];
+	char* analogWaveformData[MAX_ANALOG] {nullptr};
 	int analogWaveformDataSize[MAX_ANALOG];
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
-	char* digitalWaveformDataBytes[MAX_DIGITAL];
+	char* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
 	std::string digitalWaveformData;
 
 	//State for this acquisition (may be more than one waveform)
@@ -2190,12 +2190,12 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	//Clean up
 	for(int i = 0; i < MAX_ANALOG; i++)
 	{
-		if(analogWaveformData[i])
+		if(analogWaveformData[i] != nullptr)
 			delete[] analogWaveformData[i];
 	}
 	for(int i = 0; i < MAX_DIGITAL; i++)
 	{
-		if(digitalWaveformDataBytes[i])
+		if(digitalWaveformDataBytes[i] != nullptr)
 			delete[] digitalWaveformDataBytes[i];
 	}
 
