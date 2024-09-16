@@ -2096,13 +2096,23 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					if(enabled[i])
 					{	// Allocate buffer
 						analogWaveformData[i] = new char[WAVEFORM_SIZE];
+						uint64_t acqPoints = GetAcqPoints();
+						uint64_t pageSize = GetMaxPoints();
+						uint64_t pages = ceil(acqPoints/pageSize);
+						if(pages <= 1)
+						{	// All data fits one page
+							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
+							analogWaveformDataSize[i] = ReadWaveformBlock((hdWorkaround ? (acqPoints*2) : acqPoints), analogWaveformData[i], hdWorkaround);
+							// This is the 0x0a0a at the end
+							m_transport->ReadRawData(2, (unsigned char*)tmp);
+						}
+						else
+						{	// We need pagination
+
+						}
 						// TODO chuck reading logic
 						//string reply = converse("ACQ:POIN?");
 						//LogDebug("Got acq point %s\n",reply.c_str());
-						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
-						analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i], hdWorkaround);
-						// This is the 0x0a0a at the end
-						m_transport->ReadRawData(2, (unsigned char*)tmp);
 					}
 				}
 			}
@@ -2808,9 +2818,10 @@ uint64_t SiglentSCPIOscilloscope::GetMaxPoints()
 				break;
 				// --------------------------------------------------
 		}
-		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+		sscanf(reply.c_str(), "%lf", &f);
 		m_maxPoints = static_cast<int64_t>(f);
 		m_maxPointsValid = true;
+		//LogWarning("Got max point %s => %d\n",reply.c_str(),(int)m_maxPoints);
 	}
 	return m_maxPoints;
 }
@@ -2832,9 +2843,10 @@ uint64_t SiglentSCPIOscilloscope::GetAcqPoints()
 				break;
 				// --------------------------------------------------
 		}
-		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+		sscanf(reply.c_str(), "%lf", &f);
 		m_acqPoints = static_cast<int64_t>(f);
 		m_acqPointsValid = true;
+		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
 	}
 	return m_acqPoints;
 }
