@@ -1910,7 +1910,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 {
 	// Transfer buffers
 	char* analogWaveformData[MAX_ANALOG] {nullptr};
-	int analogWaveformDataSize[MAX_ANALOG];
+	int analogWaveformDataSize[MAX_ANALOG] {0};
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
 	char* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
 	std::string digitalWaveformData;
@@ -2076,9 +2076,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			}
 
 			if(pdesc)
-			{
-				// THIS SECTION IS UNTESTED
-				//Figure out when the first trigger happened.
+			{	//Figure out when the first trigger happened.
 				//Read the timestamps if we're doing segmented capture
 				ttime = ExtractTimestamp(pdesc, basetime);
 				if(num_sequences > 1)
@@ -2095,10 +2093,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				{
 					if(enabled[i])
 					{	// Allocate buffer
-						analogWaveformData[i] = new char[WAVEFORM_SIZE];
 						uint64_t acqPoints = GetAcqPoints();
 						uint64_t pageSize = GetMaxPoints();
 						uint64_t pages = ceil(acqPoints/pageSize);
+						analogWaveformData[i] = new char[acqPoints];
 						if(pages <= 1)
 						{	// All data fits one page
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
@@ -2108,13 +2106,19 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						}
 						else
 						{	// We need pagination
-
+							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
+							for(uint64_t page = 0; page < pages; page++)
+							{
+								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
+								analogWaveformDataSize[i] += ReadWaveformBlock((hdWorkaround ? (pageSize*2) : pageSize), analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
+								// This is the 0x0a0a at the end
+								m_transport->ReadRawData(2, (unsigned char*)tmp);
+							}
 						}
-						// TODO chuck reading logic
-						//string reply = converse("ACQ:POIN?");
-						//LogDebug("Got acq point %s\n",reply.c_str());
 					}
 				}
+				// Reset waveform start to 0 to prevent errors if next acquisition in not paginated
+				m_transport->SendCommand(":WAVEFORM:START 0");
 			}
 
 			//Read the data from the digital waveforms, if enabled
