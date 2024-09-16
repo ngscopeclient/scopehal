@@ -36,6 +36,8 @@
 #ifndef EyeMask_h
 #define EyeMask_h
 
+#include "../canvas_ity/src/canvas_ity.hpp"
+
 class EyeDecoder2;
 class EyeWaveform;
 
@@ -71,9 +73,13 @@ public:
  */
 class EyeMask
 {
+
 public:
 	EyeMask();
 	virtual ~EyeMask();
+
+    canvas_ity::canvas eyemask_canvas = canvas_ity::canvas(0,0);
+
 
 	bool Load(std::string path);
 	bool Load(const YAML::Node& node);
@@ -103,6 +109,7 @@ public:
 
 	const std::vector<EyeMaskPolygon>& GetPolygons() const
 	{ return m_polygons; }
+
 
 protected:
 	std::string m_fname;

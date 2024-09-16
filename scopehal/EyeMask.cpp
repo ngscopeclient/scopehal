@@ -43,67 +43,10 @@
 #endif
 
 #include <time.h>
-
-/* ----------------------------------------------------------------------- */
-/*
-  Easy embeddable cross-platform high resolution timer function. For each 
-  platform we select the high resolution timer. You can call the 'ns()' 
-  function in your file after embedding this. 
-*/
-#include <stdint.h>
-#if defined(__linux)
-#  define HAVE_POSIX_TIMER
-#  include <time.h>
-#  ifdef CLOCK_MONOTONIC
-#     define CLOCKID CLOCK_MONOTONIC
-#  else
-#     define CLOCKID CLOCK_REALTIME
-#  endif
-#elif defined(__APPLE__)
-#  define HAVE_MACH_TIMER
-#  include <mach/mach_time.h>
-#elif defined(_WIN32)
-#  define WIN32_LEAN_AND_MEAN
-#  include <windows.h>
-#endif
-static uint64_t ns() {
-  static uint64_t is_init = 0;
-#if defined(__APPLE__)
-    static mach_timebase_info_data_t info;
-    if (0 == is_init) {
-      mach_timebase_info(&info);
-      is_init = 1;
-    }
-    uint64_t now;
-    now = mach_absolute_time();
-    now *= info.numer;
-    now /= info.denom;
-    return now;
-#elif defined(__linux)
-    static struct timespec linux_rate;
-    if (0 == is_init) {
-      clock_getres(CLOCKID, &linux_rate);
-      is_init = 1;
-    }
-    uint64_t now;
-    struct timespec spec;
-    clock_gettime(CLOCKID, &spec);
-    now = spec.tv_sec * 1.0e9 + spec.tv_nsec;
-    return now;
-#elif defined(_WIN32)
-    static LARGE_INTEGER win_frequency;
-    if (0 == is_init) {
-      QueryPerformanceFrequency(&win_frequency);
-      is_init = 1;
-    }
-    LARGE_INTEGER now;
-    QueryPerformanceCounter(&now);
-    return (uint64_t) ((1e9 * now.QuadPart)  / win_frequency.QuadPart);
-#endif
-}
-/* ----------------------------------------------------------------------- */
+#include <iostream>
 
 using namespace std;
+using namespace canvas_ity;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -239,20 +182,30 @@ float EyeMask::CalculateHitRate(
 {
 	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
 
-	auto time1 = ns()/1e3;
-	printf("Start time: \t%f µs\n", time1);
+	// auto begin_canvas_ity = std::chrono::high_resolution_clock::now();
+	
+	//canvas_ity::canvas canvas( width, height ); // width and height could be reversed
+	this->eyemask_canvas = new canvas(width,height); // width and height could be reversed
 
-	canvas_ity::canvas canvas( width, height ); // width and height could be reversed
+/* 
+	auto end_canvas_ity = std::chrono::high_resolution_clock::now();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end_canvas_ity-begin_canvas_ity).count() << "ns" << std::endl;
+	
 
-
-	auto time2 = (ns()-time1)/1e3;
-	printf("Create canvas: \t%f µs\n", time2);
+	auto beginfill1 = std::chrono::high_resolution_clock::now();
 
 	canvas.set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
+
     canvas.fill();
+
+	auto endfill1 = std::chrono::high_resolution_clock::now();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(endfill1-beginfill1).count() << "ns" << std::endl;
+
+
 	
-	auto time3 = (ns()-time2)/1e3;
-	printf("Fill background: \t%f µs\n", time3);
+
+	auto begin_sw_rendering = std::chrono::high_resolution_clock::now();
+
 
 	//Software rendering
 	float yscale = height / fullscalerange;
@@ -267,23 +220,26 @@ float EyeMask::CalculateHitRate(
 	canvas.line_to(-1e5, height);
 
 
-	auto time4 = (ns()-time3)/1e3;
-	printf("2nd lines: \t%f µs\n", time4);
+	auto end_sw_rendering = std::chrono::high_resolution_clock::now();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end_sw_rendering-begin_sw_rendering).count() << "ns" << std::endl;
+
+	auto beginfill2 = std::chrono::high_resolution_clock::now();
 
 	canvas.fill();
 
 	canvas.set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
 
-	auto time5 =  (ns()-time4)/1e3;
-	printf("fill+0xff color: \t%f µs\n", time5);
+	auto endfill2 = std::chrono::high_resolution_clock::now();
+	std::cout << "fill2" << std::chrono::duration_cast<std::chrono::nanoseconds>(endfill2-beginfill2).count() << "ns" << std::endl;
+
+
+
+	auto poly_start = std::chrono::high_resolution_clock::now();
 
 	//Draw each polygon
 	for(auto poly : m_polygons)
 	{
-		auto poly_time = (ns()-time5)/1e3;
-		printf("poly_start: \t%f µs\n", poly_time);
-
-		for(size_t i=0; i<poly.m_points.size(); i++)
+				for(size_t i=0; i<poly.m_points.size(); i++)
 		{
 			auto point = poly.m_points[i];
 
@@ -302,24 +258,24 @@ float EyeMask::CalculateHitRate(
 				canvas.line_to(x, y); // Draw line to next coord
 		}
 		canvas.fill(); // fill the resultant line defined polygon with the current color (white)
-		auto poly_endtime =  (ns()-poly_time)/1e3;
-		printf("poly end: \t%f µs\n", poly_endtime);
 
 	}
 
-	auto time6 = (ns()-time5)/1e3;
-	printf("fill+0xff color: \t%f µs\n", time6);
+
+	auto poly_end = std::chrono::high_resolution_clock::now();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(poly_end-poly_start).count() << "ns" << std::endl;
+
 
 	//Test each pixel of the eye pattern against the mask
+*/
+
 	float nmax = 0;
-	int stride = sizeof(unsigned char) * 4; // TODO: Check this for correctness
+/*	int stride = sizeof(unsigned char) * 4; // TODO: Check this for correctness
 
 	vector<unsigned char> image_data(width*height);
 
 	canvas.get_image_data(image_data.data(), width, height, stride, 0,0);
 
-	auto time7 = (ns()-time6)/1e3;
-	printf("pre-eyemask: \t%f µs\n", time7);
 
 
 	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
@@ -327,19 +283,11 @@ float EyeMask::CalculateHitRate(
 		auto accum = cap->GetAccumData();
 
 		auto data = &image_data[0];
-		auto timey = (ns()-time7)/1e3;
-		printf("start of y: \t%f µs\n", time7);
 
 		for(size_t y=0; y<height; y++)
 		{
 			auto row = data + (y*stride);
 			auto eyerow = accum + (y*width);
-
-			timey =(ns()-timey)/1e3;
-			printf("emd of y: %ld ||||| : \t%f µs\n", y, timey);
-
-			auto timex =(ns()-timey)/1e3;
-			printf("start of x: %d ||||| : \t%f µs\n", 0, timex);
 
 			for(size_t x=0; x<width; x++)
 			{
@@ -352,8 +300,6 @@ float EyeMask::CalculateHitRate(
 					{
 						nmax = rate;
 					}
-					timex = (ns()-timex)/1e3;
-					printf("end of mask check x: %ld ||||| : \t%f µs\n", x, timex);
 				}
 			}
 		}
@@ -384,7 +330,7 @@ float EyeMask::CalculateHitRate(
 		}
 	}
 
-	printf("null");
+	printf("null"); */
 
 	return nmax;
 }
