@@ -853,6 +853,17 @@ vector<string> explode(const string& str, char separator)
 }
 
 /**
+	@brief Converts a string to lower case
+ */
+string strtolower(const string& s)
+{
+	string ret;
+	for(auto c : s)
+		ret += tolower(c);
+	return ret;
+}
+
+/**
 	@brief Replaces all occurrences of the search string with "replace" in the given string
  */
 string str_replace(const string& search, const string& replace, const string& subject)
