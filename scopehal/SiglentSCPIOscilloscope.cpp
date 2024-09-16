@@ -2898,299 +2898,332 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 	//save original sample rate (scope often changes sample rate when adjusting memory depth)
 	uint64_t rate = GetSampleRate();
 
-	switch(m_modelid)
+	if(m_protocolId != PROTOCOL_E11)
 	{
 		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-		case MODEL_SIGLENT_SDS2000XE:
-			// we can not change memory size in Run/Stop mode
-			sendOnly("TRIG_MODE AUTO");
-			switch(depth)
-			{
-				case 7000:
-					sendOnly("MEMORY_SIZE 7K");
-					break;
-				case 14000:
-					sendOnly("MEMORY_SIZE 14K");
-					break;
-				case 70000:
-					sendOnly("MEMORY_SIZE 70K");
-					break;
-				case 140000:
-					sendOnly("MEMORY_SIZE 140K");
-					break;
-				case 700000:
-					sendOnly("MEMORY_SIZE 700K");
-					break;
-				case 1400000:
-					sendOnly("MEMORY_SIZE 1.4M");
-					break;
-				case 7000000:
-					sendOnly("MEMORY_SIZE 7M");
-					break;
-				case 14000000:
-					sendOnly("MEMORY_SIZE 14M");
-					break;
-				default:
-					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
-			}
-			if(IsTriggerArmed())
-			{
-				// restart trigger
-				sendOnly("TRIG_MODE SINGLE");
-			}
-			else
-			{
-				// change to stop mode
-				sendOnly("TRIG_MODE STOP");
-			}
-			m_sampleRateValid = false;
-			break;
-
-		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS1000X_HD:
-		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS3000X_HD:
-			// TODO HD : dynamically rework this based on mdepth attribute
-			// we can not change memory size in Run/Stop mode
-			sendOnly("TRIG_MODE AUTO");
-
-			switch(depth)
-			{
-				case 10000:
-					sendOnly("ACQUIRE:MDEPTH 10k");
-					break;
-				case 20000:
-					sendOnly("ACQUIRE:MDEPTH 20k");
-					break;
-				case 100000:
-					sendOnly("ACQUIRE:MDEPTH 100k");
-					break;
-				case 200000:
-					sendOnly("ACQUIRE:MDEPTH 200k");
-					break;
-				case 1000000:
-					sendOnly("ACQUIRE:MDEPTH 1M");
-					break;
-				case 2000000:
-					sendOnly("ACQUIRE:MDEPTH 2M");
-					break;
-				case 10000000:
-					sendOnly("ACQUIRE:MDEPTH 10M");
-					break;
-
-				// We don't yet support memory depths that need to be transferred in chunks
-				case 20000000:
-				//sendOnly("ACQUIRE:MDEPTH 20M");
-				//	break;
-				case 50000000:
-				//	sendOnly("ACQUIRE:MDEPTH 50M");
-				//	break;
-				case 100000000:
-				//	sendOnly("ACQUIRE:MDEPTH 100M");
-				//	break;
-				case 200000000:
-				//	sendOnly("ACQUIRE:MDEPTH 200M");
-				//	break;
-				default:
-					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
-			}
-
-			if(IsTriggerArmed())
-			{
-				// restart trigger
-				sendOnly("TRIG_MODE SINGLE");
-			}
-			else
-			{
-				// change to stop mode
-				sendOnly("TRIG_MODE STOP");
-			}
-			break;
-
-		case MODEL_SIGLENT_SDS5000X:
-
-			// we can not change memory size in Run/Stop mode
-			sendOnly("TRIG_MODE AUTO");
-
-			switch(depth)
-			{
-				case 5:
-					sendOnly("ACQUIRE:MDEPTH 5");
-					break;
-				case 12:
-					sendOnly("ACQUIRE:MDEPTH 12.5");
-					break;
-				case 25:
-					sendOnly("ACQUIRE:MDEPTH 25");
-					break;
-				case 50:
-					sendOnly("ACQUIRE:MDEPTH 50");
-					break;
-				case 125:
-					sendOnly("ACQUIRE:MDEPTH 125");
-					break;
-				case 250:
-					sendOnly("ACQUIRE:MDEPTH 250");
-					break;
-				case 500:
-					sendOnly("ACQUIRE:MDEPTH 500");
-					break;
-				case 1250:
-					sendOnly("ACQUIRE:MDEPTH 1.25k");
-					break;
-				case 2500:
-					sendOnly("ACQUIRE:MDEPTH 2.5k");
-					break;
-				case 5000:
-					sendOnly("ACQUIRE:MDEPTH 5k");
-					break;
-				case 12500:
-					sendOnly("ACQUIRE:MDEPTH 12.5k");
-					break;
-				case 25000:
-					sendOnly("ACQUIRE:MDEPTH 25k");
-					break;
-				case 50000:
-					sendOnly("ACQUIRE:MDEPTH 50k");
-					break;
-				case 125000:
-					sendOnly("ACQUIRE:MDEPTH 125k");
-					break;
-				case 250000:
-					sendOnly("ACQUIRE:MDEPTH 250k");
-					break;
-				case 500000:
-					sendOnly("ACQUIRE:MDEPTH 500k");
-					break;
-				case 1250000:
-					sendOnly("ACQUIRE:MDEPTH 1.25M");
-					break;
-				case 2500000:
-					sendOnly("ACQUIRE:MDEPTH 2.5M");
-					break;
-				case 5000000:
-					sendOnly("ACQUIRE:MDEPTH 5M");
-					break;
-				case 12500000:
-					sendOnly("ACQUIRE:MDEPTH 12.5M");
-					break;
-				case 25000000:
-					sendOnly("ACQUIRE:MDEPTH 25M");
-					break;
-				case 50000000:
-					sendOnly("ACQUIRE:MDEPTH 50M");
-					break;
-				case 125000000:
-					sendOnly("ACQUIRE:MDEPTH 125M");
-					break;
-				default:
-					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
-			}
-
-			if(IsTriggerArmed())
-			{
-				// restart trigger
-				sendOnly("TRIG_MODE SINGLE");
-			}
-			else
-			{
-				// change to stop mode
-				sendOnly("TRIG_MODE STOP");
-			}
-			break;
-
-		case MODEL_SIGLENT_SDS6000A:
-		case MODEL_SIGLENT_SDS6000L:
-		case MODEL_SIGLENT_SDS6000PRO:
-		case MODEL_SIGLENT_SDS7000A:
-
-			// we can not change memory size in Run/Stop mode
-			sendOnly("TRIG_MODE AUTO");
-
-			switch(depth)
-			{
-				case 1250:
-					sendOnly("ACQUIRE:MDEPTH 1.25k");
-					break;
-				case 2500:
-					sendOnly("ACQUIRE:MDEPTH 2.5k");
-					break;
-				case 5000:
-					sendOnly("ACQUIRE:MDEPTH 5k");
-					break;
-				case 12500:
-					sendOnly("ACQUIRE:MDEPTH 12.5k");
-					break;
-				case 25000:
-					sendOnly("ACQUIRE:MDEPTH 25k");
-					break;
-				case 50000:
-					sendOnly("ACQUIRE:MDEPTH 50k");
-					break;
-				case 125000:
-					sendOnly("ACQUIRE:MDEPTH 125k");
-					break;
-				case 250000:
-					sendOnly("ACQUIRE:MDEPTH 250k");
-					break;
-				case 500000:
-					sendOnly("ACQUIRE:MDEPTH 500k");
-					break;
-				case 1250000:
-					sendOnly("ACQUIRE:MDEPTH 1.25M");
-					break;
-				case 2500000:
-					sendOnly("ACQUIRE:MDEPTH 2.5M");
-					break;
-				case 5000000:
-					sendOnly("ACQUIRE:MDEPTH 5M");
-					break;
-				case 12500000:
-					sendOnly("ACQUIRE:MDEPTH 12.5M");
-					break;
-				case 25000000:
-					sendOnly("ACQUIRE:MDEPTH 25M");
-					break;
-				case 50000000:
-					sendOnly("ACQUIRE:MDEPTH 50M");
-					break;
-				case 62500000:
-					sendOnly("ACQUIRE:MDEPTH 62.5M");
-					break;
-				case 125000000:
-					sendOnly("ACQUIRE:MDEPTH 125M");
-					break;
-				case 250000000:
-					sendOnly("ACQUIRE:MDEPTH 250M");
-					break;
-				case 500000000:
-					sendOnly("ACQUIRE:MDEPTH 500M");
-					break;
-			}
-
-			if(IsTriggerArmed())
-			{
-				// restart trigger
-				sendOnly("TRIG_MODE SINGLE");
-			}
-			else
-			{
-				// change to stop mode
-				sendOnly("TRIG_MODE STOP");
-			}
-
-			//Force sample rate to be correct, adjusting time/div if needed
-			SetSampleRate(GetSampleRate());
-
-			break;
-		// --------------------------------------------------
-		default:
-			LogError("Unknown scope type\n");
-			break;
+		// case of SDS1000 and SDS2000XE
+		// we can not change memory size in Run/Stop mode
+		sendOnly("TRIG_MODE AUTO");
+		switch(depth)
+		{
+			case 7000:
+				sendOnly("MEMORY_SIZE 7K");
+				break;
+			case 14000:
+				sendOnly("MEMORY_SIZE 14K");
+				break;
+			case 70000:
+				sendOnly("MEMORY_SIZE 70K");
+				break;
+			case 140000:
+				sendOnly("MEMORY_SIZE 140K");
+				break;
+			case 700000:
+				sendOnly("MEMORY_SIZE 700K");
+				break;
+			case 1400000:
+				sendOnly("MEMORY_SIZE 1.4M");
+				break;
+			case 7000000:
+				sendOnly("MEMORY_SIZE 7M");
+				break;
+			case 14000000:
+				sendOnly("MEMORY_SIZE 14M");
+				break;
+			default:
+				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+		}
+		if(IsTriggerArmed())
+		{
+			// restart trigger
+			sendOnly("TRIG_MODE SINGLE");
+		}
+		else
+		{
+			// change to stop mode
+			sendOnly("TRIG_MODE STOP");
+		}
+		m_sampleRateValid = false;
+	}
+	else
+	{	// All E11 models
+		// we can not change memory size in Run/Stop mode
+		sendOnly("TRIG_MODE AUTO");
+		switch(m_modelid)
+		{
+			case MODEL_SIGLENT_SDS800X_HD:
+			case MODEL_SIGLENT_SDS1000X_HD:
+				switch(depth)
+				{
+					case 6000:
+						sendOnly("ACQUIRE:MDEPTH 6k");
+						break;
+					case 12000:
+						sendOnly("ACQUIRE:MDEPTH 12k");
+						break;
+					case 60000:
+						sendOnly("ACQUIRE:MDEPTH 60k");
+						break;
+					case 120000:
+						sendOnly("ACQUIRE:MDEPTH 120k");
+						break;
+					case 600000:
+						sendOnly("ACQUIRE:MDEPTH 600k");
+						break;
+					case 1200000:
+						sendOnly("ACQUIRE:MDEPTH 1.2M");
+						break;
+					case 6000000:
+						sendOnly("ACQUIRE:MDEPTH 6M");
+						break;
+					case 12000000:
+						sendOnly("ACQUIRE:MDEPTH 12M");
+						break;
+					default:
+						LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+				}
+				break;
+			case MODEL_SIGLENT_SDS2000XP:
+			case MODEL_SIGLENT_SDS2000X_HD:
+				switch(depth)
+				{
+					case 10000:
+						sendOnly("ACQUIRE:MDEPTH 10k");
+						break;
+					case 20000:
+						sendOnly("ACQUIRE:MDEPTH 20k");
+						break;
+					case 100000:
+						sendOnly("ACQUIRE:MDEPTH 100k");
+						break;
+					case 200000:
+						sendOnly("ACQUIRE:MDEPTH 200k");
+						break;
+					case 1000000:
+						sendOnly("ACQUIRE:MDEPTH 1M");
+						break;
+					case 2000000:
+						sendOnly("ACQUIRE:MDEPTH 2M");
+						break;
+					case 10000000:
+						sendOnly("ACQUIRE:MDEPTH 10M");
+						break;
+					case 20000000:
+						sendOnly("ACQUIRE:MDEPTH 20M");
+						break;
+					case 100000000:
+						sendOnly("ACQUIRE:MDEPTH 100M");
+						break;
+					case 200000000:
+						sendOnly("ACQUIRE:MDEPTH 200M");
+						break;
+					default:
+						LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+				}
+				break;
+			case MODEL_SIGLENT_SDS3000X_HD:
+				switch(depth)
+				{
+					case 2000:
+						sendOnly("ACQUIRE:MDEPTH 2k");
+						break;
+					case 10000:
+						sendOnly("ACQUIRE:MDEPTH 10k");
+						break;
+					case 20000:
+						sendOnly("ACQUIRE:MDEPTH 20k");
+						break;
+					case 100000:
+						sendOnly("ACQUIRE:MDEPTH 100k");
+						break;
+					case 200000:
+						sendOnly("ACQUIRE:MDEPTH 200k");
+						break;
+					case 1000000:
+						sendOnly("ACQUIRE:MDEPTH 1M");
+						break;
+					case 2000000:
+						sendOnly("ACQUIRE:MDEPTH 2M");
+						break;
+					case 10000000:
+						sendOnly("ACQUIRE:MDEPTH 10M");
+						break;
+					case 20000000:
+						sendOnly("ACQUIRE:MDEPTH 20M");
+						break;
+					case 100000000:
+						sendOnly("ACQUIRE:MDEPTH 100M");
+						break;
+					case 400000000:
+						sendOnly("ACQUIRE:MDEPTH 400M");
+						break;
+					default:
+						LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+				}
+				break;
+			case MODEL_SIGLENT_SDS5000X:
+				switch(depth)
+				{
+					case 125000:
+						sendOnly("ACQUIRE:MDEPTH 125k");
+						break;
+					case 250000:
+						sendOnly("ACQUIRE:MDEPTH 250k");
+						break;
+					case 625000:
+						sendOnly("ACQUIRE:MDEPTH 625k");
+						break;
+					case 1250000:
+						sendOnly("ACQUIRE:MDEPTH 1.25M");
+						break;
+					case 2500000:
+						sendOnly("ACQUIRE:MDEPTH 2.5M");
+						break;
+					case 6250000:
+						sendOnly("ACQUIRE:MDEPTH 6.255M");
+						break;
+					case 12500000:
+						sendOnly("ACQUIRE:MDEPTH 12.5M");
+						break;
+					case 25000000:
+						sendOnly("ACQUIRE:MDEPTH 25M");
+						break;
+					case 62500000:
+						sendOnly("ACQUIRE:MDEPTH 62.5M");
+						break;
+					case 125000000:
+						sendOnly("ACQUIRE:MDEPTH 125M");
+						break;
+					case 250000000:
+						sendOnly("ACQUIRE:MDEPTH 250M");
+						break;
+					default:
+						LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+				}
+				break;
+			case MODEL_SIGLENT_SDS6000A:
+			case MODEL_SIGLENT_SDS6000PRO:
+			case MODEL_SIGLENT_SDS6000L:
+				switch(depth)
+				{
+					case 1250:
+						sendOnly("ACQUIRE:MDEPTH 1.25k");
+						break;
+					case 5000:
+						sendOnly("ACQUIRE:MDEPTH 5k");
+						break;
+					case 12500:
+						sendOnly("ACQUIRE:MDEPTH 12.5k");
+						break;
+					case 25000:
+						sendOnly("ACQUIRE:MDEPTH 25k");
+						break;
+					case 50000:
+						sendOnly("ACQUIRE:MDEPTH 50k");
+						break;
+					case 125000:
+						sendOnly("ACQUIRE:MDEPTH 125k");
+						break;
+					case 250000:
+						sendOnly("ACQUIRE:MDEPTH 250k");
+						break;
+					case 500000:
+						sendOnly("ACQUIRE:MDEPTH 500k");
+						break;
+					case 1250000:
+						sendOnly("ACQUIRE:MDEPTH 1.25M");
+						break;
+					case 2500000:
+						sendOnly("ACQUIRE:MDEPTH 2.5M");
+						break;
+					case 5000000:
+						sendOnly("ACQUIRE:MDEPTH 5M");
+						break;
+					case 12500000:
+						sendOnly("ACQUIRE:MDEPTH 12.5M");
+						break;
+					case 25000000:
+						sendOnly("ACQUIRE:MDEPTH 25M");
+						break;
+					case 50000000:
+						sendOnly("ACQUIRE:MDEPTH 50M");
+						break;
+					case 62500000:
+						sendOnly("ACQUIRE:MDEPTH 62.5M");
+						break;
+					case 125000000:
+						sendOnly("ACQUIRE:MDEPTH 125M");
+						break;
+					case 250000000:
+						sendOnly("ACQUIRE:MDEPTH 250M");
+						break;
+					case 500000000:
+						sendOnly("ACQUIRE:MDEPTH 500M");
+						break;
+				}
+				//Force sample rate to be correct, adjusting time/div if needed
+				SetSampleRate(GetSampleRate());
+				break;
+			case MODEL_SIGLENT_SDS7000A:
+				switch(depth)
+				{
+					case 1000:
+						sendOnly("ACQUIRE:MDEPTH 1k");
+						break;
+					case 5000:
+						sendOnly("ACQUIRE:MDEPTH 5k");
+						break;
+					case 10000:
+						sendOnly("ACQUIRE:MDEPTH 10k");
+						break;
+					case 50000:
+						sendOnly("ACQUIRE:MDEPTH 50k");
+						break;
+					case 100000:
+						sendOnly("ACQUIRE:MDEPTH 100k");
+						break;
+					case 500000:
+						sendOnly("ACQUIRE:MDEPTH 500k");
+						break;
+					case 1000000:
+						sendOnly("ACQUIRE:MDEPTH 1M");
+						break;
+					case 5000000:
+						sendOnly("ACQUIRE:MDEPTH 5M");
+						break;
+					case 10000000:
+						sendOnly("ACQUIRE:MDEPTH 10M");
+						break;
+					case 50000000:
+						sendOnly("ACQUIRE:MDEPTH 50M");
+						break;
+					case 100000000:
+						sendOnly("ACQUIRE:MDEPTH 100M");
+						break;
+					case 500000000:
+						sendOnly("ACQUIRE:MDEPTH 500M");
+						break;
+					case 1000000000:
+						sendOnly("ACQUIRE:MDEPTH 1G");
+						break;
+				}
+				//Force sample rate to be correct, adjusting time/div if needed
+				SetSampleRate(GetSampleRate());
+				break;
 			// --------------------------------------------------
+			default:
+				LogError("Unknown scope type\n");
+				break;
+				// --------------------------------------------------
+		}
+		if(IsTriggerArmed())
+		{	// restart trigger
+			sendOnly("TRIG_MODE SINGLE");
+		}
+		else
+		{	// change to stop mode
+			sendOnly("TRIG_MODE STOP");
+		}
 	}
 
 	m_memoryDepthValid = false;
