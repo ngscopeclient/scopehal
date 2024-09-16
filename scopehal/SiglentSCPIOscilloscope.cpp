@@ -2656,8 +2656,8 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	vector<uint64_t> ret = {};
-
+	vector<uint64_t> ret;
+	ChannelMode channelMode = GetChannelMode();
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -2669,126 +2669,66 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
-		case MODEL_SIGLENT_SDS3000X_HD:
-			// TODO HD: dynamic calculation based on bandwidth (cf. Rigol driver)
-			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000};
+			else
+				ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
-
+		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS800X_HD:
-			// Memory depth varies by speed, and by 1/2/4 channels
-			// Using safe (4 channel) maximum values for now..
-			if(m_maxBandwidth == 200)
+			if((m_modelid == MODEL_SIGLENT_SDS1000X_HD) || (m_maxBandwidth >= 200))
 			{
-				ret =
-				{
-					10 * 1000,
-					100 * 1000,
-					1000 * 1000,
-					10 * 1000 * 1000,
-					25 * 1000 * 1000
-				};
+				if(channelMode == CHANNEL_MODE_SINGLE)
+					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000, 100 * 1000 * 1000};
+				else if(channelMode == CHANNEL_MODE_DUAL)
+					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000, 50 * 1000 * 1000};
+				else
+					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000, 25 * 1000 * 1000};
 			}
 			else
 			{
-				ret =
-				{
-					10 * 1000,
-					100 * 1000,
-					1000 * 1000,
-					10 * 1000 * 1000
-				};
+				if(channelMode == CHANNEL_MODE_SINGLE)
+					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000, 50 * 1000 * 1000};
+				else if(channelMode == CHANNEL_MODE_DUAL)
+					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000, 25 * 1000 * 1000};
+				else
+					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000};
 			}
 			break;
-
-		case MODEL_SIGLENT_SDS5000X:
-			ret = {
-					5,
-					12, //Should be 12.5 
-					25,
-					50,
-					125,
-					250,
-					500,
-					1250,
-					2500,
-					5 * 1000,
-					12500,
-					25 * 1000,
-					50 * 1000,
-					125 * 1000,
-					250 * 1000,
-					500 * 1000,
-					1250 * 1000,
-					2500 * 1000,
-					5 * 1000 * 1000,
-					12500 * 1000,
-					25 * 1000 * 1000,
-					50 * 1000 * 1000,
-					125 * 1000 * 1000
-				  };
+		case MODEL_SIGLENT_SDS3000X_HD:
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {	2 * 1000, 10 * 1000, 20 * 1000, 100 * 1000, 200 * 1000, 1000 * 1000, 2 * 1000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 100 * 1000 * 1000, 200 * 1000 * 1000, 400 * 1000 * 1000};
+			else if(channelMode == CHANNEL_MODE_DUAL)
+				ret = {	2 * 1000, 10 * 1000, 20 * 1000, 100 * 1000, 200 * 1000, 1000 * 1000, 2 * 1000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 100 * 1000 * 1000, 200 * 1000 * 1000};
+			else
+				ret = {	1 * 1000, 5 * 1000, 10 * 1000, 50 * 1000, 100 * 1000, 500 * 1000, 1000 * 1000, 5 * 1000 * 1000, 10 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000};
 			break;
-
+		case MODEL_SIGLENT_SDS5000X:
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {10 * 1000, 50 * 1000, 250 * 1000, 1250000, 2500000, 12500000, 25 * 1000 * 1000, 125 * 1000 * 1000, 250 * 1000 * 1000};
+			else
+				ret = {5 * 1000, 25 * 1000, 125 * 1000, 625 * 1000, 1250000, 6250000, 12500000, 62500000, 125 * 1000 * 1000};
+			break;
 		case MODEL_SIGLENT_SDS6000A:
 		case MODEL_SIGLENT_SDS6000L:
 		case MODEL_SIGLENT_SDS6000PRO:
-		case MODEL_SIGLENT_SDS7000A:
-
-			if(m_maxBandwidth == 2000)
-			{
-				ret =
-				{
-					2500,
-					5000,
-					25 * 1000,
-					50 * 1000,
-					250 * 1000,
-					500 * 1000,
-					2500 * 1000L,
-					5000 * 1000L,
-					12500 * 1000L
-
-					//these depths need chunked download?? TODO
-					/*,
-					25000 * 1000L,
-					50000 * 1000L,
-					125000 * 1000L,
-					250000 * 1000L,
-					500000 * 1000L
-					*/
-				};
-			}
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret ={ 2500, 5000, 25 * 1000, 50 * 1000, 250 * 1000, 500 * 1000, 2500 * 1000L, 5000 * 1000L, 12500 * 1000L, 25000 * 1000L, 50000 * 1000L, 125000 * 1000L, 250000 * 1000L, 500000 * 1000L };
+			else if(channelMode == CHANNEL_MODE_DUAL)
+				ret ={ 2500, 5000, 25 * 1000, 50 * 1000, 250 * 1000, 500 * 1000, 2500 * 1000L, 5000 * 1000L, 12500 * 1000L, 25000 * 1000L, 50000 * 1000L, 125000 * 1000L, 250000 * 1000L };
 			else
-			{
-				ret =
-				{
-					1250,
-					2500,
-					5000,
-					25 * 1000,
-					50 * 1000,
-					250 * 1000,
-					500 * 1000,
-					2500 * 1000L,
-					5000 * 1000L,
-					12500 * 1000L
-
-					//these depths need chunked download?? TODO
-					/*,
-					25000 * 1000L,
-					50000 * 1000L,
-					125000 * 1000L
-					*/
-				};
-			}
+				ret ={ 2500, 5000, 25 * 1000, 50 * 1000, 250 * 1000, 500 * 1000, 2500 * 1000L, 5000 * 1000L, 12500 * 1000L, 25000 * 1000L, 50000 * 1000L, 125000 * 1000L };
 			break;
-
+		case MODEL_SIGLENT_SDS7000A:
+			ret ={ 1000, 5000, 10 * 1000, 50 * 1000, 100 * 1000, 500 * 1000, 5 * 1000 * 1000L, 10 * 1000 * 1000L, 50 * 1000 * 1000L, 100 * 1000 * 1000L, 500 *1000 * 1000L, 1000 * 1000 * 1000L };
+			break;
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
+			ret = {};
 			break;
-			// --------------------------------------------------
+		// --------------------------------------------------
 	}
 	return ret;
 }
