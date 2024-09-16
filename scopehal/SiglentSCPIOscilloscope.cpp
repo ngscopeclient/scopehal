@@ -2940,29 +2940,26 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 			case MODEL_SIGLENT_SDS1000X_HD:
 				switch(depth)
 				{
-					case 6000:
-						sendOnly("ACQUIRE:MDEPTH 6k");
+					case 10000:
+						sendOnly("ACQUIRE:MDEPTH 10k");
 						break;
-					case 12000:
-						sendOnly("ACQUIRE:MDEPTH 12k");
+					case 100000:
+						sendOnly("ACQUIRE:MDEPTH 100k");
 						break;
-					case 60000:
-						sendOnly("ACQUIRE:MDEPTH 60k");
+					case 1000000:
+						sendOnly("ACQUIRE:MDEPTH 1M");
 						break;
-					case 120000:
-						sendOnly("ACQUIRE:MDEPTH 120k");
+					case 10000000:
+						sendOnly("ACQUIRE:MDEPTH 10M");
 						break;
-					case 600000:
-						sendOnly("ACQUIRE:MDEPTH 600k");
+					case 25000000:
+						sendOnly("ACQUIRE:MDEPTH 25M");
 						break;
-					case 1200000:
-						sendOnly("ACQUIRE:MDEPTH 1.2M");
+					case 50000000:
+						sendOnly("ACQUIRE:MDEPTH 50M");
 						break;
-					case 6000000:
-						sendOnly("ACQUIRE:MDEPTH 6M");
-						break;
-					case 12000000:
-						sendOnly("ACQUIRE:MDEPTH 12M");
+					case 100000000:
+						sendOnly("ACQUIRE:MDEPTH 100M");
 						break;
 					default:
 						LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
@@ -3009,8 +3006,14 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 			case MODEL_SIGLENT_SDS3000X_HD:
 				switch(depth)
 				{
+					case 1000:
+						sendOnly("ACQUIRE:MDEPTH 1k");
+						break;
 					case 2000:
 						sendOnly("ACQUIRE:MDEPTH 2k");
+						break;
+					case 5000:
+						sendOnly("ACQUIRE:MDEPTH 5k");
 						break;
 					case 10000:
 						sendOnly("ACQUIRE:MDEPTH 10k");
@@ -3018,11 +3021,17 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					case 20000:
 						sendOnly("ACQUIRE:MDEPTH 20k");
 						break;
+					case 50000:
+						sendOnly("ACQUIRE:MDEPTH 50k");
+						break;
 					case 100000:
 						sendOnly("ACQUIRE:MDEPTH 100k");
 						break;
 					case 200000:
 						sendOnly("ACQUIRE:MDEPTH 200k");
+						break;
+					case 500000:
+						sendOnly("ACQUIRE:MDEPTH 500k");
 						break;
 					case 1000000:
 						sendOnly("ACQUIRE:MDEPTH 1M");
@@ -3030,14 +3039,23 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					case 2000000:
 						sendOnly("ACQUIRE:MDEPTH 2M");
 						break;
+					case 5000000:
+						sendOnly("ACQUIRE:MDEPTH 5M");
+						break;
 					case 10000000:
 						sendOnly("ACQUIRE:MDEPTH 10M");
 						break;
 					case 20000000:
 						sendOnly("ACQUIRE:MDEPTH 20M");
 						break;
+					case 50000000:
+						sendOnly("ACQUIRE:MDEPTH 50M");
+						break;
 					case 100000000:
 						sendOnly("ACQUIRE:MDEPTH 100M");
+						break;
+					case 200000000:
+						sendOnly("ACQUIRE:MDEPTH 200M");
 						break;
 					case 400000000:
 						sendOnly("ACQUIRE:MDEPTH 400M");
@@ -3049,6 +3067,18 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 			case MODEL_SIGLENT_SDS5000X:
 				switch(depth)
 				{
+					case 5000:
+						sendOnly("ACQUIRE:MDEPTH 5k");
+						break;
+					case 10000:
+						sendOnly("ACQUIRE:MDEPTH 10k");
+						break;
+					case 25000:
+						sendOnly("ACQUIRE:MDEPTH 25k");
+						break;
+					case 50000:
+						sendOnly("ACQUIRE:MDEPTH 50k");
+						break;
 					case 125000:
 						sendOnly("ACQUIRE:MDEPTH 125k");
 						break;
@@ -3065,7 +3095,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 						sendOnly("ACQUIRE:MDEPTH 2.5M");
 						break;
 					case 6250000:
-						sendOnly("ACQUIRE:MDEPTH 6.255M");
+						sendOnly("ACQUIRE:MDEPTH 6.25M");
 						break;
 					case 12500000:
 						sendOnly("ACQUIRE:MDEPTH 12.5M");
@@ -3091,14 +3121,11 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 			case MODEL_SIGLENT_SDS6000L:
 				switch(depth)
 				{
-					case 1250:
-						sendOnly("ACQUIRE:MDEPTH 1.25k");
+					case 2500:
+						sendOnly("ACQUIRE:MDEPTH 2.5k");
 						break;
 					case 5000:
 						sendOnly("ACQUIRE:MDEPTH 5k");
-						break;
-					case 12500:
-						sendOnly("ACQUIRE:MDEPTH 12.5k");
 						break;
 					case 25000:
 						sendOnly("ACQUIRE:MDEPTH 25k");
@@ -3106,17 +3133,11 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 					case 50000:
 						sendOnly("ACQUIRE:MDEPTH 50k");
 						break;
-					case 125000:
-						sendOnly("ACQUIRE:MDEPTH 125k");
-						break;
 					case 250000:
 						sendOnly("ACQUIRE:MDEPTH 250k");
 						break;
 					case 500000:
 						sendOnly("ACQUIRE:MDEPTH 500k");
-						break;
-					case 1250000:
-						sendOnly("ACQUIRE:MDEPTH 1.25M");
 						break;
 					case 2500000:
 						sendOnly("ACQUIRE:MDEPTH 2.5M");
@@ -3132,9 +3153,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 						break;
 					case 50000000:
 						sendOnly("ACQUIRE:MDEPTH 50M");
-						break;
-					case 62500000:
-						sendOnly("ACQUIRE:MDEPTH 62.5M");
 						break;
 					case 125000000:
 						sendOnly("ACQUIRE:MDEPTH 125M");
