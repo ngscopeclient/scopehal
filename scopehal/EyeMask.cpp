@@ -239,20 +239,20 @@ float EyeMask::CalculateHitRate(
 {
 	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
 
-	auto time1 = ns();
-	printf("Start time: %f µs\n", time1/1e3);
+	auto time1 = ns()/1e3;
+	printf("Start time: \t%f µs\n", time1);
 
 	canvas_ity::canvas canvas( width, height ); // width and height could be reversed
 
 
-	auto time11 = ns();
-	printf("%f µs\n", (time11-time1)/1e3);
+	auto time2 = (ns()-time1)/1e3;
+	printf("Create canvas: \t%f µs\n", time2);
 
 	canvas.set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
     canvas.fill();
 	
-	auto time12 = ns();
-	printf("%f µs\n", (time12-time1)/1e3);
+	auto time3 = (ns()-time2)/1e3;
+	printf("Fill background: \t%f µs\n", time3);
 
 	//Software rendering
 	float yscale = height / fullscalerange;
@@ -267,19 +267,22 @@ float EyeMask::CalculateHitRate(
 	canvas.line_to(-1e5, height);
 
 
-	auto time13 = ns();
-	printf("%f µs\n", (time13-time1)/1e3);
+	auto time4 = (ns()-time3)/1e3;
+	printf("2nd lines: \t%f µs\n", time4);
 
 	canvas.fill();
 
 	canvas.set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
 
-	auto time2 = ns();
-	printf("%f µs\n", (time2-time1)/1e3);
+	auto time5 =  (ns()-time4)/1e3;
+	printf("fill+0xff color: \t%f µs\n", time5);
 
 	//Draw each polygon
 	for(auto poly : m_polygons)
 	{
+		auto poly_time = (ns()-time5)/1e3;
+		printf("poly_start: \t%f µs\n", poly_time);
+
 		for(size_t i=0; i<poly.m_points.size(); i++)
 		{
 			auto point = poly.m_points[i];
@@ -299,10 +302,13 @@ float EyeMask::CalculateHitRate(
 				canvas.line_to(x, y); // Draw line to next coord
 		}
 		canvas.fill(); // fill the resultant line defined polygon with the current color (white)
+		auto poly_endtime =  (ns()-poly_time)/1e3;
+		printf("poly end: \t%f µs\n", poly_endtime);
+
 	}
 
-	auto time3 = ns();
-	printf("%f µs\n", (time3-time2)/1e3);
+	auto time6 = (ns()-time5)/1e3;
+	printf("fill+0xff color: \t%f µs\n", time6);
 
 	//Test each pixel of the eye pattern against the mask
 	float nmax = 0;
@@ -312,8 +318,8 @@ float EyeMask::CalculateHitRate(
 
 	canvas.get_image_data(image_data.data(), width, height, stride, 0,0);
 
-	auto time4 = ns();
-	printf("%f µs\n", (time4-time3)/1e3);
+	auto time7 = (ns()-time6)/1e3;
+	printf("pre-eyemask: \t%f µs\n", time7);
 
 
 	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
@@ -321,13 +327,20 @@ float EyeMask::CalculateHitRate(
 		auto accum = cap->GetAccumData();
 
 		auto data = &image_data[0];
+		auto timey = (ns()-time7)/1e3;
+		printf("start of y: \t%f µs\n", time7);
+
 		for(size_t y=0; y<height; y++)
 		{
-
-			auto timey = ns();
-			//printf("%ld %f µs\n", y, (timey-time4)/1e3);
 			auto row = data + (y*stride);
 			auto eyerow = accum + (y*width);
+
+			timey =(ns()-timey)/1e3;
+			printf("emd of y: %ld ||||| : \t%f µs\n", y, timey);
+
+			auto timex =(ns()-timey)/1e3;
+			printf("start of x: %d ||||| : \t%f µs\n", 0, timex);
+
 			for(size_t x=0; x<width; x++)
 			{
 				//If mask pixel isn't black, count violations
@@ -336,10 +349,15 @@ float EyeMask::CalculateHitRate(
 				{
 					float rate = (eyerow[x] * 1.0f / cap->GetTotalUIs());
 					if(rate > nmax)
+					{
 						nmax = rate;
+					}
+					timex = (ns()-timex)/1e3;
+					printf("end of mask check x: %ld ||||| : \t%f µs\n", x, timex);
 				}
 			}
 		}
+		printf("null");
 	}
 	else //if(cap->GetType() == EyeWaveform::EYE_BER)
 	{
@@ -365,6 +383,8 @@ float EyeMask::CalculateHitRate(
 			}
 		}
 	}
+
+	printf("null");
 
 	return nmax;
 }
