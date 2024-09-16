@@ -832,6 +832,55 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 	}
 }
 
+SiglentSCPIOscilloscope::ChannelMode SiglentSCPIOscilloscope::GetChannelMode()
+{
+	ChannelMode result;
+	int activeChannels = GetEnabledChannelCount();
+	switch (m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+			result = CHANNEL_MODE_SINGLE;
+			break;
+		case MODEL_SIGLENT_SDS800X_HD:
+		case MODEL_SIGLENT_SDS1000X_HD:
+		case MODEL_SIGLENT_SDS6000A:
+		case MODEL_SIGLENT_SDS6000L:
+		case MODEL_SIGLENT_SDS6000PRO:
+			// Channels are indendent on this models, keep standard count
+			if(activeChannels > 2)
+				result = CHANNEL_MODE_MULTI;
+			else if(activeChannels == 2)
+				result = CHANNEL_MODE_DUAL;
+			else
+				result = CHANNEL_MODE_SINGLE;
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+			// Dual mode if both c1 and c2 are on or both c2 and c3 are on, Single mode otherwise
+			result = ((IsChannelEnabled(0) && IsChannelEnabled(1)) || (IsChannelEnabled(2) && IsChannelEnabled(3))) ? CHANNEL_MODE_DUAL : CHANNEL_MODE_SINGLE;
+			break;
+		case MODEL_SIGLENT_SDS3000X_HD:
+			// Dual mode if both c1 and c2 are on or both c2 and c3 are on, Single mode otherwise
+			if(activeChannels>=3)
+				result = CHANNEL_MODE_MULTI;
+			else
+				result = ((IsChannelEnabled(0) && IsChannelEnabled(1)) || (IsChannelEnabled(2) && IsChannelEnabled(3))) ? CHANNEL_MODE_DUAL : CHANNEL_MODE_SINGLE;
+			break;
+		case MODEL_SIGLENT_SDS7000A:
+				result = CHANNEL_MODE_SINGLE;
+			break;
+		default:
+			LogError("Unknown scope type\n");
+			result = CHANNEL_MODE_SINGLE;
+			break;
+	}
+	return result;
+}
+
 vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
@@ -2595,8 +2644,8 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesInterleaved()
 {
-	//no interleaving on SDS6000A
-	if(m_modelid == MODEL_SIGLENT_SDS6000A)
+	//No interleaving on E11 models, srates values are calculated dynamically according to number of active channels
+	if((m_protocolId == PROTOCOL_E11))
 		return GetSampleRatesNonInterleaved();
 
 	vector<uint64_t> ret = GetSampleRatesNonInterleaved();
@@ -2746,12 +2795,8 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 {
-	//no interleaving on SDS6000A 2 GHz SKU
-	if( (m_modelid == MODEL_SIGLENT_SDS6000A) && (m_maxBandwidth == 2000) )
-		return GetSampleDepthsNonInterleaved();
-
-	//Only the largest memory depth changes on SDS800X HD, ignore for now..
-	if(m_modelid == MODEL_SIGLENT_SDS800X_HD)
+	//No interleaving on E11 models, srates values are calculated dynamically according to number of active channels
+	if((m_protocolId == PROTOCOL_E11))
 		return GetSampleDepthsNonInterleaved();
 
 	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();

@@ -161,6 +161,14 @@ public:
 		MODEL_UNKNOWN
 	};
 
+	//Scope channel mode (only relevant for E11 models).
+	enum ChannelMode
+	{
+		CHANNEL_MODE_SINGLE,
+		CHANNEL_MODE_DUAL,
+		CHANNEL_MODE_MULTI
+	};
+
 	Model GetModelID() { return m_modelid; }
 
 	//Timebase
@@ -266,6 +274,9 @@ protected:
 	void PushWindowTrigger(WindowTrigger* trig);
 
 	void BulkCheckChannelEnableState();
+
+    ChannelMode GetChannelMode();
+
 
 	std::string GetPossiblyEmptyString(const std::string& property);
 
