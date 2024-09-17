@@ -381,6 +381,15 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_requireSizeWorkaround = true;
 			}
 		}
+		else if(m_model.compare(0, 4, "SDS3") == 0)
+		{
+			m_modelid = MODEL_SIGLENT_SDS3000X_HD;
+			m_protocolId = PROTOCOL_E11;
+			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
+			// This can be overriden by driver 16bits setting
+			m_highDefinition = true;
+			m_requireSizeWorkaround = true;
+		}
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
 			m_modelid = MODEL_SIGLENT_SDS5000X;
@@ -388,8 +397,17 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 		}
 		else if(m_model.compare(0, 4, "SDS6") == 0)
 		{
-			m_modelid = MODEL_SIGLENT_SDS6000A;
+			m_modelid = (m_model.back() == 'L') ? MODEL_SIGLENT_SDS6000L : ((m_model.back() == 'o') ? MODEL_SIGLENT_SDS6000PRO : MODEL_SIGLENT_SDS6000A);
 			m_protocolId = PROTOCOL_E11;
+		}
+		else if(m_model.compare(0, 4, "SDS7") == 0)
+		{
+			m_modelid = MODEL_SIGLENT_SDS7000A;
+			m_protocolId = PROTOCOL_E11;
+			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
+			// This can be overriden by driver 16bits setting
+			m_highDefinition = true;
+			m_requireSizeWorkaround = true;
 		}
 		else if(m_model.compare(0, 4, "SDS8") == 0)
 		{
@@ -398,6 +416,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
+			m_requireSizeWorkaround = true;
 		}
 		else
 		{
@@ -456,6 +475,8 @@ void SiglentSCPIOscilloscope::DetectBandwidth()
 				m_maxBandwidth = 1000;
 			if(m_model.compare(4, 1, "2") == 0)
 				m_maxBandwidth = 2000;
+			if(m_model.compare(5, 1, "3") == 0)
+				m_maxBandwidth = 350;
 			break;
 		case MODEL_SIGLENT_SDS7000A:
 			m_maxBandwidth = 3000;
@@ -2750,11 +2771,9 @@ uint64_t SiglentSCPIOscilloscope::GetMaxPoints()
 			case PROTOCOL_E11:
 				reply = converse(":WAV:MAXP?");
 				break;
-			// --------------------------------------------------
 			default:
 				LogError("Max points only supported by E11 protocol\n");
 				break;
-				// --------------------------------------------------
 		}
 		sscanf(reply.c_str(), "%lf", &f);
 		m_maxPoints = static_cast<int64_t>(f);
@@ -2775,11 +2794,9 @@ uint64_t SiglentSCPIOscilloscope::GetAcqPoints()
 			case PROTOCOL_E11:
 				reply = converse(":ACQ:POIN?");
 				break;
-			// --------------------------------------------------
 			default:
 				LogError("Acq points only supported by E11 protocol\n");
 				break;
-				// --------------------------------------------------
 		}
 		sscanf(reply.c_str(), "%lf", &f);
 		m_acqPoints = static_cast<int64_t>(f);
