@@ -2662,9 +2662,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
 			if(channelMode == CHANNEL_MODE_SINGLE)
-				ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000};
+				ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000, 200 * 1000 * 1000};
 			else
-				ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
+				ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000, 100 * 1000 * 1000};
 			break;
 		case MODEL_SIGLENT_SDS3000X_HD:
 			if(channelMode == CHANNEL_MODE_SINGLE)
@@ -2846,8 +2846,10 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 	//Need to lock the mutex when setting depth because of the quirks around needing to change trigger mode too
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	//save original sample rate (scope often changes sample rate when adjusting memory depth)
+	//Save original sample rate (scope often changes sample rate when adjusting memory depth)
 	uint64_t rate = GetSampleRate();
+	// Get Trigger State to restore it after setting changing memory detph
+	TriggerMode triggerMode = PollTrigger();
 
 	if(m_protocolId != PROTOCOL_E11)
 	{
@@ -2885,13 +2887,11 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 		}
 		if(IsTriggerArmed())
-		{
-			// restart trigger
+		{	// restart trigger
 			sendOnly("TRIG_MODE SINGLE");
 		}
 		else
-		{
-			// change to stop mode
+		{	// change to stop mode
 			sendOnly("TRIG_MODE STOP");
 		}
 		m_sampleRateValid = false;
@@ -3190,8 +3190,8 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 			sendOnly("TRIG_MODE SINGLE");
 		}
 		else
-		{	// change to stop mode
-			sendOnly("TRIG_MODE STOP");
+		{	// Restore previous trigger mode
+			sendOnly("TRIG_MODE %s", ((triggerMode == TRIGGER_MODE_STOP) ? "STOP" : "AUTO"));
 		}
 	}
 
