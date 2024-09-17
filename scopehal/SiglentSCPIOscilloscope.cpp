@@ -2166,11 +2166,12 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						uint64_t acqPoints = GetAcqPoints();
 						uint64_t pageSize = GetMaxPoints();
 						uint64_t pages = ceil(acqPoints/pageSize);
-						analogWaveformData[i] = new char[acqPoints];
+						uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
+						analogWaveformData[i] = new char[acqBytes];
 						if(pages <= 1)
 						{	// All data fits one page
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
-							analogWaveformDataSize[i] = ReadWaveformBlock((hdWorkaround ? (acqPoints*2) : acqPoints), analogWaveformData[i], hdWorkaround);
+							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround);
 							// This is the 0x0a0a at the end
 							m_transport->ReadRawData(2, (unsigned char*)tmp);
 						}
@@ -2180,7 +2181,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							for(uint64_t page = 0; page < pages; page++)
 							{
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
-								analogWaveformDataSize[i] += ReadWaveformBlock((hdWorkaround ? (pageSize*2) : pageSize), analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
+								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes, analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
