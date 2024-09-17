@@ -2534,6 +2534,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 	const uint64_t k = 1000;
 	const uint64_t m = k*k;
 	const uint64_t g = k*m;
+	ChannelMode channelMode = GetChannelMode();
 
 	vector<uint64_t> ret;
 	switch(m_modelid)
@@ -2541,96 +2542,44 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			ret = {1 * k,
-			       2 * k,
-			       5 * k,
-			       10 * k,
-			       20 * k,
-			       50 * k,
-			       100 * k,
-			       200 * k,
-			       500 * k,
-			       1 * m,
-			       2 * m,
-			       5 * m,
-			       10 * m,
-			       20 * m,
-			       50 * m,
-			       100 * m,
-			       250 * m,
-			       500 * m,
-			       1 * g};
+			ret = {1 * k, 2 * k, 5 * k, 10 * k, 20 * k, 50 * k, 100 * k, 200 * k, 500 * k, 1 * m, 2 * m, 5 * m, 10 * m, 20 * m, 50 * m, 100 * m, 250 * m, 500 * m, 1 * g};
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS800X_HD:
-		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS1000X_HD:
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {2, 5, 10, 20, 50, 100, 200, 500, 1*k, 2*k, 5*k, 10*k, 20*k, 50*k, 100*k, 200*k, 500*k, 1*m, 2*m, 5*m, 10*m, 20*m, 50*m, 100*m, 200*m, 500*m, 1*g, 2*g };
+			else if(channelMode == CHANNEL_MODE_DUAL)
+				ret = {2, 5, 10, 20, 50, 100, 200, 500, 1*k, 2*k, 5*k, 10*k, 20*k, 50*k, 100*k, 200*k, 500*k, 1*m, 2*m, 5*m, 10*m, 20*m, 50*m, 100*m, 200*m, 500*m, 1*g};
+			else
+				ret = {2, 5, 10, 20, 50, 100, 200, 500, 1*k, 2*k, 5*k, 10*k, 20*k, 50*k, 100*k, 200*k, 500*k, 1*m, 2*m, 5*m, 10*m, 20*m, 50*m, 100*m, 200*m, 500*m};
+			break;
+		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS2000X_HD:
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {2, 4, 10, 20, 40, 100, 200, 400, 1*k, 2*k, 4*k, 10*k, 20*k, 40*k, 100*k, 200*k, 400*k, 1*m, 2*m, 4*m, 10*m, 20*m, 40*m, 100*m, 200*m, 400*m, 1*g, 2*g };
+			else
+				ret = {2, 4, 10, 20, 40, 100, 200, 400, 1*k, 2*k, 4*k, 10*k, 20*k, 40*k, 100*k, 200*k, 400*k, 1*m, 2*m, 4*m, 10*m, 20*m, 40*m, 100*m, 200*m, 400*m, 1*g };
+			break;
 		case MODEL_SIGLENT_SDS3000X_HD:
-			ret = {10 * 1000,
-				20 * k,
-				50 * k,
-				100 * k,
-				200 * k,
-				500 * k,
-				1 * m,
-				2 * m,
-				5 * m,
-				10 * m,
-				20 * m,
-				50 * m,
-				100 * m,
-				200 * m,
-				500 * m,
-				1 * g};
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {2, 4, 10, 20, 40, 100, 200, 400, 1*k, 2*k, 4*k, 10*k, 20*k, 40*k, 100*k, 200*k, 400*k, 1*m, 2*m, 4*m, 10*m, 20*m, 40*m, 100*m, 200*m, 400*m, 1*g, 2*g, 4*g };
+			else
+				ret = {2, 4, 10, 20, 40, 100, 200, 400, 1*k, 2*k, 4*k, 10*k, 20*k, 40*k, 100*k, 200*k, 400*k, 1*m, 2*m, 4*m, 10*m, 20*m, 40*m, 100*m, 200*m, 400*m, 1*g, 2*g};
 			break;
-
 		case MODEL_SIGLENT_SDS5000X:
-			ret = {500,
-				1250,
-				2500,
-				5000,
-				12500,
-				25 * k,
-				50 * k,
-				125 * k,
-				250 * k,
-				500 * k,
-				1250 * k,
-				2500 * k,
-				5 * m,
-				12500 * k,
-				25 * m,
-				50 * m,
-				125 * m,
-				250 * m,
-				500 * m,
-				1250 * m,
-				2500 * m};
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {500, 1250, 2500, 5000, 12500, 25 * k, 50 * k, 125 * k, 250 * k, 500 * k, 1250 * k, 2500 * k, 5 * m, 12500 * k, 25 * m, 50 * m, 125 * m, 250 * m, 500 * m, 1250 * m, 2500 * m, 5 * g};
+			else
+				ret = {500, 1250, 2500, 5000, 12500, 25 * k, 50 * k, 125 * k, 250 * k, 500 * k, 1250 * k, 2500 * k, 5 * m, 12500 * k, 25 * m, 50 * m, 125 * m, 250 * m, 500 * m, 1250 * m, 2500 * m};
 			break;
-
 		case MODEL_SIGLENT_SDS6000A:
 		case MODEL_SIGLENT_SDS6000L:
 		case MODEL_SIGLENT_SDS6000PRO:
+			ret = {10 * k, 20 * k, 50 * k, 100 * k, 200 * k, 500 * k, 1 * m, 2 * m, 5 * m, 10 * m, 20 * m, 50 * m, 100 * m, 200 * m, 500 * m, 1 * g, 5 * g, 10 * g};
+			break;
 		case MODEL_SIGLENT_SDS7000A:
-			ret = {10 * k,
-				20 * k,
-				50 * k,
-				100 * k,
-				200 * k,
-				500 * k,
-				1 * m,
-				2 * m,
-				5 * m,
-				10 * m,
-				20 * m,
-				50 * m,
-				100 * m,
-				200 * m,
-				500 * m,
-				1 * g,
-				5 * g,
-				10 * g};
+			ret = {10 * k, 20 * k, 50 * k, 100 * k, 200 * k, 500 * k, 1 * m, 2 * m, 5 * m, 10 * m, 20 * m, 50 * m, 100 * m, 200 * m, 500 * m, 1 * g, 5 * g, 10 * g};
 			break;
 		// --------------------------------------------------
 		default:
@@ -2667,14 +2616,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 			// {7K,70K,700K,7M} for non-interleaved mode
 			ret = {7 * 1000, 70 * 1000, 700 * 1000, 7 * 1000 * 1000};
 			break;
-		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS2000X_HD:
-			if(channelMode == CHANNEL_MODE_SINGLE)
-				ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000};
-			else
-				ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
-			break;
+			// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS800X_HD:
 			if((m_modelid == MODEL_SIGLENT_SDS1000X_HD) || (m_maxBandwidth >= 200))
@@ -2695,6 +2637,13 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 				else
 					ret = {	10 * 1000, 100 * 1000, 1000 * 1000,	10 * 1000 * 1000};
 			}
+			break;
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+			if(channelMode == CHANNEL_MODE_SINGLE)
+				ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000};
+			else
+				ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
 		case MODEL_SIGLENT_SDS3000X_HD:
 			if(channelMode == CHANNEL_MODE_SINGLE)
