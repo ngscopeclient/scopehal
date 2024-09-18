@@ -78,9 +78,6 @@ public:
 	EyeMask();
 	virtual ~EyeMask();
 
-    canvas_ity::canvas eyemask_canvas = canvas_ity::canvas(0,0);
-
-
 	bool Load(std::string path);
 	bool Load(const YAML::Node& node);
 
@@ -120,6 +117,8 @@ protected:
 
 	std::string m_maskname;
 
+private:
+    std::unique_ptr< canvas_ity::canvas > canvas;
 };
 
 #endif

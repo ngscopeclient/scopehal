@@ -46,7 +46,6 @@
 #include <iostream>
 
 using namespace std;
-using namespace canvas_ity;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -182,12 +181,13 @@ float EyeMask::CalculateHitRate(
 {
 	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
 
-	// auto begin_canvas_ity = std::chrono::high_resolution_clock::now();
+	auto begin_canvas_ity = std::chrono::high_resolution_clock::now();
 	
-	//canvas_ity::canvas canvas( width, height ); // width and height could be reversed
-	this->eyemask_canvas = new canvas(width,height); // width and height could be reversed
+	canvas = std::make_unique< canvas_ity::canvas >( width, height );
+	float nmax = 0;
 
-/* 
+
+/*
 	auto end_canvas_ity = std::chrono::high_resolution_clock::now();
 	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end_canvas_ity-begin_canvas_ity).count() << "ns" << std::endl;
 	
@@ -261,16 +261,12 @@ float EyeMask::CalculateHitRate(
 
 	}
 
-
 	auto poly_end = std::chrono::high_resolution_clock::now();
 	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(poly_end-poly_start).count() << "ns" << std::endl;
 
-
 	//Test each pixel of the eye pattern against the mask
-*/
 
-	float nmax = 0;
-/*	int stride = sizeof(unsigned char) * 4; // TODO: Check this for correctness
+	int stride = sizeof(unsigned char) * 4; // TODO: Check this for correctness
 
 	vector<unsigned char> image_data(width*height);
 
