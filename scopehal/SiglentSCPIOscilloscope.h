@@ -277,6 +277,7 @@ protected:
 
     ChannelMode GetChannelMode();
 
+	void PrepareAcquisition();
 
 	std::string GetPossiblyEmptyString(const std::string& property);
 
@@ -284,11 +285,12 @@ protected:
 	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false);
 	//  	bool ReadWavedescs(
 	//		std::vector<std::string>& wavedescs,
-	//		bool* enabled,
-	//		unsigned int& firstEnabledChannel,
-	//		bool& any_enabled);
+	//		bool* analogEnabled,
+	//		bool* digitalEnabled,
+	//		bool& anyAnalogEnabled,
+	//		bool& anyDigitalEnabled);
 	bool ReadWavedescs(
-		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* enabled, unsigned int& firstEnabledChannel, bool& any_enabled);
+		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
@@ -306,6 +308,7 @@ protected:
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
+	unsigned int m_analogAndDigitalChannelCount;
 	size_t m_digitalChannelBase;
 
 	Model m_modelid;

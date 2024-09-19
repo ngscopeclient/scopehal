@@ -111,6 +111,7 @@ static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold 
 SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
+	, m_digitalChannelCount(0)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
@@ -141,8 +142,8 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	IdentifyHardware();
 	DetectBandwidth();
 	DetectAnalogChannels();
-	SharedCtorInit();
 	DetectOptions();
+	SharedCtorInit();
 
 	//Figure out if scope is in low or high bit depth mode so we can download waveforms with the correct format
 	GetADCMode(0);
@@ -175,8 +176,6 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 
 void SiglentSCPIOscilloscope::SharedCtorInit()
 {
-	m_digitalChannelCount = 0;
-
 	//Add the external trigger input
 	m_extTrigChannel =
 		new OscilloscopeChannel(
@@ -358,16 +357,9 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			if(m_requireSizeWorkaround)
 				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
 
-			//TODO: check for whether we actually have the license
-			m_hasFunctionGen = true;
 		}
 		else if( (m_model.compare(0, 4, "SDS2") == 0) && (m_model.find("HD") != string::npos))
-		{
-			//TODO: check for whether we actually have the license
-			//(no SCPI command for this yet)
-			m_hasFunctionGen = true;
-
-			//2000X+ HD is native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
+		{	//2000X+ HD is native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
 
@@ -491,14 +483,40 @@ void SiglentSCPIOscilloscope::DetectBandwidth()
 
 void SiglentSCPIOscilloscope::DetectOptions()
 {
-	//AddDigitalChannels(16);
-
-	//TODO HD: support feature checking for SDS2000XP
-	//SDS2000XP supports optional feature checking via LCISL? <OPT> on all firmware
-	//Valid OPT choices: AWG, MSO, FLX, CFD, I2S, 1553, PWA, MANC, SENT
-	// E11 protocol supports "*OPT?" command (undocumented) which returns a comma seperated list of active otions
-	// Available options for SDS2000X HD are : FG,FlexRay,CANFD,I2S,1553B,PA,SENT,Manch,ARINC
-	return;
+	if(m_protocolId == PROTOCOL_E11)
+	{	// E11 protocol supports "*OPT?" command (undocumented) which returns a comma seperated list of active otions
+		// Available options for SDS2000X HD are : FG,FlexRay,CANFD,I2S,1553B,PA,SENT,Manch,ARINC
+		string options = converse("*OPT?");
+		switch (m_modelid)
+		{
+			// --------------------------------------------------
+			case MODEL_SIGLENT_SDS1000:
+			case MODEL_SIGLENT_SDS2000XE:
+			case MODEL_SIGLENT_SDS800X_HD:
+			case MODEL_SIGLENT_SDS1000X_HD:
+				// No options for these models
+				break;
+			case MODEL_SIGLENT_SDS2000XP:
+			case MODEL_SIGLENT_SDS2000X_HD:
+			case MODEL_SIGLENT_SDS3000X_HD:
+				// LA is now available for all these models, no option required anymore
+				AddDigitalChannels(16);
+				// FG is optional
+				if(options.find("FG") != string::npos)
+					m_hasFunctionGen = true;
+				break;
+			case MODEL_SIGLENT_SDS6000A:
+			case MODEL_SIGLENT_SDS6000L:
+			case MODEL_SIGLENT_SDS6000PRO:
+			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS7000A:
+				// No options for these models
+				break;
+			default:
+				LogError("Unknown scope type\n");
+				break;
+		}
+	}
 }
 
 /**
@@ -508,6 +526,7 @@ void SiglentSCPIOscilloscope::DetectOptions()
 void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int count)
 {
 	m_digitalChannelCount = count;
+	m_analogAndDigitalChannelCount = m_analogChannelCount + m_digitalChannelCount;
 	m_digitalChannelBase = m_channels.size();
 
 	char chn[32];
@@ -592,6 +611,7 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 				i));
 	}
 	m_analogChannelCount = nchans;
+	m_analogAndDigitalChannelCount = m_analogChannelCount + m_digitalChannelCount;
 }
 
 SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
@@ -723,12 +743,12 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 				// --------------------------------------------------
 		}
 	}
-	else
+	else if(i < m_analogAndDigitalChannelCount)
 	{
 		//Digital
 
-		//See if the channel is on
-		size_t nchan = i - (m_analogChannelCount + 1);
+		//See if the channel is on (digital channel numbers are 0 based)
+		size_t nchan = i - m_analogChannelCount;
 		string str = converse(":DIGITAL:D%d?", nchan);
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -766,14 +786,14 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 				// --------------------------------------------------
 		}
 	}
+	else if(i < m_analogAndDigitalChannelCount)
+	{
+		//Digital channel (digital channel numbers are 0 based)
+		sendOnly(":DIGITAL:D%d ON", i - m_analogChannelCount);
+	}
 	else if(i == m_extTrigChannel->GetIndex())
 	{
 		//Trigger can't be enabled
-	}
-	else
-	{
-		//Digital channel
-		sendOnly(":DIGITAL:D%d ON", i - (m_analogChannelCount + 1));
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -824,25 +844,25 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 				// --------------------------------------------------
 		}
 	}
-	else if(i == m_extTrigChannel->GetIndex())
-	{
-		//Trigger can't be enabled
-	}
-	else
+	else if(i < m_analogAndDigitalChannelCount)
 	{
 		//Digital channel
 
-		//Disable this channel
-		sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
+		//Disable this channel (digital channel numbers are 0 based)
+		sendOnly(":DIGITAL:D%d OFF", i - m_analogChannelCount);
 
 		//If we have NO digital channels enabled, disable the appropriate digital bus
 
 		//bool anyDigitalEnabled = false;
-		//        for (uint32_t c=m_analogChannelCount+1+((chNum/8)*8); c<(m_analogChannelCount+1+((chNum/8)*8)+c_digiChannelsPerBus); c++)
+		//        for (uint32_t c=m_analogChannelCount+((chNum/8)*8); c<(m_analogChannelCount+((chNum/8)*8)+c_digiChannelsPerBus); c++)
 		//          anyDigitalEnabled |= m_channelsEnabled[c];
 
 		//        if(!anyDigitalEnabled)
 		//sendOnly(":DIGITAL:BUS%d:DISP OFF",chNum/8);
+	}
+	else if(i == m_extTrigChannel->GetIndex())
+	{
+		//Trigger can't be enabled
 	}
 
 	//Sample rate and memory depth can change if interleaving state changed
@@ -1086,7 +1106,7 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 
 double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 1;
 
 	//TODO: support ext/10
@@ -1212,7 +1232,7 @@ vector<unsigned int> SiglentSCPIOscilloscope::GetChannelBandwidthLimiters(size_t
 
 unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 0;
 
 	string reply;
@@ -1383,7 +1403,7 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 			}
 			else
 			{
-				sendOnly(":DIGITAL:LABEL%zu \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
+				sendOnly(":DIGITAL:LABEL%zu \"%s\"", i - m_analogChannelCount, name.c_str());
 			}
 			break;
 		// --------------------------------------------------
@@ -1427,7 +1447,7 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 			}
 			else
 			{
-				name = converse(":DIGITAL:LABEL%d?", i - (m_analogChannelCount + 1));
+				name = converse(":DIGITAL:LABEL%d?", i - m_analogChannelCount);
 				// Remove "'s around the name
 				if(name.length() > 2)
 					name = name.substr(1, name.length() - 2);
@@ -1558,13 +1578,13 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
  */
 void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 {
-	vector<int> uncached;
+	vector<unsigned int> uncached;
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//Check enable state in the cache.
-		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		for(unsigned int i = 0; i < m_analogAndDigitalChannelCount; i++)
 		{
 			if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
 				uncached.push_back(i);
@@ -1573,7 +1593,7 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 
 	for(auto i : uncached)
 	{
-		string reply = converse(":CHANNEL%d:SWITCH?", i + 1);
+		string reply = (i < m_analogChannelCount) ? converse(":CHANNEL%d:SWITCH?", i + 1) : converse(":DIGITAL:D%d?", (i - m_analogChannelCount));
 		if(reply == "OFF")
 			m_channelsEnabled[i] = false;
 		else if(reply == "ON")
@@ -1581,46 +1601,34 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 		else
 			LogWarning("BulkCheckChannelEnableState: Unrecognised reply [%s]\n", reply.c_str());
 	}
-
-	//Check digital status
-	for(unsigned int i = 0; i < m_digitalChannelCount; i++)
-	{
-		string reply = converse(":DIGITAL:D%d?", i);
-		if(reply == "ON")
-		{
-			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = true;
-		}
-		else if(reply == "OFF")
-		{
-			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = false;
-		}
-		else
-			LogWarning("BulkCheckChannelEnableState: Unrecognised reply [%s]\n", reply.c_str());
-	}
 }
 
 bool SiglentSCPIOscilloscope::ReadWavedescs(
-	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* enabled, unsigned int& firstEnabledChannel, bool& any_enabled)
+	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled)
 {
 	BulkCheckChannelEnableState();
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		enabled[i] = IsChannelEnabled(i);
-		any_enabled |= enabled[i];
+	for(unsigned int i = 0; i <  m_analogChannelCount; i++)
+	{	// Check all analog channels
+		analogEnabled[i] = IsChannelEnabled(i);
+		anyAnalogEnabled |= analogEnabled[i];
 	}
 
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		if(enabled[i] || (!any_enabled && i == 0))
-		{
-			if(firstEnabledChannel == UINT_MAX)
-				firstEnabledChannel = i;
+	for(unsigned int i = 0; i <  m_digitalChannelCount; i++)
+	{	// Check digital channels
+		digitalEnabled[i] = IsChannelEnabled(i+m_analogChannelCount);
+		anyDigitalEnabled |= digitalEnabled[i];
+	}
 
+	for(unsigned int i = 0; i < m_analogChannelCount ; i++)
+	{	// Read Wavedesc only for analog channels
+		if(analogEnabled[i] || (!anyAnalogEnabled && i == 0))
+		{
 			m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:PREAMBLE?");
+
 			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE, wavedescs[i]))
 				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
 
-			// I have no idea why this is needed, but it certainly is
+			// Read 0x0A 0x0A trailer
 			m_transport->ReadReply();
 		}
 	}
@@ -1826,15 +1834,15 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	return ret;
 }
 
-map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& /*data*/)
+map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& data)
 {
 	map<int, SparseDigitalWaveform*> ret;
 
 	// Digital channels not yet implemented
 	return ret;
 
-	/*
-
+	
+/*
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
 	tmp = tmp.substr(0, 16);
@@ -1972,8 +1980,7 @@ map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform
 			ret[m_digitalChannels[i]->GetIndex()] = NULL;
 	}
 	delete[] block;
-	return ret;
-	*/
+	return ret;*/
 }
 
 bool SiglentSCPIOscilloscope::AcquireData()
@@ -1983,6 +1990,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	int analogWaveformDataSize[MAX_ANALOG] {0};
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
 	char* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
+	int digitalWaveformDataSize[MAX_DIGITAL] {0};
 	std::string digitalWaveformData;
 
 	//State for this acquisition (may be more than one waveform)
@@ -1994,9 +2002,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	double h_off_frac = 0;
 	vector<vector<WaveformBase*>> waveforms;
 	unsigned char* pdesc = NULL;
-	bool denabled = false;
 	string wavetime;
-	bool enabled[8] = {false};
+	bool analogEnabled[MAX_ANALOG] = {false};
+	bool digitalEnabled[MAX_DIGITAL] = {false};
+	bool anyDigitalEnabled = false;
+	bool anyAnalogEnabled = true;
 	double* pwtime = NULL;
 	char tmp[128];
 
@@ -2004,9 +2014,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	start = GetTime();
-	//Get the wavedescs for all channels
-	unsigned int firstEnabledChannel = UINT_MAX;
-	bool any_enabled = true;
 
 	switch(m_protocolId)
 	{
@@ -2019,13 +2026,13 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			// get enabled channels
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				enabled[i] = IsChannelEnabled(i);
-				any_enabled |= enabled[i];
+				analogEnabled[i] = IsChannelEnabled(i);
+				anyAnalogEnabled |= analogEnabled[i];
 			}
 			start = GetTime();
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(enabled[i])
+				if(analogEnabled[i])
 				{	// Allocate buffer
 					analogWaveformData[i] = new char[WAVEFORM_SIZE];
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
@@ -2085,7 +2092,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			//Save analog waveform data
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(!enabled[i])
+				if(!analogEnabled[i])
 					continue;
 
 				//Done, update the data
@@ -2096,32 +2103,17 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			if(!ReadWavedescs(wavedescs, enabled, firstEnabledChannel, any_enabled))
+			if(!ReadWavedescs(wavedescs, analogEnabled, digitalEnabled, anyAnalogEnabled, anyDigitalEnabled))
 				return false;
 
 			//Grab the WAVEDESC from the first enabled channel
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(enabled[i] || (!any_enabled && i == 0))
+				if(analogEnabled[i] || (!anyAnalogEnabled && i == 0))
 				{
 					pdesc = (unsigned char*)(&wavedescs[i][0]);
 					break;
 				}
-			}
-
-			//See if any digital channels are enabled
-			if(m_digitalChannelCount > 0)
-			{
-				m_cacheMutex.lock();
-				for(size_t i = 0; i < m_digitalChannels.size(); i++)
-				{
-					if(m_channelsEnabled[m_digitalChannels[i]->GetIndex()])
-					{
-						denabled = true;
-						break;
-					}
-				}
-				m_cacheMutex.unlock();
 			}
 
 			//Pull sequence count out of the WAVEDESC if we have analog channels active
@@ -2137,7 +2129,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			{
 				//TODO: support sequence capture of digital channels if the instrument supports this
 				//(need to look into it)
-				if(denabled)
+				if(anyDigitalEnabled)
 					num_sequences = 1;
 
 				//no enabled channels. abort
@@ -2146,7 +2138,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			}
 
 			if(pdesc)
-			{	//Figure out when the first trigger happened.
+			{	// Handle the case when only digital channel is activated
+				// Figure out when the first trigger happened.
 				//Read the timestamps if we're doing segmented capture
 				ttime = ExtractTimestamp(pdesc, basetime);
 				if(num_sequences > 1)
@@ -2158,17 +2151,20 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				//2000X+ HD running firmware 1.1.7.0 seems to report size in bytes.
 				bool hdWorkaround = m_requireSizeWorkaround && m_highDefinition;
 
+				uint64_t acqPoints = GetAcqPoints();
+				uint64_t pageSize = GetMaxPoints();
+				uint64_t pageSizeBytes = pageSize/8;
+				uint64_t pages = ceil(acqPoints/pageSize);
+				uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
+				uint64_t acqDigitalBytes = ceil(acqPoints/8); // 8 points per byte on digital channels
+				bool paginated = (pages > 1);
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
-					if(enabled[i])
+					if(analogEnabled[i])
 					{	// Allocate buffer
-						uint64_t acqPoints = GetAcqPoints();
-						uint64_t pageSize = GetMaxPoints();
-						uint64_t pages = ceil(acqPoints/pageSize);
-						uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
 						analogWaveformData[i] = new char[acqBytes];
-						if(pages <= 1)
+						if(!paginated)
 						{	// All data fits one page
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
 							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround);
@@ -2188,18 +2184,31 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						}
 					}
 				}
-				// Reset waveform start to 0 to prevent errors if next acquisition in not paginated
-				m_transport->SendCommand(":WAVEFORM:START 0");
-			}
-
-			//Read the data from the digital waveforms, if enabled
-			if(denabled)
-			{	// TODO : fix this, should iterate across active digital channels
-				// Allocate buffer
-				digitalWaveformDataBytes[0] = new char[WAVEFORM_SIZE];
-				if(!ReadWaveformBlock(WAVEFORM_SIZE, digitalWaveformDataBytes[0]))
+				//Read the data from each digital waveform
+				for(size_t i = 0; i < m_digitalChannelCount; i++)
 				{
-					LogDebug("failed to download digital waveform\n");
+					if(digitalEnabled[i])
+					{	// Allocate buffer
+						digitalWaveformDataBytes[i] = new char[acqDigitalBytes];
+						if(!paginated)
+						{	// All data fits one page
+							m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
+							digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false);
+							// This is the 0x0a0a at the end
+							m_transport->ReadRawData(2, (unsigned char*)tmp);
+						}
+						else
+						{	// We need pagination
+							m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
+							for(uint64_t page = 0; page < pages; page++)
+							{
+								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSizeBytes) + ";:WAVEFORM:DATA?");
+								digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false);
+								// This is the 0x0a0a at the end
+								m_transport->ReadRawData(2, (unsigned char*)tmp);
+							}
+						}
+					}
 				}
 			}
 
@@ -2215,7 +2224,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			waveforms.resize(m_analogChannelCount);
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(enabled[i])
+				if(analogEnabled[i])
 				{
 					waveforms[i] = ProcessAnalogWaveform(&analogWaveformData[i][0],
 						analogWaveformDataSize[i],
@@ -2231,7 +2240,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			//Save analog waveform data
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(!enabled[i])
+				if(!analogEnabled[i])
 					continue;
 
 				//Done, update the data
@@ -2248,7 +2257,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	}
 
 	//TODO: proper support for sequenced capture when digital channels are active
-	// if(denabled)
+	// if(anyDigitalEnabled)
 	// {
 	// 	//This is a weird XML-y format but I can't find any other way to get it :(
 	// 	map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData);
@@ -2263,7 +2272,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	for(size_t i = 0; i < num_sequences; i++)
 	{
 		SequenceSet s;
-		for(size_t j = 0; j < m_channels.size(); j++)
+		for(size_t j = 0; j < m_analogAndDigitalChannelCount; j++)
 		{
 			if(pending_waveforms.find(j) != pending_waveforms.end())
 				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
@@ -2289,6 +2298,15 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	return true;
 }
 
+void SiglentSCPIOscilloscope::PrepareAcquisition()
+{
+	m_acqPointsValid = false;
+	if(m_protocolId == PROTOCOL_E11)
+	{	// Make sure to reset waveform Start Point
+		m_transport->SendCommand(":WAVEFORM:START 0");
+	}
+}
+
 void SiglentSCPIOscilloscope::Start()
 {
 	switch(m_protocolId)
@@ -2303,7 +2321,7 @@ void SiglentSCPIOscilloscope::Start()
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			m_acqPointsValid = false;
+			PrepareAcquisition();
 			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
 			break;
@@ -2333,7 +2351,7 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			m_acqPointsValid = false;
+			PrepareAcquisition();
 			sendOnly(":TRIGGER:STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");
 			break;
@@ -2398,7 +2416,7 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			m_acqPointsValid = false;
+			PrepareAcquisition();
 			sendOnly(":TRIGGER:MODE SINGLE");
 			if(!m_triggerArmed)
 				sendOnly(":TRIGGER:MODE SINGLE");
@@ -2417,7 +2435,7 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 0;
 
 	{
@@ -2458,7 +2476,7 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return;
 
 	{
@@ -2488,7 +2506,7 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, floa
 float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 1;
 
 	{
@@ -3660,7 +3678,7 @@ float SiglentSCPIOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 
 float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 {
-	channel -= m_analogChannelCount + 1;
+	channel -= m_analogChannelCount;
 
 	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
 
@@ -3688,7 +3706,7 @@ void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*l
 
 void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
-	channel -= m_analogChannelCount + 1;
+	channel -= m_analogChannelCount;
 
 	// Search through standard thresholds to see if one matches
 	uint32_t i = 0;
@@ -3704,7 +3722,7 @@ void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 		{
 			sendOnly(":DIGITAL:THRESHOLD%d CUSTOM,%1.2E", (channel / 8) + 1, level);
 
-		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount + 1) - level)) > 0.1f);
+		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount) - level)) > 0.1f);
 	}
 }
 
