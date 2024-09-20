@@ -41,6 +41,18 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Construct a new compute pipeline
+
+	Initialization is deferred until the first time the shader is bound. This allows creation of a ComputePipeline
+	object to be relatively inexpensive (so many pipelines can be created which may not ever be used).
+
+	@param shaderPath			Path to the compiled shader binary
+	@param numSSBOs				Number of SSBO bindings
+	@param pushConstantSize		Size in bytes of our push constants
+	@param numStorageImages		Number of output image bindings
+	@param numSampledImages		Number of input image bindings
+ */
 ComputePipeline::ComputePipeline(
 	const string& shaderPath,
 	size_t numSSBOs,
@@ -59,6 +71,18 @@ ComputePipeline::ComputePipeline(
 	m_sampledImageInfo.resize(numSampledImages);
 }
 
+/**
+	@brief Wipes the state of this object and recreates it with a new shader binary and configuration
+
+	Initialization is deferred until the first time the shader is bound. This allows creation of a ComputePipeline
+	object to be relatively inexpensive (so many pipelines can be created which may not ever be used).
+
+	@param shaderPath			Path to the compiled shader binary
+	@param numSSBOs				Number of SSBO bindings
+	@param pushConstantSize		Size in bytes of our push constants
+	@param numStorageImages		Number of output image bindings
+	@param numSampledImages		Number of input image bindings
+ */
 void ComputePipeline::Reinitialize(
 	const string& shaderPath,
 	size_t numSSBOs,
@@ -96,6 +120,11 @@ ComputePipeline::~ComputePipeline()
 	m_shaderModule = nullptr;
 }
 
+/**
+	@brief Performs deferred initialization of the compute pipeline the first time the object is used.
+
+	This function actually loads the shader binary and creates descriptor sets etc.
+ */
 void ComputePipeline::DeferredInit()
 {
 	//Look up the pipeline cache to see if we have a binary etc to use
