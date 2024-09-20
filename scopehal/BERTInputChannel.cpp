@@ -51,7 +51,7 @@ BERTInputChannel::BERTInputChannel(
 	{
 		auto pscope = dynamic_pointer_cast<Oscilloscope>(ptr);
 		if(pscope)
-			m_scope = pscope.get();
+			m_instrument = pscope.get();
 	}
 
 	//Make horizontal bathtub stream

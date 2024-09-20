@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,8 +39,7 @@ PowerSupplyChannel::PowerSupplyChannel(
 	PowerSupply* powerSupply,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
-	, m_powerSupply(powerSupply)
+	: InstrumentChannel(powerSupply, hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -85,13 +84,13 @@ void PowerSupplyChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr
 	if(voltageSetPointIn)
 	{
 		if(Unit(Unit::UNIT_VOLTS) == voltageSetPointIn.GetYAxisUnits())
-			m_powerSupply->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
+			GetPowerSupply()->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
 	}
 
 	auto currentSetPointIn = GetInput(1);
 	if(currentSetPointIn)
 	{
 		if(Unit(Unit::UNIT_AMPS) == currentSetPointIn.GetYAxisUnits())
-			m_powerSupply->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
+			GetPowerSupply()->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
 	}
 }

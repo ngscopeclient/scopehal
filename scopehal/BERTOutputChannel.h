@@ -51,60 +51,57 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	BERT* GetBERT() const
-	{ return m_bert; }
+	{ return dynamic_cast<BERT*>(m_instrument); }
 
 	void SetPattern(BERT::Pattern pattern)
-	{ m_bert->SetTxPattern(GetIndex(), pattern); }
+	{ GetBERT()->SetTxPattern(GetIndex(), pattern); }
 
 	BERT::Pattern GetPattern()
-	{ return m_bert->GetTxPattern(GetIndex()); }
+	{ return GetBERT()->GetTxPattern(GetIndex()); }
 
 	std::vector<BERT::Pattern> GetAvailablePatterns()
-	{ return m_bert->GetAvailableTxPatterns(GetIndex()); }
+	{ return GetBERT()->GetAvailableTxPatterns(GetIndex()); }
 
 	bool GetInvert()
-	{ return m_bert->GetTxInvert(GetIndex()); }
+	{ return GetBERT()->GetTxInvert(GetIndex()); }
 
 	void SetInvert(bool invert)
-	{ m_bert->SetTxInvert(GetIndex(), invert); }
+	{ GetBERT()->SetTxInvert(GetIndex(), invert); }
 
 	std::vector<float> GetAvailableDriveStrengths()
-	{ return m_bert->GetAvailableTxDriveStrengths(GetIndex()); }
+	{ return GetBERT()->GetAvailableTxDriveStrengths(GetIndex()); }
 
 	float GetDriveStrength()
-	{ return m_bert->GetTxDriveStrength(GetIndex()); }
+	{ return GetBERT()->GetTxDriveStrength(GetIndex()); }
 
 	void SetDriveStrength(float drive)
-	{ m_bert->SetTxDriveStrength(GetIndex(), drive); }
+	{ GetBERT()->SetTxDriveStrength(GetIndex(), drive); }
 
 	bool GetEnable()
-	{ return m_bert->GetTxEnable(GetIndex()); }
+	{ return GetBERT()->GetTxEnable(GetIndex()); }
 
 	void Enable(bool b)
-	{ m_bert->SetTxEnable(GetIndex(), b); }
+	{ GetBERT()->SetTxEnable(GetIndex(), b); }
 
 	float GetPreCursor()
-	{ return m_bert->GetTxPreCursor(GetIndex()); }
+	{ return GetBERT()->GetTxPreCursor(GetIndex()); }
 
 	void SetPreCursor(float f)
-	{ m_bert->SetTxPreCursor(GetIndex(), f); }
+	{ GetBERT()->SetTxPreCursor(GetIndex(), f); }
 
 	float GetPostCursor()
-	{ return m_bert->GetTxPostCursor(GetIndex()); }
+	{ return GetBERT()->GetTxPostCursor(GetIndex()); }
 
 	void SetPostCursor(float f)
-	{ m_bert->SetTxPostCursor(GetIndex(), f); }
+	{ GetBERT()->SetTxPostCursor(GetIndex(), f); }
 
 	int64_t GetDataRate()
-	{ return m_bert->GetDataRate(GetIndex()); }
+	{ return GetBERT()->GetDataRate(GetIndex()); }
 
 	void SetDataRate(int64_t rate)
-	{ m_bert->SetDataRate(GetIndex(), rate); }
+	{ GetBERT()->SetDataRate(GetIndex(), rate); }
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
-
-protected:
-	BERT* m_bert;
 };
 
 #endif

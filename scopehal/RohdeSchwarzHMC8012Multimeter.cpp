@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,7 +46,7 @@ RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* tran
 	GetMeterMode();
 
 	//Create our single channel
-	m_channels.push_back(new MultimeterChannel("VIN", "#808080", 0));
+	m_channels.push_back(new MultimeterChannel(this, "VIN", "#808080", 0));
 }
 
 RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()

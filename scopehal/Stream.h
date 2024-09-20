@@ -35,6 +35,8 @@
 #ifndef Stream_h
 #define Stream_h
 
+#include "Waveform.h"
+
 /**
 	@brief Information associated with a single stream
 

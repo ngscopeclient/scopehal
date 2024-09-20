@@ -99,7 +99,7 @@ protected:
 		MSO5,	 //MSO5000 series
 		DS,
 		DS_OLD,
-		DHO,	//DHO800 and DHO900 series
+		DHO,	//DHO800, DHO900, DHO1000 and DHO4000 series
 	};
 
 	OscilloscopeChannel* m_extTrigChannel;
@@ -130,7 +130,9 @@ protected:
 	int m_modelNumber;
 	unsigned int m_bandwidth;
 	bool m_opt200M;
-	bool m_opt500M; /* 500M memory option on DHO4000, option RLU */
+	uint64_t m_maxMdepth; /* Maximum Memory depth for DHO model s*/
+	uint64_t m_maxSrate;  /* Maximum Sample rate for DHO models */
+	bool m_lowSrate;	  /* True for DHO low sample rate models (DHO800/900) */
 	protocol_version m_protocol;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);

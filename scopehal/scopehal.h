@@ -121,12 +121,14 @@ extern size_t g_maxComputeGroupCount[3];
 #endif
 
 #include "FlowGraphNode.h"
+#include "Instrument.h"
+#include "StreamDescriptor.h"
+
 #include "OscilloscopeChannel.h"
 #include "StreamDescriptor_inlines.h"
 #include "FlowGraphNode_inlines.h"
 #include "Trigger.h"
 
-#include "Instrument.h"
 #include "BERT.h"
 #include "DigitalIOChannel.h"
 #include "DigitalInputChannel.h"
@@ -209,6 +211,7 @@ uint64_t prev_pow2(uint64_t v);
 
 std::vector<std::string> explode(const std::string& str, char separator);
 std::string str_replace(const std::string& search, const std::string& replace, const std::string& subject);
+std::string strtolower(const std::string& s);
 
 #define FS_PER_PICOSECOND 1e3
 #define FS_PER_NANOSECOND 1e6

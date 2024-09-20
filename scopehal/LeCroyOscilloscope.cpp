@@ -356,6 +356,14 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
+			//GPIB for DDA 5000A
+			else if(o == "GPIB1")
+			{
+				type = "Hardware";
+				desc = "GPIB interface";
+				action = "Ignoring";
+			}
+
 			//Extra sample rate and memory for WaveRunner 8000
 			else if(o == "-M")
 			{
@@ -437,6 +445,15 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Hardware";
 				desc = "Very large (256M point) memory";
 				m_memoryDepthOption = 256;
+				action = "Enabled";
+			}
+
+			//Memory capacity options for DDA 5000 family
+			else if(o == "-XL")
+			{
+				type = "Hardware";
+				desc = "Extra large (48M point) memory";
+				m_memoryDepthOption = 48;
 				action = "Enabled";
 			}
 
@@ -4078,28 +4095,31 @@ void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
 void LeCroyOscilloscope::PullTrigger()
 {
 	//Figure out what kind of trigger is active.
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Type'"));
-	if (reply == "C8B10B")
+	//Do case insensitive comparisons because older scopes (e.g. DDA 5000 series) return all caps
+	//while more modern use
+	auto reply = strtolower(Trim(
+		m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Type'")));
+	if (reply == "c8b10b")
 		Pull8b10bTrigger();
-	else if(reply == "C64B66B")
+	else if(reply == "c64b66b")
 		Pull64b66bTrigger();
-	else if(reply == "NRZPattern")
+	else if(reply == "nrzpattern")
 		PullNRZTrigger();
-	else if (reply == "Dropout")
+	else if (reply == "dropout")
 		PullDropoutTrigger();
-	else if (reply == "Edge")
+	else if (reply == "edge")
 		PullEdgeTrigger();
-	else if (reply == "Glitch")
+	else if (reply == "glitch")
 		PullGlitchTrigger();
-	else if (reply == "Runt")
+	else if (reply == "runt")
 		PullRuntTrigger();
-	else if (reply == "SlewRate")
+	else if (reply == "slewrate")
 		PullSlewRateTrigger();
-	else if (reply == "UART")
+	else if (reply == "uart")
 		PullUartTrigger();
-	else if (reply == "Width")
+	else if (reply == "width")
 		PullPulseWidthTrigger();
-	else if (reply == "Window")
+	else if (reply == "window")
 		PullWindowTrigger();
 
 	//Unrecognized trigger type
@@ -4457,13 +4477,26 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	//Level
-	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
+	string tmp;
+	if(m_modelid == MODEL_DDA_5K)
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.TrigLevel'");
+	else
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
 	et->SetLevel(stof(tmp));
 
 	//TODO: OptimizeForHF (changes hysteresis for fast signals)
 
 	//Slope
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
+	if(m_modelid == MODEL_DDA_5K)
+	{
+		//Get trigger source
+		auto src = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Source'"));
+		tmp = m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.Trigger.") + src + ".Slope'");
+	}
+	else
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
+
 	GetTriggerSlope(et, Trim(tmp));
 }
 
@@ -5152,27 +5185,40 @@ void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 {
 	//Level
-	PushFloat(tree + ".Level", trig->GetLevel());
+	if(m_modelid == MODEL_DDA_5K)
+		PushFloat("app.Acquisition.Trigger.TrigLevel", trig->GetLevel());
+	else
+		PushFloat(tree + ".Level", trig->GetLevel());
 
 	//Slope
+	string slope = "Positive";
 	switch(trig->GetType())
 	{
 		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"Positive\"'");
+			slope = "Positive";
 			break;
 
 		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"Negative\"'");
+			slope = "Negative";
 			break;
 
 		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"Either\"'");
+			slope = "Either";
 			break;
 
 		default:
 			LogWarning("Invalid trigger type %d\n", trig->GetType());
-			break;
+			return;
 	}
+
+	if(m_modelid == MODEL_DDA_5K)
+	{
+		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.trigger.") + src + ".Slope = \"" + slope + "\"'");
+	}
+	else
+		m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"" + slope + "\"'");
 }
 
 /**

@@ -178,7 +178,7 @@ bool Multimeter::AcquireData()
 {
 	auto chan = dynamic_cast<MultimeterChannel*>(GetChannel(GetCurrentMeterChannel()));
 	if(chan)
-		chan->Update(this);
+		chan->Update();
 
 	return true;
 }

@@ -38,6 +38,8 @@
 
 #include "Stream.h"
 
+class Instrument;
+
 /**
 	@brief A single channel of an instrument
 
@@ -61,12 +63,14 @@ class InstrumentChannel : public FlowGraphNode
 {
 public:
 	InstrumentChannel(
+		Instrument* inst,
 		const std::string& hwname,
 		const std::string& color = "#808080",
 		Unit xunit = Unit(Unit::UNIT_FS),
 		size_t index = 0);
 
 	InstrumentChannel(
+		Instrument* inst,
 		const std::string& hwname,
 		const std::string& color = "#808080",
 		Unit xunit = Unit(Unit::UNIT_FS),
@@ -82,17 +86,17 @@ public:
 	virtual void SetDisplayName(std::string name);
 	virtual std::string GetDisplayName();
 
-	/**
-		@brief Gets the hardware name of the channel (m_hwname)
-	 */
+	///@brief Gets the hardware name of the channel (m_hwname)
 	std::string GetHwname()
 	{ return m_hwname; }
 
-	/**
-		@brief Gets the (zero based) index of the channel
-	 */
+	///@brief Gets the (zero based) index of the channel
 	size_t GetIndex()
 	{ return m_index; }
+
+	///@brief Gets the instrument this channel is part of (if any)
+	Instrument* GetInstrument()
+	{ return m_instrument; }
 
 	/**
 		@brief Sets the display name to an empty string, causing a fetch from hardware
@@ -239,6 +243,9 @@ protected:
 
 	virtual void ClearStreams();
 	virtual size_t AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
+
+	///@brief The instrument we're part of (may be null in the case of filters etc)
+	Instrument* m_instrument;
 
 	/**
 		@brief Hardware name of the channel

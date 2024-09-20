@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,7 +35,11 @@
 #ifndef ScalarStairstepFilter_h
 #define ScalarStairstepFilter_h
 
-class ScalarStairstepFilter : public Filter
+#include "../scopehal/ActionProvider.h"
+
+class ScalarStairstepFilter
+	: public Filter
+	, public ActionProvider
 {
 public:
 	ScalarStairstepFilter(const std::string& color);
@@ -47,6 +51,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table) override;
+
+	virtual std::vector<std::string> EnumActions() override;
+	virtual bool PerformAction(const std::string& id) override;
 
 	PROTOCOL_DECODER_INITPROC(ScalarStairstepFilter)
 

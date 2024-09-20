@@ -131,6 +131,7 @@ public:
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
 	enum Model
 	{
+		MODEL_SIGLENT_SDS800X_HD,
 		MODEL_SIGLENT_SDS1000,
 		MODEL_SIGLENT_SDS2000XE,
 		MODEL_SIGLENT_SDS2000XP,

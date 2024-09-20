@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,6 +47,9 @@ public:
 
 	virtual ~RFSignalGeneratorChannel();
 
+	RFSignalGenerator* GetRFSignalGenerator()
+	{ return dynamic_cast<RFSignalGenerator*>(m_instrument); }
+
 	//Well defined stream IDs used by RFSignalGeneratorChannel
 	enum StreamIndexes
 	{
@@ -64,9 +67,6 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
-
-protected:
-	RFSignalGenerator* m_gen;
 };
 
 #endif

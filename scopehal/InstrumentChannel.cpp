@@ -41,12 +41,14 @@ using namespace std;
 // Construction / destruction
 
 InstrumentChannel::InstrumentChannel(
+	Instrument* inst,
 	const string& hwname,
 	const string& color,
 	Unit xunit,
 	size_t index)
 	: m_displaycolor(color)
 	, m_visibilityMode(VIS_AUTO)
+	, m_instrument(inst)
 	, m_hwname(hwname)
 	, m_displayname(hwname)
 	, m_index(index)
@@ -55,6 +57,7 @@ InstrumentChannel::InstrumentChannel(
 }
 
 InstrumentChannel::InstrumentChannel(
+	Instrument* inst,
 	const string& hwname,
 	const string& color,
 	Unit xunit,
@@ -63,6 +66,7 @@ InstrumentChannel::InstrumentChannel(
 	size_t index)
 	: m_displaycolor(color)
 	, m_visibilityMode(VIS_AUTO)
+	, m_instrument(inst)
 	, m_hwname(hwname)
 	, m_displayname(hwname)
 	, m_index(index)

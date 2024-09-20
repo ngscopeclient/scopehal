@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,10 +35,11 @@ using namespace std;
 // Construction / destruction
 
 MultimeterChannel::MultimeterChannel(
+	Multimeter* parent,
 	const string& hwname,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+	: InstrumentChannel(parent, hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
 	m_primaryStream = AddStream(Unit(Unit::UNIT_VOLTS), "Primary", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	m_secondaryStream = AddStream(Unit(Unit::UNIT_VOLTS), "Secondary", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -48,8 +49,9 @@ MultimeterChannel::~MultimeterChannel()
 {
 }
 
-void MultimeterChannel::Update(Multimeter* meter)
+void MultimeterChannel::Update()
 {
+	auto meter = GetMeter();
 	m_streams[m_primaryStream].m_yAxisUnit = meter->GetMeterUnit();
 	m_streams[m_primaryStream].m_value = meter->GetMeterValue();
 

@@ -27,45 +27,56 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef MultimeterChannel_h
-#define MultimeterChannel_h
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of StreamDescriptor
+ */
+#ifndef StreamDescriptor_h
+#define StreamDescriptor_h
+
+class InstrumentChannel;
 
 /**
-	@brief A single channel of a multimeter
-
-	Meter channels can overlap with scope channels, which (by convention) use stream index zero for waveform data.
-
-	So our meter channel reading can get a bit tricky to update.
+	@brief Descriptor for a single stream coming off a channel
  */
-class MultimeterChannel : public InstrumentChannel
+class StreamDescriptor
 {
 public:
+	StreamDescriptor()
+	: m_channel(NULL)
+	, m_stream(0)
+	{}
 
-	MultimeterChannel(
-		Multimeter* parent,
-		const std::string& hwname,
-		const std::string& color = "#808080",
-		size_t index = 0);
+	StreamDescriptor(InstrumentChannel* channel, size_t stream = 0)
+		: m_channel(channel)
+		, m_stream(stream)
+	{}
 
-	virtual ~MultimeterChannel();
+	operator bool() const
+	{ return (m_channel != NULL); }
 
-	Multimeter* GetMeter()
-	{ return dynamic_cast<Multimeter*>(m_instrument); }
+	std::string GetName() const;
 
-	void Update();
+	InstrumentChannel* m_channel;
+	size_t m_stream;
 
-	float GetPrimaryValue()
-	{ return GetScalarValue(m_primaryStream); }
-
-	float GetSecondaryValue()
-	{ return GetScalarValue(m_secondaryStream); }
-
-	virtual PhysicalConnector GetPhysicalConnector() override;
-
-protected:
-	size_t m_primaryStream;
-	size_t m_secondaryStream;
-
+	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
+	//See StreamDescriptor_inlines.h for implementations
+	Unit GetXAxisUnits();
+	Unit GetYAxisUnits();
+	WaveformBase* GetData() const;
+	bool operator==(const StreamDescriptor& rhs) const;
+	bool operator!=(const StreamDescriptor& rhs) const;
+	bool operator<(const StreamDescriptor& rhs) const;
+	uint8_t GetFlags() const;
+	float GetVoltageRange();
+	float GetOffset();
+	void SetVoltageRange(float v);
+	void SetOffset(float v);
+	Stream::StreamType GetType();
+	float GetScalarValue();
 };
+
 
 #endif

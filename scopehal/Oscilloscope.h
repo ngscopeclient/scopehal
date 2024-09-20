@@ -978,6 +978,10 @@ protected:
 	static CreateMapType m_createprocs;
 };
 
+//must be declared here after Oscilloscope is defined
+inline Oscilloscope* OscilloscopeChannel::GetScope()
+{ return dynamic_cast<Oscilloscope*>(m_instrument); }
+
 #ifndef STRINGIFY
 #define STRINGIFY(T) #T
 #endif
