@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of ComputePipeline
+	@ingroup vksupport
+ */
+
 #ifndef ComputePipeline_h
 #define ComputePipeline_h
 
@@ -36,9 +42,11 @@
 /**
 	@brief A ComputePipeline encapsulates a Vulkan compute pipeline and all necessary resources to use it
 
-	Requirement: image bindings are numerically after SSBO bindings
+	Supported shaders must have all image bindings numerically after all SSBO bindings.
 
 	A ComputePipeline is typically owned by a filter instance.
+
+	@ingroup vksupport
  */
 class ComputePipeline
 {

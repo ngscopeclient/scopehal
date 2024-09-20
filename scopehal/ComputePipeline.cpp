@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of ComputePipeline
+	@ingroup vksupport
+ */
+
 #include "../scopehal/scopehal.h"
 #include "PipelineCacheManager.h"
 
