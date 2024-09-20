@@ -83,6 +83,7 @@ protected:
 	void ParseFirmwareVersion();
 	uint64_t GetMaxPoints();
 	uint64_t GetAcqPoints();
+	uint64_t GetDigitalAcqPoints();
 
 public:
 	//Device information
@@ -303,8 +304,16 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	std::map<int, SparseDigitalWaveform*> ProcessDigitalWaveform(std::string& data);
-
+	
+	std::vector<SparseDigitalWaveform*> ProcessDigitalWaveform(const char* data,
+		size_t datalen,
+		char* wavedesc,
+		uint32_t num_sequences,
+		time_t ttime,
+		double basetime,
+		double* wavetime,
+		int i);
+	
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
@@ -356,6 +365,8 @@ protected:
 	uint64_t m_maxPoints;
 	bool m_acqPointsValid;
 	uint64_t m_acqPoints;
+	bool m_digitalAcqPointsValid;
+	uint64_t m_digitalAcqPoints;
 	std::map<size_t, int64_t> m_channelDeskew;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;

@@ -131,6 +131,7 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_triggerOffset(0)
 	, m_maxPointsValid(false)
 	, m_acqPointsValid(false)
+	, m_digitalAcqPointsValid(false)
 	, m_highDefinition(false)
 {
 	//Enable command rate limiting
@@ -648,6 +649,9 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
 	m_meterModeValid = false;
+	m_acqPointsValid = false;
+	m_maxPointsValid = false;
+	m_digitalAcqPointsValid = false;
 	m_awgEnabled.clear();
 	m_awgDutyCycle.clear();
 	m_awgRange.clear();
@@ -752,7 +756,8 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 		string str = converse(":DIGITAL:D%d?", nchan);
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_channelsEnabled[i] = (str == "OFF") ? false : true;
+		// OFF can bee "SUPPORT_OFF" if all digital channels are off
+		m_channelsEnabled[i] = (str == "ON") ? true : false;
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -1594,12 +1599,8 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 	for(auto i : uncached)
 	{
 		string reply = (i < m_analogChannelCount) ? converse(":CHANNEL%d:SWITCH?", i + 1) : converse(":DIGITAL:D%d?", (i - m_analogChannelCount));
-		if(reply == "OFF")
-			m_channelsEnabled[i] = false;
-		else if(reply == "ON")
-			m_channelsEnabled[i] = true;
-		else
-			LogWarning("BulkCheckChannelEnableState: Unrecognised reply [%s]\n", reply.c_str());
+		// OFF can bee "SUPPORT_OFF" if all digital channels are off
+		m_channelsEnabled[i] = (reply == "ON") ? true : false;
 	}
 }
 
@@ -1834,40 +1835,27 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	return ret;
 }
 
-map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& data)
+vector<SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(const char* data,
+	size_t datalen,
+	char* wavedesc,
+	uint32_t num_sequences,
+	time_t ttime,
+	double basetime,
+	double* wavetime,
+	int ch)
 {
-	map<int, SparseDigitalWaveform*> ret;
+	vector<SparseDigitalWaveform*> ret;
 
-	// Digital channels not yet implemented
-	return ret;
+	//Parse the wavedesc headers
+	auto pdesc = wavedesc;
 
-	
-/*
-	//See what channels are enabled
-	string tmp = data.substr(data.find("SelectedLines=") + 14);
-	tmp = tmp.substr(0, 16);
-	bool enabledChannels[16];
-	for(int i = 0; i < 16; i++)
-		enabledChannels[i] = (tmp[i] == '1');
+	//cppcheck-suppress invalidPointerCast
+	float interval = *reinterpret_cast<float*>(pdesc + 176) * FS_PER_SECOND;
 
-	//Quick and dirty string searching. We only care about a small fraction of the XML
-	//so no sense bringing in a full parser.
-	tmp = data.substr(data.find("<HorPerStep>") + 12);
-	tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
-	float interval = atof(tmp.c_str()) * FS_PER_SECOND;
-	//LogDebug("Sample interval: %.2f fs\n", interval);
+	//Raw waveform data
+	size_t numSamples = datalen*8;
 
-	tmp = data.substr(data.find("<NumSamples>") + 12);
-	tmp = tmp.substr(0, tmp.find("</NumSamples>"));
-	size_t num_samples = atoi(tmp.c_str());
-	//LogDebug("Expecting %d samples\n", num_samples);
-
-	//Extract the raw trigger timestamp (nanoseconds since Jan 1 2000)
-	tmp = data.substr(data.find("<FirstEventTime>") + 16);
-	tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
-	int64_t timestamp;
-	if(1 != sscanf(tmp.c_str(), "%ld", &timestamp))
-		return ret;
+	//LogTrace("\nDigital, interval=%f, datalen=%zu\n", interval,	datalen);
 
 	//Get the client's local time.
 	//All we need from this is to know whether DST is active
@@ -1876,111 +1864,72 @@ map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform
 	time(&tnow);
 	localtime_r(&tnow, &now);
 
-	//Convert Jan 1 2000 in the client's local time zone (assuming this is the same as instrument time) to Unix time.
-	//Note that the instrument time zone conversion seems to be broken and not handle DST offsets right.
-	//Move the epoch by an hour if we're currently in DST to compensate.
-	tm epoch;
-	epoch.tm_sec = 0;
-	epoch.tm_min = 0;
-	epoch.tm_hour = 0;
-	epoch.tm_mday = 1;
-	epoch.tm_mon = 0;
-	epoch.tm_year = 100;
-	epoch.tm_wday = 6;	  //Jan 1 2000 was a Saturday
-	epoch.tm_yday = 0;
-	epoch.tm_isdst = now.tm_isdst;
-	time_t epoch_stamp = mktime(&epoch);
-
-	//Pull out nanoseconds from the timestamp and convert to femtoseconds since that's the scopehal fine time unit
-	const int64_t ns_per_sec = 1000000000;
-	int64_t start_ns = timestamp % ns_per_sec;
-	int64_t start_fs = 1000000 * start_ns;
-	int64_t start_sec = (timestamp - start_ns) / ns_per_sec;
-	time_t start_time = epoch_stamp + start_sec;
-
-	//Pull out the actual binary data (Base64 coded)
-	tmp = data.substr(data.find("<BinaryData>") + 12);
-	tmp = tmp.substr(0, tmp.find("</BinaryData>"));
-
-	//Decode the base64
-	base64_decodestate bstate;
-	base64_init_decodestate(&bstate);
-	unsigned char* block = new unsigned char[tmp.length()];	   //base64 is smaller than plaintext, leave room
-	base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &bstate);
+	// Sample ratio between digital and analog
+	int64_t digitalToAnalogSampleRatio = m_acqPoints / m_digitalAcqPoints;
 
 	//We have each channel's data from start to finish before the next (no interleaving).
-	//TODO: Multithread across waveforms
-	unsigned int icapchan = 0;
-	for(unsigned int i = 0; i < m_digitalChannelCount; i++)
+	for(size_t numSeq = 0; numSeq < num_sequences; numSeq++)
 	{
-		if(enabledChannels[i])
+		SparseDigitalWaveform* cap = new SparseDigitalWaveform;
+		// Since the LA sample rate is a fraction of the sample rate of the analog channels, timescale needs to be updated accordingly
+		cap->m_timescale = round(interval)*digitalToAnalogSampleRatio;
+		cap->PrepareForCpuAccess();
+
+		//Capture timestamp
+		cap->m_startTimestamp = ttime;
+		//Parse the time
+		if(num_sequences > 1)
+			cap->m_startFemtoseconds = static_cast<int64_t>((basetime + wavetime[numSeq * 2]) * FS_PER_SECOND);
+		else
+			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
+
+		//Preallocate memory assuming no deduplication possible
+		cap->Resize(numSamples);
+
+		size_t k = 0;
+		size_t sampleIndex = 0;
+		bool sampleValue;
+		bool lastSampleValue;
+
+
+		//Read and de-duplicate the other samples
+		for (size_t curByteIndex = 0; curByteIndex < datalen; curByteIndex++) 
 		{
-			DigitalWaveform* cap = new DigitalWaveform;
-			cap->m_timescale = interval;
-			cap->m_densePacked = true;
-
-			//Capture timestamp
-			cap->m_startTimestamp = start_time;
-			cap->m_startFemtoseconds = start_fs;
-
-			//Preallocate memory assuming no deduplication possible
-			cap->Resize(num_samples);
-
-			//Save the first sample (can't merge with sample -1 because that doesn't exist)
-			size_t base = icapchan * num_samples;
-			size_t k = 0;
-			cap->m_offsets[0] = 0;
-			cap->m_durations[0] = 1;
-			cap->m_samples[0] = block[base];
-
-			//Read and de-duplicate the other samples
-			//TODO: can we vectorize this somehow?
-			bool last = block[base];
-			for(size_t j = 1; j < num_samples; j++)
-			{
-				bool sample = block[base + j];
-
-				//Deduplicate consecutive samples with same value
-				//FIXME: temporary workaround for rendering bugs
-				//if(last == sample)
-				if((last == sample) && ((j + 3) < num_samples))
+			char samples = data[curByteIndex];
+			for (int ii = 0; ii < 8; ii++, samples >>= 1) 
+			{	// Check if the current scope sample bit is set.
+				sampleValue = (samples & 0x1);
+				if((sampleIndex > 0) && (lastSampleValue == sampleValue) && ((sampleIndex + 3) < numSamples))
+				{	//Deduplicate consecutive samples with same value
 					cap->m_durations[k]++;
-
-				//Nope, it toggled - store the new value
-				else
-				{
-					k++;
-					cap->m_offsets[k] = j;
-					cap->m_durations[k] = 1;
-					cap->m_samples[k] = sample;
-					last = sample;
 				}
+				else
+				{	//Nope, it toggled - store the new value
+					cap->m_offsets[k] = sampleIndex;
+					cap->m_durations[k] = 1;
+					cap->m_samples[k] = sampleValue;
+					lastSampleValue = sampleValue;
+					k++;
+				}
+				sampleIndex++;
 			}
-
-			//Done, shrink any unused space
-			cap->Resize(k);
-			cap->m_offsets.shrink_to_fit();
-			cap->m_durations.shrink_to_fit();
-			cap->m_samples.shrink_to_fit();
-
-			//See how much space we saved
-			LogDebug("%s: %zu samples deduplicated to %zu (%.1f %%)\n",
-				m_digitalChannels[i]->GetDisplayName().c_str(),
-				num_samples,
-				k,
-				(k * 100.0f) / num_samples);
-
-			//Done, save data and go on to next
-			ret[m_digitalChannels[i]->GetIndex()] = cap;
-			icapchan++;
 		}
 
-		//No data here for us!
-		else
-			ret[m_digitalChannels[i]->GetIndex()] = NULL;
+		//Done, shrink any unused space
+		cap->Resize(k);
+		cap->m_offsets.shrink_to_fit();
+		cap->m_durations.shrink_to_fit();
+		cap->m_samples.shrink_to_fit();
+		cap->MarkSamplesModifiedFromCpu();
+		cap->MarkTimestampsModifiedFromCpu();
+
+		//See how much space we saved
+		//LogDebug("%zu samples deduplicated to %zu (%.1f %%)\n",	numSamples,	k, (k * 100.0f) / (numSamples));
+
+		//Done, save data and go on to next
+		ret.push_back(cap);
 	}
-	delete[] block;
-	return ret;*/
+	return ret;
 }
 
 bool SiglentSCPIOscilloscope::AcquireData()
@@ -2001,6 +1950,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	double basetime = 0;
 	double h_off_frac = 0;
 	vector<vector<WaveformBase*>> waveforms;
+	vector<vector<SparseDigitalWaveform*>> digitalWaveforms;
 	unsigned char* pdesc = NULL;
 	string wavetime;
 	bool analogEnabled[MAX_ANALOG] = {false};
@@ -2153,10 +2103,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 				uint64_t acqPoints = GetAcqPoints();
 				uint64_t pageSize = GetMaxPoints();
-				uint64_t pageSizeBytes = pageSize/8;
 				uint64_t pages = ceil(acqPoints/pageSize);
 				uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
-				uint64_t acqDigitalBytes = ceil(acqPoints/8); // 8 points per byte on digital channels
 				bool paginated = (pages > 1);
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
@@ -2177,76 +2125,121 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							for(uint64_t page = 0; page < pages; page++)
 							{
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
-								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes, analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
+								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
 						}
 					}
 				}
-				//Read the data from each digital waveform
-				for(size_t i = 0; i < m_digitalChannelCount; i++)
+				if(anyDigitalEnabled)
+				{
+					uint64_t digitalAcqPoints = GetDigitalAcqPoints();
+					bool wasPaginated = paginated;
+					// For digital channels, page size is half the size of analog channels (as per empirical determination...)
+					pageSize /= 2;
+					pages = ceil(digitalAcqPoints/pageSize);
+					paginated = (pages > 1);
+					uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
+					// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
+					if(wasPaginated && !paginated)
+					{	// Reset page start
+						m_transport->SendCommand(":WAVEFORM:START 0");
+					}
+					//Read the data from each digital waveform
+					for(size_t i = 0; i < m_digitalChannelCount; i++)
+					{
+						if(digitalEnabled[i])
+						{	// Allocate buffer
+							digitalWaveformDataBytes[i] = new char[acqDigitalBytes];
+							if(!paginated)
+							{	// All data fits one page
+								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
+								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false);
+								// This is the 0x0a0a at the end
+								m_transport->ReadRawData(2, (unsigned char*)tmp);
+							}
+							else
+							{	// We need pagination
+								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
+								for(uint64_t page = 0; page < pages; page++)
+								{
+									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
+									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
+									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false);
+									// This is the 0x0a0a at the end
+									m_transport->ReadRawData(2, (unsigned char*)tmp);
+								}
+							}
+						}
+					}
+				}
+
+				//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
+				//Re-arm the trigger if not in one-shot mode
+				if(!m_triggerOneShot)
+				{
+					sendOnly(":TRIGGER:MODE SINGLE");
+					m_triggerArmed = true;
+				}
+
+				//Process analog waveforms
+				waveforms.resize(m_analogChannelCount);
+				for(unsigned int i = 0; i < m_analogChannelCount; i++)
+				{
+					if(analogEnabled[i])
+					{
+						waveforms[i] = ProcessAnalogWaveform(&analogWaveformData[i][0],
+							analogWaveformDataSize[i],
+							&wavedescs[i][0],
+							num_sequences,
+							ttime,
+							basetime,
+							pwtime,
+							i);
+					}
+				}
+
+				//Save analog waveform data
+				for(unsigned int i = 0; i < m_analogChannelCount; i++)
+				{
+					if(!analogEnabled[i])
+						continue;
+
+					//Done, update the data
+					for(size_t j = 0; j < num_sequences; j++)
+						pending_waveforms[i].push_back(waveforms[i][j]);
+				}
+
+				//Process digital waveforms
+				digitalWaveforms.resize(m_digitalChannelCount);
+				for(unsigned int i = 0; i < m_digitalChannelCount; i++)
 				{
 					if(digitalEnabled[i])
-					{	// Allocate buffer
-						digitalWaveformDataBytes[i] = new char[acqDigitalBytes];
-						if(!paginated)
-						{	// All data fits one page
-							m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
-							digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false);
-							// This is the 0x0a0a at the end
-							m_transport->ReadRawData(2, (unsigned char*)tmp);
-						}
-						else
-						{	// We need pagination
-							m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
-							for(uint64_t page = 0; page < pages; page++)
-							{
-								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSizeBytes) + ";:WAVEFORM:DATA?");
-								digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false);
-								// This is the 0x0a0a at the end
-								m_transport->ReadRawData(2, (unsigned char*)tmp);
-							}
-						}
+					{
+						digitalWaveforms[i] = ProcessDigitalWaveform(&digitalWaveformDataBytes[i][0],
+							digitalWaveformDataSize[i],
+							(char*)pdesc,
+							num_sequences,
+							ttime,
+							basetime,
+							pwtime,
+							i);
 					}
 				}
-			}
 
-			//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
-			//Re-arm the trigger if not in one-shot mode
-			if(!m_triggerOneShot)
-			{
-				sendOnly(":TRIGGER:MODE SINGLE");
-				m_triggerArmed = true;
-			}
-
-			//Process analog waveforms
-			waveforms.resize(m_analogChannelCount);
-			for(unsigned int i = 0; i < m_analogChannelCount; i++)
-			{
-				if(analogEnabled[i])
+				//Save digital waveform data
+				for(unsigned int i = 0; i < m_digitalChannelCount; i++)
 				{
-					waveforms[i] = ProcessAnalogWaveform(&analogWaveformData[i][0],
-						analogWaveformDataSize[i],
-						&wavedescs[i][0],
-						num_sequences,
-						ttime,
-						basetime,
-						pwtime,
-						i);
+					if(!digitalEnabled[i])
+						continue;
+
+					//Done, update the data
+					for(size_t j = 0; j < num_sequences; j++)
+						pending_waveforms[i+m_analogChannelCount].push_back(digitalWaveforms[i][j]);
 				}
 			}
 
-			//Save analog waveform data
-			for(unsigned int i = 0; i < m_analogChannelCount; i++)
-			{
-				if(!analogEnabled[i])
-					continue;
-
-				//Done, update the data
-				for(size_t j = 0; j < num_sequences; j++)
-					pending_waveforms[i].push_back(waveforms[i][j]);
-			}
 			break;
 
 		// --------------------------------------------------
@@ -2255,17 +2248,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			break;
 			// --------------------------------------------------
 	}
-
-	//TODO: proper support for sequenced capture when digital channels are active
-	// if(anyDigitalEnabled)
-	// {
-	// 	//This is a weird XML-y format but I can't find any other way to get it :(
-	// 	map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData);
-
-	// 	//Done, update the data
-	// 	for(auto it : digwaves)
-	// 		pending_waveforms[it.first].push_back(it.second);
-	// }
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
@@ -2301,6 +2283,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 void SiglentSCPIOscilloscope::PrepareAcquisition()
 {
 	m_acqPointsValid = false;
+	m_digitalAcqPointsValid = false;
+	m_triggerOffsetValid = false;
 	if(m_protocolId == PROTOCOL_E11)
 	{	// Make sure to reset waveform Start Point
 		m_transport->SendCommand(":WAVEFORM:START 0");
@@ -2823,6 +2807,29 @@ uint64_t SiglentSCPIOscilloscope::GetAcqPoints()
 		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
 	}
 	return m_acqPoints;
+}
+
+uint64_t SiglentSCPIOscilloscope::GetDigitalAcqPoints()
+{
+	double f;
+	if(!m_digitalAcqPointsValid)
+	{
+		string reply;
+		switch(m_protocolId)
+		{
+			case PROTOCOL_E11:
+				reply = converse(":DIG:POIN?");
+				break;
+			default:
+				LogError("Digital Acq points only supported by E11 protocol\n");
+				break;
+		}
+		sscanf(reply.c_str(), "%lf", &f);
+		m_digitalAcqPoints = static_cast<int64_t>(f);
+		m_digitalAcqPointsValid = true;
+		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
+	}
+	return m_digitalAcqPoints;
 }
 
 
