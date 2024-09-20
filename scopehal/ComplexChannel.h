@@ -31,13 +31,19 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of ComplexChannel
+	@ingroup datamodel
  */
 
 #ifndef ComplexChannel_h
 #define ComplexChannel_h
 
 /**
-	@brief An OscilloscopeChannel storing complex-valued data
+	@brief An OscilloscopeChannel storing complex-valued data.
+
+	This is a helper class intended for instruments producing I/Q outputs which creates two analog waveform streams,
+	called I and Q, as outputs.
+
+	@ingroup datamodel
  */
 class ComplexChannel : public OscilloscopeChannel
 {

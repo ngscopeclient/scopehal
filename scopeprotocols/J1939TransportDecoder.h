@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -29,70 +29,29 @@
 
 /**
 	@file
-	@brief Declaration of CopperMountainVNA
-	@ingroup vnadrivers
+	@author Andrew D. Zonenberg
+	@brief Declaration of J1939TransportDecoder
  */
+#ifndef J1939TransportDecoder_h
+#define J1939TransportDecoder_h
 
-#ifndef CopperMountainVNA_h
-#define CopperMountainVNA_h
+#include "J1939PDUDecoder.h"
 
-/**
-	@brief Driver for Copper Mountain VNAs
-	@ingroup vnadrivers
-
-	So far, only tested on a S5180B
- */
-class CopperMountainVNA : public virtual SCPIVNA
+class J1939TransportDecoder : public PacketDecoder
 {
 public:
-	CopperMountainVNA(SCPITransport* transport);
-	virtual ~CopperMountainVNA();
+	J1939TransportDecoder(const std::string& color);
 
-	//Channel configuration
-	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual void Refresh() override;
+	std::vector<std::string> GetHeaders() override;
 
-	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger() override;
-	virtual bool AcquireData() override;
-	virtual void Start() override;
-	virtual void StartSingleTrigger() override;
-	virtual void Stop() override;
-	virtual void ForceTrigger() override;
-	virtual bool IsTriggerArmed() override;
-	virtual void PushTrigger() override;
-	virtual void PullTrigger() override;
+	static std::string GetProtocolName();
 
-	//Timebase
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
-	virtual uint64_t GetSampleDepth() override;
-	virtual void SetSampleDepth(uint64_t depth) override;
-	virtual void SetSpan(int64_t span) override;
-	virtual int64_t GetSpan() override;
-	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
-	virtual int64_t GetCenterFrequency(size_t channel) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	//TODO: Sweep configuration
-	virtual int64_t GetResolutionBandwidth() override;
+	PROTOCOL_DECODER_INITPROC(J1939TransportDecoder)
 
 protected:
-
-	std::string GetChannelColor(size_t i);
-
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
-	int64_t m_memoryDepth;
-	int64_t m_sweepStart;
-	int64_t m_sweepStop;
-
-	int64_t m_freqMin;
-	int64_t m_freqMax;
-
-	int64_t m_rbw;
-
-public:
-	static std::string GetDriverNameInternal();
-	VNA_INITPROC(CopperMountainVNA)
 };
 
 #endif
