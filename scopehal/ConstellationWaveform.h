@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of ConstellationWaveform
+	@ingroup datamodel
  */
 
 #ifndef ConstellationWaveform_h
@@ -38,6 +39,10 @@
 
 #include "../scopehal/DensityFunctionWaveform.h"
 
+/**
+	@brief A constellation diagram
+	@ingroup datamodel
+ */
 class ConstellationWaveform : public DensityFunctionWaveform
 {
 public:
@@ -49,22 +54,47 @@ public:
 	ConstellationWaveform(const ConstellationWaveform&) =delete;
 	ConstellationWaveform& operator=(const ConstellationWaveform&) =delete;
 
+	///@brief Returns the raw accumulator sample data
 	int64_t* GetAccumData()
 	{ return m_accumdata; }
 
 	void Normalize();
 
+	///@brief Returns the number of integrated symbols in the constellation
 	size_t GetTotalSymbols()
 	{ return m_totalSymbols; }
 
+	/**
+		@brief Marks the waveform as having integrated another batch of symbols
+
+		@param symbols	Number of symbols integrated
+	 */
 	void IntegrateSymbols(size_t symbols)
 	{ m_totalSymbols += symbols; }
 
+	/**
+		@brief Value to pre-normalize the waveform to before clipping to the range [0, 1]. Must be non-negative.
+
+		The default of 1.0 means the input range is mapped losslessly to [0, 1].
+
+		Values less than 1.0 result in the output never reaching full scale.
+
+		Values greater than 1.0 allow clipping; for example a saturation level of 2.0 means the input is mapped to
+		[0, 2] then clipped to [0, 1]. This is equivalent to mapping the low half of the input values to [0, 1] and
+		saturating beyond that point.
+	 */
 	float m_saturationLevel;
 
 protected:
+
+	/**
+		@brief Raw accumulator buffer, not normalized
+
+		2D array of width*height values, each counting the number of hits at that pixel location
+	 */
 	int64_t* m_accumdata;
 
+	///@brief The number of symbols which have been integrated so far
 	size_t m_totalSymbols;
 };
 

@@ -139,7 +139,7 @@ void J1939PDUDecoder::Refresh()
 					pack->m_len = 0;
 					m_packets.push_back(pack);
 
-					auto p = s.m_data >> 26;
+					auto p = (s.m_data >> 26) & 0x7;
 					auto edp = (s.m_data >> 25) & 1;
 					auto dp = (s.m_data >> 24) & 1;
 					auto pf = (s.m_data >> 16) & 0xff;

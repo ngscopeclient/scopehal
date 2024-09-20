@@ -142,6 +142,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(J1939BitmaskDecoder);
 	AddDecoderClass(J1939PDUDecoder);
 	AddDecoderClass(J1939SourceMatchFilter);
+	AddDecoderClass(J1939TransportDecoder);
 	AddDecoderClass(ISIMeasurement);
 	AddDecoderClass(JitterFilter);
 	AddDecoderClass(JitterSpectrumFilter);

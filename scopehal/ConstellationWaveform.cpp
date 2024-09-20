@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of ConstellationWaveform
+	@ingroup datamodel
+ */
+
 #include "../scopehal/scopehal.h"
 #include "ConstellationWaveform.h"
 #include <algorithm>
@@ -53,6 +60,11 @@ ConstellationWaveform::~ConstellationWaveform()
 	m_accumdata = NULL;
 }
 
+/**
+	@brief Normalizes the waveform so that the output buffer has values in the range [0, 1].
+
+	The normalization process can saturate, see m_saturationLevel for detailed discussion of this behavior
+ */
 void ConstellationWaveform::Normalize()
 {
 	//Preprocessing
@@ -69,13 +81,7 @@ void ConstellationWaveform::Normalize()
 		nmax = 1;
 	float norm = 2.0f / nmax;
 
-	/*
-		Normalize with saturation
-		Saturation level of 1.0 means mapping all values to [0, 1].
-		2.0 means mapping values to [0, 2] and saturating anything above 1.
-
-		TODO: do this in a shader?
-	 */
+	//TODO: do this in a shader?
 	norm *= m_saturationLevel;
 	size_t len = m_width * m_height;
 	m_outdata.PrepareForCpuAccess();
