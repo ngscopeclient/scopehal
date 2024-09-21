@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of WindowTrigger
+	@ingroup triggers
  */
 #ifndef WindowTrigger_h
 #define WindowTrigger_h
@@ -39,6 +40,7 @@
 
 /**
 	@brief Window trigger - detect when the signal leaves a specified range
+	@ingroup triggers
  */
 class WindowTrigger : public TwoLevelTrigger
 {
@@ -48,26 +50,47 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	/**
+		@brief Type of level crossing to detect for "stay inside" and "stay outside" windows
+	 */
 	enum Crossing
 	{
+		///@brief Upper threshold
 		CROSS_UPPER,
+
+		///@brief Lower threshold
 		CROSS_LOWER,
+
+		///@brief Either threshold
 		CROSS_EITHER,
+
+		///@brief Nothing
 		CROSS_NONE,
 	};
 
+	/**
+		@brief How to trigger
+	 */
 	enum WindowType
 	{
-		WINDOW_ENTER,			//Trigger immediately upon entry to the window
-		WINDOW_EXIT,			//Trigger immediately upon exit from the window
-		WINDOW_EXIT_TIMED,		//Trigger upon exit from the window, if we were in it for at least X time
-		WINDOW_ENTER_TIMED		//Trigger upon entry to the window, if we were outside it for at least X time
+		///@brief Trigger immediately upon entry to the window
+		WINDOW_ENTER,
+
+		///@brief Trigger immediately upon exit from the window
+		WINDOW_EXIT,
+
+		///@brief Trigger upon exit from the window, if we were in it for at least X time
+		WINDOW_EXIT_TIMED,
+
+		///@brief Trigger upon entry to the window, if we were outside it for at least X time
+		WINDOW_ENTER_TIMED
 	};
 
 	/// @brief Sets the crossing direction (only used for "stay inside" and "stay outside" window types)
 	void SetCrossingDirection(Crossing dir)
 	{ m_parameters[m_crossingName].SetIntVal(dir); }
 
+	///@brief Gets the selected crossing direction
 	Crossing GetCrossingDirection()
 	{ return (Crossing)m_parameters[m_crossingName].GetIntVal(); }
 
@@ -75,13 +98,19 @@ public:
 	void SetWindowType(WindowType type)
 	{ m_parameters[m_windowName].SetIntVal(type); }
 
+	///@brief Gets the type of window
 	WindowType GetWindowType()
 	{ return (WindowType)m_parameters[m_windowName].GetIntVal(); }
 
-	///	@brief Sets the time the signal needs to stay in/outside the window
+	/**
+		@brief Sets the time the signal needs to stay in/outside the window
+
+		Only used for WINDOW_ENTER_TIMED and WINDOW_EXIT_TIMED
+	 */
 	void SetWidth(int64_t ps)
 	{ m_parameters[m_widthName].SetIntVal(ps); }
 
+	///@brief Gets the time the signal needs to stay in / outside the winodw
 	int64_t GetWidth()
 	{ return m_parameters[m_widthName].GetIntVal(); }
 
@@ -89,8 +118,14 @@ public:
 	TRIGGER_INITPROC(WindowTrigger);
 
 protected:
+
+	///@brief Name of the "width" parameter
 	std::string m_widthName;
+
+	///@brief Name of the "crossing type" parameter
 	std::string m_crossingName;
+
+	///@brief Name of the "window type" parameter
 	std::string m_windowName;
 };
 

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of WindowTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "WindowTrigger.h"
 #include "TektronixOscilloscope.h"
@@ -36,6 +43,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Creates a new window trigger
+
+	@param scope	The oscilloscope the trigger is going to be used with
+ */
 WindowTrigger::WindowTrigger(Oscilloscope* scope)
 	: TwoLevelTrigger(scope)
 	, m_widthName("Time Limit")

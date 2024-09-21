@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of WaveformBase
+	@ingroup datamodel
+ */
+
 #include "scopehal.h"
 #include "Waveform.h"
 #include "Filter.h"

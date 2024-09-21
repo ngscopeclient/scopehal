@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* ngscopeclient                                                                                                        *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
@@ -31,18 +31,29 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief  Declaration of WaveformPool
+	@ingroup datamodel
  */
 #ifndef WaveformPool_h
 #define WaveformPool_h
 
 /**
 	@brief Thread safe memory pool for reusing Waveform objects
+	@ingroup datamodel
+
+	Allocating and freeing GPU memory can be an expensive operation so it's usually preferable to recycle existing
+	Waveform objects if possible.
  */
 class WaveformPool
 {
 public:
-	WaveformPool()
-	: m_maxSize(16)
+
+	/**
+		@brief Creates a waveform pool
+
+		@param maxSize	Maximum number of waveforms to store in the pool
+	 */
+	WaveformPool(size_t maxSize = 16)
+	: m_maxSize(maxSize)
 	{}
 
 	~WaveformPool()
@@ -53,7 +64,11 @@ public:
 	}
 
 	/**
-		@brief Adds a new waveform to the pool if there's space for it, otherwise free it
+		@brief Adds a new waveform to the pool if there's sufficient free slots in the pool.
+
+		If the pool is already full the waveform is destroyed.
+
+		@param w	The waveform to add
 	 */
 	void Add(WaveformBase* w)
 	{
@@ -67,7 +82,9 @@ public:
 	}
 
 	/**
-		@brief Gets a waveform from the pool if there's space for it, otherwise return null
+		@brief Attempts to get a waveform from the pool.
+
+		@return The waveform, if one is available. Returns nullptr if the pool is empty.
 	 */
 	WaveformBase* Get()
 	{
@@ -85,10 +102,14 @@ public:
 	}
 
 protected:
+
+	///@brief Maximum number of waveforms to store in the pool
 	size_t m_maxSize;
 
+	///@brief Mutex for synchronizing access to m_waveforms across threads
 	std::mutex m_mutex;
 
+	///@brief The list of free waveforms
 	std::list<WaveformBase*> m_waveforms;
 };
 
