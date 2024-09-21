@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -31,6 +31,8 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of VulkanFFTPlan
+
+	@ingroup core
  */
 #include "scopehal.h"
 #include "VulkanFFTPlan.h"
@@ -40,6 +42,15 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Creates a new FFT plan
+
+	@param npoints			Number of points in the FFT
+	@param nouts			Number of output samples
+	@param dir				Direction (forward or reverse)
+	@param numBatches		Number of batched FFTs to perform (for spectrograms etc)
+	@param timeDomainType	Data type of the time-domain signal (real or complex)
+ */
 VulkanFFTPlan::VulkanFFTPlan(
 	size_t npoints,
 	size_t nouts,
@@ -198,6 +209,13 @@ VulkanFFTPlan::~VulkanFFTPlan()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Execution
 
+/**
+	@brief Appends a forward FFT to a command buffer
+
+	@param dataIn	Time domain input
+	@param dataOut	Frequency domain output
+	@param cmdBuf	Command buffer to append the FFT to
+ */
 void VulkanFFTPlan::AppendForward(
 	AcceleratorBuffer<float>& dataIn,
 	AcceleratorBuffer<float>& dataOut,
@@ -225,6 +243,13 @@ void VulkanFFTPlan::AppendForward(
 	dataOut.MarkModifiedFromGpu();
 }
 
+/**
+	@brief Appends an inverse FFT to a command buffer
+
+	@param dataIn	Frequency domain input
+	@param dataOut	Time domain output
+	@param cmdBuf	Command buffer to append the FFT to
+ */
 void VulkanFFTPlan::AppendReverse(
 	AcceleratorBuffer<float>& dataIn,
 	AcceleratorBuffer<float>& dataOut,

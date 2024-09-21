@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Vulkan initialization
+	@ingroup vksupport
  */
 #include "scopehal.h"
 #include <glslang_c_interface.h>
@@ -53,21 +54,25 @@ using namespace std;
 
 /**
 	@brief Global Vulkan context
+	@ingroup vksupport
  */
 vk::raii::Context g_vkContext;
 
 /**
 	@brief Global Vulkan instance
+	@ingroup vksupport
  */
 unique_ptr<vk::raii::Instance> g_vkInstance;
 
 /**
 	@brief The Vulkan device selected for compute operations (may or may not be same device as rendering)
+	@ingroup vksupport
  */
 shared_ptr<vk::raii::Device> g_vkComputeDevice;
 
 /**
 	@brief Command pool for AcceleratorBuffer transfers
+	@ingroup vksupport
 
 	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
 	when parallelism isn't that important.
@@ -76,6 +81,7 @@ unique_ptr<vk::raii::CommandPool> g_vkTransferCommandPool;
 
 /**
 	@brief Command buffer for AcceleratorBuffer transfers
+	@ingroup vksupport
 
 	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
 	when parallelism isn't that important.
@@ -84,6 +90,7 @@ unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 
 /**
 	@brief Queue for AcceleratorBuffer transfers
+	@ingroup vksupport
 
 	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
 	when parallelism isn't that important.
@@ -91,80 +98,162 @@ unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 shared_ptr<QueueHandle> g_vkTransferQueue;
 
 /**
- * @brief Allocates QueueHandle objects
- *
- * This is a single global resource, all QueueHandles must be obtained through this object.
+	@brief Allocates QueueHandle objects
+	@ingroup vksupport
+
+	This is a single global resource, all QueueHandles must be obtained through this object.
  */
 std::unique_ptr<QueueManager> g_vkQueueManager;
 
 /**
 	@brief Mutex for interlocking access to g_vkTransferCommandBuffer and g_vkTransferCommandPool
+	@ingroup vksupport
  */
 mutex g_vkTransferMutex;
 
 /**
 	@brief Vulkan memory type for CPU-based memory that is also GPU-readable
+	@ingroup vksupport
  */
 uint32_t g_vkPinnedMemoryType;
 
 /**
-	@brief Vulkan memory type for GPU-based memory (generally not CPU-readable, except on integrated cards)
+	@brief Vulkan memory type for GPU-based memory (generally not CPU-readable, except on unified memory systems)
+	@ingroup vksupport
  */
 uint32_t g_vkLocalMemoryType;
 
 /**
 	@brief UUID of g_vkComputeDevice
+	@ingroup vksupport
  */
 uint8_t g_vkComputeDeviceUuid[16];
 
 /**
 	@brief Driver version of g_vkComputeDevice
+	@ingroup vksupport
  */
 uint32_t g_vkComputeDeviceDriverVer;
 
 /**
 	@brief Physical device for g_vkComputeDevice
+	@ingroup vksupport
  */
 vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
 
 /**
 	@brief Heap from which g_vkPinnedMemoryType is allocated
+	@ingroup vksupport
  */
 uint32_t g_vkPinnedMemoryHeap = 0;
 
 /**
 	@brief Heap from which g_vkLocalMemoryType is allocated
+	@ingroup vksupport
  */
 uint32_t g_vkLocalMemoryHeap = 0;
 
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
-//Feature flags indicating that we have support for specific data types / features on the GPU
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Feature flags indicating that we have support for specific data types / features on the GPU
+
+/**
+	@brief Indicates whether the float64 type is available for use in shaders and SSBOs
+	@ingroup vksupport
+ */
 bool g_hasShaderFloat64 = false;
+
+/**
+	@brief Indicates whether the int64 type is available for use in shaders and SSBOs
+	@ingroup vksupport
+ */
 bool g_hasShaderInt64 = false;
+
+/**
+	@brief Indicates whether the int16 type is available for use in shaders and SSBOs
+	@ingroup vksupport
+ */
 bool g_hasShaderInt16 = false;
+
+/**
+	@brief Indicates whether the int8 type is available for use in shaders and SSBOs
+	@ingroup vksupport
+ */
 bool g_hasShaderInt8 = false;
+
+/**
+	@brief Indicates whether atomic operations on the float type are available in shaders
+	@ingroup vksupport
+ */
 bool g_hasShaderAtomicFloat = false;
+
+/**
+	@brief Indicates whether the VK_EXT_debug_utils extension is available
+	@ingroup vksupport
+ */
 bool g_hasDebugUtils = false;
+
+/**
+	@brief Indicates whether the VK_EXT_memory_budget extension is available
+	@ingroup vksupport
+ */
 bool g_hasMemoryBudget = false;
+
+/**
+	@brief Indicates whether the VK_KHR_push_descriptor extension is available
+	@ingroup vksupport
+ */
 bool g_hasPushDescriptor = false;
+
+/**
+	@brief Indicates whether the Vulkan device is unified memory
+	@ingroup vksupport
+
+	Unified memory means that all memory allocations for compute shaders are from a single heap which is accessible
+	to both the CPU and GPU with roughly equal performance, and there is no device-local memory with higher performance.
+
+	For example, AMD APUs, Intel integrated GPUs, and Apple Silicon platforms are unified memory.
+
+	Discrete PCIe GPUs typically are not.
+ */
 bool g_vulkanDeviceHasUnifiedMemory = false;
 
-//Max compute group count in each direction
+/**
+	@brief Maximum size of a Vulkan dispatch group for compute shaders, in each axis
+	@ingroup vksupport
+ */
 size_t g_maxComputeGroupCount[3] = {0};
 
-//Feature flags indicating specific drivers, for bug workarounds
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Feature flags indicating specific drivers, for bug workarounds
+
+/**
+	@brief Indicates that the Vulkan driver is Mesa on an Intel GPU
+	@ingroup vksupport
+ */
 bool g_vulkanDeviceIsIntelMesa = false;
+
+/**
+	@brief Indicates that the Vulkan driver is Mesa on any GPU
+	@ingroup vksupport
+ */
 bool g_vulkanDeviceIsAnyMesa = false;
+
+/**
+	@brief Indicates that the Vulkan driver is MoltenVK
+	@ingroup vksupport
+ */
 bool g_vulkanDeviceIsMoltenVK = false;
 
 void VulkanCleanup();
 
 /**
 	@brief Initialize a Vulkan context for compute
+	@ingroup vksupport
 
 	@param skipGLFW Do not initalize GLFW (workaround for what looks like gtk or video driver bug).
-			This should only be set true in glscopeclient.
+					This was a workaround used by glscopeclient and should probably be removed as it's not used now.
  */
 bool VulkanInit(bool skipGLFW)
 {
@@ -938,8 +1027,11 @@ bool VulkanInit(bool skipGLFW)
 
 /**
 	@brief Checks if a given Vulkan device is "better" than another
+	@ingroup vksupport
 
-	True if we should use device B over A
+	@param a	One of two devices being considered
+	@param b	The second device being considered
+	@return		True if we should use device B over A
  */
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b)
 {
@@ -965,6 +1057,7 @@ bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::Physical
 
 /**
 	@brief Free all global Vulkan resources in the correct order
+	@ingroup vksupport
  */
 void VulkanCleanup()
 {

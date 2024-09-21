@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of VulkanFFTPlan
+	@ingroup core
  */
 #ifndef VulkanFFTPlan_h
 #define VulkanFFTPlan_h
@@ -49,40 +50,75 @@
 #include "AcceleratorBuffer.h"
 #include "PipelineCacheManager.h"
 
+/**
+	@brief Arguments to a window function for FFT processing
+	@ingroup core
+ */
 struct WindowFunctionArgs
 {
+	///@brief Number of samples in the input
 	uint32_t numActualSamples;
+
+	///@brief Number of FFT points
 	uint32_t npoints;
+
+	///@brief Offset from start of the input buffer to start reading from
 	uint32_t offsetIn;
+
+	///@brief Offset from start of the output buffer to start writing to
 	uint32_t offsetOut;
+
+	///@brief Scaling factor for normalization
 	float scale;
+
+	///@brief Alpha0 factor for cosine-sum windows, ignored for others
 	float alpha0;
+
+	///@brief Alpha1 factor for cosine-sum windows, ignored for others
 	float alpha1;
 };
 
+/**
+	@brief Arguments for normalizing output of a de-embed
+	@ingroup core
+ */
 struct DeEmbedNormalizationArgs
 {
+	///@brief Length of the output buffer, in samples
 	uint32_t outlen;
+
+	///@brief Starting sample index
 	uint32_t istart;
+
+	///@brief Scaling factor for normalization
 	float scale;
 };
 
 /**
 	@brief RAII wrapper around a VkFFTApplication and VkFFTConfiguration
+	@ingroup core
  */
 class VulkanFFTPlan
 {
 public:
 
+	///@brief Direction of a FFT
 	enum VulkanFFTPlanDirection
 	{
+		///@brief Normal FFT
 		DIRECTION_FORWARD,
+
+		///@brief Inverse FFT
 		DIRECTION_REVERSE
 	};
 
+	///@brief Data type of a FFT input or output
 	enum VulkanFFTDataType
 	{
+		///@brief Real float32 values
 		TYPE_REAL,
+
+		///@brief Complex float32 values
 		TYPE_COMPLEX
 	};
 
@@ -104,24 +140,44 @@ public:
 		AcceleratorBuffer<float>& dataOut,
 		vk::raii::CommandBuffer& cmdBuf);
 
+	///@brief Return the number of points in the FFT
 	size_t size() const
 	{ return m_size; }
 
 protected:
+
+	///@brief VkFFT application handle
 	VkFFTApplication m_app;
+
+	///@brief VkFFT configuration state
 	VkFFTConfiguration m_config;
+
+	///@brief Number of points in the FFT
 	size_t m_size;
 
 	//this is ugly but apparently we can't take a pointer to the underlying vk:: c++ wrapper objects?
+	///@brief Physical device the FFT is runnning on
 	VkPhysicalDevice m_physicalDevice;
+
+	///@brief Device the FFT is runnning on
 	VkDevice m_device;
+
+	///@brief Pipeline cache for precompiled shader binaries
 	VkPipelineCache m_pipelineCache;
 
+	///@brief Fence for synchronizing FFTs
 	vk::raii::Fence m_fence;
+
+	///@brief The underlying VkFence of m_fence (we need to be able to take a pointer to it)
 	VkFence m_rawfence;
 
+	///@brief Byte size of the output buffer (for forward) or input (for reverse)
 	uint64_t m_bsize;
+
+	///@brief Byte size of the temporary working buffer
 	uint64_t m_tsize;
+
+	///@brief Byte size of the input buffer (for forward) or output (for reverse)
 	uint64_t m_isize;
 };
 
