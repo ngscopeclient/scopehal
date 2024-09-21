@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of CDRTrigger
+	@ingroup triggers
+ */
 #include "scopehal.h"
 #include "CDRTrigger.h"
 #include "LeCroyOscilloscope.h"
@@ -36,6 +42,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Creates a new CDR trigger
+
+	@param scope	The scope the trigger is to be created for
+ */
 CDRTrigger::CDRTrigger(Oscilloscope* scope)
 	: Trigger(scope)
 	, m_bitRateName("Bit Rate")
@@ -78,6 +89,12 @@ CDRTrigger::~CDRTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Autobaud
 
+/**
+	@brief Checks whether automatic bit rate calculation is available on this trigger.
+
+	The current implementation assumes any LeCroyOscilloscope with a CDR trigger board has auto-baud capability,
+	and nothing else does.
+ */
 bool CDRTrigger::IsAutomaticBitRateCalculationAvailable()
 {
 	if(dynamic_cast<LeCroyOscilloscope*>(m_scope) != nullptr)
@@ -104,6 +121,9 @@ bool CDRTrigger::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PLL lock status
 
+/**
+	@brief Checks whether the hardware clock recovery PLL is locked
+ */
 bool CDRTrigger::IsCDRLocked()
 {
 	auto lscope = dynamic_cast<LeCroyOscilloscope*>(m_scope);
