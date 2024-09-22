@@ -48,6 +48,16 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(SawtoothGeneratorFilter)
 
+	enum RampType
+	{
+		RAMP_UP,
+		RAMP_DOWN,
+		RAMP_BOTH
+	};
+
+	RampType GetRampType()
+	{ return static_cast<RampType>(m_parameters[m_rampname].GetIntVal()); }
+
 protected:
 	std::string m_ratename;
 	std::string m_freqname;
@@ -57,13 +67,6 @@ protected:
 	std::string m_phasename;
 	std::string m_unitname;
 	std::string m_rampname;
-
-	enum RampType
-	{
-		RAMP_UP,
-		RAMP_DOWN,
-		RAMP_BOTH
-	};
 
 	void OnUnitChanged();
 };
