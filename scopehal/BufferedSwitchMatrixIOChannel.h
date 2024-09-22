@@ -27,11 +27,17 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@brief Declaration of BufferedSwitchMatrixIOChannel
+	@ingroup core
+ */
+
 #ifndef BufferedSwitchMatrixIOChannel_h
 #define BufferedSwitchMatrixIOChannel_h
 
 /**
 	@brief An output channel of a buffered switch matrix
+	@ingroup core
  */
 class BufferedSwitchMatrixIOChannel : public DigitalIOChannel
 {
@@ -48,24 +54,39 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual void OnInputChanged(size_t i) override;
 
+	///@brief Gets the switch matrix this channel is part of
 	SwitchMatrix* GetSwitchMatrix()
 	{ return dynamic_cast<SwitchMatrix*>(m_instrument); }
 
+	///@brief Returns true if the channel has configurable input threshold
 	bool MuxHasConfigurableThreshold()
 	{ return GetSwitchMatrix()->MuxHasConfigurableThreshold(GetIndex()); }
 
+	///@brief Gets the input threshold
 	float GetMuxInputThreshold()
 	{ return GetSwitchMatrix()->GetMuxInputThreshold(GetIndex()); }
 
+	/**
+		@brief Sets the input port threshold voltage
+
+		@param v	Input switching threshold, in volts
+	 */
 	void SetMuxInputThreshold(float v)
 	{ GetSwitchMatrix()->SetMuxInputThreshold(GetIndex(), v); }
 
+	///@brief Returns true if the channel has configurable output drive voltage
 	bool MuxHasConfigurableDrive()
 	{ return GetSwitchMatrix()->MuxHasConfigurableDrive(GetIndex()); }
 
+	///@brief Gets the output port drive voltage
 	float GetMuxOutputDrive()
 	{ return GetSwitchMatrix()->GetMuxOutputDrive(GetIndex()); }
 
+	/**
+		@brief Sets the output port drive voltage
+
+		@param v	Output drive voltage, in volts
+	 */
 	void SetMuxOutputDrive(float v)
 	{ GetSwitchMatrix()->SetMuxOutputDrive(GetIndex(), v); }
 

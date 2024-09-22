@@ -27,6 +27,11 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@brief Implementation of BufferedSwitchMatrixOutputChannel
+	@ingroup core
+ */
+
 #include "scopehal.h"
 #include "BufferedSwitchMatrixOutputChannel.h"
 
@@ -49,7 +54,7 @@ BufferedSwitchMatrixOutputChannel::~BufferedSwitchMatrixOutputChannel()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Vertical scaling and stream management
+// Input management
 
 bool BufferedSwitchMatrixOutputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 {

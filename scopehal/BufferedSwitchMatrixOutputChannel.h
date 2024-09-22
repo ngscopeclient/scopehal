@@ -27,11 +27,17 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@brief Declaration of BufferedSwitchMatrixOutputChannel
+	@ingroup core
+ */
+
 #ifndef BufferedSwitchMatrixOutputChannel_h
 #define BufferedSwitchMatrixOutputChannel_h
 
 /**
 	@brief An output channel of a buffered switch matrix
+	@ingroup core
  */
 class BufferedSwitchMatrixOutputChannel : public DigitalOutputChannel
 {
@@ -48,19 +54,25 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual void OnInputChanged(size_t i) override;
 
+	///@brief Gets the switch matrix this channel is part of
 	SwitchMatrix* GetSwitchMatrix()
 	{ return dynamic_cast<SwitchMatrix*>(m_instrument); }
 
+	///@brief Returns true if the channel has configurable output drive voltage
 	bool MuxHasConfigurableDrive()
 	{ return GetSwitchMatrix()->MuxHasConfigurableDrive(GetIndex()); }
 
+	///@brief Gets the output port drive voltage
 	float GetMuxOutputDrive()
 	{ return GetSwitchMatrix()->GetMuxOutputDrive(GetIndex()); }
 
+	/**
+		@brief Sets the output port drive voltage
+
+		@param v	Output drive voltage, in volts
+	 */
 	void SetMuxOutputDrive(float v)
 	{ GetSwitchMatrix()->SetMuxOutputDrive(GetIndex(), v); }
-
-protected:
 };
 
 #endif

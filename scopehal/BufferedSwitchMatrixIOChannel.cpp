@@ -27,6 +27,11 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@brief Implementation of BufferedSwitchMatrixIOChannel
+	@ingroup core
+ */
+
 #include "scopehal.h"
 #include "BufferedSwitchMatrixIOChannel.h"
 
