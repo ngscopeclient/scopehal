@@ -27,47 +27,105 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of CANChannel, CANSymbol, and CANWaveform
+	@ingroup datamodel
+ */
+
 #ifndef CANChannel_h
 #define CANChannel_h
 
+/**
+	@brief A single symbol within a CAN bus protocol decode
+	@ingroup datamodel
+ */
 class CANSymbol
 {
 public:
+
+	///@brief Type of the symbol
 	enum stype
 	{
+		///@brief Start of frame
 		TYPE_SOF,
+
+		///@brief CAN ID
 		TYPE_ID,
+
+		///@brief Remote transmission request bit
 		TYPE_RTR,
+
+		///@brief Reserved bit
 		TYPE_R0,
+
+		///@brief Full-duplex bit
 		TYPE_FD,
+
+		///@brief Data length code
 		TYPE_DLC,
+
+		///@brief A data byte
 		TYPE_DATA,
+
+		///@brief CRC with a correct value
 		TYPE_CRC_OK,
+
+		///@brief CRC with an incorrect value
 		TYPE_CRC_BAD,
+
+		///@brief CRC delimiter
 		TYPE_CRC_DELIM,
+
+		///@brief Acknowledgement bit
 		TYPE_ACK,
+
+		///@brief ACK delimiter
 		TYPE_ACK_DELIM,
+
+		///@brief End of frame
 		TYPE_EOF
 	};
 
+	///@brief Default constructor, performs no initialization
 	CANSymbol()
 	{}
 
+	/**
+		@brief Initializes a CAN symbol
+
+		@param t	Type of the symbol
+		@param data	Data value
+	 */
 	CANSymbol(stype t, uint32_t data)
 	 : m_stype(t)
 	 , m_data(data)
 	{
 	}
 
+	///@brief Type of the symbol
 	stype m_stype;
+
+	///@brief Data value (meaning depends on type)
 	uint32_t m_data;
 
+	/**
+		@brief Checks this symbol for equality against a second
+
+		Two symbols are considered equal if both the type and data are equal.
+
+		@param s	The other symbol
+	 */
 	bool operator== (const CANSymbol& s) const
 	{
 		return (m_stype == s.m_stype) && (m_data == s.m_data);
 	}
 };
 
+/**
+	@brief A waveform containing CAN bus packets
+	@ingroup datamodel
+ */
 class CANWaveform : public SparseWaveform<CANSymbol>
 {
 public:
@@ -77,7 +135,8 @@ public:
 };
 
 /**
-	@brief A single channel of a CAN bus interface
+	@brief A filter or protocol analyzer channel which provides CAN bus data
+	@ingroup datamodel
  */
 class CANChannel : public OscilloscopeChannel
 {

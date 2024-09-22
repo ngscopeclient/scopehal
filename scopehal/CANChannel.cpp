@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of CANChannel, CANSymbol, and CANWaveform
+	@ingroup datamodel
+ */
+
 #include "scopehal.h"
 
 using namespace std;
