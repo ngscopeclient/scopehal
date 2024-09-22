@@ -27,6 +27,10 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@brief Implementation of BufferedSwitchMatrixInputChannel
+	@ingroup core
+ */
 #include "scopehal.h"
 #include "BufferedSwitchMatrixInputChannel.h"
 
@@ -35,6 +39,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the channel
+
+	@param hwname	Hardware name of the channel
+	@param parent	Switch matrix the channel is part of
+	@param color	Initial display color of the channel
+	@param index	Number of the channel
+ */
 BufferedSwitchMatrixInputChannel::BufferedSwitchMatrixInputChannel(
 	const string& hwname,
 	SwitchMatrix* parent,
@@ -51,13 +63,15 @@ BufferedSwitchMatrixInputChannel::~BufferedSwitchMatrixInputChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vertical scaling and stream management
 
-bool BufferedSwitchMatrixInputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+bool BufferedSwitchMatrixInputChannel::ValidateChannel(
+	[[maybe_unused]] size_t i,
+	[[maybe_unused]] StreamDescriptor stream)
 {
 	//no inputs allowed to an input
 	return false;
 }
 
-void BufferedSwitchMatrixInputChannel::OnInputChanged(size_t i)
+void BufferedSwitchMatrixInputChannel::OnInputChanged([[maybe_unused]] size_t i)
 {
 
 }

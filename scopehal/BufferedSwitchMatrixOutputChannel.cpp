@@ -40,6 +40,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the output channel
+
+	@param hwname	Hardware name of the channel
+	@param parent	Switch matrix the channel is part of
+	@param color	Initial display color of the channel
+	@param index	Number of the channel
+ */
 BufferedSwitchMatrixOutputChannel::BufferedSwitchMatrixOutputChannel(
 	const string& hwname,
 	SwitchMatrix* parent,

@@ -27,11 +27,16 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@brief Declaration of BufferedSwitchMatrixInputChannel
+	@ingroup core
+ */
 #ifndef BufferedSwitchMatrixInputChannel_h
 #define BufferedSwitchMatrixInputChannel_h
 
 /**
 	@brief An input channel of a buffered switch matrix
+	@ingroup core
  */
 class BufferedSwitchMatrixInputChannel : public DigitalInputChannel
 {
@@ -48,15 +53,23 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual void OnInputChanged(size_t i) override;
 
+	///@brief Gets the switch matrix this channel is part of
 	SwitchMatrix* GetSwitchMatrix()
 	{ return dynamic_cast<SwitchMatrix*>(m_instrument); }
 
+	///@brief Returns true if the channel has configurable input threshold
 	bool MuxHasConfigurableThreshold()
 	{ return GetSwitchMatrix()->MuxHasConfigurableThreshold(GetIndex()); }
 
+	///@brief Gets the input threshold
 	float GetMuxInputThreshold()
 	{ return GetSwitchMatrix()->GetMuxInputThreshold(GetIndex()); }
 
+	/**
+		@brief Sets the input port threshold voltage
+
+		@param v	Input switching threshold, in volts
+	 */
 	void SetMuxInputThreshold(float v)
 	{ GetSwitchMatrix()->SetMuxInputThreshold(GetIndex(), v); }
 
