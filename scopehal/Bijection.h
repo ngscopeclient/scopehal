@@ -48,40 +48,78 @@ class Bijection
 {
 public:
 
+	///@brief Type of the forward map
 	typedef std::map<T1, T2, Compare1> forwardType;
+
+	///@brief Type of the reverse map
 	typedef std::map<T2, T1, Compare2> reverseType;
 
-	///@brief
+	///@brief Get an iterator to the start of the forward map
 	typename forwardType::const_iterator begin()
 	{ return m_forwardMap.begin(); }
 
+	///@brief Get an iterator to the end of the forward map
 	typename forwardType::const_iterator end()
 	{ return m_forwardMap.end(); }
 
+	/**
+		@brief Adds a new entry to the bijection.
+
+		Neither a nor b is allowed to be in the map when this function is called.
+
+		@param a	First object
+		@param b	Second object
+	 */
 	void emplace(T1 a, T2 b)
 	{
 		m_forwardMap[a] = b;
 		m_reverseMap[b] = a;
 	}
 
+	/**
+		@brief Looks up an object in the reverse direction
+
+		@param key	The object being looked up
+	 */
 	const T1& operator[](T2 key)
 	{ return m_reverseMap[key]; }
 
+	/**
+		@brief Looks up an object in the forward direction
+
+		@param key	The object being looked up
+	 */
 	const T2& operator[](T1 key)
 	{ return m_forwardMap[key]; }
 
+	/**
+		@brief Determines if an object is present in the forward mapping
+
+		@param key	The object being looked up
+	 */
 	bool HasEntry(T1 key)
 	{ return m_forwardMap.find(key) != m_forwardMap.end(); }
 
+	/**
+		@brief Determines if an object is present in the reverse mapping
+
+		@param key	The object being looked up
+	 */
 	bool HasEntry(T2 key)
 	{ return m_reverseMap.find(key) != m_reverseMap.end(); }
 
+	///@brief Erase all entries in the bijection
 	void clear()
 	{
 		m_forwardMap.clear();
 		m_reverseMap.clear();
 	}
 
+	/**
+		@brief Erase an entry given a forward key
+
+		@param key	The object to remove
+	 */
 	void erase(T1 key)
 	{
 		auto value = m_forwardMap[key];
@@ -89,6 +127,11 @@ public:
 		m_reverseMap.erase(value);
 	}
 
+	/**
+		@brief Erase an entry given a reverse key
+
+		@param key	The object to remove
+	 */
 	void erase(T2 key)
 	{
 		auto value = m_reverseMap[key];
@@ -107,11 +150,16 @@ public:
 		m_reverseMap[newval] = key;
 	}
 
+	///@brief Return the number of entries in the bijection
 	size_t size()
 	{ return m_forwardMap.size(); }
 
 protected:
+
+	///@brief Map of object-to-object in the forward direction
 	forwardType m_forwardMap;
+
+	///@brief Map of object-to-object in the reverse direction
 	reverseType m_reverseMap;
 };
 

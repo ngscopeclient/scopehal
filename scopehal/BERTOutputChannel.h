@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of BERTOutputChannel
+	@ingroup core
+ */
 #ifndef BERTOutputChannel_h
 #define BERTOutputChannel_h
 
@@ -34,6 +40,7 @@
 
 /**
 	@brief A pattern generator channel of a BERT
+	@ingroup core
  */
 class BERTOutputChannel : public InstrumentChannel
 {
@@ -50,54 +57,138 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
+	///@brief Get the BERT this channel is part of
 	BERT* GetBERT() const
 	{ return dynamic_cast<BERT*>(m_instrument); }
 
+	/**
+		@brief Set the pattern this channel is generating
+
+		@param pattern	The new pattern
+	 */
 	void SetPattern(BERT::Pattern pattern)
 	{ GetBERT()->SetTxPattern(GetIndex(), pattern); }
 
+	///@brief Get the pattern this channel is currently generating
 	BERT::Pattern GetPattern()
 	{ return GetBERT()->GetTxPattern(GetIndex()); }
 
+	///@brief Get the set of patterns this channel is capable of generating
 	std::vector<BERT::Pattern> GetAvailablePatterns()
 	{ return GetBERT()->GetAvailableTxPatterns(GetIndex()); }
 
+	///@brief Get the polarity inversion state of this channel
 	bool GetInvert()
 	{ return GetBERT()->GetTxInvert(GetIndex()); }
 
+	/**
+		@brief Set the polarity inversion state of this channel
+
+		@param invert	New inversion state (true = invert, false = normal polarity)
+	 */
 	void SetInvert(bool invert)
 	{ GetBERT()->SetTxInvert(GetIndex(), invert); }
 
+	/**
+		@brief Get the set of amplitudes this channel is capable of outputting
+
+		Amplitudes are in nominal volts P-P with all TX equalizer taps set to zero.
+	 */
 	std::vector<float> GetAvailableDriveStrengths()
 	{ return GetBERT()->GetAvailableTxDriveStrengths(GetIndex()); }
 
+	/**
+		@brief Get the current nominal amplitude of this channel
+
+		Amplitudes are in nominal volts P-P with all TX equalizer taps set to zero.
+	 */
 	float GetDriveStrength()
 	{ return GetBERT()->GetTxDriveStrength(GetIndex()); }
 
+	/**
+		@brief Set the current nominal amplitude of this channel
+
+		@param drive	Desired amplitude; nominal volts P-P with all TX equalizer taps set to zero.
+	 */
 	void SetDriveStrength(float drive)
 	{ GetBERT()->SetTxDriveStrength(GetIndex(), drive); }
 
+	///@brief Gets the enable status of this channel
 	bool GetEnable()
 	{ return GetBERT()->GetTxEnable(GetIndex()); }
 
+	/**
+		@brief Set the enable state of this channel
+
+		@param b	True to enable the channel, false to disable
+	 */
 	void Enable(bool b)
 	{ GetBERT()->SetTxEnable(GetIndex(), b); }
 
+	/**
+		@brief Gets the TX FFE pre-cursor coefficient
+
+		Equalizer coefficients are are normalized so that 0 is the lowest possible tap value and 1 is the highest
+		possible tap value. Some instruments allow negative values (which invert the sign of the tap).
+
+		The exact mapping of normalized coefficients to FFE gain steps is instrument specific and may be nonlinear.
+	 */
 	float GetPreCursor()
 	{ return GetBERT()->GetTxPreCursor(GetIndex()); }
 
+	/**
+		@brief Sets the TX FFE pre-cursor coefficient
+
+		Equalizer coefficients are are normalized so that 0 is the lowest possible tap value and 1 is the highest
+		possible tap value. Some instruments allow negative values (which invert the sign of the tap).
+
+		The exact mapping of normalized coefficients to FFE gain steps is instrument specific and may be nonlinear.
+
+		@param f	Pre-cursor coefficient
+	 */
 	void SetPreCursor(float f)
 	{ GetBERT()->SetTxPreCursor(GetIndex(), f); }
 
+	/**
+		@brief Gets the TX FFE post-cursor coefficient
+
+		Equalizer coefficients are are normalized so that 0 is the lowest possible tap value and 1 is the highest
+		possible tap value. Some instruments allow negative values (which invert the sign of the tap).
+
+		The exact mapping of normalized coefficients to FFE gain steps is instrument specific and may be nonlinear.
+	 */
 	float GetPostCursor()
 	{ return GetBERT()->GetTxPostCursor(GetIndex()); }
 
+	/**
+		@brief Sets the TX FFE post-cursor coefficient
+
+		Equalizer coefficients are are normalized so that 0 is the lowest possible tap value and 1 is the highest
+		possible tap value. Some instruments allow negative values (which invert the sign of the tap).
+
+		The exact mapping of normalized coefficients to FFE gain steps is instrument specific and may be nonlinear.
+
+		@param f	Post-cursor coefficient
+	 */
 	void SetPostCursor(float f)
 	{ GetBERT()->SetTxPostCursor(GetIndex(), f); }
 
+	/**
+		@brief Gets the data rate of this channel, in symbols per second
+	 */
 	int64_t GetDataRate()
 	{ return GetBERT()->GetDataRate(GetIndex()); }
 
+	/**
+		@brief Sets the data rate of this channel, in symbols per second
+
+		Depending on the clocking architecture of the instrument, this may affect other channels.
+
+		For example, on MultiLane BERTs all channels share a single timebase. Antikernel Labs BERTs are
+		based on Xilinx FPGAs and channels are divided into quads which each share some clocking resources.
+
+		@param rate		Desired data rate
+	 */
 	void SetDataRate(int64_t rate)
 	{ GetBERT()->SetDataRate(GetIndex(), rate); }
 

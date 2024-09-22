@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of BERTInputChannelWithDataCapture
+	@ingroup core
+ */
 #ifndef BERTInputChannelWithDataCapture_h
 #define BERTInputChannelWithDataCapture_h
 
@@ -34,6 +40,8 @@
 
 /**
 	@brief Input channel for a BERT that also supports CDR logic analyzer (raw serial bitstream capture) mode
+
+	@ingroup core
  */
 class BERTInputChannelWithDataCapture : public BERTInputChannel
 {
@@ -46,9 +54,13 @@ public:
 
 	virtual ~BERTInputChannelWithDataCapture();
 
+	///@brief Stream IDs for waveform capture
 	enum DataStreamIDs
 	{
+		///@brief Data capture waveform
 		STREAM_CDR_CAPTURE = 4,
+
+		///@brief Recovered clock waveform
 		STREAM_CDR_RECCLK = 5
 	};
 };
