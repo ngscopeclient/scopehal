@@ -30,13 +30,18 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Bijection class
+	@brief Declaration of Bijection
+	@ingroup core
  */
 #ifndef Bijection_h
 #define Bijection_h
 
 /**
-	@brief A one-to-one mapping from objects of type T1 to type T2 (which must be different types)
+	@brief A strict one-to-one mapping from objects of type T1 to type T2 (which must be different types).
+
+	Internally implemented as two synchronized std::map instances
+
+	@ingroup core
  */
 template<class T1, class T2, typename Compare1 = std::less<T1>, typename Compare2 = std::less<T2> >
 class Bijection
@@ -46,6 +51,7 @@ public:
 	typedef std::map<T1, T2, Compare1> forwardType;
 	typedef std::map<T2, T1, Compare2> reverseType;
 
+	///@brief
 	typename forwardType::const_iterator begin()
 	{ return m_forwardMap.begin(); }
 
