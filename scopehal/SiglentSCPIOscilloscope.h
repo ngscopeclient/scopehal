@@ -48,6 +48,7 @@ class WindowTrigger;
  */
 
 #define MAX_ANALOG 4
+#define MAX_DIGITAL 16
 #define WAVEDESC_SIZE 346
 
 // These SDS2000/SDS5000 scopes will actually sample 200MPoints, but the maximum it can transfer in one
@@ -74,11 +75,15 @@ private:
 
 protected:
 	void IdentifyHardware();
+	void DetectBandwidth();
 	void SharedCtorInit();
 	virtual void DetectAnalogChannels();
 	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
 	void ParseFirmwareVersion();
+	uint64_t GetMaxPoints();
+	uint64_t GetAcqPoints();
+	uint64_t GetDigitalAcqPoints();
 
 public:
 	//Device information
@@ -127,18 +132,42 @@ public:
 	virtual void EnableTriggerOutput() override;
 	virtual std::vector<std::string> GetTriggerTypes() override;
 
+	//Scope communication protocol.
+	enum Protocol
+	{
+		PROTOCOL_SPO,
+		PROTOCOL_ESERIES,
+		// Refers to E11 Siglent Programming Guide :
+		// https://www.siglenteu.com/wp-content/uploads/dlm_uploads/2024/03/ProgrammingGuide_EN11F.pdf
+		PROTOCOL_E11,
+		PROTOCOL_UNKNOWN
+	};
+
 	//Scope models.
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
 	enum Model
 	{
 		MODEL_SIGLENT_SDS800X_HD,
 		MODEL_SIGLENT_SDS1000,
+		MODEL_SIGLENT_SDS1000X_HD,
 		MODEL_SIGLENT_SDS2000XE,
 		MODEL_SIGLENT_SDS2000XP,
 		MODEL_SIGLENT_SDS2000X_HD,
+		MODEL_SIGLENT_SDS3000X_HD,
 		MODEL_SIGLENT_SDS5000X,
+		MODEL_SIGLENT_SDS6000L,
 		MODEL_SIGLENT_SDS6000A,
+		MODEL_SIGLENT_SDS6000PRO,
+		MODEL_SIGLENT_SDS7000A,
 		MODEL_UNKNOWN
+	};
+
+	//Scope channel mode (only relevant for E11 models).
+	enum ChannelMode
+	{
+		CHANNEL_MODE_SINGLE,
+		CHANNEL_MODE_DUAL,
+		CHANNEL_MODE_MULTI
 	};
 
 	Model GetModelID() { return m_modelid; }
@@ -228,7 +257,7 @@ protected:
 	void PullSlewRateTrigger();
 	void PullUartTrigger();
 	void PullWindowTrigger();
-	void PullTriggerSource(Trigger* trig, std::string triggerModeName);
+	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
 
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
@@ -247,17 +276,22 @@ protected:
 
 	void BulkCheckChannelEnableState();
 
+    ChannelMode GetChannelMode();
+
+	void PrepareAcquisition();
+
 	std::string GetPossiblyEmptyString(const std::string& property);
 
 	//  bool ReadWaveformBlock(std::string& data);
 	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false);
 	//  	bool ReadWavedescs(
 	//		std::vector<std::string>& wavedescs,
-	//		bool* enabled,
-	//		unsigned int& firstEnabledChannel,
-	//		bool& any_enabled);
+	//		bool* analogEnabled,
+	//		bool* digitalEnabled,
+	//		bool& anyAnalogEnabled,
+	//		bool& anyDigitalEnabled);
 	bool ReadWavedescs(
-		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* enabled, unsigned int& firstEnabledChannel, bool& any_enabled);
+		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
@@ -270,14 +304,24 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	std::map<int, SparseDigitalWaveform*> ProcessDigitalWaveform(std::string& data);
-
+	
+	std::vector<SparseDigitalWaveform*> ProcessDigitalWaveform(const char* data,
+		size_t datalen,
+		char* wavedesc,
+		uint32_t num_sequences,
+		time_t ttime,
+		double basetime,
+		double* wavetime,
+		int i);
+	
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
+	unsigned int m_analogAndDigitalChannelCount;
 	size_t m_digitalChannelBase;
 
 	Model m_modelid;
+	Protocol m_protocolId;
 
 	// Firmware version
 	int m_ubootMajorVersion;
@@ -307,13 +351,6 @@ protected:
 	bool m_triggerOneShot;
 	bool m_triggerForced;
 
-	// Transfer buffer. This is a bit hacky
-	char m_analogWaveformData[MAX_ANALOG][WAVEFORM_SIZE];
-	int m_analogWaveformDataSize[MAX_ANALOG];
-	char m_wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
-	char m_digitalWaveformDataBytes[WAVEFORM_SIZE];
-	std::string m_digitalWaveformData;
-
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;
@@ -324,6 +361,12 @@ protected:
 	int64_t m_memoryDepth;
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
+	bool m_maxPointsValid;
+	uint64_t m_maxPoints;
+	bool m_acqPointsValid;
+	uint64_t m_acqPoints;
+	bool m_digitalAcqPointsValid;
+	uint64_t m_digitalAcqPoints;
 	std::map<size_t, int64_t> m_channelDeskew;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
