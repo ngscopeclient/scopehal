@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of CDR8B10BTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "CDR8B10BTrigger.h"
 #include "LeCroyOscilloscope.h"
@@ -36,6 +43,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Create a new 8B/10B trigger
+
+	@param scope	The scope to create the trigger for
+ */
 CDR8B10BTrigger::CDR8B10BTrigger(Oscilloscope* scope)
 	: CDRTrigger(scope)
 	, m_patternModeName("Mode")
@@ -83,6 +95,9 @@ string CDR8B10BTrigger::GetTriggerName()
 	return "CDR (8B/10B)";
 }
 
+/**
+	@brief Handles a change to the pattern length by creating/destroying symbol fields
+ */
 void CDR8B10BTrigger::OnLengthChanged()
 {
 	auto pat = m_parameters[m_patternName].Get8B10BPattern();
@@ -90,6 +105,11 @@ void CDR8B10BTrigger::OnLengthChanged()
 	m_parameters[m_patternName].Set8B10BPattern(pat);
 }
 
+/**
+	@brief Handles a change to the match mode by changing the max allowed pattern length
+
+	Currently only implemented for Teledyne LeCroy SDA 8Zi GTX trigger board
+ */
 void CDR8B10BTrigger::OnModeChanged()
 {
 	//Pattern length can be up to 8 in sequence mode, or 6 in match mode
