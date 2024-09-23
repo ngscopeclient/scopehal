@@ -56,6 +56,11 @@ unsigned int BERT::GetInstrumentTypes() const
 	return INST_BERT;
 }
 
+/**
+	@brief Converts a Pattern enum into a strnig
+
+	@param pat	The desired pattern
+ */
 string BERT::GetPatternName(Pattern pat)
 {
 	switch(pat)
@@ -95,6 +100,11 @@ string BERT::GetPatternName(Pattern pat)
 	}
 }
 
+/**
+	@brief Converts a string name into a Pattern enum
+
+	@param name	Name of the pattern
+ */
 BERT::Pattern BERT::GetPatternOfName(string name)
 {
 	if(name == "PRBS7")
