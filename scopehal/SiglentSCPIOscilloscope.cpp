@@ -1842,7 +1842,7 @@ vector<SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(c
 	time_t ttime,
 	double basetime,
 	double* wavetime,
-	int ch)
+	int /*ch*/)
 {
 	vector<SparseDigitalWaveform*> ret;
 
@@ -1888,8 +1888,8 @@ vector<SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(c
 
 		size_t k = 0;
 		size_t sampleIndex = 0;
-		bool sampleValue;
-		bool lastSampleValue;
+		bool sampleValue = false;
+		bool lastSampleValue = false;
 
 
 		//Read and de-duplicate the other samples
