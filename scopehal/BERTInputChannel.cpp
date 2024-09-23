@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of BERTInputChannel
+	@ingroup core
+ */
+
 #include "scopehal.h"
 
 using namespace std;
@@ -34,6 +41,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the channel
+
+	@param hwname	Hardware name of the channel
+	@param bert	BERT the channel is part of
+	@param color	Initial display color of the channel
+	@param index	Number of the channel
+ */
 BERTInputChannel::BERTInputChannel(
 	const string& hwname,
 	std::weak_ptr<BERT> bert,

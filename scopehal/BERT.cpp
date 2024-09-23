@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of BERT
+	@ingroup core
+ */
+
 #include "scopehal.h"
 #include "BERT.h"
 
