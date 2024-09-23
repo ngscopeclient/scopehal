@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of VICPSocketTransport
+	@ingroup transports
  */
 
 #include "scopehal.h"
@@ -40,6 +41,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Creates a VICP transport
+
+	@param args	Path to the scope, either host:port or hostname with implied port 1861
+ */
 VICPSocketTransport::VICPSocketTransport(const string& args)
 	: m_nextSequence(1)
 	, m_lastSequence(1)
@@ -103,6 +109,7 @@ string VICPSocketTransport::GetConnectionString()
 	return string(tmp);
 }
 
+///@brief Gets the next sequence number to be used by a packet
 uint8_t VICPSocketTransport::GetNextSequenceNumber()
 {
 	m_lastSequence = m_nextSequence;
