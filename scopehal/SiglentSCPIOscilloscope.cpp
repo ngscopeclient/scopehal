@@ -2618,7 +2618,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesInterleaved()
 {
 	//No interleaving on E11 models, srates values are calculated dynamically according to number of active channels
-	if((m_protocolId == PROTOCOL_E11))
+	if(m_protocolId == PROTOCOL_E11)
 		return GetSampleRatesNonInterleaved();
 
 	vector<uint64_t> ret = GetSampleRatesNonInterleaved();
@@ -2709,7 +2709,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 {
 	//No interleaving on E11 models, srates values are calculated dynamically according to number of active channels
-	if((m_protocolId == PROTOCOL_E11))
+	if(m_protocolId == PROTOCOL_E11)
 		return GetSampleDepthsNonInterleaved();
 
 	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();
