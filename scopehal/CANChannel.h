@@ -136,7 +136,7 @@ public:
 
 /**
 	@brief A filter or protocol analyzer channel which provides CAN bus data
-	@ingroup datamodel
+	@ingroup core
  */
 class CANChannel : public OscilloscopeChannel
 {

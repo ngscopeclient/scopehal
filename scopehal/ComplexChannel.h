@@ -31,7 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of ComplexChannel
-	@ingroup datamodel
+	@ingroup core
  */
 
 #ifndef ComplexChannel_h
@@ -43,7 +43,7 @@
 	This is a helper class intended for instruments producing I/Q outputs which creates two analog waveform streams,
 	called I and Q, as outputs.
 
-	@ingroup datamodel
+	@ingroup core
  */
 class ComplexChannel : public OscilloscopeChannel
 {

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of AseqSpectrometer and AseqSpectrometerChannel
+	@ingroup spectrometerdrivers
+ */
+
 #ifndef AseqSpectrometer_h
 #define AseqSpectrometer_h
 
@@ -36,10 +43,21 @@ class EdgeTrigger;
 
 /**
 	@brief Helper class for creating output streams
+
+	@ingroup spectrometerdrivers
  */
 class AseqSpectrometerChannel : public OscilloscopeChannel
 {
 public:
+
+	/**
+		@brief Initialize the channel
+
+		@param scope	Parent instrument
+		@param hwname	Hardware name of the channel
+		@param color	Initial display color of the channel
+		@param index	Number of the channel
+	 */
 	AseqSpectrometerChannel(
 		Oscilloscope* scope,
 		const std::string& hwname,
@@ -54,16 +72,24 @@ public:
 		AddStream(Unit::UNIT_W_M2_NM, "AbsoluteIrradiance", Stream::STREAM_TYPE_ANALOG);
 	}
 
+	///@brief Indexes of output streams
 	enum StreamIndex
 	{
+		///@brief  Raw counts without any corrections applied
 		STREAM_RAW_COUNTS,
+
+		///@brief Flattened counts after dark frame subtraction and sensor response correction
 		STREAM_FLATTENED_COUNTS,
+
+		///@brief Absolute irradiance (if the spectrometer is calibrated with absolute data)
 		STREAM_ABSOLUTE_IRRADIANCE
 	};
 };
 
 /**
-	@brief AseqSpectrometer - driver for talking to the scopehal-aseq-bridge server
+	@brief Driver for Aseq Instruments LR1/HR1 spectrometers via the scopehal-aseq-bridge server
+
+	@ingroup spectrometerdrivers
  */
 class AseqSpectrometer 	: public virtual SCPISpectrometer
 {
@@ -104,22 +130,39 @@ public:
 	virtual void SetIntegrationTime(int64_t t) override;
 
 protected:
+
+	///@brief Indicates trigger is armed
 	bool m_triggerArmed;
+
+	///@brief Indicates most recent trigger arm was a one-shot rather than continuous trigger
 	bool m_triggerOneShot;
 
+	///@brief Wavelength (in picometers) at each spectral bin
 	std::vector<float> m_wavelengths;
+
+	///@brief Flatness calibration coefficient for each spectral bin
 	std::vector<float> m_flatcal;
+
+	///@brief Irradiance calibration (if available) for each spectral bin
 	std::vector<float> m_irrcal;
+
+	///@brief Global scaling factor for irradiance calibration
 	float m_irrcoeff;
 
+	///@brief Channel indexes
 	enum channelids
 	{
+		///@brief Spectral output
 		CHAN_SPECTRUM,
+
+		///@brief Dark frame correction input
 		CHAN_DARKFRAME
 	};
 
+	///@brief Dark frame input
 	SpectrometerDarkFrameChannel* m_darkframe;
 
+	///@brief Integration time, in femtoseconds
 	int64_t m_integrationTime;
 
 public:
