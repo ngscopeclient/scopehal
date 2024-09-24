@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of ThunderScopeOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifndef ThunderScopeOscilloscope_h
 #define ThunderScopeOscilloscope_h
 
@@ -34,7 +41,9 @@
 #include "../xptools/HzClock.h"
 
 /**
-	@brief ThunderScopeOscilloscope - driver for talking to the TS.NET daemons
+	@brief Driver for talking to the TS.NET server controlling a ThunderScope
+
+	@ingroup scopedrivers
  */
 class ThunderScopeOscilloscope : public RemoteBridgeOscilloscope
 {
@@ -86,26 +95,46 @@ protected:
 
 	std::string GetChannelColor(size_t i);
 
+	///@brief Number of analog channels (always 4 at the moment)
 	size_t m_analogChannelCount;
 
-	// Cache
+	///@brief Map of channel numbers to attenuation levels
 	std::map<size_t, double> m_channelAttenuations;
 
+	///@brief Number of WFM/s acquired by hardware
 	FilterParameter m_diag_hardwareWFMHz;
+
+	///@brief Number of WFM/s recieved by the driver
 	FilterParameter m_diag_receivedWFMHz;
+
+	///@brief Number of waveforms acquired during this session
 	FilterParameter m_diag_totalWFMs;
+
+	///@brief Number of waveforms dropped because some part of the pipeline couldn't keep up
 	FilterParameter m_diag_droppedWFMs;
+
+	///@brief Percentage of waveforms which were dropped
 	FilterParameter m_diag_droppedPercent;
+
+	///@brief Counter of average trigger rate
 	HzClock m_receiveClock;
 
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
 
+	///@brief Vulkan queue used for sample conversion
 	std::shared_ptr<QueueHandle> m_queue;
+
+	///@brief Command pool from which m_cmdBuf was allocated
 	std::unique_ptr<vk::raii::CommandPool> m_pool;
+
+	///@brief Command buffer for sample conversion
 	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
 	std::unique_ptr<ComputePipeline> m_conversionPipeline;
 
+	///@brief Buffer for storing channel clip state
 	AcceleratorBuffer<uint32_t> m_clippingBuffer;
 
 public:
