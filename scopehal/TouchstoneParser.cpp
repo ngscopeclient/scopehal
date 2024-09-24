@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of TouchstoneParser
+	@ingroup core
  */
 #include "scopehal.h"
 #include <math.h>
@@ -40,10 +41,16 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TouchstoneParser
 
+/**
+	@brief Default constructor, does nothing
+ */
 TouchstoneParser::TouchstoneParser()
 {
 }
 
+/**
+	@brief Default destructor, does nothing
+ */
 TouchstoneParser::~TouchstoneParser()
 {
 
@@ -51,6 +58,11 @@ TouchstoneParser::~TouchstoneParser()
 
 /**
 	@brief Reads a SxP file
+
+	@param		fname	Path to the .s*p file
+	@param[out] params	The parsed S-parameters (if successful)
+
+	@return	True on success, false on failure
  */
 bool TouchstoneParser::Load(string fname, SParameters& params)
 {
@@ -238,6 +250,13 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 
 /**
 	@brief Reads a single ASCII float from the input buffer
+
+	@param		 	buf		Input buffer
+	@param		 	i		Index of the cursor within the buffer
+	@param		 	len		Size of the buffer
+	@param[out]		f		Output value
+
+	@param True on success, false on EOF or malformed data
  */
 bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& f)
 {
@@ -259,6 +278,9 @@ bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& 
 
 /**
 	@brief Converts a complex number in (real, imaginary) form to (magnitude, angle)
+
+	@param f1 Input real part, output magnitude part
+	@param f2 Input imaginary part, output angle part
  */
 void TouchstoneParser::ComplexToPolar(float& f1, float& f2)
 {
