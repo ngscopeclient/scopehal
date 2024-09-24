@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of Unit
+	@ingroup datamodel
  */
 
 #ifndef Unit_h
@@ -49,6 +50,8 @@
 	@brief A unit of measurement, plus conversion to pretty-printed output
 
 	TODO: add scale factors too?
+
+	@ingroup datamodel
  */
 class Unit
 {

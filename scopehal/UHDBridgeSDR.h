@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of UHDBridgeSDR
+	@ingroup sdrdrivers
+ */
+
 #ifndef UHDBridgeSDR_h
 #define UHDBridgeSDR_h
 
@@ -34,6 +41,8 @@
 
 /**
 	@brief UHDBridgeSDR - driver for talking to the scopehal-uhd-bridge daemon (uhdbridge)
+
+	@ingroup sdrdrivers
  */
 class UHDBridgeSDR
 	: public virtual RemoteBridgeOscilloscope
@@ -104,7 +113,10 @@ protected:
 
 	std::string GetChannelColor(size_t i);
 
+	///@brief Frequency span of the acquisition, in Hz
 	int64_t m_span;
+
+	///@brief Center frequency for the downconverter, in Hz
 	int64_t m_centerFreq;
 
 public:

@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of UHDBridgeSDR
+	@ingroup sdrdrivers
+ */
+
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
@@ -39,10 +46,14 @@
 
 using namespace std;
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
+/**
+	@brief Constructs a new driver object
+
+	@param transport	SCPITransport connected to a scopehal-uhd-bridge server
+ */
 UHDBridgeSDR::UHDBridgeSDR(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -89,6 +100,8 @@ UHDBridgeSDR::UHDBridgeSDR(SCPITransport* transport)
 
 /**
 	@brief Color the channels arbitrarily (yellow-cyan-magenta-green)
+
+	@param i	Channel number
  */
 string UHDBridgeSDR::GetChannelColor(size_t i)
 {
@@ -109,6 +122,9 @@ string UHDBridgeSDR::GetChannelColor(size_t i)
 	}
 }
 
+/**
+	@brief Query the hardware to determine capabilities of the instrument
+ */
 void UHDBridgeSDR::IdentifyHardware()
 {
 	//TODO: figure out what we are
