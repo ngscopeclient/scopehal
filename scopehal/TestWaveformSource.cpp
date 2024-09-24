@@ -30,6 +30,8 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of TestWaveformSource
+
+	@ingroup core
  */
 #include "scopehal.h"
 #include "TestWaveformSource.h"
@@ -40,6 +42,13 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initializes a TestWaveformSource
+
+	@param rng	Random number generator instance that the source should use.
+				The source maintains a persistent reference to the RNG so it must remain valid
+				for the entire lifespan of the TestWaveformSource.
+ */
 TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
 	, m_cachedBinSize(0)
@@ -69,7 +78,15 @@ TestWaveformSource::~TestWaveformSource()
 // Signal generation
 
 /**
-	@brief Generates a unit step
+	@brief Generates a step waveform
+
+	The waveform starts at vlo for half of the total duration, the instantly transitions to vhi and remains at vhi
+	for the remainder of the total length.
+
+	@param vlo				Starting voltage
+	@param vhi				Ending voltage
+	@param sampleperiod		Interval, in femtoseconds, between samples
+	@param depth			Number of points in the waveform
  */
 WaveformBase* TestWaveformSource::GenerateStep(
 	float vlo,
@@ -94,7 +111,14 @@ WaveformBase* TestWaveformSource::GenerateStep(
 }
 
 /**
-	@brief Generates a sinewave with a bit of extra noise added
+	@brief Generates a sinewave with AWGN added
+
+	@param amplitude	P-P amplitude of the waveform
+	@param startphase	Starting phase in radians
+	@param period		Period of the sine, in femtoseconds
+	@param sampleperiod	Interval between samples, in femtoseconds
+	@param depth		Total number of samples to generate
+	@param noise_stdev	Standard deviation of the AWGN
  */
 WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float amplitude,
@@ -102,13 +126,13 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	float noise_amplitude)
+	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySine");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
-	normal_distribution<> noise(0, noise_amplitude);
+	normal_distribution<> noise(0, noise_stdev);
 
 	float samples_per_cycle = period * 1.0 / sampleperiod;
 	float radians_per_sample = 2 * M_PI / samples_per_cycle;
@@ -133,13 +157,13 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	float period2,
 	int64_t sampleperiod,
 	size_t depth,
-	float noise_amplitude)
+	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySineMix");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
-	normal_distribution<> noise(0, noise_amplitude);
+	normal_distribution<> noise(0, noise_stdev);
 
 	float radians_per_sample1 = 2 * M_PI * sampleperiod / period1;
 	float radians_per_sample2 = 2 * M_PI * sampleperiod / period2;
@@ -166,7 +190,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_amplitude
+	float noise_stdev
 	)
 {
 	auto ret = new UniformAnalogWaveform("PRBS31");
@@ -211,7 +235,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude, cmdBuf, queue);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
 
 	return ret;
 }
@@ -224,7 +248,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_amplitude)
+	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("8B10B");
 	ret->m_timescale = sampleperiod;
@@ -275,7 +299,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude, cmdBuf, queue);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
 
 	return ret;
 }
@@ -290,7 +314,7 @@ void TestWaveformSource::DegradeSerialData(
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_amplitude,
+	float noise_stdev,
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
 {
@@ -298,7 +322,7 @@ void TestWaveformSource::DegradeSerialData(
 	cap->MarkModifiedFromCpu();
 
 	//RNGs
-	normal_distribution<> noise(0, noise_amplitude);
+	normal_distribution<> noise(0, noise_stdev);
 
 	//Prepare for second pass: reallocate FFT buffer if sample depth changed
 	const size_t npoints = next_pow2(depth);

@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of TestWaveformSource
+	@ingroup core
  */
 
 #ifndef TestWaveformSource_h
@@ -42,7 +43,9 @@
 /**
 	@brief Helper class for generating test waveforms
 
-	Used by DemoOscilloscope as well as various unit tests etc.
+	Used by DemoOscilloscope as well as various unit tests
+
+	@ingroup core
  */
 class TestWaveformSource
 {
@@ -59,7 +62,7 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
-		float noise_amplitude = 0.01);
+		float noise_stdev = 0.01);
 
 	WaveformBase* GenerateNoisySinewaveMix(
 		float amplitude,
@@ -69,7 +72,7 @@ public:
 		float period2,
 		int64_t sampleperiod,
 		size_t depth,
-		float noise_amplitude = 0.01);
+		float noise_stdev = 0.01);
 
 	WaveformBase* GeneratePRBS31(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -79,7 +82,7 @@ public:
 		int64_t sampleperiod,
 		size_t depth,
 		bool lpf = true,
-		float noise_amplitude = 0.01);
+		float noise_stdev = 0.01);
 
 	WaveformBase* Generate8b10b(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -89,7 +92,7 @@ public:
 		int64_t sampleperiod,
 		size_t depth,
 		bool lpf = true,
-		float noise_amplitude = 0.01);
+		float noise_stdev = 0.01);
 
 	WaveformBase* GenerateStep(
 		float vlo,
@@ -102,30 +105,52 @@ public:
 		int64_t sampleperiod,
 		size_t depth,
 		bool lpf,
-		float noise_amplitude,
+		float noise_stdev,
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue);
 
 protected:
+
+	///@brief Random number generator
 	std::minstd_rand& m_rng;
 
+	///@brief Input buffer for FFTs
 	AcceleratorBuffer<float> m_forwardInBuf;
+
+	///@brief Output buffer for FFTs
 	AcceleratorBuffer<float> m_forwardOutBuf;
+
+	///@brief Output buffer for IFFTs
 	AcceleratorBuffer<float> m_reverseOutBuf;
 
+	///@brief FFT plan
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
+
+	///@brief Inverse FFT plan
 	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
 
+	///@brief FFT bin size, in Hz
 	double m_cachedBinSize;
+
+	///@brief Serial channel S-parameter real part
 	AcceleratorBuffer<float> m_resampledSparamSines;
+
+	///@brief Serial channel S-parameter imaginary part
 	AcceleratorBuffer<float> m_resampledSparamCosines;
 
+	///@brief Compute pipeline for our window function
 	ComputePipeline m_rectangularComputePipeline;
+
+	///@brief Compute pipeline for channel emulation
 	ComputePipeline m_channelEmulationComputePipeline;
 
+	///@brief S-parameters of the channel
 	SParameters m_sparams;
 
+	///@brief FFT point count as of last cache update
 	size_t m_cachedNumPoints;
+
+	///@brief Input size of FFT as of last cache update
 	size_t m_cachedRawSize;
 
 	void InterpolateSparameters(float bin_hz, size_t nouts);
