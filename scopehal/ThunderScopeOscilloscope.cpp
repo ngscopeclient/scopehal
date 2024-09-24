@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of ThunderScopeOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
@@ -41,6 +48,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport connected to a TS.NET instance
+ */
 ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -148,6 +160,9 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	m_clippingBuffer.resize(1);
 }
 
+/**
+	@brief Reset performance counters at the start of a capture
+ */
 void ThunderScopeOscilloscope::ResetPerCaptureDiagnostics()
 {
 	m_diag_hardwareWFMHz.SetFloatVal(0);
@@ -159,11 +174,11 @@ void ThunderScopeOscilloscope::ResetPerCaptureDiagnostics()
 }
 
 /**
-	@brief Color the channels based on Pico's standard color sequence (blue-red-green-yellow-purple-gray-cyan-magenta)
+	@brief Color the channels based on our standard color sequence (blue-red-green-yellow)
  */
 string ThunderScopeOscilloscope::GetChannelColor(size_t i)
 {
-	switch(i % 8)
+	switch(i % 4)
 	{
 		case 0:
 			return "#4040ff";
@@ -201,6 +216,7 @@ uint32_t ThunderScopeOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) co
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Device interface functions
 
+///@brief Return the driver name "thunderscope"
 string ThunderScopeOscilloscope::GetDriverNameInternal()
 {
 	return "thunderscope";
