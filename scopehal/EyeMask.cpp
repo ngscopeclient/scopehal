@@ -175,11 +175,12 @@ void EyeMask::RenderForAnalysis(
 		float yoff,
 		float height) const
 {
-	canvas->set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
-    canvas->fill();
-	canvas->set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f );
 
-	canvas->move_to( -1e5, 0 ); 
+	//clear background
+	canvas->set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
+	canvas->fill();
+
+	canvas->move_to( -1e5, 0 );
 	canvas->line_to( 1e5, 0 );
 
 	canvas->line_to( 1e5, height );
