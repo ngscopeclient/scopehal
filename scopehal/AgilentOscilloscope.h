@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of AgilentOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifndef AgilentOscilloscope_h
 #define AgilentOscilloscope_h
 
@@ -34,6 +40,10 @@
 #include "PulseWidthTrigger.h"
 #include "NthEdgeBurstTrigger.h"
 
+/**
+	@brief Driver for Agilent (and some Keysight) oscilloscopes
+	@ingroup scopedrivers
+ */
 class AgilentOscilloscope : public virtual SCPIOscilloscope
 {
 public:
@@ -96,17 +106,30 @@ public:
 	virtual bool SetInterleaving(bool combine) override;
 
 protected:
+
+	///@brief External trigger
 	OscilloscopeChannel* m_extTrigChannel;
 
-	//hardware analog channel count, independent of LA option etc
+	///@brief Hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
+
+	///@brief Number of digital channels supported
 	unsigned int m_digitalChannelCount;
+
+	///@brief Index of the first digital channel (if any)
 	unsigned int m_digitalChannelBase;
 
-	enum ProbeType {
+	///@brief Type of probe connected to a channel
+	enum ProbeType
+	{
+		///@brief No probe, or no ID ring present
 		None,
+
+		///@brief Passive probe with ID resistor for detecting attenuation
 		AutoProbe,
-		SmartProbe,
+
+		///@brief Active probe
+		SmartProbe
 	};
 
 	//config cache
