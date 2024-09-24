@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of UartTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "UartTrigger.h"
 #include "SiglentSCPIOscilloscope.h"
@@ -36,6 +43,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Creates a new UART trigger
+
+	@param scope	Scope to create the trigger for
+ */
 UartTrigger::UartTrigger(Oscilloscope* scope)
 	: SerialTrigger(scope)
 {
@@ -78,6 +90,7 @@ UartTrigger::~UartTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Returns the trigger name "UART"
 string UartTrigger::GetTriggerName()
 {
 	return "UART";

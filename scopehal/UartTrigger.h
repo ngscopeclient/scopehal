@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of UartTrigger
+	@ingroup triggers
  */
 #ifndef UartTrigger_h
 #define UartTrigger_h
@@ -49,6 +50,7 @@
 
 /**
 	@brief Trigger when a UART sees a certain data pattern
+	@ingroup triggers
  */
 class UartTrigger : public SerialTrigger
 {
@@ -56,56 +58,108 @@ public:
 	UartTrigger(Oscilloscope* scope);
 	virtual ~UartTrigger();
 
+	///@brief Type of parity to use
 	enum ParityType
 	{
+		///@brief No parity
 		PARITY_NONE,
+
+		///@brief Odd parity
 		PARITY_ODD,
+
+		///@brief Even parity
 		PARITY_EVEN,
-                PARITY_MARK,
-                PARITY_SPACE
+
+		///@brief Mark parity
+		PARITY_MARK,
+
+		///@brief Space parity
+		PARITY_SPACE
 	};
 
+	/**
+		@brief Set the parity for the trigger
+
+		@param type		Selected parity mode
+	 */
 	void SetParityType(ParityType type)
 	{ m_parameters[m_ptypename].SetIntVal(type); }
 
+	///@brief Get the currently selected parity mode
 	ParityType GetParityType()
 	{ return (ParityType) m_parameters[m_ptypename].GetIntVal(); }
 
+	///@brief What kind of pattern to match
 	enum MatchType
 	{
+		///@brief Match on a data byte
 		TYPE_DATA,
+
+		///@brief Match on a parity error
 		TYPE_PARITY_ERR,
-                TYPE_START,
-                TYPE_STOP
+
+		///@brief Match on a start bit
+		TYPE_START,
+
+		///@brief Match on a stop bit
+		TYPE_STOP
 	};
 
+	/**
+		@brief Sets the match mode for the trigger
+
+		@param type		Type of pattern to look for
+	 */
 	void SetMatchType(MatchType type)
 	{ m_parameters[m_typename].SetIntVal(type); }
 
+	///@brief Returns the currently selected match mode
 	MatchType GetMatchType()
 	{ return (MatchType) m_parameters[m_typename].GetIntVal(); }
 
+	///@brief Polarity of the port
 	enum Polarity
 	{
+		///@brief Idle high, pull low to send a bit
 		IDLE_HIGH,
+
+		///@brief Idle low, pull high to send a bit
 		IDLE_LOW
 	};
 
+	/**
+		@brief Sets the UART polarity
+
+		@param type		Desired polarity
+	 */
 	void SetPolarity(Polarity type)
 	{ m_parameters[m_polarname].SetIntVal(type); }
 
+	///@brief Get the current trigger polarity
 	Polarity GetPolarity()
 	{ return (Polarity) m_parameters[m_polarname].GetIntVal(); }
 
+	///@brief Get the current baud rate
 	int64_t GetBitRate()
 	{ return m_parameters[m_baudname].GetIntVal(); }
 
+	/**
+		@brief Sets the baud rate
+
+		@param t	Desired baud rate
+	 */
 	void SetBitRate(int64_t t)
 	{ m_parameters[m_baudname].SetIntVal(t); }
 
+	///@brief Get the length of the stop bit, in UI
 	float GetStopBits()
 	{ return m_parameters[m_stopname].GetFloatVal(); }
 
+	/**
+		@brief Set the length of the stop bit
+
+		@param n	Length of the stop bit, in UI
+	 */
 	void SetStopBits(float n)
 	{ m_parameters[m_stopname].SetFloatVal(n); }
 
@@ -115,10 +169,20 @@ public:
 	TRIGGER_INITPROC(UartTrigger);
 
 protected:
+
+	///@brief Name of the "baud rate" parameter
 	std::string m_baudname;
+
+	///@brief Name of the "parity type" parameter
 	std::string m_ptypename;
+
+	///@brief Name of the "match type" parameter
 	std::string m_typename;
+
+	///@brief Name of the "stop bits" parameter
 	std::string m_stopname;
+
+	///@brief Name of the "polarity" parameter
 	std::string m_polarname;
 };
 
