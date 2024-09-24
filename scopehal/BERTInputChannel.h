@@ -133,7 +133,7 @@ public:
 
 	void SetMaskFile(const std::string& fname);
 
-	const EyeMask& GetMask()
+	EyeMask& GetMask()
 	{ return m_mask; }
 
 	virtual PhysicalConnector GetPhysicalConnector() override;

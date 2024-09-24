@@ -90,13 +90,21 @@ public:
 	float GetAllowedHitRate() const
 	{ return m_hitrate; }
 
+	void RenderForAnalysis(
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const;
+
 	float CalculateHitRate(
 		EyeWaveform* cap,
 		size_t width,
 		size_t height,
 		float fullscalerange,
 		float xscale,
-		float xoff) const;
+		float xoff);
 
 	bool empty() const
 	{ return m_polygons.empty(); }
@@ -119,6 +127,8 @@ protected:
 
 private:
     std::unique_ptr< canvas_ity::canvas > canvas;
+    size_t m_width, m_height;
+
 };
 
 #endif

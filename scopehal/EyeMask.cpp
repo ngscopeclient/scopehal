@@ -167,74 +167,26 @@ bool EyeMask::Load(const YAML::Node& node)
 	return true;
 }
 
-/**
-	@brief Checks a raw eye pattern dataset against the mask
- */
-float EyeMask::CalculateHitRate(
-	EyeWaveform* cap,
-	size_t width,
-	size_t height,
-	float fullscalerange,
-	float xscale,
-	float xoff
-	) const
+void EyeMask::RenderForAnalysis(
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const
 {
-	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
+	canvas->set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
+    canvas->fill();
+	canvas->set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f );
 
-	auto begin_canvas_ity = std::chrono::high_resolution_clock::now();
-	
-	canvas = std::make_unique< canvas_ity::canvas >( width, height );
-	float nmax = 0;
+	canvas->move_to( -1e5, 0 ); 
+	canvas->line_to( 1e5, 0 );
 
+	canvas->line_to( 1e5, height );
+	canvas->line_to(-1e5, height);
 
-/*
-	auto end_canvas_ity = std::chrono::high_resolution_clock::now();
-	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end_canvas_ity-begin_canvas_ity).count() << "ns" << std::endl;
-	
-
-	auto beginfill1 = std::chrono::high_resolution_clock::now();
-
-	canvas.set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
-
-    canvas.fill();
-
-	auto endfill1 = std::chrono::high_resolution_clock::now();
-	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(endfill1-beginfill1).count() << "ns" << std::endl;
-
-
-	
-
-	auto begin_sw_rendering = std::chrono::high_resolution_clock::now();
-
-
-	//Software rendering
-	float yscale = height / fullscalerange;
-	float yoff = 0.0f;
-
-	canvas.set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f );
-
-	canvas.move_to( -1e5, 0 ); 
-	canvas.line_to( 1e5, 0 );
-
-	canvas.line_to( 1e5, height );
-	canvas.line_to(-1e5, height);
-
-
-	auto end_sw_rendering = std::chrono::high_resolution_clock::now();
-	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end_sw_rendering-begin_sw_rendering).count() << "ns" << std::endl;
-
-	auto beginfill2 = std::chrono::high_resolution_clock::now();
-
-	canvas.fill();
-
-	canvas.set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
-
-	auto endfill2 = std::chrono::high_resolution_clock::now();
-	std::cout << "fill2" << std::chrono::duration_cast<std::chrono::nanoseconds>(endfill2-beginfill2).count() << "ns" << std::endl;
-
-
-
-	auto poly_start = std::chrono::high_resolution_clock::now();
+	canvas->fill();
+	canvas->set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
 
 	//Draw each polygon
 	for(auto poly : m_polygons)
@@ -246,39 +198,64 @@ float EyeMask::CalculateHitRate(
 			//Convert from ps to UI if needed
 			float time = point.m_time;
 			if(m_timebaseIsRelative)
-				time *= cap->GetUIWidth();
+				time *= waveform->GetUIWidth();
 
 			float x = (time - xoff) * xscale;
 
 			float y = height/2 - ( (point.m_voltage + yoff) * yscale );
 
 			if(i == 0) // TODO: Probably not necessary and can always run line_to(x, y)
-				canvas.move_to(x, y); // Set to starting point for line if first run
+				canvas->move_to(x, y); // Set to starting point for line if first run
 			else
-				canvas.line_to(x, y); // Draw line to next coord
+				canvas->line_to(x, y); // Draw line to next coord
 		}
-		canvas.fill(); // fill the resultant line defined polygon with the current color (white)
-
+		canvas->fill(); // fill the resultant line defined polygon with the current color (white)
 	}
+}
 
-	auto poly_end = std::chrono::high_resolution_clock::now();
-	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(poly_end-poly_start).count() << "ns" << std::endl;
+/**
+	@brief Checks a raw eye pattern dataset against the mask
+ */
+float EyeMask::CalculateHitRate(
+	EyeWaveform* cap,
+	size_t width,
+	size_t height,
+	float fullscalerange,
+	float xscale,
+	float xoff
+	)
+{
+
+	if(!canvas || (m_width != width) || (m_height != height))
+	{
+		m_width = width;
+		m_height = height;
+		canvas = std::make_unique< canvas_ity::canvas >( width, height );
+		
+		//Software rendering
+		float yscale = height / fullscalerange;
+		RenderForAnalysis(
+			cap,
+			xscale,
+			xoff,
+			yscale,
+			0,
+			height);
+	}
 
 	//Test each pixel of the eye pattern against the mask
 
-	int stride = sizeof(unsigned char) * 4; // TODO: Check this for correctness
-
+	float nmax = 0;
 	vector<unsigned char> image_data(width*height);
-
-	canvas.get_image_data(image_data.data(), width, height, stride, 0,0);
-
+	canvas->get_image_data(image_data.data(), width, height, 4, 0,0);
 
 
 	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
 	{
 		auto accum = cap->GetAccumData();
 
-		auto data = &image_data[0];
+		uint32_t* data = reinterpret_cast<uint32_t*>(&image_data[0]);
+		int stride = 1; // TODO: Check this for correctness
 
 		for(size_t y=0; y<height; y++)
 		{
@@ -299,14 +276,13 @@ float EyeMask::CalculateHitRate(
 				}
 			}
 		}
-		printf("null");
 	}
 	else //if(cap->GetType() == EyeWaveform::EYE_BER)
 	{
 		auto accum = cap->GetData();
 		
-		auto data = &image_data[0];
-
+		uint32_t* data = reinterpret_cast<uint32_t*>(&image_data[0]);
+		int stride = 1;
 		for(size_t y=0; y<height; y++)
 		{
 			auto row = data + (y*stride);
@@ -325,8 +301,6 @@ float EyeMask::CalculateHitRate(
 			}
 		}
 	}
-
-	printf("null"); */
 
 	return nmax;
 }
