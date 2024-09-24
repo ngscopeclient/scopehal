@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,12 +31,15 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of TwoLevelTrigger
+	@ingroup triggers
  */
 #ifndef TwoLevelTrigger_h
 #define TwoLevelTrigger_h
 
 /**
 	@brief Base class for all triggers that have two thresholds rather than one
+
+	@ingroup triggers
  */
 class TwoLevelTrigger : public Trigger
 {
@@ -44,21 +47,39 @@ public:
 	TwoLevelTrigger(Oscilloscope* scope);
 	virtual ~TwoLevelTrigger();
 
-	//Upper bound of range is the base class "trigger level"
+	/**
+		@brief Gets the upper of the two trigger levels
+
+		This is the base class "trigger level.
+	 */
 	float GetUpperBound()
 	{ return GetLevel(); }
 
-	void SetUpperBound(float f)
-	{ SetLevel(f); }
+	/**
+		@brief Sets the upper trigger level
 
-	//Lower bound
+		This is the base class "trigger level.
+
+		@param level	Trigger level
+	 */
+	void SetUpperBound(float level)
+	{ SetLevel(level); }
+
+	///@brief Gets the lower of the two trigger levels
 	float GetLowerBound()
 	{ return m_parameters[m_lowername].GetFloatVal(); }
 
+	/**
+		@brief Sets the lower trigger level
+
+		@param level	Trigger level
+	 */
 	void SetLowerBound(float level)
 	{ m_parameters[m_lowername].SetFloatVal(level); }
 
 protected:
+
+	///@brief Name of the "lower threshold" parameter
 	std::string m_lowername;
 };
 
