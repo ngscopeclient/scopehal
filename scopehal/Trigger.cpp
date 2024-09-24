@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of Trigger
+	@ingroup core
+ */
+
 #include "scopehal.h"
 
 using namespace std;
@@ -36,6 +43,11 @@ Trigger::CreateMapType Trigger::m_createprocs;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a new trigger
+
+	@param scope	The scope this trigger is attached to
+ */
 Trigger::Trigger(Oscilloscope* scope)
 	: m_scope(scope)
 	, m_levelname("Level")
@@ -51,24 +63,45 @@ Trigger::~Trigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
+/**
+	@brief Register a new trigger class for dynamic creation
+
+	Do not call this function directly, use the AddTriggerClass macro
+
+	@param name		Name of the trigger class
+	@param proc		Factory method
+ */
 void Trigger::DoAddTriggerClass(string name, CreateProcType proc)
 {
 	m_createprocs[name] = proc;
 }
 
+/**
+	@brief Gets a list of all registered trigger types
+
+	@param[out] names	List of known triggers
+ */
 void Trigger::EnumTriggers(vector<string>& names)
 {
 	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
 		names.push_back(it->first);
 }
 
+/**
+	@brief	Creates a new trigger for an oscilloscope
+
+	@param name		Name of the desired trigger
+	@param scope	The scope to create the trigger for
+
+	@return The newly created trigger, or nullptr on failure
+ */
 Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
 {
 	if(m_createprocs.find(name) != m_createprocs.end())
 		return m_createprocs[name](scope);
 
 	LogError("Invalid trigger name: %s\n", name.c_str());
-	return NULL;
+	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
