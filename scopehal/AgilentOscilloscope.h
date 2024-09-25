@@ -132,21 +132,43 @@ protected:
 		SmartProbe
 	};
 
-	//config cache
+	///@brief Map of channel ID to offset
 	std::map<size_t, float> m_channelOffsets;
+
+	///@brief Map of channel ID to voltage range
 	std::map<size_t, float> m_channelVoltageRanges;
+
+	///@brief Map of channel ID to voltage range
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
+
+	///@brief Map of channel ID to attenuation
 	std::map<size_t, double> m_channelAttenuations;
+
+	///@brief Map of channel ID to bandwidth limit
 	std::map<size_t, int> m_channelBandwidthLimits;
+
+	///@brief Map of channel ID to enable flag
 	std::map<int, bool> m_channelsEnabled;
+
+	///@brief Map of channel ID to probe type
 	std::map<size_t, ProbeType> m_probeTypes;
 
+	///@brief True if m_sampleDepth is valid, false if not
 	bool m_sampleDepthValid;
+
+	///@brief Acquisition memory depth
 	uint64_t m_sampleDepth;
+
+	///@brief True if m_sampleRate is valid, false if not
 	bool m_sampleRateValid;
+
+	///@brief Acquisition sample rate
 	uint64_t m_sampleRate;
 
+	///@brief True if trigger is armed, false if idle
 	bool m_triggerArmed;
+
+	///@brief True if trigger is one-shot (single or forced), false if idle
 	bool m_triggerOneShot;
 
 	void PullEdgeTrigger();
@@ -167,9 +189,13 @@ protected:
 	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
 
 private:
+
+	///@brief Map of sample rates to maximum on-screen record length
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
 
-	struct WaveformPreamble {
+	///@brief Preamble of a waveform
+	struct WaveformPreamble
+	{
 		unsigned int format;
 		unsigned int type;
 		size_t length;
@@ -193,7 +219,6 @@ private:
 		std::vector<uint8_t> &data, WaveformPreamble &preamble,
 		size_t chan_start);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
-
 
 public:
 	static std::string GetDriverNameInternal();

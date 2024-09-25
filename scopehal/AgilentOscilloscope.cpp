@@ -178,6 +178,11 @@ AgilentOscilloscope::~AgilentOscilloscope()
 {
 }
 
+/**
+	@brief Set up the operating mode for a channel
+
+	@param channel	The channel to configure
+ */
 void AgilentOscilloscope::ConfigureWaveform(string channel)
 {
 	//Select the channel to apply settings to
@@ -194,6 +199,7 @@ void AgilentOscilloscope::ConfigureWaveform(string channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant driver name "agilent".
 string AgilentOscilloscope::GetDriverNameInternal()
 {
 	return "agilent";
@@ -231,16 +237,39 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_trigger = NULL;
 }
 
+/**
+	@brief Check if a channel is analog
+
+	@param i	Channel index
+
+	@return		True if analog, false if digital
+ */
 bool AgilentOscilloscope::IsAnalogChannel(size_t i)
 {
 	return GetOscilloscopeChannel(i)->GetType(0) == Stream::STREAM_TYPE_ANALOG;
 }
 
-size_t AgilentOscilloscope::GetDigitalPodIndex(size_t i) {
+/**
+	@brief Get the digital pod number given a channel number
+
+	@param	i	Channel index
+
+	@return	Pod number
+ */
+size_t AgilentOscilloscope::GetDigitalPodIndex(size_t i)
+{
 	return ((i - m_digitalChannelBase) / 8) + 1;
 }
 
-std::string AgilentOscilloscope::GetDigitalPodName(size_t i) {
+/**
+	@brief Get the digital pod name given a channel number
+
+	@param	i	Channel index
+
+	@return	Pod name
+ */
+std::string AgilentOscilloscope::GetDigitalPodName(size_t i)
+{
 	return "POD" + to_string(GetDigitalPodIndex(i));
 }
 
@@ -561,6 +590,13 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 	}
 }
 
+/**
+	@brief Download waveform data from a single channel
+
+	@param channel	Name of the channel
+
+	@return			Raw waveform data
+ */
 vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -586,6 +622,13 @@ vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 	return buf;
 }
 
+/**
+	@brief Get the waveform preamble for a single channel
+
+	@param channel	Name of the channel
+
+	@return			Preamble data
+ */
 AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
 {
 	WaveformPreamble ret;
@@ -602,9 +645,18 @@ AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(s
 	return ret;
 }
 
+/**
+	@brief Convert raw data from a digital pod into waveform objects
+
+	@param[out] pending_waveforms	Resulting digital waveforms
+	@param[in]	data				The raw sample data
+	@param[in]	preamble			Preamble of the waveform
+	@param		chan_start			Index of the first channel in the pod
+ */
 void AgilentOscilloscope::ProcessDigitalWaveforms(
        map<int, vector<WaveformBase*>> &pending_waveforms,
-       vector<uint8_t> &data, AgilentOscilloscope::WaveformPreamble &preamble,
+       vector<uint8_t> &data,
+       AgilentOscilloscope::WaveformPreamble &preamble,
        size_t chan_start)
 {
 	for (int i = 0; i < 8; i++)
@@ -797,7 +849,8 @@ bool AgilentOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
-static std::map<uint64_t, double> sampleRateToDuration {
+static std::map<uint64_t, double> sampleRateToDuration
+{
 	// Map sample rates to corresponding maximum on-screen time duration setting
 	{8000      , 500},
 	{20000     , 200},
@@ -896,6 +949,12 @@ uint64_t AgilentOscilloscope::GetSampleDepth()
 	return depth;
 }
 
+/**
+	@brief Simultaneously set sample rate and memory depth
+
+	@param rate		Sample rate, in samples per second
+	@param depth	Acquisition memory depth
+ */
 void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 {
 	// Look up the maximum capture duration for the requested sample rate
@@ -1024,6 +1083,9 @@ void AgilentOscilloscope::PullEdgeTrigger()
 	GetTriggerSlope(et, m_transport->ReadReply());
 }
 
+/**
+	@brief Reads settings for an Nth-edge-burst trigger from the instrument
+ */
 void AgilentOscilloscope::PullNthEdgeBurstTrigger()
 {
 	//Clear out any triggers of the wrong type
@@ -1065,6 +1127,9 @@ void AgilentOscilloscope::PullNthEdgeBurstTrigger()
 	bt->SetEdgeNumber(stoi(m_transport->ReadReply()));
 }
 
+/**
+	@brief Reads settings for a pulse width trigger from the instrument
+ */
 void AgilentOscilloscope::PullPulseWidthTrigger()
 {
 	//Clear out any triggers of the wrong type
@@ -1135,6 +1200,9 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 
 /**
 	@brief Processes the slope for an edge or edge-derived trigger
+
+	@param trig		Trigger to configure
+	@param reply	Response from the instrument
  */
 void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 {
@@ -1152,6 +1220,9 @@ void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 
 /**
 	@brief Processes the slope for an Nth edge burst trigger
+
+	@param trig		Trigger to configure
+	@param reply	Response from the instrument
  */
 void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string reply)
 {
@@ -1164,7 +1235,9 @@ void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string repl
 }
 
 /**
-	@brief Parses a trigger condition
+	@brief Converts a trigger condition from a string to a Trigger::Condition
+
+	@param reply	Response from the instrument
  */
 Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
 {
@@ -1181,6 +1254,11 @@ Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
 	return Trigger::CONDITION_LESS;
 }
 
+/**
+	@brief Figures out what kind of probe is connected to a channel
+
+	@param i	Channel index
+ */
 void AgilentOscilloscope::GetProbeType(size_t i)
 {
 	{
@@ -1224,6 +1302,8 @@ void AgilentOscilloscope::PushTrigger()
 
 /**
 	@brief Pushes settings for an edge trigger to the instrument
+
+	@param trig	The trigger
  */
 void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
@@ -1244,6 +1324,8 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 
 /**
 	@brief Pushes settings for a Nth edge burst trigger to the instrument
+
+	@param trig	The trigger
  */
 void AgilentOscilloscope::PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig)
 {
@@ -1260,6 +1342,8 @@ void AgilentOscilloscope::PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig)
 
 /**
 	@brief Pushes settings for a pulse width trigger to the instrument
+
+	@param trig	The trigger
  */
 void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
@@ -1285,6 +1369,12 @@ void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 	}
 }
 
+/**
+	@brief Send a trigger condition to the instrument
+
+	@param path		SCPI path of the parameter to set
+	@param cond		Trigger condition
+ */
 void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
 {
 	string cond_str;
@@ -1305,11 +1395,23 @@ void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
 	m_transport->SendCommand(path + " " + cond_str);
 }
 
+/**
+	@brief Send a floating-point value to the instrument
+
+	@param path		SCPI path of the parameter to set
+	@param f		The value to send
+ */
 void AgilentOscilloscope::PushFloat(string path, float f)
 {
 	m_transport->SendCommand(path + " " + to_string_sci(f));
 }
 
+/**
+	@brief Send a trigger slope to the instrument
+
+	@param path		SCPI path of the parameter to set
+	@param slope	The desired slope
+ */
 void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
 {
 	string slope_str;
@@ -1333,6 +1435,12 @@ void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
 	m_transport->SendCommand(path + " " + slope_str);
 }
 
+/**
+	@brief Send a trigger slope to the instrument
+
+	@param path		SCPI path of the parameter to set
+	@param slope	The desired slope
+ */
 void AgilentOscilloscope::PushSlope(string path, NthEdgeBurstTrigger::EdgeType slope)
 {
 	string slope_str;
