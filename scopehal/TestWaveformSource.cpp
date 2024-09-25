@@ -113,12 +113,12 @@ WaveformBase* TestWaveformSource::GenerateStep(
 /**
 	@brief Generates a sinewave with AWGN added
 
-	@param amplitude	P-P amplitude of the waveform
+	@param amplitude	P-P amplitude of the waveform in volts
 	@param startphase	Starting phase in radians
 	@param period		Period of the sine, in femtoseconds
 	@param sampleperiod	Interval between samples, in femtoseconds
 	@param depth		Total number of samples to generate
-	@param noise_stdev	Standard deviation of the AWGN
+	@param noise_stdev	Standard deviation of the AWGN in volts
  */
 WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float amplitude,
@@ -147,9 +147,18 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 }
 
 /**
-	@brief Generates a mix of two sinewaves plus some noise
+	@brief Generates a sum of two sinewaves with AWGN added
+
+	@param amplitude	P-P amplitude of the waveform in volts
+	@param startphase1	Starting phase of the first sine in radians
+	@param startphase2	Starting phase of the second sine in radians
+	@param period1		Period of the first sine, in femtoseconds
+	@param period2		Period of the second sine, in femtoseconds
+	@param sampleperiod	Interval between samples, in femtoseconds
+	@param depth		Total number of samples to generate
+	@param noise_stdev	Standard deviation of the AWGN in volts
  */
-WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
+WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	float amplitude,
 	float startphase1,
 	float startphase2,
@@ -159,7 +168,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	size_t depth,
 	float noise_stdev)
 {
-	auto ret = new UniformAnalogWaveform("NoisySineMix");
+	auto ret = new UniformAnalogWaveform("NoisySineSum");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -182,6 +191,18 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	return ret;
 }
 
+/**
+	@brief Generates a PRBS-31 waveform through a lossy channel with AWGN
+
+	@param cmdBuf		Vulkan command buffer to use for channel emulation
+	@param queue		Vulkan queue to use for channel emulation
+	@param amplitude	P-P amplitude of the waveform in volts
+	@param period		Unit interval, in femtoseconds
+	@param sampleperiod	Interval between samples, in femtoseconds
+	@param depth		Total number of samples to generate
+	@param lpf			Emulate a lossy channel if true, no channel emulation if false
+	@param noise_stdev	Standard deviation of the AWGN in volts
+ */
 WaveformBase* TestWaveformSource::GeneratePRBS31(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue,
@@ -240,6 +261,18 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	return ret;
 }
 
+/**
+	@brief Generates a K28.5 D16.2 (1000base-X / SGMII idle) waveform through a lossy channel with AWGN
+
+	@param cmdBuf		Vulkan command buffer to use for channel emulation
+	@param queue		Vulkan queue to use for channel emulation
+	@param amplitude	P-P amplitude of the waveform in volts
+	@param period		Unit interval, in femtoseconds
+	@param sampleperiod	Interval between samples, in femtoseconds
+	@param depth		Total number of samples to generate
+	@param lpf			Emulate a lossy channel if true, no channel emulation if false
+	@param noise_stdev	Standard deviation of the AWGN in volts
+ */
 WaveformBase* TestWaveformSource::Generate8b10b(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue,
@@ -307,7 +340,16 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 /**
 	@brief Takes an idealized serial data stream and turns it into something less pretty
 
-	by adding noise and a band-limiting filter
+	The channel is a combination of a lossy S-parameter channel (approximately 300mm of microstrip on Shengyi S1000-2M)
+	and AWGN with configurable standard deviation
+
+	@param cap				Waveform to degrade
+	@param sampleperiod		Period of the input waveform
+	@param depth			Number of points in the input waveform
+	@param lpf				True to perform channel emulation, false to only add noise
+	@param noise_stdev		Standard deviation of the AWGN, in volts
+	@param cmdBuf			Vulkan command buffer to use for channel emulation
+	@param queue			Vulkan queue to use for channel emulation
  */
 void TestWaveformSource::DegradeSerialData(
 	UniformAnalogWaveform* cap,
@@ -438,7 +480,10 @@ void TestWaveformSource::DegradeSerialData(
 }
 
 /**
-	@brief Recalculate the cached S-parameters
+	@brief Recalculate the cached S-parameters used for channel emulation
+
+	@param bin_hz	Size of each FFT bin, in Hz
+	@param nouts	Number of FFT bins
  */
 void TestWaveformSource::InterpolateSparameters(float bin_hz, size_t nouts)
 {

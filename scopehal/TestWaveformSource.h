@@ -64,7 +64,7 @@ public:
 		size_t depth,
 		float noise_stdev = 0.01);
 
-	WaveformBase* GenerateNoisySinewaveMix(
+	WaveformBase* GenerateNoisySinewaveSum(
 		float amplitude,
 		float startphase1,
 		float startphase2,
