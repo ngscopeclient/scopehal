@@ -2687,7 +2687,11 @@ void TektronixOscilloscope::PullTrigger()
 }
 
 /**
-	@brief Parses a trigger level message
+	@brief Determine the current trigger level
+
+	@param chan	The channel selected as the trigger source
+
+	@return	The current trigger level, in volts
  */
 float TektronixOscilloscope::ReadTriggerLevelMSO56(OscilloscopeChannel* chan)
 {
@@ -2983,7 +2987,7 @@ void TektronixOscilloscope::PullRuntTrigger()
 }
 
 /**
-	@brief Reads settings for a runt trigger from the instrument
+	@brief Reads settings for a slew rate trigger from the instrument
  */
 void TektronixOscilloscope::PullSlewRateTrigger()
 {
@@ -3144,6 +3148,11 @@ void TektronixOscilloscope::PushTrigger()
 		LogWarning("Unknown trigger type (not an edge)\n");
 }
 
+/**
+	@brief Push the current trigger voltage level to hardware
+
+	@param trig	The trigger to push
+ */
 void TektronixOscilloscope::SetTriggerLevelMSO56(Trigger* trig)
 {
 	auto chan = trig->GetInput(0).m_channel;
@@ -3159,6 +3168,8 @@ void TektronixOscilloscope::SetTriggerLevelMSO56(Trigger* trig)
 
 /**
 	@brief Pushes settings for an edge trigger to the instrument
+
+	@param trig	The trigger to push
  */
 void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
@@ -3202,6 +3213,11 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	}
 }
 
+/**
+	@brief Pushes settings for a pulse width trigger to the instrument
+
+	@param trig	The trigger to push
+ */
 void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
 	switch(m_family)
@@ -3263,6 +3279,8 @@ void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 
 /**
 	@brief Pushes settings for a dropout trigger to the instrument
+
+	@param trig	The trigger to push
  */
 void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
@@ -3306,6 +3324,8 @@ void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 
 /**
 	@brief Pushes settings for a runt trigger to the instrument
+
+	@param trig	The trigger to push
  */
 void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
@@ -3377,7 +3397,9 @@ void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 }
 
 /**
-	@brief Pushes settings for a runt trigger to the instrument
+	@brief Pushes settings for a slew rate trigger to the instrument
+
+	@param trig	The trigger to push
  */
 void TektronixOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 {
@@ -3445,7 +3467,9 @@ void TektronixOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 }
 
 /**
-	@brief Pushes settings for a runt trigger to the instrument
+	@brief Pushes settings for a window trigger to the instrument
+
+	@param trig	The trigger to push
  */
 void TektronixOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {

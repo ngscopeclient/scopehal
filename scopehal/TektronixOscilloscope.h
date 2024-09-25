@@ -355,10 +355,16 @@ protected:
 	//The lane number for each flex channel
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelLanes;
 
+	///@brief Starting index for digital channels
 	size_t m_digitalChannelBase;
+
+	///@brief Starting index for spectrum channels
 	size_t m_spectrumChannelBase;
 
+	///@brief True if trigger is armed, false if idle
 	bool m_triggerArmed;
+
+	///@brief True if trigger is single or forced, false if continuous
 	bool m_triggerOneShot;
 
 	void PullEdgeTrigger();
@@ -377,10 +383,23 @@ protected:
 	float ReadTriggerLevelMSO56(OscilloscopeChannel* chan);
 	void SetTriggerLevelMSO56(Trigger* trig);
 
-	//Helpers for figuring out type of a channel by the index
+	/**
+		@brief Check if a channel is analog given the index
+
+		@param index	Channel number
+
+		@return	True if analog, false if spectrum or digital
+	 */
 	bool IsAnalog(size_t index)
 	{ return index < m_analogChannelCount; }
 
+	/**
+		@brief Check if a channel is digital given the index
+
+		@param index	Channel number
+
+		@return	True if digital, false if spectrum or analog
+	 */
 	bool IsDigital(size_t index)
 	{
 		if(index < m_digitalChannelBase)
@@ -390,6 +409,13 @@ protected:
 		return true;
 	}
 
+	/**
+		@brief Check if a channel is spectrum given the index
+
+		@param index	Channel number
+
+		@return	True if spectrum, false if analog or digital
+	 */
 	bool IsSpectrum(size_t index)
 	{
 		if(index < m_spectrumChannelBase)
@@ -399,17 +425,23 @@ protected:
 		return true;
 	}
 
-	///Maximum bandwidth we support, in MHz
+	///@brief Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
+	///@brief Type of scope we're connected to
 	enum Family
 	{
+		///@brief MSO5 series
 		FAMILY_MSO5,
+
+		///@brief MSO6 series
 		FAMILY_MSO6,
+
+		///@brief Other or unknown
 		FAMILY_UNKNOWN
 	} m_family;
 
-	//Installed software options
+	///@brief True if we have the DVM option installed
 	bool m_hasDVM;
 
 	/**
@@ -430,14 +462,28 @@ protected:
 	bool IsEnableStateDirty(size_t chan);
 	void FlushChannelEnableStates();
 
-	//Function generator state
+	///@brief True if we have the AFG option installed
 	bool m_hasAFG;
+
+	///@brief True if the AFG is currently outputting a waveform
 	bool m_afgEnabled;
+
+	///@brief Amplitude of the AFG output, in volts
 	float m_afgAmplitude;
+
+	///@brief DC offset of the AFG output, in volts
 	float m_afgOffset;
+
+	///@brief Frequency of the AFG output, in Hz
 	float m_afgFrequency;
+
+	///@brief Duty cycle of the AFG output (0-1)
 	float m_afgDutyCycle;
+
+	///@brief Waveform the AFG is outputting
 	FunctionGenerator::WaveShape m_afgShape;
+
+	///@brief Impedance selected for the AFG output
 	FunctionGenerator::OutputImpedance m_afgImpedance;
 
 public:
