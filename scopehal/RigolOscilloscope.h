@@ -93,6 +93,8 @@ public:
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
 
+	void ForceHDMode(bool mode);
+
 protected:
 	enum protocol_version
 	{
@@ -134,6 +136,9 @@ protected:
 	uint64_t m_maxSrate;  /* Maximum Sample rate for DHO models */
 	bool m_lowSrate;	  /* True for DHO low sample rate models (DHO800/900) */
 	protocol_version m_protocol;
+
+	//True if we have >8 bit capture depth
+	bool m_highDefinition;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullEdgeTrigger();

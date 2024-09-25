@@ -50,6 +50,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_triggerWasLive(false)
 	, m_triggerOneShot(false)
 	, m_liveMode(false)
+	, m_highDefinition(false)
 {
 	//Last digit of the model number is the number of channels
 	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
@@ -115,6 +116,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		// - DHO1072 (70MHz), DHO1074 (70MHz), DHO1102 (100MHz), DHO1104 (100MHz), DHO1202 (200MHz), DHO1204 (200MHz)
 		// - DHO4204 (200MHz), DHO4404 (400 MHz), DHO4804 (800MHz)
 		m_protocol = DHO;
+		// Those are 12 bits (HD) models => default to high definition mode
+		// This can be overriden by driver 8bits setting
+		m_highDefinition = true;
 
 		int model_multiplicator = 100;
 		int model_modulo = 100;
@@ -237,7 +241,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
 	else
 	{
-		m_transport->SendCommandQueued(":WAV:FORM BYTE");
+		m_transport->SendCommandQueued(string(":WAV:FORM ") + (m_highDefinition ? "WORD" : "BYTE"));
 		m_transport->SendCommandQueued(":WAV:MODE RAW");
 	}
 	if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
@@ -779,7 +783,7 @@ bool RigolOscilloscope::AcquireData()
 	else if(m_protocol == MSO5)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
 
-	unsigned char* temp_buf = new unsigned char[maxpoints + 1];
+	unsigned char* temp_buf = new unsigned char[(m_highDefinition ? (maxpoints * 2) : maxpoints) + 1];
 	map<int, vector<UniformAnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
@@ -900,6 +904,7 @@ bool RigolOscilloscope::AcquireData()
 			//size_t blocksize = end - npoints;
 			//LogDebug("Block size = %zu\n", blocksize);
 			size_t header_blocksize;
+			size_t header_blocksize_bytes;
 			sscanf((char*)header, "%zu", &header_blocksize);
 			//LogDebug("Header block size = %zu\n", header_blocksize);
 
@@ -917,6 +922,10 @@ bool RigolOscilloscope::AcquireData()
 				break;
 			}
 
+			// Block size is provided in bytes, not in points
+			header_blocksize_bytes = header_blocksize;
+			if(m_highDefinition)
+			 	header_blocksize = header_blocksize_bytes/2;
 			if(header_blocksize > maxpoints)
 			{
 				header_blocksize = maxpoints;
@@ -924,14 +933,26 @@ bool RigolOscilloscope::AcquireData()
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	 //trailing newline after data block
+			m_transport->ReadRawData(header_blocksize_bytes + 1, temp_buf);	 //trailing newline after data block
 
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
 			cap->PrepareForCpuAccess();
+
+			const uint16_t* temp_buf_int16 = m_highDefinition ? reinterpret_cast<const uint16_t*>(temp_buf) : NULL;
 			for(size_t j = 0; j < header_blocksize; j++)
-			{
-				float v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
+			{	// Handle 8bit / 16bit acquisition modes
+				float v;
+				if(m_highDefinition)
+				{
+ 					v = (((static_cast<float>(temp_buf_int16[j]))) - ydelta) * yincrement;	
+					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf_int16[j], ydelta, yincrement);
+				}
+				else
+				{
+ 					v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;	
+					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
+				}
 				if(m_protocol == DS_OLD)
 					v = (128 - static_cast<float>(temp_buf[j])) * yincrement - ydelta;
 				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
@@ -1567,5 +1588,17 @@ void RigolOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 		default:
 			LogWarning("Unknown edge type\n");
 			return;
+	}
+}
+
+/**
+	@brief Forces 16-bit transfer mode on/off when for HD models
+ */
+void RigolOscilloscope::ForceHDMode(bool mode)
+{
+	if((m_protocol == DHO) && mode != m_highDefinition)
+	{
+		m_highDefinition = mode;
+		m_transport->SendCommandQueued(string(":WAV:FORM ") + (m_highDefinition ? "WORD" : "BYTE"));
 	}
 }
