@@ -27,6 +27,14 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of TektronixOscilloscope
+
+	@ingroup scopedrivers
+ */
+
 #include "scopehal.h"
 #include "TektronixOscilloscope.h"
 #include "EdgeTrigger.h"
@@ -41,6 +49,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport connected to the scope
+ */
 TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -305,6 +318,7 @@ TektronixOscilloscope::~TektronixOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant driver name string "tektronix"
 string TektronixOscilloscope::GetDriverNameInternal()
 {
 	return "tektronix";
@@ -342,6 +356,9 @@ string TektronixOscilloscope::GetProbeName(size_t i)
 	return m_probeNames[i];
 }
 
+/**
+	@brief Look at each input channel and determine what kind of probe, if any, is connected
+ */
 void TektronixOscilloscope::DetectProbes()
 {
 	std::vector<bool> currentlyEnabled;
@@ -1553,6 +1570,12 @@ bool TektronixOscilloscope::AcquireData()
 	return true;
 }
 
+/**
+	@brief Parses a waveform preamble
+
+	@param[in] 	preamble_in		Raw string preamble
+	@param[out]	preamble_out	Parsed preamble data
+ */
 bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& preamble_out)
 {
 	size_t semicolons = std::count(preamble_in.begin(), preamble_in.end(), ';');
@@ -1623,6 +1646,19 @@ bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& pr
 	return false;
 }
 
+/**
+	@brief Attempt to recover synchronization between ngscopeclient and the scope-side SCPI stack.
+
+	This involves a lot of ugly hacks while attempting to undo behavior the scope should never have had in the first
+	place (keeping application layer protocol state across client disconnect/reconnect events).
+
+	We flush the receive buffer twice at the scope side, throw away anything in the socket RX buffer, then send a
+	PRBS-3 of two different query commands with predictable output. By cross-correlating the replies with the sent
+	commands, we can determine how many lines worth of garbage were in the instrument's TX buffer, discard them,
+	and recover sync.
+
+	In theory. It doesn't always work and sometimes things are completely hosed until the scope reboots.
+ */
 void TektronixOscilloscope::ResynchronizeSCPI()
 {
 	LogTrace("Resynchronizing\n");
@@ -1726,6 +1762,13 @@ void TektronixOscilloscope::ResynchronizeSCPI()
 	*/
 }
 
+/**
+	@brief Acquire data from a MSO5 or MSO6 scope
+
+	@param[out] pending_waveforms 	Map of channel number -> waveform
+
+	@return True on success, false on failure
+ */
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Seems like we might need a command before reading data after the trigger?
@@ -2110,12 +2153,22 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	return true;
 }
 
+/**
+	@brief Checks if the channel enable state of a channel is up to date
+
+	@param chan	Channel index
+
+	@return	True if up to date, false if not
+ */
 bool TektronixOscilloscope::IsEnableStateDirty(size_t chan)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelEnableStatusDirty.find(chan) != m_channelEnableStatusDirty.end();
 }
 
+/**
+	@brief Flushes pending channel enable/disable commands
+ */
 void TektronixOscilloscope::FlushChannelEnableStates()
 {
 	//Push all previous commands to the scope, then mark channel enable states as up to date
