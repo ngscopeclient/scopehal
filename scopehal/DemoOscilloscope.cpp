@@ -539,7 +539,7 @@ bool DemoOscilloscope::AcquireData()
 				break;
 
 			case 1:
-				waveforms[i] = m_source[i]->GenerateNoisySinewaveMix(
+				waveforms[i] = m_source[i]->GenerateNoisySinewaveSum(
 					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
 				break;
 

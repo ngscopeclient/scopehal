@@ -27,6 +27,14 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of TektronixOscilloscope
+
+	@ingroup scopedrivers
+ */
+
 #ifndef TektronixOscilloscope_h
 #define TektronixOscilloscope_h
 
@@ -39,6 +47,7 @@ class WindowTrigger;
 
 /**
 	@brief Driver for Tektronix oscilloscopes
+	@ingroup scopedrivers
 
 	Tek scopes appear to adhere strictly to the LXI-style request-response model.
 	Sending a new command while another is currently executing will result in one or both commands aborting.
@@ -56,6 +65,12 @@ class WindowTrigger;
 		Prints a status register, not quite sure what this does
 	ALLEV?
 		Prints the error log in a somewhat confusing and not-human-readable format
+
+	Other gotchas to be aware of: if you send a command that is malformed or the scope is not in the correct state for
+	(e.g. querying status of a MSO channel when there is no MSO probe connected to that channel), it will be dropped
+	silently and the scope may hang for a few seconds before processing more commands. Resync after this is difficult.
+
+	Just don't do it.
  */
 class TektronixOscilloscope
 	: public virtual SCPIOscilloscope
@@ -206,9 +221,18 @@ public:
 	virtual int64_t GetResolutionBandwidth() override;
 
 protected:
+
+	///@brief External trigger
 	OscilloscopeChannel* m_extTrigChannel;
+
+	///@brief Function generator output
 	FunctionGeneratorChannel* m_awgChannel;
 
+	/**
+		@brief Binary waveform header
+
+		TODO: link relevant documentation
+	 */
 	struct mso56_preamble
 	{
 		int byte_num;
@@ -249,32 +273,69 @@ protected:
 	bool AcquireDataMSO56(std::map<int, std::vector<WaveformBase*> >& pending_waveforms);
 	void DetectProbes();
 
-	//hardware analog channel count, independent of LA option etc
+	///@brief Hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 
+	///@brief Type of probe connected to a hardware channel
 	enum ProbeType
 	{
+		///@brief Standard high impedance probe
 		PROBE_TYPE_ANALOG,
+
+		///@brief 250K ohm high bandwidth probe
 		PROBE_TYPE_ANALOG_250K,
+
+		///@brief Current probe
 		PROBE_TYPE_ANALOG_CURRENT,
+
+		///@brief 8-bit logic pod
 		PROBE_TYPE_DIGITAL_8BIT
 	};
 
 	//config cache
+
+	///@brief Cached map of <channel ID, offset>
 	std::map<size_t, float> m_channelOffsets;
+
+	///@brief Cached map of <channel ID, full scale range>
 	std::map<size_t, float> m_channelVoltageRanges;
+
+	///@brief Cached map of <channel ID, coupling>
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
+
+	///@brief Cached map of <channel ID, attenuation>
 	std::map<size_t, double> m_channelAttenuations;
+
+	///@brief Cached map of <channel ID, bandwidth limiter>
 	std::map<size_t, int> m_channelBandwidthLimits;
+
+	///@brief Cached map of <channel ID, enable flag>
 	std::map<int, bool> m_channelsEnabled;
+
+	///@brief True if m_triggerChannel is valid, false if out of sync
 	bool m_triggerChannelValid;
+
+	///@brief Index of the channel selected for triggering
 	size_t m_triggerChannel;
+
+	///@brief True if m_sampleRate is valid, false if out of sync
 	bool m_sampleRateValid;
+
+	///@brief Acquisition sample rate, in samples/sec
 	uint64_t m_sampleRate;
+
+	///@brief True if m_sampleDepth is valid, false if out of sync
 	bool m_sampleDepthValid;
+
+	///@brief Acquisition memory depth, in samples
 	uint64_t m_sampleDepth;
+
+	///@brief True if m_triggerOffset is valid, false if out of sync
 	bool m_triggerOffsetValid;
+
+	///@brief Offset from start of wavefrom to trigger position
 	int64_t m_triggerOffset;
+
 	std::map<size_t, int64_t> m_channelDeskew;
 	std::map<size_t, ProbeType> m_probeTypes;
 	std::map<size_t, std::string> m_probeNames;
