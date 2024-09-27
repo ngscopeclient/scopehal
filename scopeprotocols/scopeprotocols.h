@@ -191,6 +191,7 @@
 #include "ScaleFilter.h"
 #include "SDCmdDecoder.h"
 #include "SDDataDecoder.h"
+#include "SiglentBINImportFilter.h"
 #include "SNRFilter.h"
 #include "SParameterCascadeFilter.h"
 #include "SParameterDeEmbedFilter.h"

@@ -865,6 +865,14 @@ public:
 	static void Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, float gain, float offset, size_t count);
 #endif
 
+	static void ConvertUnsigned16BitSamples(float* pout, uint16_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned16BitSamplesGeneric(float* pout, uint16_t* pin, float gain, float offset, size_t count);
+#ifdef __x86_64__
+	static void ConvertUnsigned16BitSamplesAVX2(float* pout, uint16_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned16BitSamplesFMA(float* pout, uint16_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned16BitSamplesAVX512F(float* pout, uint16_t* pin, float gain, float offset, size_t count);
+#endif
+
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Waveform Access
