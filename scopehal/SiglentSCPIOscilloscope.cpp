@@ -405,7 +405,8 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
-			m_requireSizeWorkaround = true;
+			// No need for size workaround on SDS800X HD, at lease with fimware versions v1.1.3.3 and v1.1.3.8
+			// m_requireSizeWorkaround = true;
 		}
 		else
 		{
