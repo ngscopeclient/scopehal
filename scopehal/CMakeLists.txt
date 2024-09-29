@@ -136,6 +136,7 @@ set(SCOPEHAL_SOURCES
 	SCPIBERT.cpp
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp
+	ModbusInstrument.cpp
 	SCPILoad.cpp
 	SCPIMiscInstrument.cpp
 	SCPIMultimeter.cpp
@@ -185,6 +186,7 @@ set(SCOPEHAL_SOURCES
 	RSRTO6Oscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
+	RidenPowerSupply.cpp
 
 	StandardColors.cpp
 	Filter.cpp

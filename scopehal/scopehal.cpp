@@ -71,6 +71,7 @@
 #include "RigolDP8xxPowerSupply.h"
 #include "RohdeSchwarzHMC804xPowerSupply.h"
 #include "SiglentPowerSupply.h"
+#include "RidenPowerSupply.h"
 
 #include "SiglentLoad.h"
 
@@ -249,6 +250,7 @@ void DriverStaticInit()
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 	AddPowerSupplyDriverClass(SiglentPowerSupply);
 	AddPowerSupplyDriverClass(HP662xAPowerSupply);
+	AddPowerSupplyDriverClass(RidenPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
