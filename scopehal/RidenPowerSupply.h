@@ -62,7 +62,28 @@ public:
 	virtual bool IsPowerConstantCurrent(int chan) override;
 
 protected:
-	unsigned int GetStatusRegister();
+	enum Registers : uint8_t {
+		REGISTER_MODEL    = 0x00,
+		REGISTER_SERIAL   = 0x02,
+		REGISTER_FIRMWARE = 0x03,
+
+		REGISTER_TEMP_C = 0x05,
+		REGISTER_TEMP_F = 0x07,
+
+		REGISTER_V_SET = 0x08,
+		REGISTER_I_SET = 0x09,
+		REGISTER_V_OUT = 0x0A,
+		REGISTER_I_OUT = 0x0B,
+
+		REGISTER_WATT    = 0x0D,
+		REGISTER_V_INPUT = 0x0E,
+		REGISTER_LOCK    = 0x0F,
+		REGISTER_ERROR   = 0x10,
+		
+		REGISTER_ON_OFF  = 0x12
+	};
+
+
 
 public:
 	static std::string GetDriverNameInternal();

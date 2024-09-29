@@ -42,18 +42,16 @@ RidenPowerSupply::RidenPowerSupply(SCPITransport* transport)
 	m_channels.push_back(new PowerSupplyChannel("CH1", this, "#008000", 0));
 	m_vendor = "Riden";
 	// Read model number
-	uint16_t modelNumber = ReadRegister(0x00);
+	uint16_t modelNumber = ReadRegister(REGISTER_MODEL);
 	m_model = string("RD") + to_string(modelNumber/10) +"-" + to_string(modelNumber%10);
 	// Read serial number
-	uint16_t seriallNumber = ReadRegister(0x02);
+	uint16_t seriallNumber = ReadRegister(REGISTER_SERIAL);
 	m_serial = to_string(seriallNumber);
 	// Read firmware version number
 	float firmwareVersion = ((float)ReadRegister(0x03))/100;
 	m_fwVersion = to_string(firmwareVersion);
-	// Unlock remote command
-
-	// 
-	WriteRegister(0x12,0x01);
+	// Unlock remote control
+	WriteRegister(REGISTER_LOCK,0x00);
 }
 
 RidenPowerSupply::~RidenPowerSupply()
@@ -90,24 +88,10 @@ bool RidenPowerSupply::SupportsVoltageCurrentControl(int chan)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual hardware interfacing
 
-/*
-	Bit 0: CH1 CC mode
-	Bit 1: CH2 CC mode
-	Bit 4: CH1 on
-	Bit 5: CH2 on
- */
-unsigned int RidenPowerSupply::GetStatusRegister()
-{
-	//auto str = m_transport->SendCommandQueuedWithReply("syst:stat?");
-	unsigned int ret = 0;
-	//sscanf(str.c_str(), "0x%x", &ret);
-	return ret;
-}
-
 bool RidenPowerSupply::IsPowerConstantCurrent(int chan)
 {
 	if(chan == 0)
-		return (ReadRegister(0x10)==0x02);
+		return (ReadRegister(REGISTER_ERROR)==0x02);
 	else
 		return false;
 }
@@ -116,54 +100,54 @@ double RidenPowerSupply::GetPowerVoltageActual(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(0x0A))/100;
+	return ((double)ReadRegister(REGISTER_V_OUT))/100;
 }
 
 double RidenPowerSupply::GetPowerVoltageNominal(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(0x08))/100;
+	return ((double)ReadRegister(REGISTER_V_SET))/100;
 }
 
 double RidenPowerSupply::GetPowerCurrentActual(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(0x0B))/1000;
+	return ((double)ReadRegister(REGISTER_I_OUT))/1000;
 }
 
 double RidenPowerSupply::GetPowerCurrentNominal(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(0x09))/1000;
+	return ((double)ReadRegister(REGISTER_I_SET))/1000;
 }
 
 bool RidenPowerSupply::GetPowerChannelActive(int chan)
 {
 	if(chan != 0)
 		return false;
-	return (ReadRegister(0x12)==0x0001);
+	return (ReadRegister(REGISTER_ON_OFF)==0x0001);
 }
 
 void RidenPowerSupply::SetPowerVoltage(int chan, double volts)
 {
 	if(chan != 0)
 		return;
-	WriteRegister(0x08,(uint16_t)(volts*100));
+	WriteRegister(REGISTER_V_SET,(uint16_t)(volts*100));
 }
 
 void RidenPowerSupply::SetPowerCurrent(int chan, double amps)
 {
 	if(chan != 0)
 		return;
-	WriteRegister(0x09,(uint16_t)(amps*1000));
+	WriteRegister(REGISTER_I_SET,(uint16_t)(amps*1000));
 }
 
 void RidenPowerSupply::SetPowerChannelActive(int chan, bool on)
 {
 	if(chan != 0)
 		return;
-	WriteRegister(0x12, (on ? 0x01 : 0x00));
+	WriteRegister(REGISTER_ON_OFF, (on ? 0x01 : 0x00));
 }
