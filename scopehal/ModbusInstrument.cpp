@@ -70,7 +70,7 @@ uint16_t ModbusInstrument::ReadRegister(uint16_t address)
 	std::vector<uint8_t> data;
 	// Adress to read
 	PushUint16(&data,address);
-	// Number of bytes to read (1)
+	// Number of registers to read (1)
 	PushUint16(&data,0x0001);
 	Converse(ReadAnalogOutputHoldingRegisters,&data);
 	// Response data should be the 2 bytes of the requested register
@@ -99,10 +99,29 @@ uint16_t ModbusInstrument::WriteRegister(uint16_t address, uint16_t value)
 	return ReadUint16(&data,2);
 }
 
-uint8_t ModbusInstrument::ReadRegisters(uint16_t /*address*/, uint8_t* /*data*/, uint8_t /*count*/)
+uint8_t ModbusInstrument::ReadRegisters(uint16_t address, std::vector<uint16_t>* result, uint8_t count)
 {
-	// TODO
-	return 0;
+	if(!result)
+		return 0;
+	uint16_t byteCount = count*2;
+	std::vector<uint8_t> data;
+	// Adress to read
+	PushUint16(&data,address);
+	// Number of registers to read (1)
+	PushUint16(&data,count);
+	Converse(ReadAnalogOutputHoldingRegisters,&data);
+	// Response data should be the 2 bytes of the requested register
+	if(data.size()!=byteCount)
+	{
+		LogError("Invalid response length: %llu, expected %d.\n",data.size(),byteCount);
+		return 0;
+	}
+	result->reserve(count);
+	for(int i = 0 ; i < count ; i++)
+	{
+		result->push_back(ReadUint16(&data,2*i));
+	}
+	return count;
 }
 
 
@@ -198,13 +217,12 @@ void ModbusInstrument::ReadResponse(ModbusFunction function, std::vector<uint8_t
 		dataLength = 4;
 	}
 	// Read data and CRC
-	buffer.reserve(dataLength);
+	buffer.reserve(dataLength+2);
 	if(!m_transport->ReadRawData(dataLength+2,buffer.begin().base()))
 	{
 		LogError("Could not read Modbus data and CRC response.\n");
 		return;
 	}
-	// TODO check CRC
 	if(data)
 	{	// Move data to result vector
 		data->clear();

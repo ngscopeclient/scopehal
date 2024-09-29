@@ -41,7 +41,7 @@ public:
 
 	virtual uint16_t ReadRegister(uint16_t address);
 	virtual uint16_t WriteRegister(uint16_t address, uint16_t value);
-	virtual uint8_t ReadRegisters(uint16_t address, uint8_t* data, uint8_t count);
+	virtual uint8_t ReadRegisters(uint16_t address, std::vector<uint16_t>* data, uint8_t count);
 
 protected:
 	enum ModbusFunction : uint8_t {
