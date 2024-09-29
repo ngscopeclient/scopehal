@@ -53,7 +53,7 @@ void ModbusInstrument::PushUint16(std::vector<uint8_t>* data, uint16_t value)
 
 uint16_t ModbusInstrument::ReadUint16(std::vector<uint8_t>* data, uint8_t index)
 {
-	if(data->size() <= ((size_t)(index+1)))
+	if(!data || data->size() <= ((size_t)(index+1)))
 		return 0;
 	return (static_cast<uint16_t>((*data)[index+1]) + (static_cast<uint16_t>((*data)[index]) << 8)); 
 }
