@@ -285,16 +285,21 @@ vector< pair<int64_t, int64_t> > SetupHoldMeasurement::GetEdgeTimestamps(
 		float vin = wfm->m_samples[i];
 		int64_t tstamp = GetOffsetScaled(wfm, i);
 
+		float lerpHi = InterpolateTime(wfm, i-1, vih);
+		float lerpLo = InterpolateTime(wfm, i-1, vil);
+
+		int64_t thi = tstamp + lerpHi * wfm->m_timescale;
+		int64_t tlo = tstamp + lerpLo * wfm->m_timescale;
+
 		switch(state)
 		{
 			//Look for rising edges
 			case STATE_UNKNOWN_WAS_LOW:
 
-				//TODO: interpolate Vih level crossing?
 				if(vin > vih)
 				{
 					if(matchRising)
-						ret.push_back( pair<int64_t, int64_t>(edgestart, tstamp));
+						ret.push_back( pair<int64_t, int64_t>(edgestart, thi));
 
 					state = STATE_HIGH;
 				}
@@ -303,11 +308,10 @@ vector< pair<int64_t, int64_t> > SetupHoldMeasurement::GetEdgeTimestamps(
 
 			case STATE_UNKNOWN_WAS_HIGH:
 
-				//TODO: interpolate Vil level crossing?
 				if(vin < vil)
 				{
 					if(matchFalling)
-						ret.push_back( pair<int64_t, int64_t>(edgestart, tstamp));
+						ret.push_back( pair<int64_t, int64_t>(edgestart, tlo));
 
 					state = STATE_LOW;
 				}
@@ -320,7 +324,7 @@ vector< pair<int64_t, int64_t> > SetupHoldMeasurement::GetEdgeTimestamps(
 				if(vin > vil)
 				{
 					state = STATE_UNKNOWN_WAS_LOW;
-					edgestart = tstamp;
+					edgestart = tlo;
 				}
 
 				break;
@@ -331,7 +335,7 @@ vector< pair<int64_t, int64_t> > SetupHoldMeasurement::GetEdgeTimestamps(
 				if(vin < vih)
 				{
 					state = STATE_UNKNOWN_WAS_HIGH;
-					edgestart = tstamp;
+					edgestart = thi;
 				}
 
 				break;
