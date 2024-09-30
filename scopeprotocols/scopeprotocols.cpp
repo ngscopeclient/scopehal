@@ -191,6 +191,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
+	AddDecoderClass(SetupHoldMeasurement);
 	AddDecoderClass(SNRFilter);
 	AddDecoderClass(SParameterCascadeFilter);
 	AddDecoderClass(SParameterDeEmbedFilter);
