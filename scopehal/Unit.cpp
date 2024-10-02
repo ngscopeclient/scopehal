@@ -227,6 +227,27 @@ void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix) c
 	prefix = "";
 	num = fabs(num);
 
+	//Bytes: use binary rather than decimal scaling factors
+	if(m_type == UNIT_BYTES)
+	{
+		if(num >= 1024)
+		{
+			scaleFactor = 1.0 / 1024;
+			prefix = "k";
+		}
+		if(num >= 1024*1024)
+		{
+			scaleFactor = 1.0 / (1024*1024);
+			prefix = "M";
+		}
+		if(num >= 1024*1024*1024)
+		{
+			scaleFactor = 1.0 / (1024*1024*1024);
+			prefix = "G";
+		}
+		return;
+	}
+
 	if(num >= 1e12f)
 	{
 		scaleFactor = 1e-12;
@@ -953,13 +974,29 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 				continue;
 
 			if(c == 'T')
+			{
 				scale = 1e12;
+				if(m_type == UNIT_BYTES)
+					scale = 1024 * 1024 * 1024 * 1024LL;
+			}
 			else if(c == 'G')
+			{
 				scale = 1e9;
+				if(m_type == UNIT_BYTES)
+					scale = 1024 * 1024 * 1024;
+			}
 			else if(c == 'M')
+			{
 				scale = 1e6;
+				if(m_type == UNIT_BYTES)
+					scale = 1024 * 1024;
+			}
 			else if(c == 'K' || c == 'k')
+			{
 				scale = 1e3;
+				if(m_type == UNIT_BYTES)
+					scale = 1024;
+			}
 			else if(c == 'm')
 				scale = 1e-3;
 			else if( (c == 'u') || (str.find("μ", i) == i) )
@@ -1066,13 +1103,33 @@ int64_t Unit::ParseStringInt64(const string& str, bool useDisplayLocale)
 				continue;
 
 			if(c == 'T')
-				mulscale *= 1e12;
+			{
+				if(m_type == UNIT_BYTES)
+					mulscale *= 1024 * 1024 * 1024 * 1024LL;
+				else
+					mulscale *= 1e12;
+			}
 			else if(c == 'G')
-				mulscale *= 1e9;
+			{
+				if(m_type == UNIT_BYTES)
+					mulscale *= 1024 * 1024 * 1024;
+				else
+					mulscale *= 1e9;
+			}
 			else if(c == 'M')
-				mulscale *= 1e6;
+			{
+				if(m_type == UNIT_BYTES)
+					mulscale *= 1024 * 1024;
+				else
+					mulscale *= 1e6;
+			}
 			else if(c == 'K' || c == 'k')
-				mulscale *= 1e3;
+			{
+				if(m_type == UNIT_BYTES)
+					mulscale *= 1024;
+				else
+					mulscale *= 1e3;
+			}
 			else if(c == 'm')
 				divscale *= 1e3;
 			else if( (c == 'u') || (str.find("μ", i) == i) )
