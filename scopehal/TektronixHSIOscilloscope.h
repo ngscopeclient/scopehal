@@ -27,13 +27,22 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of TektronixHSIOscilloscope
+
+	@ingroup scopedrivers
+ */
+
 #ifndef TektronixHSIOscilloscope_h
 #define TektronixHSIOscilloscope_h
 
 #include <TektronixOscilloscope.h>
 
 /**
-	   @brief TektronixHSIOscilloscope
+	@brief Driver for the Tektronix HSI interface using an external bridge server (WIP)
+	@ingroup scopedrivers
  */
 class TektronixHSIOscilloscope : public TektronixOscilloscope
 {

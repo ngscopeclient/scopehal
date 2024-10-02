@@ -27,11 +27,21 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SwitchMatrix
+
+	@ingroup core
+ */
+
 #ifndef SwitchMatrix_h
 #define SwitchMatrix_h
 
 /**
-	@brief A generic power supply
+	@brief Base class for switch matrixes
+
+	@ingroup core
  */
 class SwitchMatrix : public virtual Instrument
 {

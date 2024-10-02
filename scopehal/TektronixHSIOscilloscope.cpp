@@ -27,6 +27,14 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of TektronixHSIOscilloscope
+
+	@ingroup scopedrivers
+ */
+
 #include "scopehal.h"
 #include "TektronixHSIOscilloscope.h"
 
@@ -35,6 +43,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITwinLanTransport pointing at the bridge server
+ */
 TektronixHSIOscilloscope::TektronixHSIOscilloscope(SCPITransport* transport)
 	   : SCPIDevice(transport)
 	   , SCPIInstrument(transport)
