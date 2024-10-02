@@ -134,10 +134,6 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_digitalAcqPointsValid(false)
 	, m_highDefinition(false)
 {
-	//Enable command rate limiting
-	//TODO: only for some firmware versions or instrument SKUs?
-	transport->EnableRateLimiting(chrono::milliseconds(50));
-
 	//standard initialization
 	FlushConfigCache();
 	IdentifyHardware();
@@ -409,13 +405,23 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
-			m_requireSizeWorkaround = true;
+			// No need for size workaround on SDS800X HD, at lease with fimware versions v1.1.3.3 and v1.1.3.8
+			// m_requireSizeWorkaround = true;
 		}
 		else
 		{
 			LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
 				m_model.c_str());
 		}
+		if(m_protocolId != PROTOCOL_E11 || m_modelid == MODEL_SIGLENT_SDS2000XP)
+		{	// Enable command rate limiting => 50ms for older models
+			m_transport->EnableRateLimiting(chrono::milliseconds(50));
+		}
+		else
+		{	// Only 5 ms for newer models
+			m_transport->EnableRateLimiting(chrono::milliseconds(5));
+		}
+
 	}
 	else
 	{
@@ -2114,7 +2120,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						analogWaveformData[i] = new char[acqBytes];
 						if(!paginated)
 						{	// All data fits one page
-							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
+							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
+							m_transport->SendCommand(":WAVEFORM:DATA?");
 							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround);
 							// This is the 0x0a0a at the end
 							m_transport->ReadRawData(2, (unsigned char*)tmp);
@@ -2124,7 +2131,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
 							for(uint64_t page = 0; page < pages; page++)
 							{
-								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
+								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
+								m_transport->SendCommand(":WAVEFORM:DATA?");
 								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
@@ -2530,6 +2538,10 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 
 void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
+	// Only for analog channels
+	if(i >= m_analogChannelCount)
+		return;
+
 	float vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
@@ -5497,7 +5509,7 @@ void SiglentSCPIOscilloscope::SetFunctionChannelOutputImpedance(int chan, Functi
  */
 void SiglentSCPIOscilloscope::ForceHDMode(bool mode)
 {
-	if((m_modelid == MODEL_SIGLENT_SDS800X_HD || m_modelid == MODEL_SIGLENT_SDS2000X_HD) && mode != m_highDefinition)
+	if((m_protocolId == PROTOCOL_E11) && (mode != m_highDefinition))
 	{
 		m_highDefinition = mode;
 		sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
