@@ -987,3 +987,15 @@ const char* ScopehalGetVersion()
 {
 	return SCOPEHAL_VERSION;
 }
+
+/**
+	@brief Called when we run low on memory
+
+	@param level	Indicates if this is a soft or hard memory exhaustion condition
+	@param type		Indicates if we are low on CPU or GPU memory
+ */
+void OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type)
+{
+	for(auto handler : g_memoryPressureHandlers)
+		handler(level, type);
+}
