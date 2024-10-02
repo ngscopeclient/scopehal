@@ -132,6 +132,9 @@ vector<string> g_searchPaths;
 
 void VulkanCleanup();
 
+///@brief List of handlers for low memory registered by various subsystems
+set<MemoryPressureHandler> g_memoryPressureHandlers;
+
 /**
 	@brief Static initialization for SCPI transports
  */
@@ -996,6 +999,11 @@ const char* ScopehalGetVersion()
  */
 void OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type)
 {
+	LogWarning("OnMemoryPressure: %s memory exhaustion on %s\n",
+		(level == MemoryPressureLevel::Hard) ? "Hard" : "Soft",
+		(type == MemoryPressureType::Host) ? "host" : "device");
+	LogIndenter li;
+
 	for(auto handler : g_memoryPressureHandlers)
 		handler(level, type);
 }

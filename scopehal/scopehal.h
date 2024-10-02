@@ -302,8 +302,7 @@ enum class MemoryPressureType
 ///@brief Memory pressure handler type, called when free memory reaches a warning level or a Vulkan allocation fails
 typedef void (*MemoryPressureHandler)(MemoryPressureLevel level, MemoryPressureType type);
 
-///@brief List of handlers for low memory registered by various subsystems
-std::set<MemoryPressureHandler> g_memoryPressureHandlers;
+extern std::set<MemoryPressureHandler> g_memoryPressureHandlers;
 
 void OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type);
 
