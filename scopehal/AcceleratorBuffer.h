@@ -1329,7 +1329,7 @@ protected:
 			LogError(
 				"Failed to allocate %s of GPU memory despite our best efforts to reclaim space\n"
 				"This is unrecoverable (for now).\n",
-				Unit(Unit::UNIT_BYTES).PrettyPrint(req.size).c_str());
+				Unit(Unit::UNIT_BYTES).PrettyPrint(req.size, 4).c_str());
 			exit(1);
 		}
 		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;

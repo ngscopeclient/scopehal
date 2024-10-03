@@ -1006,7 +1006,7 @@ bool OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type, size_t
 	LogWarning("OnMemoryPressure: %s memory exhaustion on %s (tried to allocate %s)\n",
 		(level == MemoryPressureLevel::Hard) ? "Hard" : "Soft",
 		(type == MemoryPressureType::Host) ? "host" : "device",
-		Unit(Unit::UNIT_BYTES).PrettyPrint(requestedSize).c_str());
+		Unit(Unit::UNIT_BYTES).PrettyPrint(requestedSize, 4).c_str());
 
 	bool moreFreed = false;
 
