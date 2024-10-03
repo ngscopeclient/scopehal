@@ -272,38 +272,4 @@ uint32_t ColorFromString(const std::string& str, unsigned int alpha = 255);
 
 const char* ScopehalGetVersion();
 
-///@brief Levels of memory pressure
-enum class MemoryPressureLevel
-{
-	///@brief A memory allocation has failed and we need to free memory immediately to continue execution
-	Hard,
-
-	/**
-		@brief Free memory has reached a warning threshold.
-
-		We should trim caches or otherwise try to make space but don't need to be too aggressive about it.
-
-		This level is only available if we have VK_EXT_memory_budget; without this extension we do not know about
-		memory pressure until a hard allocation failure occurs.
-	 */
-	Soft
-};
-
-///@brief Types of memory pressure
-enum class MemoryPressureType
-{
-	///@brief Pinned CPU-side memory
-	Host,
-
-	///@brief GPU-side memory
-	Device
-};
-
-///@brief Memory pressure handler type, called when free memory reaches a warning level or a Vulkan allocation fails
-typedef void (*MemoryPressureHandler)(MemoryPressureLevel level, MemoryPressureType type);
-
-extern std::set<MemoryPressureHandler> g_memoryPressureHandlers;
-
-void OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type);
-
 #endif

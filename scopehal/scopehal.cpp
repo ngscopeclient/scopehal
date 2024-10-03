@@ -994,16 +994,27 @@ const char* ScopehalGetVersion()
 /**
 	@brief Called when we run low on memory
 
-	@param level	Indicates if this is a soft or hard memory exhaustion condition
-	@param type		Indicates if we are low on CPU or GPU memory
+	@param level			Indicates if this is a soft or hard memory exhaustion condition
+	@param type				Indicates if we are low on CPU or GPU memory
+	@param requestedSize	For hard memory exhaustion, the size of the failing allocation.
+							For soft exhaustion, ignored and set to zero
+
+	@return True if memory was freed, false if no space could be freed
  */
-void OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type)
+bool OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type, size_t requestedSize)
 {
-	LogWarning("OnMemoryPressure: %s memory exhaustion on %s\n",
+	LogWarning("OnMemoryPressure: %s memory exhaustion on %s (tried to allocate %s)\n",
 		(level == MemoryPressureLevel::Hard) ? "Hard" : "Soft",
-		(type == MemoryPressureType::Host) ? "host" : "device");
-	LogIndenter li;
+		(type == MemoryPressureType::Host) ? "host" : "device",
+		Unit(Unit::UNIT_BYTES).PrettyPrint(requestedSize).c_str());
+
+	bool moreFreed = false;
 
 	for(auto handler : g_memoryPressureHandlers)
-		handler(level, type);
+	{
+		if(handler(level, type, requestedSize))
+			moreFreed = true;
+	}
+
+	return moreFreed;
 }

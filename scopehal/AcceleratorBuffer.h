@@ -62,6 +62,38 @@ extern bool g_vulkanDeviceHasUnifiedMemory;
 template<class T>
 class AcceleratorBuffer;
 
+///@brief Levels of memory pressure
+enum class MemoryPressureLevel
+{
+	///@brief A memory allocation has failed and we need to free memory immediately to continue execution
+	Hard,
+
+	/**
+		@brief Free memory has reached a warning threshold.
+
+		We should trim caches or otherwise try to make space but don't need to be too aggressive about it.
+
+		This level is only available if we have VK_EXT_memory_budget; without this extension we do not know about
+		memory pressure until a hard allocation failure occurs.
+	 */
+	Soft
+};
+
+///@brief Types of memory pressure
+enum class MemoryPressureType
+{
+	///@brief Pinned CPU-side memory
+	Host,
+
+	///@brief GPU-side memory
+	Device
+};
+
+///@brief Memory pressure handler type, called when free memory reaches a warning level or a Vulkan allocation fails
+typedef bool (*MemoryPressureHandler)(MemoryPressureLevel level, MemoryPressureType type, size_t requestedSize);
+
+bool OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type, size_t requestedSize);
+
 template<class T>
 class AcceleratorBufferIterator
 {
@@ -1263,9 +1295,43 @@ protected:
 		//(may be rounded up from what we asked for)
 		auto req = m_gpuBuffer->getMemoryRequirements();
 
-		//For now, always use local memory
+		//Try to allocate the memory
 		vk::MemoryAllocateInfo info(req.size, g_vkLocalMemoryType);
-		m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+		try
+		{
+			//For now, always use local memory
+			m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+		}
+
+		//Fallback path in case of low memory
+		catch(vk::OutOfDeviceMemoryError& ex)
+		{
+			bool ok = false;
+			while(!ok)
+			{
+				//Attempt to free memory and stop if we couldn't free more
+				if(!OnMemoryPressure(MemoryPressureLevel::Hard, MemoryPressureType::Device, req.size))
+					break;
+
+				///Retry the allocation
+				try
+				{
+					m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+					ok = true;
+				}
+				catch(vk::OutOfDeviceMemoryError& ex2)
+				{
+					LogDebug("Allocation failed again\n");
+				}
+			}
+
+			//If we get here, we couldn't allocate no matter what
+			LogError(
+				"Failed to allocate %s of GPU memory despite our best efforts to reclaim space\n"
+				"This is unrecoverable (for now).\n",
+				Unit(Unit::UNIT_BYTES).PrettyPrint(req.size).c_str());
+			exit(1);
+		}
 		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
 
 		m_gpuBuffer->bindMemory(**m_gpuPhysMem, 0);
@@ -1347,5 +1413,7 @@ public:
 	}
 
 };
+
+extern std::set<MemoryPressureHandler> g_memoryPressureHandlers;
 
 #endif
