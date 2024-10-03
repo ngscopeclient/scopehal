@@ -412,7 +412,7 @@ public:
 	virtual void FreeGpuMemory() override
 	{ m_samples.FreeGpuBuffer(); }
 
-	virtual bool HasGpuBuffer()
+	virtual bool HasGpuBuffer() override
 	{ return m_samples.HasGpuBuffer(); }
 
 	virtual void Resize(size_t size) override
@@ -530,7 +530,7 @@ public:
 		m_samples.FreeGpuBuffer();
 	}
 
-	virtual bool HasGpuBuffer()
+	virtual bool HasGpuBuffer() override
 	{ return m_samples.HasGpuBuffer() || m_offsets.HasGpuBuffer() || m_durations.HasGpuBuffer(); }
 
 	virtual void Resize(size_t size) override
