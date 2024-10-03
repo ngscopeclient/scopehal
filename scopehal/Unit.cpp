@@ -553,6 +553,7 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 
 		//Bytes: use binary rather than decimal scaling factors
 		case UNIT_BYTES:
+			suffix = "B";
 			if(scaleFactor <= 1e-9)
 				scaleFactor = 1.0 / (1024 * 1024 * 1024);
 			else if(scaleFactor <= 1e-6)
