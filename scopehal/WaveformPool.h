@@ -101,6 +101,25 @@ public:
 		return ret;
 	}
 
+	/**
+		@brief Free all waveforms in the pool to reclaim memory
+
+		@return True if memory was freed, false if pool was empty to begin with
+	 */
+	bool clear()
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+
+		if(m_waveforms.empty())
+			return false;
+
+		for(auto w : m_waveforms)
+			delete w;
+		m_waveforms.clear();
+
+		return true;
+	}
+
 protected:
 
 	///@brief Maximum number of waveforms to store in the pool

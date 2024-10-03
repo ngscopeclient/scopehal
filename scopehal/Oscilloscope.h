@@ -959,6 +959,15 @@ protected:
 	}
 
 public:
+
+	/**
+		@brief Free all waveforms in our pool to reclaim memory
+
+		@return True if memory was freed, false if pools were already empty
+	 */
+	bool FreeWaveformPools()
+	{ return m_analogWaveformPool.clear() || m_digitalWaveformPool.clear();	}
+
 	void AddWaveformToAnalogPool(WaveformBase* w)
 	{ m_analogWaveformPool.Add(w); }
 

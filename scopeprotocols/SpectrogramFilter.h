@@ -66,6 +66,12 @@ public:
 	double GetBottomEdgeFrequency()
 	{ return m_bottomEdgeFrequency; }
 
+	virtual void FreeGpuMemory() override
+	{}
+
+	virtual bool HasGpuBuffer() override
+	{ return false; }
+
 protected:
 	double m_binsize;
 	double m_bottomEdgeFrequency;

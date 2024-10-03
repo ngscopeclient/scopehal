@@ -234,6 +234,12 @@ public:
 
 	virtual void CacheColors();
 
+	///@brief Free GPU-side memory if we are short on VRAM or do not anticipate using this waveform for a while
+	virtual void FreeGpuMemory() =0;
+
+	///@brief Returns true if we have at least one buffer resident on the GPU
+	virtual bool HasGpuBuffer() =0;
+
 protected:
 
 	///@brief Cache of packed RGBA32 data with colors for each protocol decode event. Empty for non-protocol waveforms.
@@ -403,6 +409,12 @@ public:
 	///@brief Sample data
 	AcceleratorBuffer<S> m_samples;
 
+	virtual void FreeGpuMemory() override
+	{ m_samples.FreeGpuBuffer(); }
+
+	virtual bool HasGpuBuffer()
+	{ return m_samples.HasGpuBuffer(); }
+
 	virtual void Resize(size_t size) override
 	{ m_samples.resize(size); }
 
@@ -510,6 +522,16 @@ public:
 
 	///@brief Sample data
 	AcceleratorBuffer<S> m_samples;
+
+	virtual void FreeGpuMemory() override
+	{
+		m_offsets.FreeGpuBuffer();
+		m_durations.FreeGpuBuffer();
+		m_samples.FreeGpuBuffer();
+	}
+
+	virtual bool HasGpuBuffer()
+	{ return m_samples.HasGpuBuffer() || m_offsets.HasGpuBuffer() || m_durations.HasGpuBuffer(); }
 
 	virtual void Resize(size_t size) override
 	{

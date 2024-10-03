@@ -344,7 +344,7 @@ public:
 	~AcceleratorBuffer()
 	{
 		FreeCpuBuffer();
-		FreeGpuBuffer();
+		FreeGpuBuffer(true);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1073,14 +1073,24 @@ protected:
 		}
 	}
 
+public:
 	/**
 		@brief Free the GPU-side buffer and underlying physical memory
+
+		@param dataLossOK		True if we do not intend to use the contents of this buffer again
+								(and thus it's OK to remove the only copy of the data)
 	 */
-	void FreeGpuBuffer()
+	void FreeGpuBuffer(bool dataLossOK = false)
 	{
 		//Early out if buffer is already null
 		if(m_gpuPhysMem == nullptr)
 			return;
+
+		//If we do NOT have a CPU-side buffer, we're deleting all of our data! Warn for now
+		if( (m_cpuMemoryType == MEM_TYPE_NULL) && m_gpuPhysMemIsStale && !empty() && !dataLossOK)
+		{
+			LogWarning("Freeing a GPU buffer without any CPU backing, may cause data loss\n");
+		}
 
 		//If we have a CPU-side buffer, and it's stale, move our about-to-be-deleted content over before we free it
 		if( (m_cpuMemoryType != MEM_TYPE_NULL) && m_cpuPhysMemIsStale && !empty() )
@@ -1325,12 +1335,34 @@ protected:
 				}
 			}
 
+			//Retry one more time.
+			//If we OOM simultaneously in two threads, it's possible to have the second OnMemoryPressure call
+			//return false because the first one already freed all it could. But we might have enough free to continue.
+			if(!ok)
+			{
+				LogDebug("Final retry\n");
+				try
+				{
+					m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+					ok = true;
+				}
+				catch(vk::OutOfDeviceMemoryError& ex2)
+				{
+					LogDebug("Allocation failed again\n");
+				}
+			}
+
 			//If we get here, we couldn't allocate no matter what
-			LogError(
-				"Failed to allocate %s of GPU memory despite our best efforts to reclaim space\n"
-				"This is unrecoverable (for now).\n",
-				Unit(Unit::UNIT_BYTES).PrettyPrint(req.size, 4).c_str());
-			exit(1);
+			//TODO: Fall back to a CPU-side allocation
+			if(!ok)
+			{
+				LogError(
+					"Failed to allocate %s of GPU memory despite our best efforts to reclaim space\n"
+					"This is unrecoverable (for now).\n",
+					Unit(Unit::UNIT_BYTES).PrettyPrint(req.size, 4).c_str());
+
+				std::abort();
+			}
 		}
 		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
 

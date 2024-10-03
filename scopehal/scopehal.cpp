@@ -1003,6 +1003,11 @@ const char* ScopehalGetVersion()
  */
 bool OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type, size_t requestedSize)
 {
+	//Only allow one OnMemoryPressure() to execute at a time
+	//Anyone else who simultaneously OOM'd has to wait
+	static mutex memoryPressureMutex;
+	lock_guard<mutex> lock(memoryPressureMutex);
+
 	LogWarning("OnMemoryPressure: %s memory exhaustion on %s (tried to allocate %s)\n",
 		(level == MemoryPressureLevel::Hard) ? "Hard" : "Soft",
 		(type == MemoryPressureType::Host) ? "host" : "device",

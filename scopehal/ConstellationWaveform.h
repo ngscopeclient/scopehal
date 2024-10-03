@@ -85,6 +85,12 @@ public:
 	 */
 	float m_saturationLevel;
 
+	virtual void FreeGpuMemory() override
+	{}
+
+	virtual bool HasGpuBuffer() override
+	{ return false; }
+
 protected:
 
 	/**
