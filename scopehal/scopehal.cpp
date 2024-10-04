@@ -349,6 +349,10 @@ void InitializePlugins()
 			if(pent->d_name[0] == '.')
 				continue;
 
+			// Don't load directories
+			if(pent->d_type == DT_DIR)
+				continue;
+
 			//Try loading it and see if it works.
 			//(for now, never unload the plugins)
 			string fname = dir + "/" + pent->d_name;
