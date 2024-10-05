@@ -188,7 +188,6 @@
 #include "SawtoothGeneratorFilter.h"
 #include "ScalarPulseDelayFilter.h"
 #include "ScalarStairstepFilter.h"
-#include "ScaleFilter.h"
 #include "SDCmdDecoder.h"
 #include "SDDataDecoder.h"
 #include "SetupHoldMeasurement.h"

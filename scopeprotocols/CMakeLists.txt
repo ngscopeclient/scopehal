@@ -149,7 +149,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	SawtoothGeneratorFilter.cpp
 	ScalarPulseDelayFilter.cpp
 	ScalarStairstepFilter.cpp
-	ScaleFilter.cpp
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp

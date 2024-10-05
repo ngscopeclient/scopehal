@@ -188,7 +188,6 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SawtoothGeneratorFilter);
 	AddDecoderClass(ScalarPulseDelayFilter);
 	AddDecoderClass(ScalarStairstepFilter);
-	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
 	AddDecoderClass(SetupHoldMeasurement);
