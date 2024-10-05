@@ -1432,6 +1432,15 @@ protected:
 	}
 
 public:
+
+	/**
+		@brief Sets the debug name for this buffer.
+
+		The name can be queried by m_name in a debugger. If VK_EXT_debug_utils is active, the name will also
+		be attached to the Vulkan object handle.
+
+		@param name	Name of the buffer
+	 */
 	void SetName(std::string name)
 	{
 		m_name = name;
