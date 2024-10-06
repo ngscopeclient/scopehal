@@ -341,3 +341,10 @@ void OscilloscopeChannel::SetInputMux(size_t select)
 	if(m_instrument)
 		GetScope()->SetInputMux(m_index, select);
 }
+
+int OscilloscopeChannel::GetDownloadState()
+{
+	if(m_instrument)
+		return GetScope()->GetChannelDownloadState(m_index);
+	return DownloadState::DOWNLOAD_PROGRESS_DISABLED;
+}

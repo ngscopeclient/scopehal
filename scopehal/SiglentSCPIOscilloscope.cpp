@@ -2094,7 +2094,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			}
 
 			if(pdesc)
-			{	// Handle the case when only digital channel is activated
+			{	// Notify about download operation start
+				ChannelsDownloadStarted();
+				
+				// Handle the case when only digital channel is activated
 				// Figure out when the first trigger happened.
 				//Read the timestamps if we're doing segmented capture
 				ttime = ExtractTimestamp(pdesc, basetime);
@@ -2129,14 +2132,18 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						else
 						{	// We need pagination
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
+							int percent = 100/pages;
+							int percentage = 0;
 							for(uint64_t page = 0; page < pages; page++)
 							{
+								UpdateChannelDownloadState(i,page*percent);
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
 								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
+							UpdateChannelDownloadState(i,100);
 						}
 					}
 				}
@@ -2170,14 +2177,18 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							else
 							{	// We need pagination
 								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
+								int percent = 100/pages;
+								int percentage = 0;
 								for(uint64_t page = 0; page < pages; page++)
 								{
+									UpdateChannelDownloadState(i,page*percent);
 									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
 									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false);
 									// This is the 0x0a0a at the end
 									m_transport->ReadRawData(2, (unsigned char*)tmp);
 								}
+								UpdateChannelDownloadState(i,100);
 							}
 						}
 					}

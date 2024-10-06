@@ -384,6 +384,63 @@ public:
 	 */
 	virtual bool IsInverted(size_t i);
 
+	/**
+		@brief Gets the download state of the specified channel.
+
+		The returned int value can either be an integer ranging from 0 to 100 corresponding to the percentage of the waveform that has already been downloaded,
+		or a (negative) int value to be mapped to the OscilloscopeChannel::DownloadState enum
+
+		@param i Zero-based index of channel
+	 */
+	virtual int GetChannelDownloadState(size_t i);
+
+protected:
+
+	/**
+		@brief Let the driver decide wehther channels download progress should be displayed or not, according to the current sample depth configuration.
+
+		If scope download speed is fast enough according the the currently set sample depth, progress should not be shown to prevent flickering effect on the download bar.
+		
+		If this method is not called by the driver, Oscilloscope class will try and determine whether download progress bar should be shown or not automatically.
+
+		@param show true if the download progress bar should be displayed, false otherwise
+	 */
+	void SetShowChannelsDownloadProgress(bool show);
+
+	/**
+		@brief Drivers should call this method at a download operation start to tell the Oscilloscope class to initialize all channel download states.
+
+	 */
+	void ChannelsDownloadStarted();
+
+	/**
+		@brief Updates the download state for the specified channel.
+
+		The provided int value can either be an integer ranging from 0 to 100 corresponding to the percentage of the waveform that has already been downloaded
+		or a (negative) int value to be mapped to the OscilloscopeChannel::DownloadState enum
+
+		@param i Zero-based index of channel
+		@param downloadState the download state value
+
+	 */
+	void UpdateChannelDownloadState(size_t i, int downloadState);
+
+// Handling of waveform downnload operation state
+private:
+	// True when the download progress bar should be displayed (i.e. slow download speed)
+	bool m_showChannelProgressBar = false;
+	// True when the driver is handling download progressbar display state on its side
+	bool m_forceShowChannelProgressBar = false;
+	// Time of start of the latest download operation for this instrument
+	double m_downloadStartTime = 0;
+	// Sample depth that was set on this Oscilloscope the last time the download speed have been evaluated
+	uint64_t m_downloadSpeedEvalSampleDepth = 0;
+	// True whent the download speed has been evaluated
+	bool m_downloadSpeedEvaluated = false;
+	// Dowbload state for each channel of this Oscilloscope
+	std::vector<int> m_channelDownloadStates;
+
+public:
 	//Triggering
 	enum TriggerMode
 	{

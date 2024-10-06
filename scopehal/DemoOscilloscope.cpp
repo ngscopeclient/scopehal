@@ -401,6 +401,9 @@ uint64_t DemoOscilloscope::GetSampleDepth()
 void DemoOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	m_depth = depth;
+	// Another way to let GetChannelDownloadState() API know when to show progress bar is to
+	// force its behaviour according to the current sample depth using SetShowChannelsDownloadProgress() method
+	// SetShowChannelsDownloadProgress(depth>=10000000L);
 }
 
 void DemoOscilloscope::SetSampleRate(uint64_t rate)
@@ -491,6 +494,9 @@ bool DemoOscilloscope::AcquireData()
 	if(!m_triggerArmed)
 		return false;
 
+	// Tell the GetChannelDownloadState() of Oscilloscope class that waveform download operation is starting
+	ChannelsDownloadStarted();
+
 	//cap waveform rate at 50 wfm/s to avoid saturating cpu
 	std::this_thread::sleep_for(std::chrono::microseconds(20 * 1000));
 
@@ -531,26 +537,34 @@ bool DemoOscilloscope::AcquireData()
 		if(!m_channelsEnabled[i])
 			continue;
 
+		// Lambda passed to generate waveform methods to update "download" percentage
+		auto updateProgress = [i,this](int percentage) 
+			{
+				this->UpdateChannelDownloadState(i,percentage);
+			};
 		switch(i)
 		{
 			case 0:
 				waveforms[i] = m_source[i]->GenerateNoisySinewave(
-					0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+					0.9, 0.0, 1e6, sampleperiod, depth, updateProgress, noise[0]);
 				break;
 
 			case 1:
 				waveforms[i] = m_source[i]->GenerateNoisySinewaveSum(
-					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
+					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, updateProgress, noise[1]);
 				break;
 
 			case 2:
+
 				waveforms[i] = m_source[i]->GeneratePRBS31(
-					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
+					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, 
+					updateProgress,
+					lpf2, noise[2]);
 				break;
 
 			case 3:
 				waveforms[i] = m_source[i]->Generate8b10b(
-					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
+					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, updateProgress, lpf3, noise[3]);
 				break;
 
 			default:

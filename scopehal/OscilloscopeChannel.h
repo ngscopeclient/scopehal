@@ -145,6 +145,28 @@ public:
 	virtual void SetInputMux(size_t select);
 
 	void SetDefaultDisplayName();
+
+
+	/**
+		@brief Enum values to be mapped to GetDownloadState() int result value for specific channel download states
+	 */
+	enum DownloadState : int 
+	{
+		DOWNLOAD_PROGRESS_DISABLED = -3, 	// Tell the UI not to show a download progress bar (e.g. if downloading the whole waveform is fast enough)
+		DOWNLOAD_NONE = -2,					// No download is pending (e.g. the scope is in stop mode)
+		DOWNLOAD_WAITING = -1,				// This channel is waiting to be downloaded (i.e. scope is triggered but previous channels are currently beeing downloaded)
+		DOWNLOAD_STARTED = 0,				// Download as tarted
+		DOWNLOAD_FINISHED = 100				// Download is finished
+	};
+
+	/**
+		@brief Returns the current download state of this channel.
+
+		The returned int value can either be an integer ranging from 0 to 100 corresponding to the percentage of the waveform that has already been downloaded
+		or a (negative) int value to be mapped to the OscilloscopeChannel::DownloadState enum
+	 */
+	int GetDownloadState();
+
 protected:
 	void SharedCtorInit(Unit unit);
 
