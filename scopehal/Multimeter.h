@@ -45,15 +45,20 @@ public:
 
 	enum MeasurementTypes
 	{
-		NONE				= 0x00,
+		NONE				= 0x000,
 
-		DC_VOLTAGE			= 0x01,
-		DC_RMS_AMPLITUDE	= 0x02,
-		AC_RMS_AMPLITUDE	= 0x04,
-		FREQUENCY			= 0x08,
-		DC_CURRENT			= 0x10,
-		AC_CURRENT			= 0x20,
-		TEMPERATURE			= 0x40
+		DC_VOLTAGE			= 0x001,
+		DC_RMS_AMPLITUDE	= 0x002,
+		AC_RMS_AMPLITUDE	= 0x004,
+		FREQUENCY			= 0x008,
+		DC_CURRENT			= 0x010,
+		AC_CURRENT			= 0x020,
+		TEMPERATURE			= 0x040,
+		RESISTANCE			= 0x080,
+		CAPACITANCE			= 0x100,
+		CONTINUITY			= 0x200,
+		DIODE				= 0x400
+
 
 		//TODO: other types
 	};
