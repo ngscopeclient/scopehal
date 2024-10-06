@@ -761,6 +761,9 @@ bool RigolOscilloscope::AcquireData()
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	LogIndenter li;
 
+	// Notify about download operation start
+	ChannelsDownloadStarted();
+
 	// Rigol scopes do not have a capture time so we fake it
 	double now = GetTime();
 
@@ -854,7 +857,12 @@ bool RigolOscilloscope::AcquireData()
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = floor(now);
 		cap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
-		
+
+		// Determine the size of one percent of the data to be downloaded
+		int percent = (m_highDefinition ? 2* npoints : npoints)/100;
+		int percentage = 0;
+		int restPercentage = 0;
+
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
 		{
@@ -933,7 +941,29 @@ bool RigolOscilloscope::AcquireData()
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			m_transport->ReadRawData(header_blocksize_bytes + 1, temp_buf);	 //trailing newline after data block
+
+			// Read it in slice so that we can smoothly update download progress bar
+			size_t bytesToRead = header_blocksize_bytes + 1; //trailing newline after data block
+			int slices = bytesToRead / percent;
+			int sliceRest = bytesToRead % percent;
+			size_t bytesRead = 0;
+			for(int s = 0 ; s < slices ; s++)
+			{	// Read each block corresponding to one percent of the total waveform
+				bytesRead += m_transport->ReadRawData(percent, (temp_buf+bytesRead));
+				percentage++;
+				UpdateChannelDownloadState(i,percentage);
+			}
+			if(bytesRead < bytesToRead)
+			{	// For the rest (bytesToRead % slices)
+				m_transport->ReadRawData(bytesToRead-bytesRead, (temp_buf+bytesRead));
+				restPercentage += sliceRest;
+				if(restPercentage>=percent && percentage < OscilloscopeChannel::DownloadState::DOWNLOAD_FINISHED)
+				{	// Accumulate leftover bytes untill we get a whole percent
+					percentage++;
+					UpdateChannelDownloadState(i,percentage);
+					restPercentage = 0;
+				}
+			}
 
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
@@ -962,6 +992,8 @@ bool RigolOscilloscope::AcquireData()
 
 			npoint += header_blocksize;
 		}
+		// Notify about end of download for this channel
+		UpdateChannelDownloadState(i,OscilloscopeChannel::DownloadState::DOWNLOAD_FINISHED);
 
 		//Done, update the data
 		if(cap)
