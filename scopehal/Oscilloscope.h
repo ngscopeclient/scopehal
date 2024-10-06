@@ -435,6 +435,8 @@ private:
 	double m_downloadStartTime = 0;
 	// Sample depth that was set on this Oscilloscope the last time the download speed have been evaluated
 	uint64_t m_downloadSpeedEvalSampleDepth = 0;
+	// Number of enabled channels on this Oscilloscope the last time the download speed have been evaluated
+	size_t m_downloadSpeedEvalEnabledChannels;
 	// True whent the download speed has been evaluated
 	bool m_downloadSpeedEvaluated = false;
 	// Dowbload state for each channel of this Oscilloscope

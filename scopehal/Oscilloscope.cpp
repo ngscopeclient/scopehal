@@ -874,7 +874,7 @@ int Oscilloscope::GetChannelDownloadState(size_t i)
 		{	// We've been downloading for more than 300ms and are not finished yet => show progress bar
 			m_showChannelProgressBar = true;
 			m_downloadSpeedEvaluated = true;
-			LogError("Download speed evaluation done, show progress = true : start time = %f, now = %f, diff = %f, state = %d)\n",m_downloadStartTime, now,now - m_downloadStartTime,result);
+			//LogWarning("Download speed evaluation done, show progress = true : start time = %f, now = %f, diff = %f, state = %d)\n",m_downloadStartTime, now,now - m_downloadStartTime,result);
 		}
 	}
 	if(!m_showChannelProgressBar)
@@ -894,9 +894,11 @@ void Oscilloscope::ChannelsDownloadStarted()
 	if(!m_forceShowChannelProgressBar)
 	{	// Not in force mode => check if the sample depth has changed since last download
 		uint64_t newSampleDepth = GetSampleDepth();
-		if(newSampleDepth != m_downloadSpeedEvalSampleDepth)
+		size_t newEnabledChannels = GetEnabledChannelCount();
+		if((newSampleDepth != m_downloadSpeedEvalSampleDepth) || (newEnabledChannels != m_downloadSpeedEvalEnabledChannels))
 		{	// Sample depth has changed => re-evaluate download speed
 			m_downloadSpeedEvalSampleDepth = newSampleDepth;
+			m_downloadSpeedEvalEnabledChannels = newEnabledChannels;
 			m_downloadSpeedEvaluated = false;
 		}
 		else if(!m_downloadSpeedEvaluated)
@@ -906,7 +908,7 @@ void Oscilloscope::ChannelsDownloadStarted()
 			{	// Download fast enough, no need for a progress bar to be shown
 				m_downloadSpeedEvaluated = true;
 				m_showChannelProgressBar = false;
-				LogError("Download speed evaluation done, show = false : start time = %f, now = %f, diff = %f)\n",m_downloadStartTime, now,now - m_downloadStartTime);
+				//LogWarning("Download speed evaluation done, show = false : start time = %f, now = %f, diff = %f)\n",m_downloadStartTime, now,now - m_downloadStartTime);
 			}
 		}
 	}
