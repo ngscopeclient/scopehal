@@ -1544,7 +1544,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	return TRIGGER_MODE_RUN;
 }
 
-int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround)
+int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround, int slices, size_t channel, int startSlice)
 {
 	//Read and discard data until we see the '#'
 	uint8_t tmp;
@@ -1577,7 +1577,25 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 	len = min(len, maxsize);
 
 	// Now get the data
-	m_transport->ReadRawData(len, (unsigned char*)data);
+	if(slices > 0)
+	{	// If needed, lices download in shunks to be able to show download progress in progress bar
+		size_t sliceLen = len / slices;
+		size_t bytesRead = 0;
+		for(int i = 0 ; i < slices ; i++)
+		{
+			bytesRead += m_transport->ReadRawData(sliceLen, (unsigned char*)(data+bytesRead));
+			UpdateChannelDownloadState(channel,startSlice+i);
+		}
+		if(bytesRead < len)
+		{	// For the rest (len % slices)
+			m_transport->ReadRawData(len-bytesRead, (unsigned char*)(data+bytesRead));
+		}
+		UpdateChannelDownloadState(channel,startSlice+slices);
+	}
+	else
+	{
+		m_transport->ReadRawData(len, (unsigned char*)data);
+	}
 
 	if(hdSizeWorkaround)
 		return getLength*2;
@@ -1993,7 +2011,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					analogWaveformData[i] = new char[WAVEFORM_SIZE];
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
-					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i]);
+					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i],false,100,i);
 					// This is the 0x0a0a at the end
 					m_transport->ReadRawData(2, (unsigned char*)tmp);
 				}
@@ -2125,21 +2143,19 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						{	// All data fits one page
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
 							m_transport->SendCommand(":WAVEFORM:DATA?");
-							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround);
+							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround,100,i);
 							// This is the 0x0a0a at the end
 							m_transport->ReadRawData(2, (unsigned char*)tmp);
 						}
 						else
 						{	// We need pagination
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
-							int percent = 100/pages;
-							int percentage = 0;
+							int pagePercent = 100/pages;
 							for(uint64_t page = 0; page < pages; page++)
 							{
-								UpdateChannelDownloadState(i,page*percent);
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
-								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
+								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround,pagePercent,i,page*pagePercent);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
@@ -2170,25 +2186,23 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							if(!paginated)
 							{	// All data fits one page
 								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
-								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false);
+								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, 100, i+m_analogChannelCount);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
 							else
 							{	// We need pagination
 								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
-								int percent = 100/pages;
-								int percentage = 0;
+								int pagePercent = 100/pages;
 								for(uint64_t page = 0; page < pages; page++)
 								{
-									UpdateChannelDownloadState(i,page*percent);
 									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
-									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false);
+									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, pagePercent, i+m_analogChannelCount, page*pagePercent);
 									// This is the 0x0a0a at the end
 									m_transport->ReadRawData(2, (unsigned char*)tmp);
 								}
-								UpdateChannelDownloadState(i,100);
+								UpdateChannelDownloadState(i+m_analogChannelCount,100);
 							}
 						}
 					}
