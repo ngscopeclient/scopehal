@@ -112,6 +112,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_W_M2;
 	else if(rhs == "μA")
 		m_type = UNIT_MICROAMPS;
+	else if(rhs == "F")
+		m_type = UNIT_FARADS;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
 }
@@ -212,6 +214,9 @@ string Unit::ToString() const
 
 		case UNIT_W_M2:
 			return "W/m²";
+
+		case UNIT_FARADS:
+			return "F";
 
 		default:
 			return "unknown";
@@ -489,6 +494,10 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			break;
 		case UNIT_RPM:
 			suffix = "RPM";
+			break;
+
+		case UNIT_FARADS:
+			suffix = "F";
 			break;
 
 		//Angular degrees do not use SI prefixes
