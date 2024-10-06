@@ -2003,6 +2003,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				analogEnabled[i] = IsChannelEnabled(i);
 				anyAnalogEnabled |= analogEnabled[i];
 			}
+
+			// Notify about download operation start
+			ChannelsDownloadStarted();
+
 			start = GetTime();
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
