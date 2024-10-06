@@ -79,6 +79,8 @@ SCPITransport* SCPITransport::CreateTransport(const string& transport, const str
 	@brief Pushes a command into the transmit FIFO then returns immediately.
 
 	This command will actually be sent the next time FlushCommandQueue() is called.
+
+	@param cmd         Command to be sent
 	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
  */
 void SCPITransport::SendCommandQueued(const string& cmd, std::chrono::milliseconds settle_time)
@@ -222,7 +224,11 @@ bool SCPITransport::FlushCommandQueue()
 	@brief Sends a command (flushing any pending/queued commands first), then returns the response.
 
 	This is an atomic operation requiring no mutexing at the caller side.
+
+	@param cmd         Command to be sent
 	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
+
+	@return A string with the reply
  */
 string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon, std::chrono::milliseconds settle_time)
 {
@@ -234,7 +240,11 @@ string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon
 	@brief Sends a command (jumping ahead of the queue), then returns the response.
 
 	This is an atomic operation requiring no mutexing at the caller side.
+
+	@param cmd         Command to be sent
 	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
+
+	@return A string with the reply
  */
 string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemicolon, std::chrono::milliseconds settle_time)
 {
@@ -250,6 +260,8 @@ string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemico
 
 /**
 	@brief Sends a command (jumping ahead of the queue) which does not require a response.
+
+	@param cmd         Command to be sent
 	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
  */
 void SCPITransport::SendCommandImmediate(string cmd, std::chrono::milliseconds settle_time)
@@ -264,7 +276,12 @@ void SCPITransport::SendCommandImmediate(string cmd, std::chrono::milliseconds s
 
 /**
 	@brief Sends a command (jumping ahead of the queue) which reads a binary block response
+
+	@param cmd         Command to be sent
+	@param len         A reference to a size_t that will get the number of bytes received written to it.
 	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
+
+	@return A pointer to the reply buffer. This will need to be deleted manually.
  */
 void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len, std::chrono::milliseconds settle_time)
 {
