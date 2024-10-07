@@ -243,6 +243,7 @@ void RSRTO6Oscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
 	m_channelsEnabled.clear();
+	m_channelDigitalThresholds.clear();
 	m_channelCouplings.clear();
 	m_channelAttenuations.clear();
 
@@ -656,8 +657,21 @@ bool RSRTO6Oscilloscope::IsDigitalThresholdConfigurable()
 
 float RSRTO6Oscilloscope::GetDigitalThreshold(size_t channel)
 {
-	// Cache?
-	return stof(m_transport->SendCommandQueuedWithReply("DIG" + to_string(HWDigitalNumber(channel)) + ":THR?"));
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
+		return 0;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[channel];
+	}
+
+	float result = stof(m_transport->SendCommandQueuedWithReply("DIG" + to_string(HWDigitalNumber(channel)) + ":THR?"));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDigitalThresholds[channel] = result;
+	return result;
 }
 
 void RSRTO6Oscilloscope::SetDigitalThreshold(size_t channel, float level)

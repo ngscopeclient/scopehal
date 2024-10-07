@@ -650,6 +650,7 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
+	m_channelDigitalThresholds.clear();
 	m_probeIsActive.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
@@ -3726,7 +3727,18 @@ float SiglentSCPIOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 
 float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 {
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
+		return 0;
+
 	channel -= m_analogChannelCount;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[channel];
+	}
+
+	float result = 0.0f;
 
 	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
 
@@ -3737,14 +3749,21 @@ float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 		i++;
 
 	if(c_sds2000xp_threshold_table[i].name)
-		return c_sds2000xp_threshold_table[i].val;
+	{
+		result =  c_sds2000xp_threshold_table[i].val;
+	}
+	else if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
+	{	// Didn't match a standard, check for custom
+		result =  strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
+	}
+	else 
+	{
+		LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
+	}
 
-	// Didn't match a standard, check for custom
-	if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
-		return strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
-
-	LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
-	return 0.0f;
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDigitalThresholds[channel] = result;
+	return result;
 }
 
 void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)

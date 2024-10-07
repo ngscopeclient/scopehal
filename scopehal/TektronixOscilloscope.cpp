@@ -72,6 +72,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_dmmModeValid(false)
 	, m_dmmMode(Multimeter::DC_VOLTAGE)
 	, m_digitalChannelBase(0)
+	, m_digitalChannelCount(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_maxBandwidth(1000)
@@ -225,6 +226,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					m_flexChannelParents[chan] = i;
 					m_flexChannelLanes[chan] = j;
 					m_channels.push_back(chan);
+					m_digitalChannelCount++;
 				}
 			}
 			break;
@@ -428,6 +430,7 @@ void TektronixOscilloscope::FlushConfigCache()
 
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
+	m_channelDigitalThresholds.clear();
 	m_channelCouplings.clear();
 	m_channelsEnabled.clear();
 	m_probeTypes.clear();
@@ -3598,7 +3601,17 @@ float TektronixOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 
 float TektronixOscilloscope::GetDigitalThreshold(size_t channel)
 {
-	//TODO: caching?
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
+		return 0;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[channel];
+	}
+
+	float result = -1;
 
 	auto chan = GetOscilloscopeChannel(channel);
 
@@ -3607,14 +3620,17 @@ float TektronixOscilloscope::GetDigitalThreshold(size_t channel)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			//note, group IDs are one based but lane IDs are zero based!
-			return stof(m_transport->SendCommandQueuedWithReply(
+			result = stof(m_transport->SendCommandQueuedWithReply(
 				string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
 				":D" + to_string(m_flexChannelLanes[chan]) + ":THR?"));
 
 		default:
 			break;
 	}
-	return -1;
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDigitalThresholds[channel] = result;
+	return result;
 }
 
 void TektronixOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)

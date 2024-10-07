@@ -352,6 +352,7 @@ protected:
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;
+	std::map<size_t, float> m_channelDigitalThresholds;
 	std::map<size_t, size_t> m_channelNavg;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
