@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -66,7 +66,7 @@
  *   using 4 Channels ( 700 kpts  100 MSa/s)   got 1,62 WFM/s
  *   using 1 Channels ( 1.75 Mpts  250 MSa/s)  got 2,38 WFM/s
  *   using 4 Channels ( 3.5 Mpts  500 MSa/s)   got 0,39 WFM/s
- * 
+ *
  *  TODO Click "Reload configuration from scope"   sometimes we loosing WAVE rendering ( threading issue ?)
  *  TODO sometimes socket timeout (Warning: Socket read failed errno=11 errno=4)
  *
@@ -1899,10 +1899,10 @@ vector<SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(c
 
 
 		//Read and de-duplicate the other samples
-		for (size_t curByteIndex = 0; curByteIndex < datalen; curByteIndex++) 
+		for (size_t curByteIndex = 0; curByteIndex < datalen; curByteIndex++)
 		{
 			char samples = data[curByteIndex];
-			for (int ii = 0; ii < 8; ii++, samples >>= 1) 
+			for (int ii = 0; ii < 8; ii++, samples >>= 1)
 			{	// Check if the current scope sample bit is set.
 				sampleValue = (samples & 0x1);
 				if((sampleIndex > 0) && (lastSampleValue == sampleValue) && ((sampleIndex + 3) < numSamples))
@@ -2144,8 +2144,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							{
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
-								auto progress = [i, this, page, pages] (float progress) {
-									float linear_progress = ((float)page + progress) / (float)pages; // the last page will go slightly faster, but oh well
+								auto progress = [i, this, page, pages] (float fprogress) {
+									float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 									ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 								};
 								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
@@ -2190,8 +2190,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								{
 									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
-									auto progress = [i, this, page, pages] (float progress) {
-										float linear_progress = ((float)page + progress) / (float)pages; // the last page will go slightly faster, but oh well
+									auto progress = [i, this, page, pages] (float fprogress) {
+										float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 									};
 									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
@@ -3752,7 +3752,7 @@ float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 	{	// Didn't match a standard, check for custom
 		result =  strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
 	}
-	else 
+	else
 	{
 		LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
 	}
@@ -3920,7 +3920,7 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 		case PROTOCOL_E11:
 			//Level
 			dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
-		
+
 			//Dropout time
 			dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
 
@@ -4087,7 +4087,7 @@ void SiglentSCPIOscilloscope::PullRuntTrigger()
 
 			//Upper bound
 			rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:HLEVEL?")));
-            
+
 			//Lower bound
 			rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:TLOWER?")));
 
@@ -4279,7 +4279,7 @@ void SiglentSCPIOscilloscope::PullWindowTrigger()
 	if(m_trigger == NULL)
 		m_trigger = new WindowTrigger(this);
 	WindowTrigger* wt = dynamic_cast<WindowTrigger*>(m_trigger);
-    
+
 	Unit v(Unit::UNIT_VOLTS);
 
 	switch(m_protocolId)
@@ -4409,7 +4409,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
 			else if(et)	   //must be last
-			{				
+			{
 				// set default
 				sendOnly("TRSE EDGE,SR,%s,HT,OFF", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushEdgeTrigger(et, "EDGE");
@@ -4483,7 +4483,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
  */
 void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
-	
+
 	switch(m_protocolId)
 	{
 		// --------------------------------------------------
@@ -4586,7 +4586,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
  */
 void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
-	
+
 	switch(m_protocolId)
 	{
 		// --------------------------------------------------
@@ -4614,7 +4614,7 @@ void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
-	
+
 	switch(m_protocolId)
 	{
 		// --------------------------------------------------
@@ -4637,7 +4637,7 @@ void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 			LogError("Unknown protocol\n");
 			break;
 			// --------------------------------------------------
-	}		
+	}
 }
 
 /**
