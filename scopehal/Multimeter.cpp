@@ -57,6 +57,14 @@ Unit Multimeter::GetMeterUnit()
 		case Multimeter::AC_CURRENT:
 			return Unit(Unit::UNIT_AMPS);
 
+		case Multimeter::RESISTANCE:
+		case Multimeter::CONTINUITY:
+			return Unit(Unit::UNIT_OHMS);
+
+		case Multimeter::CAPACITANCE:
+			return Unit(Unit::UNIT_FARADS);
+
+		case Multimeter::DIODE:
 		case Multimeter::DC_VOLTAGE:
 		case Multimeter::DC_RMS_AMPLITUDE:
 		case Multimeter::AC_RMS_AMPLITUDE:
@@ -79,6 +87,14 @@ Unit Multimeter::GetSecondaryMeterUnit()
 		case Multimeter::AC_CURRENT:
 			return Unit(Unit::UNIT_AMPS);
 
+		case Multimeter::RESISTANCE:
+		case Multimeter::CONTINUITY:
+			return Unit(Unit::UNIT_OHMS);
+
+		case Multimeter::CAPACITANCE:
+			return Unit(Unit::UNIT_FARADS);
+
+		case Multimeter::DIODE:
 		case Multimeter::DC_VOLTAGE:
 		case Multimeter::DC_RMS_AMPLITUDE:
 		case Multimeter::AC_RMS_AMPLITUDE:
@@ -108,6 +124,14 @@ string Multimeter::ModeToText(MeasurementTypes type)
 			return "DC RMS Amplitude";
 		case Multimeter::AC_RMS_AMPLITUDE:
 			return "AC RMS Amplitude";
+		case Multimeter::RESISTANCE:
+			return "Resistance";
+		case Multimeter::CAPACITANCE:
+			return "Capacitance";
+		case Multimeter::CONTINUITY:
+			return "Continuity";
+		case Multimeter::DIODE:
+			return "Diode";
 
 		default:
 			return "";
@@ -133,6 +157,14 @@ Multimeter::MeasurementTypes Multimeter::TextToMode(const string& mode)
 		return Multimeter::DC_RMS_AMPLITUDE;
 	else if(mode == "AC RMS Amplitude")
 		return Multimeter::AC_RMS_AMPLITUDE;
+	else if(mode == "Resistance")
+		return Multimeter::RESISTANCE;
+	else if(mode == "Capacitance")
+		return Multimeter::CAPACITANCE;
+	else if(mode == "Continuity")
+		return Multimeter::CONTINUITY;
+	else if(mode == "Diode")
+		return Multimeter::DIODE;
 
 	//invalid / unknown
 	return Multimeter::DC_VOLTAGE;

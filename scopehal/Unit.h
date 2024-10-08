@@ -102,6 +102,8 @@ public:
 
 		UNIT_MICROAMPS,		//Another hack for current in the X axis
 
+		UNIT_FARADS,		//Capacitance in farads
+
 		//TODO: more here
 	};
 
