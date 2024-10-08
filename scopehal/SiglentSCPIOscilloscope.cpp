@@ -2153,8 +2153,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
 						}
+						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 					}
-					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 				}
 				if(anyDigitalEnabled)
 				{
@@ -2178,7 +2178,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							digitalWaveformDataBytes[i] = new char[acqDigitalBytes];
 							if(!paginated)
 							{	// All data fits one page
-								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
+								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
+								m_transport->SendCommand(":WAVEFORM:DATA?");
 								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
@@ -2189,7 +2190,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								for(uint64_t page = 0; page < pages; page++)
 								{
 									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
-									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
+									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
+									m_transport->SendCommand(":WAVEFORM:DATA?");
 									auto progress = [i, this, page, pages] (float fprogress) {
 										float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
@@ -2199,8 +2201,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									m_transport->ReadRawData(2, (unsigned char*)tmp);
 								}
 							}
+							ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 						}
-						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 					}
 				}
 
