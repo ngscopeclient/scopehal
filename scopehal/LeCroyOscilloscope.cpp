@@ -1054,6 +1054,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 
 	m_channelVoltageRanges.clear();
 	m_channelOffsets.clear();
+	m_channelDigitalThresholds.clear();
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
 	m_probeIsActive.clear();
@@ -4054,13 +4055,24 @@ float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
 		return 0;
 
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[channel];
+	}
+
 	string reply;
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxThreshold0'");
 	else
 		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxThreshold1'");
 
-	return atof(reply.c_str());
+	float result = atof(reply.c_str());
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDigitalThresholds[channel] = result;
+	return result;
 }
 
 void LeCroyOscilloscope::SetDigitalHysteresis(size_t channel, float level)

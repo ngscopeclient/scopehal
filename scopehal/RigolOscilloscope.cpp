@@ -761,6 +761,9 @@ bool RigolOscilloscope::AcquireData()
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	LogIndenter li;
 
+	// Notify about download operation start
+	ChannelsDownloadStarted();
+
 	// Rigol scopes do not have a capture time so we fake it
 	double now = GetTime();
 
@@ -854,7 +857,9 @@ bool RigolOscilloscope::AcquireData()
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = floor(now);
 		cap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
-		
+
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
+
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
 		for(size_t npoint = 0; npoint < npoints;)
 		{
@@ -933,7 +938,15 @@ bool RigolOscilloscope::AcquireData()
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			m_transport->ReadRawData(header_blocksize_bytes + 1, temp_buf);	 //trailing newline after data block
+
+			size_t bytesToRead = header_blocksize_bytes + 1; //trailing newline after data block
+			auto downloadCallback = [i, this, npoint, npoints, bytesToRead] (float progress) {
+				/* we get the percentage of this particular download; convert this into linear percentage across all chunks */
+				float bytes_progress = npoint * (m_highDefinition ? 2 : 1) + progress * bytesToRead;
+				float bytes_total = npoints * (m_highDefinition ? 2 : 1);
+				ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, bytes_progress / bytes_total);
+			};
+			m_transport->ReadRawData(bytesToRead, temp_buf, downloadCallback);
 
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
@@ -962,6 +975,8 @@ bool RigolOscilloscope::AcquireData()
 
 			npoint += header_blocksize;
 		}
+		// Notify about end of download for this channel
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 
 		//Done, update the data
 		if(cap)
@@ -985,6 +1000,10 @@ bool RigolOscilloscope::AcquireData()
 
 	//Clean up
 	delete[] temp_buf;
+
+	// Everything is done, and nothing else has anything in its buffer anymore.
+	for(size_t i = 0; i < m_analogChannelCount; i++)
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
 
 	//TODO: support digital channels
 

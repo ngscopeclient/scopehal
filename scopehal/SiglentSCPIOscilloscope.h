@@ -282,14 +282,7 @@ protected:
 
 	std::string GetPossiblyEmptyString(const std::string& property);
 
-	//  bool ReadWaveformBlock(std::string& data);
-	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false);
-	//  	bool ReadWavedescs(
-	//		std::vector<std::string>& wavedescs,
-	//		bool* analogEnabled,
-	//		bool* digitalEnabled,
-	//		bool& anyAnalogEnabled,
-	//		bool& anyDigitalEnabled);
+	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false, std::function<void(float)> progress = nullptr);
 	bool ReadWavedescs(
 		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 
@@ -354,6 +347,7 @@ protected:
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;
+	std::map<size_t, float> m_channelDigitalThresholds;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
 	int64_t m_sampleRate;

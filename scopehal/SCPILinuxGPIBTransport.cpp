@@ -146,7 +146,7 @@ void SCPILinuxGPIBTransport::SendRawData(size_t len, const unsigned char* buf)
 	ibwrt(m_handle, (const char *)buf, len);
 }
 
-size_t SCPILinuxGPIBTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPILinuxGPIBTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	if (!IsConnected())
 		return 0;

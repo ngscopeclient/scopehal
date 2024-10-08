@@ -127,6 +127,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
+	std::function<void(float)> downloadCallback,
 	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySine");
@@ -142,7 +143,13 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float scale = amplitude / 2;
 
 	for(size_t i=0; i<depth; i++)
+	{
 		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
+	}
 
 	return ret;
 }
@@ -167,6 +174,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	float period2,
 	int64_t sampleperiod,
 	size_t depth,
+	std::function<void(float)> downloadCallback,
 	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySineSum");
@@ -187,6 +195,11 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 		ret->m_samples[i] = scale *
 			(sinf(i*radians_per_sample1 + startphase1) + sinf(i*radians_per_sample2 + startphase2))
 			+ noise(m_rng);
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
+
 	}
 
 	return ret;
@@ -211,6 +224,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
+	std::function<void(float)> downloadCallback,
 	bool lpf,
 	float noise_stdev
 	)
@@ -255,6 +269,11 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 
 			ret->m_samples[i] = last_voltage + delta*frac;
 		}
+
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
 	}
 
 	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
@@ -281,6 +300,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
+	std::function<void(float)> downloadCallback,
 	bool lpf,
 	float noise_stdev)
 {
@@ -330,6 +350,11 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 			float delta = cur_voltage - last_voltage;
 
 			ret->m_samples[i] = last_voltage + delta*frac;
+		}
+
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
 		}
 	}
 

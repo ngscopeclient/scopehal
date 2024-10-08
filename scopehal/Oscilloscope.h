@@ -384,6 +384,15 @@ public:
 	 */
 	virtual bool IsInverted(size_t i);
 
+protected:
+
+	/// @brief Helper method called by drivers to reset all channels to "waiting to download" state.
+	void ChannelsDownloadStarted();
+
+	/// @brief Helper method called by drivers to set one channel's download status.
+	void ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::DownloadState state, float progress);
+
+public:
 	//Triggering
 	enum TriggerMode
 	{

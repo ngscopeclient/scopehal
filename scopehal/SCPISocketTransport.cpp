@@ -155,12 +155,32 @@ void SCPISocketTransport::SendRawData(size_t len, const unsigned char* buf)
 	m_socket.SendLooped(buf, len);
 }
 
-size_t SCPISocketTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPISocketTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress)
 {
-	if(!m_socket.RecvLooped(buf, len))
+	size_t chunk_size = len;
+	if (progress)
 	{
-		LogTrace("Failed to get %zu bytes\n", len);
-		return 0;
+		/* carve up the chunk_size into either 1% or 32kB chunks, whichever is larger; later, we'll want RecvLooped to do this for us */
+		chunk_size /= 100;
+		if (chunk_size < 32768)
+			chunk_size = 32768;
+	}
+
+	for (size_t pos = 0; pos < len; )
+	{
+		size_t n = chunk_size;
+		if (n > (len - pos))
+			n = len - pos;
+		if(!m_socket.RecvLooped(buf + pos, n))
+		{
+			LogTrace("Failed to get %zu bytes (@ pos %zu)\n", len, pos);
+			return 0;
+		}
+		pos += n;
+		if (progress)
+		{
+			progress((float)pos / (float)len);
+		}
 	}
 
 	LogTrace("Got %zu bytes\n", len);

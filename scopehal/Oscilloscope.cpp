@@ -856,6 +856,31 @@ bool Oscilloscope::IsInverted(size_t /*i*/)
 	return false;
 }
 
+void Oscilloscope::ChannelsDownloadStarted()
+{
+	for (size_t i = 0; i < m_channels.size(); i++)
+	{
+		auto chan = GetOscilloscopeChannel(i);
+		if (chan == nullptr)
+			continue;
+
+		chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_WAITING;
+		chan->m_downloadProgress = 0.0;
+		chan->m_downloadStartTime = GetTime();
+	}
+}
+
+void Oscilloscope::ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::DownloadState state, float progress)
+{
+	auto chan = GetOscilloscopeChannel(ch);
+	if (chan == nullptr)
+		return;
+
+	chan->m_downloadState = state;
+	chan->m_downloadProgress = progress;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Trigger configuration
 

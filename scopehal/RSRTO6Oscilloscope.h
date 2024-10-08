@@ -161,6 +161,7 @@ protected:
 	std::map<size_t, float> m_channelOffsets;
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<int, bool> m_channelsEnabled;
+	std::map<size_t, float> m_channelDigitalThresholds;
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, int> m_channelBandwidthLimits;
 	std::map<size_t, double> m_channelAttenuations;

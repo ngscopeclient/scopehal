@@ -300,6 +300,9 @@ protected:
 	///@brief Cached map of <channel ID, full scale range>
 	std::map<size_t, float> m_channelVoltageRanges;
 
+	///@brief Cached map of <channel ID, digital threshold>
+	std::map<size_t, float> m_channelDigitalThresholds;
+
 	///@brief Cached map of <channel ID, coupling>
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 
@@ -357,6 +360,9 @@ protected:
 
 	///@brief Starting index for digital channels
 	size_t m_digitalChannelBase;
+
+	///@brief Nuber of digital channels
+	size_t m_digitalChannelCount;
 
 	///@brief Starting index for spectrum channels
 	size_t m_spectrumChannelBase;

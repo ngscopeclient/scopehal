@@ -145,6 +145,17 @@ public:
 	virtual void SetInputMux(size_t select);
 
 	void SetDefaultDisplayName();
+
+	virtual DownloadState GetDownloadState() override;
+	virtual float GetDownloadProgress() override;
+	virtual double GetDownloadStartTime() override;
+
+private:
+	// to be accessed by Oscilloscope to update download status
+	DownloadState m_downloadState;
+	float m_downloadProgress;
+	double m_downloadStartTime;
+
 protected:
 	void SharedCtorInit(Unit unit);
 

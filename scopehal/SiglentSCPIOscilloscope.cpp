@@ -650,6 +650,7 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
+	m_channelDigitalThresholds.clear();
 	m_probeIsActive.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
@@ -1544,7 +1545,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	return TRIGGER_MODE_RUN;
 }
 
-int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround)
+int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround, std::function<void(float)> progress)
 {
 	//Read and discard data until we see the '#'
 	uint8_t tmp;
@@ -1576,8 +1577,7 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 		len *= 2;
 	len = min(len, maxsize);
 
-	// Now get the data
-	m_transport->ReadRawData(len, (unsigned char*)data);
+	m_transport->ReadRawData(len, (unsigned char*)data, progress);
 
 	if(hdSizeWorkaround)
 		return getLength*2;
@@ -1985,6 +1985,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				analogEnabled[i] = IsChannelEnabled(i);
 				anyAnalogEnabled |= analogEnabled[i];
 			}
+
+			// Notify about download operation start
+			ChannelsDownloadStarted();
+
 			start = GetTime();
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
@@ -1993,10 +1997,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					analogWaveformData[i] = new char[WAVEFORM_SIZE];
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
-					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i]);
+					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 					// This is the 0x0a0a at the end
 					m_transport->ReadRawData(2, (unsigned char*)tmp);
 				}
+				ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 			}
 			//At this point all data has been read so the scope is free to go do
 			//its thing while we crunch the results.  Re-arm the trigger if not
@@ -2055,6 +2060,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				for(size_t j = 0; j < num_sequences; j++)
 					pending_waveforms[i].push_back(waveforms[i][j]);
 			}
+
+			for(unsigned int i = 0; i < m_analogChannelCount; i++)
+				ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
 			break;
 
 		// --------------------------------------------------
@@ -2094,7 +2102,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			}
 
 			if(pdesc)
-			{	// Handle the case when only digital channel is activated
+			{	// Notify about download operation start
+				ChannelsDownloadStarted();
+
+				// Handle the case when only digital channel is activated
 				// Figure out when the first trigger happened.
 				//Read the timestamps if we're doing segmented capture
 				ttime = ExtractTimestamp(pdesc, basetime);
@@ -2122,7 +2133,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						{	// All data fits one page
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
 							m_transport->SendCommand(":WAVEFORM:DATA?");
-							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround);
+							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 							// This is the 0x0a0a at the end
 							m_transport->ReadRawData(2, (unsigned char*)tmp);
 						}
@@ -2133,12 +2144,17 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							{
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
-								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround);
+								auto progress = [i, this, page, pages] (float progress) {
+									float linear_progress = ((float)page + progress) / (float)pages; // the last page will go slightly faster, but oh well
+									ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+								};
+								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
 						}
 					}
+					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 				}
 				if(anyDigitalEnabled)
 				{
@@ -2163,7 +2179,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							if(!paginated)
 							{	// All data fits one page
 								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
-								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false);
+								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
@@ -2174,12 +2190,17 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								{
 									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
-									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false);
+									auto progress = [i, this, page, pages] (float progress) {
+										float linear_progress = ((float)page + progress) / (float)pages; // the last page will go slightly faster, but oh well
+										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+									};
+									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
 									// This is the 0x0a0a at the end
 									m_transport->ReadRawData(2, (unsigned char*)tmp);
 								}
 							}
 						}
+						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 					}
 				}
 
@@ -2246,6 +2267,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					for(size_t j = 0; j < num_sequences; j++)
 						pending_waveforms[i+m_analogChannelCount].push_back(digitalWaveforms[i][j]);
 				}
+
+				for(unsigned int i = 0; i < m_analogChannelCount; i++)
+					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
+				for(unsigned int i = 0; i < m_digitalChannelCount; i++)
+					ChannelsDownloadStatusUpdate(i+m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
 			}
 
 			break;
@@ -3697,7 +3723,18 @@ float SiglentSCPIOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 
 float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 {
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
+		return 0;
+
 	channel -= m_analogChannelCount;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[channel];
+	}
+
+	float result = 0.0f;
 
 	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
 
@@ -3708,14 +3745,21 @@ float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 		i++;
 
 	if(c_sds2000xp_threshold_table[i].name)
-		return c_sds2000xp_threshold_table[i].val;
+	{
+		result =  c_sds2000xp_threshold_table[i].val;
+	}
+	else if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
+	{	// Didn't match a standard, check for custom
+		result =  strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
+	}
+	else 
+	{
+		LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
+	}
 
-	// Didn't match a standard, check for custom
-	if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
-		return strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
-
-	LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
-	return 0.0f;
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDigitalThresholds[channel] = result;
+	return result;
 }
 
 void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)

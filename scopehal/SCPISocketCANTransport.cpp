@@ -229,7 +229,7 @@ size_t SCPISocketCANTransport::ReadPacket(can_frame* frame, int64_t& sec, int64_
 /**
 	@brief For backward compatibility, doesn't provide timestamps
  */
-size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPISocketCANTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	iovec iov;
 	iov.iov_base = buf;

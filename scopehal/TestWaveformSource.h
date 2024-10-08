@@ -62,6 +62,7 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
+		std::function<void(float)> downloadCallback,
 		float noise_stdev = 0.01);
 
 	WaveformBase* GenerateNoisySinewaveSum(
@@ -72,6 +73,7 @@ public:
 		float period2,
 		int64_t sampleperiod,
 		size_t depth,
+		std::function<void(float)> downloadCallback,
 		float noise_stdev = 0.01);
 
 	WaveformBase* GeneratePRBS31(
@@ -81,6 +83,7 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
+		std::function<void(float)> downloadCallback,
 		bool lpf = true,
 		float noise_stdev = 0.01);
 
@@ -91,6 +94,7 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
+		std::function<void(float)> downloadCallback,
 		bool lpf = true,
 		float noise_stdev = 0.01);
 

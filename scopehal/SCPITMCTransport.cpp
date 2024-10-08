@@ -167,7 +167,7 @@ void SCPITMCTransport::SendRawData(size_t len, const unsigned char* buf)
 	write(m_handle, (const char *)buf, len);
 }
 
-size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	// Data in the staging buffer is assumed to always be a consequence of a SendCommand request.
 	// Since we fetch all the reply data in one go, once all this data has been fetched, we mark
