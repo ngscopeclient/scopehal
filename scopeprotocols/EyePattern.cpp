@@ -146,11 +146,10 @@ void EyePattern::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-void EyePattern::Refresh()
+void EyePattern::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	static double total_time = 0;
-	static double total_frames = 0;
-
 	LogIndenter li;
 
 	if(!VerifyAllInputsOK())
@@ -163,7 +162,6 @@ void EyePattern::Refresh()
 	//Get the input data
 	auto waveform = GetInputWaveform(0);
 	auto clock = GetInputWaveform(1);
-	double start = GetTime();
 
 	waveform->PrepareForCpuAccess();
 	clock->PrepareForCpuAccess();
@@ -258,8 +256,7 @@ void EyePattern::Refresh()
 	auto uwfm = dynamic_cast<UniformAnalogWaveform*>(waveform);
 	if(m_xscale > FLT_EPSILON)
 	{
-		//Optimized inner loop for dense packed waveforms
-		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
+		//Optimized inner loop for uniformly sampled waveforms
 		if(uwfm)
 		{
 			#ifdef __x86_64__
@@ -275,18 +272,6 @@ void EyePattern::Refresh()
 			SparsePackedInnerLoop(swfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 	}
 
-	//Rightmost column of the eye has some rounding artifacts.
-	//For now, just replace it with the value from 1 column to its left.
-	size_t delta = ceil(m_xscale);
-	size_t xstart = xmax - delta;
-	size_t xend = xmax;
-	for(size_t y=0; y<m_height; y++)
-	{
-		int64_t* row = data + y*m_width;
-		for(size_t x=xstart; x<=xend; x++)
-			row[x] = row[x-delta];
-	}
-
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock_edges.size());
 	cap->Normalize();
@@ -295,11 +280,6 @@ void EyePattern::Refresh()
 	//If we have an eye mask, prepare it for processing
 	if(m_mask.GetFileName() != "")
 		DoMaskTest(cap);
-
-	double dt = GetTime() - start;
-	total_frames ++;
-	total_time += dt;
-	LogTrace("Refresh took %.3f ms (avg %.3f)\n", dt * 1000, (total_time * 1000) / total_frames);
 }
 
 #ifdef __x86_64__
