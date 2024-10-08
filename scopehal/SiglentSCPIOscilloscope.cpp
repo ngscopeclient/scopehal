@@ -2060,6 +2060,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				for(size_t j = 0; j < num_sequences; j++)
 					pending_waveforms[i].push_back(waveforms[i][j]);
 			}
+
+			for(unsigned int i = 0; i < m_analogChannelCount; i++)
+				ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
 			break;
 
 		// --------------------------------------------------
@@ -2101,7 +2104,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			if(pdesc)
 			{	// Notify about download operation start
 				ChannelsDownloadStarted();
-				
+
 				// Handle the case when only digital channel is activated
 				// Figure out when the first trigger happened.
 				//Read the timestamps if we're doing segmented capture
@@ -2264,6 +2267,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					for(size_t j = 0; j < num_sequences; j++)
 						pending_waveforms[i+m_analogChannelCount].push_back(digitalWaveforms[i][j]);
 				}
+
+				for(unsigned int i = 0; i < m_analogChannelCount; i++)
+					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
+				for(unsigned int i = 0; i < m_digitalChannelCount; i++)
+					ChannelsDownloadStatusUpdate(i+m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
 			}
 
 			break;
