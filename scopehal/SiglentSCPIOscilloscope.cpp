@@ -2179,7 +2179,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							if(!paginated)
 							{	// All data fits one page
 								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i) + ";:WAVEFORM:DATA?");
-								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
@@ -2192,7 +2192,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize) + ";:WAVEFORM:DATA?");
 									auto progress = [i, this, page, pages] (float progress) {
 										float linear_progress = ((float)page + progress) / (float)pages; // the last page will go slightly faster, but oh well
-										ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 									};
 									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
 									// This is the 0x0a0a at the end
