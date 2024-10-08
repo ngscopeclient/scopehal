@@ -856,73 +856,30 @@ bool Oscilloscope::IsInverted(size_t /*i*/)
 	return false;
 }
 
-// In automatic download progress bar display mode (i.e. if the driver doens not call SetShowChannelsDownloadProgress() method)
-// this is the maximum download duration under which the download progress bar will not be shown.
-#define SHOW_DOWNLOAD_PROGRESS_BAR_DURATION	0.3
-
-int Oscilloscope::GetChannelDownloadState(size_t i)
-{	// Surface check of channel index
-	if(i >= m_channelDownloadStates.size())
-		return OscilloscopeChannel::DownloadState::DOWNLOAD_NONE;
-
-	int result = m_channelDownloadStates[i];
-	if(!m_forceShowChannelProgressBar && !m_downloadSpeedEvaluated && 
-		result > OscilloscopeChannel::DownloadState::DOWNLOAD_STARTED && result < OscilloscopeChannel::DownloadState::DOWNLOAD_FINISHED)
-	{	// Check duration since start
-		double now = GetTime();
-		if((now - m_downloadStartTime) > SHOW_DOWNLOAD_PROGRESS_BAR_DURATION)
-		{	// We've been downloading for more than 300ms and are not finished yet => show progress bar
-			m_showChannelProgressBar = true;
-			m_downloadSpeedEvaluated = true;
-			//LogWarning("Download speed evaluation done, show progress = true : start time = %f, now = %f, diff = %f, state = %d)\n",m_downloadStartTime, now,now - m_downloadStartTime,result);
-		}
-	}
-	if(!m_showChannelProgressBar)
-		return OscilloscopeChannel::DownloadState::DOWNLOAD_PROGRESS_DISABLED;
-	return result;
-}
-
-void Oscilloscope::SetShowChannelsDownloadProgress(bool show)
-{	// Let the driver decide whether the progress bar should be shown or not
-	m_forceShowChannelProgressBar = true;
-	m_showChannelProgressBar = show;
-}
-
 void Oscilloscope::ChannelsDownloadStarted()
-{	// Set all channels to DOWNLOAD_WAITING state
-	m_channelDownloadStates.assign(m_channels.size(),OscilloscopeChannel::DownloadState::DOWNLOAD_WAITING);
-	if(!m_forceShowChannelProgressBar)
-	{	// Not in force mode => check if the sample depth has changed since last download
-		uint64_t newSampleDepth = GetSampleDepth();
-		size_t newEnabledChannels = GetEnabledChannelCount();
-		if((newSampleDepth != m_downloadSpeedEvalSampleDepth) || (newEnabledChannels != m_downloadSpeedEvalEnabledChannels))
-		{	// Sample depth has changed => re-evaluate download speed
-			m_downloadSpeedEvalSampleDepth = newSampleDepth;
-			m_downloadSpeedEvalEnabledChannels = newEnabledChannels;
-			m_downloadSpeedEvaluated = false;
-		}
-		else if(!m_downloadSpeedEvaluated)
-		{	// See how log elapsed since last download start
-			double now = GetTime();
-			if((now-m_downloadStartTime)<=SHOW_DOWNLOAD_PROGRESS_BAR_DURATION)
-			{	// Download fast enough, no need for a progress bar to be shown
-				m_downloadSpeedEvaluated = true;
-				m_showChannelProgressBar = false;
-				//LogWarning("Download speed evaluation done, show = false : start time = %f, now = %f, diff = %f)\n",m_downloadStartTime, now,now - m_downloadStartTime);
-			}
-		}
+{
+	for (size_t i = 0; i < m_channels.size(); i++)
+	{
+		auto chan = GetOscilloscopeChannel(i);
+		if (chan == nullptr)
+			continue;
+
+		chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_WAITING;
+		chan->m_downloadProgress = 0.0;
+		chan->m_downloadStartTime = GetTime();
 	}
-	m_downloadStartTime = GetTime();
 }
 
-void Oscilloscope::UpdateChannelDownloadState(size_t i, int downloadState)
+void Oscilloscope::ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::DownloadState state, float progress)
 {
-	if(i >= m_channelDownloadStates.size())
-	{	
-		m_channelDownloadStates.resize(i+1,OscilloscopeChannel::DownloadState::DOWNLOAD_NONE);
-	}
-	m_channelDownloadStates[i]=downloadState;
+	auto chan = GetOscilloscopeChannel(ch);
+	if (chan == nullptr)
+		return;
+
+	chan->m_downloadState = state;
+	chan->m_downloadProgress = progress;
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Trigger configuration

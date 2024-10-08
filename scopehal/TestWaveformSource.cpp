@@ -127,7 +127,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(int)> downloadCallback,
+	std::function<void(float)> downloadCallback,
 	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySine");
@@ -142,20 +142,15 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	float scale = amplitude / 2;
 
-	size_t percent = depth / 100;
-	size_t percentage = 0;
-	downloadCallback(0);
 	for(size_t i=0; i<depth; i++)
 	{
-		if(i/percent != percentage)
-		{
-			percentage = i/percent;
-			downloadCallback((int)percentage);
-		}
 		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
 	}
 
-	downloadCallback(100);
 	return ret;
 }
 
@@ -179,7 +174,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	float period2,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(int)> downloadCallback,
+	std::function<void(float)> downloadCallback,
 	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySineSum");
@@ -195,22 +190,18 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	//Divide by 2 again to avoid clipping the sum of them
 	float scale = amplitude / 4;
 
-	size_t percent = depth / 100;
-	size_t percentage = 0;
-	downloadCallback(0);
 	for(size_t i=0; i<depth; i++)
 	{
-		if(i/percent != percentage)
-		{
-			percentage = i/percent;
-			downloadCallback((int)percentage);
-		}
 		ret->m_samples[i] = scale *
 			(sinf(i*radians_per_sample1 + startphase1) + sinf(i*radians_per_sample2 + startphase2))
 			+ noise(m_rng);
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
+
 	}
 
-	downloadCallback(100);
 	return ret;
 }
 
@@ -233,7 +224,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(int)> downloadCallback,
+	std::function<void(float)> downloadCallback,
 	bool lpf,
 	float noise_stdev
 	)
@@ -247,16 +238,8 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float scale = amplitude / 2;
 	float phase_to_next_edge = period;
 	bool value = false;
-	size_t percent = depth / 100;
-	size_t percentage = 0;
-	downloadCallback(0);
 	for(size_t i=0; i<depth; i++)
 	{
-		if(i/percent != percentage)
-		{
-			percentage = i/percent;
-			downloadCallback((int)percentage);
-		}
 		//Increment phase accumulator
 		float last_phase = phase_to_next_edge;
 		phase_to_next_edge -= sampleperiod;
@@ -286,10 +269,14 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 
 			ret->m_samples[i] = last_voltage + delta*frac;
 		}
+
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
 	}
 
 	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
-	downloadCallback(100);
 
 	return ret;
 }
@@ -313,7 +300,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(int)> downloadCallback,
+	std::function<void(float)> downloadCallback,
 	bool lpf,
 	float noise_stdev)
 {
@@ -333,16 +320,8 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	float phase_to_next_edge = period;
 	bool value = false;
 	int nbit = 0;
-	size_t percent = depth / 100;
-	size_t percentage = 0;
-	downloadCallback(0);
 	for(size_t i=0; i<depth; i++)
 	{
-		if(i/percent != percentage)
-		{
-			percentage = i/percent;
-			downloadCallback((int)percentage);
-		}
 		//Increment phase accumulator
 		float last_phase = phase_to_next_edge;
 		phase_to_next_edge -= sampleperiod;
@@ -372,10 +351,14 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 
 			ret->m_samples[i] = last_voltage + delta*frac;
 		}
+
+		if (i % 1024 == 0)
+		{
+			downloadCallback((float)i / (float)depth);
+		}
 	}
 
 	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
-	downloadCallback(100);
 
 	return ret;
 }

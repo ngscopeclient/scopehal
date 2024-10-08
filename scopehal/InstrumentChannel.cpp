@@ -151,3 +151,21 @@ bool InstrumentChannel::ShouldPersistWaveform()
 	//Default to persisting everything
 	return true;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Download progress
+
+InstrumentChannel::DownloadState InstrumentChannel::GetDownloadState()
+{
+	return DownloadState::DOWNLOAD_UNKNOWN;
+}
+
+float InstrumentChannel::GetDownloadProgress()
+{
+	return 0.0;
+}
+
+double InstrumentChannel::GetDownloadStartTime()
+{
+	return 0.0;
+}

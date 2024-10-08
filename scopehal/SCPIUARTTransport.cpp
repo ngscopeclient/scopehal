@@ -121,7 +121,7 @@ void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
 	m_uart.Write(buf, len);
 }
 
-size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	if(!m_uart.Read(buf, len))
 		return 0;

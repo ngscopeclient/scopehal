@@ -173,7 +173,7 @@ void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 	lxi_send(m_device, const_cast<char*>(reinterpret_cast<const char*>(buf)), len, m_timeout);
 }
 
-size_t SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	// Data in the staging buffer is assumed to always be a consequence of a SendCommand request.
 	// Since we fetch all the reply data in one go, once all this data has been fetched, we mark

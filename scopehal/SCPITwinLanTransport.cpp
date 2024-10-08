@@ -85,7 +85,7 @@ string SCPITwinLanTransport::GetConnectionString()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Secondary socket I/O
 
-size_t SCPITwinLanTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t SCPITwinLanTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	if(m_secondarysocket.RecvLooped(buf, len))
 		return len;

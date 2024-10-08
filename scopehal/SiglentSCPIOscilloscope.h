@@ -282,7 +282,7 @@ protected:
 
 	std::string GetPossiblyEmptyString(const std::string& property);
 
-	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false, int slices = -1, size_t channel = 0, int startSlice = 0);
+	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false, std::function<void(float)> progress = nullptr);
 	bool ReadWavedescs(
 		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 

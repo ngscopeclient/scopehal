@@ -223,7 +223,7 @@ void VICPSocketTransport::SendRawData(size_t len, const unsigned char* buf)
 	m_socket.SendLooped(buf, len);
 }
 
-size_t VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf)
+size_t VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	if(!m_socket.RecvLooped(buf, len))
 		return 0;

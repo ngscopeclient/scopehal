@@ -53,7 +53,7 @@ public:
 	unsigned short GetDataPort()
 	{ return m_dataport; }
 
-	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
+	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
 	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
 	TRANSPORT_INITPROC(SCPITwinLanTransport)

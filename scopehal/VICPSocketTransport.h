@@ -63,7 +63,7 @@ public:
 
 	virtual bool SendCommand(const std::string& cmd) override;
 	virtual std::string ReadReply(bool endOnSemicolon = true) override;
-	virtual size_t ReadRawData(size_t len, unsigned char* buf) override;
+	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
 	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
 	virtual bool IsCommandBatchingSupported() override;

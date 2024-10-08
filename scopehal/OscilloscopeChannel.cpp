@@ -61,6 +61,9 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Stream::StreamType stype,
 	size_t index)
 	: InstrumentChannel(scope, hwname, color, xunit, yunit, stype, index)
+	, m_downloadState(DownloadState::DOWNLOAD_UNKNOWN)
+	, m_downloadProgress(0.0)
+	, m_downloadStartTime(0.0)
 	, m_refcount(0)
 {
 }
@@ -342,9 +345,17 @@ void OscilloscopeChannel::SetInputMux(size_t select)
 		GetScope()->SetInputMux(m_index, select);
 }
 
-int OscilloscopeChannel::GetDownloadState()
+InstrumentChannel::DownloadState OscilloscopeChannel::GetDownloadState()
 {
-	if(m_instrument)
-		return GetScope()->GetChannelDownloadState(m_index);
-	return DownloadState::DOWNLOAD_PROGRESS_DISABLED;
+	return m_downloadState;
+}
+
+float OscilloscopeChannel::GetDownloadProgress()
+{
+	return m_downloadProgress;
+}
+
+double OscilloscopeChannel::GetDownloadStartTime()
+{
+	return m_downloadStartTime;
 }

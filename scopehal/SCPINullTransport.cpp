@@ -86,7 +86,7 @@ void SCPINullTransport::SendRawData(size_t /*len*/, const unsigned char* /*buf*/
 {
 }
 
-size_t SCPINullTransport::ReadRawData(size_t /*len*/, unsigned char* /*buf*/)
+size_t SCPINullTransport::ReadRawData(size_t /*len*/, unsigned char* /*buf*/, std::function<void(float)> /*progress*/)
 {
 	return 0;
 }

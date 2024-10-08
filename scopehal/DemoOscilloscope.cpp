@@ -401,9 +401,6 @@ uint64_t DemoOscilloscope::GetSampleDepth()
 void DemoOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	m_depth = depth;
-	// Another way to let GetChannelDownloadState() API know when to show progress bar is to
-	// force its behaviour according to the current sample depth using SetShowChannelsDownloadProgress() method
-	// SetShowChannelsDownloadProgress(depth>=10000000L);
 }
 
 void DemoOscilloscope::SetSampleRate(uint64_t rate)
@@ -494,7 +491,7 @@ bool DemoOscilloscope::AcquireData()
 	if(!m_triggerArmed)
 		return false;
 
-	// Tell the GetChannelDownloadState() of Oscilloscope class that waveform download operation is starting
+	// prepare all channels to be 'about to download'
 	ChannelsDownloadStarted();
 
 	//cap waveform rate at 50 wfm/s to avoid saturating cpu
@@ -538,10 +535,11 @@ bool DemoOscilloscope::AcquireData()
 			continue;
 
 		// Lambda passed to generate waveform methods to update "download" percentage
-		auto updateProgress = [i,this](int percentage) 
+		auto updateProgress = [i,this](float progress)
 			{
-				this->UpdateChannelDownloadState(i,percentage);
+				this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress);
 			};
+		this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
 		switch(i)
 		{
 			case 0:
@@ -572,6 +570,7 @@ bool DemoOscilloscope::AcquireData()
 		}
 
 		waveforms[i]->MarkModifiedFromCpu();
+		this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 	}
 
 	SequenceSet s;
