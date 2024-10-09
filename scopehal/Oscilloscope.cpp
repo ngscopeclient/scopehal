@@ -880,6 +880,17 @@ void Oscilloscope::ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::Do
 	chan->m_downloadProgress = progress;
 }
 
+void Oscilloscope::ChannelsDownloadFinished()
+{
+	for (size_t i = 0; i < m_channels.size(); i++)
+	{
+		auto chan = GetOscilloscopeChannel(i);
+		if (chan == nullptr)
+			continue;
+
+		chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_NONE;
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Trigger configuration

@@ -1001,9 +1001,8 @@ bool RigolOscilloscope::AcquireData()
 	//Clean up
 	delete[] temp_buf;
 
-	// Everything is done, and nothing else has anything in its buffer anymore.
-	for(size_t i = 0; i < m_analogChannelCount; i++)
-		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 1.0);
+	// Tell the download monitor that waveform download has finished
+	ChannelsDownloadFinished();
 
 	//TODO: support digital channels
 

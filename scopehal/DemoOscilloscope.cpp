@@ -577,7 +577,6 @@ bool DemoOscilloscope::AcquireData()
 	for(int i=0; i<4; i++)
 	{
 		s[GetOscilloscopeChannel(i)] = waveforms[i];
-		this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 0.0);
 	}
 
 	//Timestamp the waveform(s)
@@ -602,6 +601,9 @@ bool DemoOscilloscope::AcquireData()
 
 	if(m_triggerOneShot)
 		m_triggerArmed = false;
+
+	// Tell the download monitor that waveform download has finished
+	ChannelsDownloadFinished();
 
 	return true;
 }
