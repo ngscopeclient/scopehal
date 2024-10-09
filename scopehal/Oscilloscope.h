@@ -397,8 +397,8 @@ protected:
 		or if all channels are downloaded at the same speed.
 
 		@param ch 			Zero-based index of channel
-		@param state		the new InstrumentChannel::DownloadState for this channel
-		@param progress		A one based float value representing the download progress
+		@param state		The new InstrumentChannel::DownloadState for this channel
+		@param progress		A float value ranging from 0 to 1 to represent the download progress
 	 */
 	void ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::DownloadState state, float progress);
 
