@@ -92,7 +92,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial memory configuration.
-	SetSampleRate(1000000L);
+	SetSampleRate(1000000000L);
 	SetSampleDepth(10000);
 
 	//Set up the data plane socket
@@ -508,8 +508,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		auto block = rates.substr(istart, i-istart);
-		auto fs = stol(block);
-		auto hz = FS_PER_SECOND / fs;
+		auto hz = stol(block);
 		ret.push_back(hz);
 
 		//skip the comma
