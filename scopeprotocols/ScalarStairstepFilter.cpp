@@ -54,7 +54,7 @@ ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
 	m_parameters[m_end].SetFloatVal(1);
 
 	m_parameters[m_interval] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_interval].SetFloatVal(FS_PER_SECOND);
+	m_parameters[m_interval].SetIntVal(FS_PER_SECOND);
 
 	m_parameters[m_nsteps] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_nsteps].SetIntVal(10);
