@@ -389,7 +389,17 @@ protected:
 	/// @brief Helper method called by drivers to reset all channels to "waiting to download" state.
 	void ChannelsDownloadStarted();
 
-	/// @brief Helper method called by drivers to set one channel's download status.
+	/**
+	 	@brief Helper method called by drivers to set one channel's download status and update its download progress.
+		Be aware that there is a measurement on ngscopeclient UI of the time spent between the download start and 
+		the progress of the last enabled channel. This measurement is used to decide whether to display a progress bar or not.
+		This download speed evaluation method only works if enabled channels are download sequencially in increasing numeric order
+		or if all channels are downloaded at the same speed.
+
+		@param ch 			Zero-based index of channel
+		@param state		the new InstrumentChannel::DownloadState for this channel
+		@param progress		A one based float value representing the download progress
+	 */
 	void ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::DownloadState state, float progress);
 
 	/// @brief Helper method called by drivers when waveform download is finished to reset all channels to "no download" state.
