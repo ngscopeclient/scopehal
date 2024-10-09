@@ -392,6 +392,9 @@ protected:
 	/// @brief Helper method called by drivers to set one channel's download status.
 	void ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::DownloadState state, float progress);
 
+	/// @brief Helper method called by drivers when acquisition is stopped to reset all channels to "no download" state.
+	void AcquisitionStopped();
+
 public:
 	//Triggering
 	enum TriggerMode

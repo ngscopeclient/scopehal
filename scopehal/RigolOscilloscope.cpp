@@ -1103,6 +1103,8 @@ void RigolOscilloscope::Stop()
 	m_liveMode = false;
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
+	// Tell the download monitor that no more waveform are going to be downloaded
+	AcquisitionStopped();
 }
 
 void RigolOscilloscope::ForceTrigger()

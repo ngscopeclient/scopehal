@@ -201,6 +201,8 @@ void DemoOscilloscope::Stop()
 {
 	m_triggerArmed = false;
 	m_triggerOneShot = false;
+	// Tell the download monitor that no more waveform are going to be downloaded
+	AcquisitionStopped();
 }
 
 void DemoOscilloscope::ForceTrigger()
