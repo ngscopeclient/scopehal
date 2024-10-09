@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of Filter
+	@ingroup core
  */
 
 #ifndef Filter_h
@@ -43,17 +44,25 @@ class QueueHandle;
 
 /**
 	@brief Describes a particular revision of a waveform
+	@ingroup core
 
 	Used to determine whether a filter input has changed, and thus cached state should be invalidated
  */
 class WaveformCacheKey
 {
 public:
+
+	///@brief Create an empty cache key for a null waveform
 	WaveformCacheKey()
 	: m_wfm(nullptr)
 	, m_rev(0)
 	{}
 
+	/**
+		@brief Create a cache key for a waveform
+
+		@param wfm	Input waveform
+	 */
 	WaveformCacheKey(WaveformBase* wfm)
 	: m_wfm(wfm)
 	, m_rev(wfm->m_revision)
@@ -71,12 +80,16 @@ public:
 	bool operator!=(WaveformCacheKey wfm)
 	{ return (m_wfm != wfm.m_wfm) || (m_rev != wfm.m_rev); }
 
+	///@brief Pointer to the waveform object
 	WaveformBase* m_wfm;
+
+	///@param Version of the waveform
 	uint64_t m_rev;
 };
 
 /**
-	@brief Abstract base class for all filters and protocol decoders
+	@brief Abstract base class for all filter graph blocks which are not physical instrument channels
+	@ingroup core
  */
 class Filter	: public OscilloscopeChannel
 {
@@ -86,6 +99,7 @@ public:
 	// Construction and enumeration
 
 	//Add new categories to the end of this list before CAT_COUNT to maintain ABI compatibility with existing plugins
+	//TODO: we should make this a bitmask or list of string tags or something
 	enum Category
 	{
 		CAT_ANALYSIS,		//Signal integrity analysis

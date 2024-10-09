@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* glscopeclient                                                                                                        *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Katharina B
+	@brief Implementation of common file system utilities
+	@ingroup core
+ */
+
 #include "FileSystem.h"
 
 #ifdef _WIN32
@@ -44,6 +51,14 @@
 
 using namespace std;
 
+/**
+	@brief Find files matching a filter expression
+
+	@param pathPattern		Search expression
+	@param onlyDirectories	If true, return only directories and not normal files
+
+	@return The set of matching file names
+ */
 vector<string> Glob(const string& pathPattern, [[maybe_unused]] bool onlyDirectories)
 {
 	vector<string> result{ };
@@ -101,6 +116,11 @@ vector<string> Glob(const string& pathPattern, [[maybe_unused]] bool onlyDirecto
 	return result;
 }
 
+/**
+	@brief Deletes a directory
+
+	@param basePath	Path of the directory
+ */
 void RemoveDirectory(const string& basePath)
 {
 #ifdef _WIN32

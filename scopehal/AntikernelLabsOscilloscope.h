@@ -27,9 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of AntikernelLabsOscilloscope
+	@ingroup scopedrivers
+ */
 #ifndef AntikernelLabsOscilloscope_h
 #define AntikernelLabsOscilloscope_h
 
+/**
+	@brief Driver for experimental scopes, probably not useful to most people
+
+	@ingroup scopedrivers
+ */
 class AntikernelLabsOscilloscope : public virtual SCPIOscilloscope
 {
 public:

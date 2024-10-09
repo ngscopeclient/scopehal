@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of AntikernelLabsTriggerCrossbar
+	@ingroup matrixdrivers
+ */
 #include "scopehal.h"
 #include "AntikernelLabsTriggerCrossbar.h"
 #include "EyeWaveform.h"
@@ -41,6 +47,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPI transport connected to the crossbar
+ */
 AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -447,6 +458,7 @@ void AntikernelLabsTriggerCrossbar::SetMuxInputThreshold(size_t dstchan, float v
 	}
 }
 
+///@brief Returns the constant driver name "akl.crossbar"
 string AntikernelLabsTriggerCrossbar::GetDriverNameInternal()
 {
 	return "akl.crossbar";

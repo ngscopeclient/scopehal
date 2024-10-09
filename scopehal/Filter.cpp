@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of Filter
+	@ingroup core
  */
 
 #include "scopehal.h"

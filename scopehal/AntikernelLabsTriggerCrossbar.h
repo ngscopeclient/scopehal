@@ -27,11 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of AntikernelLabsTriggerCrossbar
+	@ingroup matrixdrivers
+ */
+
 #ifndef AntikernelLabsTriggerCrossbar_h
 #define AntikernelLabsTriggerCrossbar_h
 
 /**
 	@brief An AKL-TXB1 trigger crossbar
+
+	@ingroup matrixdrivers
  */
 class AntikernelLabsTriggerCrossbar
 	: public virtual SCPIBERT

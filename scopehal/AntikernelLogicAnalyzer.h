@@ -37,6 +37,11 @@
 #ifndef AntikernelLogicAnalyzer_h
 #define AntikernelLogicAnalyzer_h
 
+/**
+	@brief Driver for Antikernel Labs FPGA logic analyzer core (WIP)
+
+	@ingroup scopedrivers
+ */
 class AntikernelLogicAnalyzer
 	: public virtual Oscilloscope
 	, public SCPIInstrument

@@ -31,12 +31,14 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of ActionProvider
+	@ingroup core
  */
 #ifndef ActionProvider_h
 #define ActionProvider_h
 
 /**
 	@brief Abstract base for objects (usually filters) which provide a series of actions a user can perform.
+	@ingroup core
 
 	Actions are identified by ASCII text names, which must be unique within a given object.
 

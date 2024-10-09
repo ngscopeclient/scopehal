@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SpectrogramFilter
+	@ingroup rf
  */
 #ifndef SpectrogramFilter_h
 #define SpectrogramFilter_h
@@ -39,6 +40,10 @@
 
 #include "../scopehal/DensityFunctionWaveform.h"
 
+/**
+	@brief Arguments passed to the SpectrogramPostprocess shader
+	@ingroup rf
+ */
 struct SpectrogramPostprocessArgs
 {
 	uint32_t nblocks;
@@ -50,6 +55,10 @@ struct SpectrogramPostprocessArgs
 	float irange;
 };
 
+/**
+	@brief Waveform object for a spectrogram
+	@ingroup datamodel
+ */
 class SpectrogramWaveform : public DensityFunctionWaveform
 {
 public:
@@ -77,6 +86,10 @@ protected:
 	double m_bottomEdgeFrequency;
 };
 
+/**
+	@brief Filter for displaying spectrogram of a real-valued signal
+	@ingroup rf
+ */
 class SpectrogramFilter : public Filter
 {
 public:
