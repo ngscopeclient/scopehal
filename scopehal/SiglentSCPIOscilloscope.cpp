@@ -2060,6 +2060,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				for(size_t j = 0; j < num_sequences; j++)
 					pending_waveforms[i].push_back(waveforms[i][j]);
 			}
+
+			// Tell the download monitor that waveform download has finished
+			ChannelsDownloadFinished();
 			break;
 
 		// --------------------------------------------------
@@ -2266,6 +2269,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					for(size_t j = 0; j < num_sequences; j++)
 						pending_waveforms[i+m_analogChannelCount].push_back(digitalWaveforms[i][j]);
 				}
+
+				// Tell the download monitor that waveform download has finished
+				ChannelsDownloadFinished();
 			}
 
 			break;

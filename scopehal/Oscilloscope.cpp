@@ -880,7 +880,7 @@ void Oscilloscope::ChannelsDownloadStatusUpdate(size_t ch, InstrumentChannel::Do
 	chan->m_downloadProgress = progress;
 }
 
-void Oscilloscope::AcquisitionStopped()
+void Oscilloscope::ChannelsDownloadFinished()
 {
 	for (size_t i = 0; i < m_channels.size(); i++)
 	{

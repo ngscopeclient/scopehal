@@ -1001,6 +1001,11 @@ bool RigolOscilloscope::AcquireData()
 	//Clean up
 	delete[] temp_buf;
 
+	// Tell the download monitor that waveform download has finished
+	ChannelsDownloadFinished();
+
+	//TODO: support digital channels
+
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
@@ -1103,8 +1108,6 @@ void RigolOscilloscope::Stop()
 	m_liveMode = false;
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
-	// Tell the download monitor that no more waveform are going to be downloaded
-	AcquisitionStopped();
 }
 
 void RigolOscilloscope::ForceTrigger()

@@ -201,8 +201,6 @@ void DemoOscilloscope::Stop()
 {
 	m_triggerArmed = false;
 	m_triggerOneShot = false;
-	// Tell the download monitor that no more waveform are going to be downloaded
-	AcquisitionStopped();
 }
 
 void DemoOscilloscope::ForceTrigger()
@@ -603,6 +601,9 @@ bool DemoOscilloscope::AcquireData()
 
 	if(m_triggerOneShot)
 		m_triggerArmed = false;
+
+	// Tell the download monitor that waveform download has finished
+	ChannelsDownloadFinished();
 
 	return true;
 }
