@@ -43,6 +43,16 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Create a new blank eye waveform
+
+	The eye is initialized to all zeroes.
+
+	@param width	Width of the buffer, in pixels
+	@param height	Height of the buffer, in pixels
+	@param center	Center voltage
+	@param etype	Type of the eye (BER or normal integrated samples)
+ */
 EyeWaveform::EyeWaveform(size_t width, size_t height, float center, EyeType etype)
 	: DensityFunctionWaveform(width, height)
 	, m_uiWidth(0)
