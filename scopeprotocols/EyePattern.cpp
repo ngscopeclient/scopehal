@@ -58,7 +58,8 @@ EyePattern::EyePattern(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_EYE);
 	AddStream(Unit(Unit::UNIT_RATIO_SCI), "hitrate", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	AddStream(Unit(Unit::UNIT_UI), "samplesIntegrated", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_UI), "uisIntegrated", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_SAMPLEDEPTH), "samplesIntegrated", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
 	CreateInput("clk");
@@ -276,6 +277,7 @@ void EyePattern::Refresh(
 	cap->IntegrateUIs(clock_edges.size(), waveform->size());
 	cap->Normalize();
 	m_streams[2].m_value = cap->GetTotalUIs();
+	m_streams[3].m_value = cap->GetTotalSamples();
 
 	//If we have an eye mask, prepare it for processing
 	if(m_mask.GetFileName() != "")
