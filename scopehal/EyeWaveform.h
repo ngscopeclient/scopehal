@@ -39,6 +39,8 @@
 
 #include "../scopehal/DensityFunctionWaveform.h"
 
+#define EYE_ACCUM_SCALE 64
+
 /**
 	@brief An eye-pattern waveform
 	@ingroup datamodel
@@ -47,6 +49,10 @@
 
 	The internal data is integrated as int64 to avoid loss of precision, then normalized to float32 by Normalize()
 	after being updated.
+
+	The raw accumulator buffer is scaled by EYE_ACCUM_SCALE to enable antialiasing where a sample fits between two
+	rows of samples. In other words, a single sample will produce a total of EYE_ACCUM_SCALE counts in the buffer,
+	often split between several pixel locations.
  */
 class EyeWaveform : public DensityFunctionWaveform
 {
@@ -74,6 +80,10 @@ public:
 	size_t GetTotalUIs()
 	{ return m_totalUIs; }
 
+	///@brief Get the total number of samples integrated in this eye
+	size_t GetTotalSamples()
+	{ return m_totalSamples; }
+
 	/**
 		@brief Get the center voltage of the eye plot (not the center of the opening)
 
@@ -89,10 +99,14 @@ public:
 
 		Typically called by filters at the end of a refresh cycle.
 
-		@param uis	Number of UIs integrated
+		@param uis		Number of UIs integrated
+		@param samples	Number of samples integrated
 	 */
-	void IntegrateUIs(size_t uis)
-	{ m_totalUIs += uis; }
+	void IntegrateUIs(size_t uis, size_t samples)
+	{
+		m_totalUIs += uis;
+		m_totalSamples += samples;
+	}
 
 	///@brief Return the UI width, in X axis units
 	float GetUIWidth()
@@ -144,6 +158,9 @@ protected:
 
 	///@brief Total UIs integrated
 	size_t m_totalUIs;
+
+	///@brief Total samples integrated
+	size_t m_totalSamples;
 
 	///@brief Voltage of the vertical midpoint of the plot
 	float m_centerVoltage;

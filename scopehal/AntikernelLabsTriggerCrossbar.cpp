@@ -1195,7 +1195,7 @@ void AntikernelLabsTriggerCrossbar::MeasureEye(size_t i)
 	m_eyeScanInProgress = false;
 
 	cap->Normalize();
-	cap->IntegrateUIs(1);	//have to put something here, but we don't have the true count value
+	cap->IntegrateUIs(1, 1);	//have to put something here, but we don't have the true count value
 
 	//Check against the eye pattern
 	/*auto rate = chan->GetMask().CalculateHitRate(

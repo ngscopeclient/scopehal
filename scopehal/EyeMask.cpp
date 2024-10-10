@@ -176,24 +176,15 @@ void EyeMask::RenderForAnalysis(
 		float yoff,
 		float height) const
 {
-
-	//clear background
-	canvas->set_color( canvas_ity::fill_style, 0.0f, 0.0f, 0.0f, 1.0f);
-	canvas->fill();
-
-	canvas->move_to( -1e5, 0 );
-	canvas->line_to( 1e5, 0 );
-
-	canvas->line_to( 1e5, height );
-	canvas->line_to(-1e5, height);
-
-	canvas->fill();
-	canvas->set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
+	//clear background to blank
+	m_canvas->clear_rectangle(0, 0, m_width, m_height);
 
 	//Draw each polygon
+	m_canvas->set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
+	float ypixoff = height / 2;
 	for(auto poly : m_polygons)
 	{
-				for(size_t i=0; i<poly.m_points.size(); i++)
+		for(size_t i=0; i<poly.m_points.size(); i++)
 		{
 			auto point = poly.m_points[i];
 
@@ -203,15 +194,14 @@ void EyeMask::RenderForAnalysis(
 				time *= waveform->GetUIWidth();
 
 			float x = (time - xoff) * xscale;
-
-			float y = height/2 - ( (point.m_voltage + yoff) * yscale );
+			float y = ( (point.m_voltage + yoff) * -yscale ) + ypixoff;
 
 			if(i == 0) // TODO: Probably not necessary and can always run line_to(x, y)
-				canvas->move_to(x, y); // Set to starting point for line if first run
+				m_canvas->move_to(x, y); // Set to starting point for line if first run
 			else
-				canvas->line_to(x, y); // Draw line to next coord
+				m_canvas->line_to(x, y); // Draw line to next coord
 		}
-		canvas->fill(); // fill the resultant line defined polygon with the current color (white)
+		m_canvas->fill(); // fill the resultant line defined polygon with the current color (white)
 	}
 }
 
@@ -227,13 +217,12 @@ float EyeMask::CalculateHitRate(
 	float xoff
 	)
 {
-
-	if(!canvas || (m_width != width) || (m_height != height))
+	if(!m_canvas || (m_width != width) || (m_height != height))
 	{
 		m_width = width;
 		m_height = height;
-		canvas = std::make_unique< canvas_ity::canvas >( width, height );
-		
+		m_canvas = std::make_unique< canvas_ity::canvas >( width, height );
+
 		//Software rendering
 		float yscale = height / fullscalerange;
 		RenderForAnalysis(
@@ -247,47 +236,42 @@ float EyeMask::CalculateHitRate(
 
 	//Test each pixel of the eye pattern against the mask
 
-	float nmax = 0;
-	vector<unsigned char> image_data(width*height);
-	canvas->get_image_data(image_data.data(), width, height, 4, 0,0);
-
+	vector<uint8_t> image_data(width*height*4);
+	m_canvas->get_image_data(image_data.data(), width, height, m_width*4, 0,0);
 
 	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
 	{
 		auto accum = cap->GetAccumData();
+		size_t nhits = 0;
 
 		uint32_t* data = reinterpret_cast<uint32_t*>(&image_data[0]);
-		int stride = 1; // TODO: Check this for correctness
-
 		for(size_t y=0; y<height; y++)
 		{
-			auto row = data + (y*stride);
+			auto row = data + (y*width);
 			auto eyerow = accum + (y*width);
 
 			for(size_t x=0; x<width; x++)
 			{
 				//If mask pixel isn't black, count violations
 				uint32_t pix = row[x];
-				if( (pix & 0xff) != 0)
-				{
-					float rate = (eyerow[x] * 1.0f / cap->GetTotalUIs());
-					if(rate > nmax)
-					{
-						nmax = rate;
-					}
-				}
+				auto hits = eyerow[x];
+				if(pix & 0xff)
+					nhits += hits;
 			}
 		}
+
+		//LogTrace("Total %zu hits out of %zu samples\n", nhits / EYE_ACCUM_SCALE, cap->GetTotalSamples());
+		return nhits * 1.0 / (cap->GetTotalSamples() * EYE_ACCUM_SCALE);
 	}
 	else //if(cap->GetType() == EyeWaveform::EYE_BER)
 	{
 		auto accum = cap->GetData();
-		
+		float nmax = 0;
+
 		uint32_t* data = reinterpret_cast<uint32_t*>(&image_data[0]);
-		int stride = 1;
 		for(size_t y=0; y<height; y++)
 		{
-			auto row = data + (y*stride);
+			auto row = data + (y*width);
 			auto eyerow = accum + (y*width);
 			for(size_t x=0; x<width; x++)
 			{
@@ -302,7 +286,7 @@ float EyeMask::CalculateHitRate(
 				}
 			}
 		}
-	}
 
-	return nmax;
+		return nmax;
+	}
 }

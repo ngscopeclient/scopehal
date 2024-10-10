@@ -58,6 +58,7 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center, EyeType etyp
 	, m_uiWidth(0)
 	, m_saturationLevel(1)
 	, m_totalUIs(0)
+	, m_totalSamples(0)
 	, m_centerVoltage(center)
 	, m_maskHitRate(0)
 	, m_type(etype)

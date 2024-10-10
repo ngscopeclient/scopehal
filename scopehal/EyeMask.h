@@ -126,6 +126,23 @@ public:
 	const std::vector<EyeMaskPolygon>& GetPolygons() const
 	{ return m_polygons; }
 
+	size_t GetWidth()
+	{ return m_width; }
+
+	size_t GetHeight()
+	{ return m_height; }
+
+	//Helpers for unit testing,
+public:
+
+	/**
+		@brief Get the raw image data as RGBA32
+	 */
+	void GetPixels(std::vector<uint8_t>& pixels)
+	{
+		pixels.resize(m_width * m_height * 4);
+		m_canvas->get_image_data(pixels.data(), m_width, m_height, m_width*4, 0,0);
+	}
 
 protected:
 	std::string m_fname;
@@ -137,8 +154,9 @@ protected:
 	std::string m_maskname;
 
 private:
-    std::unique_ptr< canvas_ity::canvas > canvas;
-    size_t m_width, m_height;
+    std::unique_ptr< canvas_ity::canvas > m_canvas;
+    size_t m_width;
+    size_t m_height;
 
 };
 

@@ -273,7 +273,7 @@ void EyePattern::Refresh(
 	}
 
 	//Count total number of UIs we've integrated
-	cap->IntegrateUIs(clock_edges.size());
+	cap->IntegrateUIs(clock_edges.size(), waveform->size());
 	cap->Normalize();
 	m_streams[2].m_value = cap->GetTotalUIs();
 
@@ -311,7 +311,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	__m256 vxtimescale	= _mm256_set1_ps(xtimescale);
 	__m256 vyoff 		= _mm256_set1_ps(yoff);
 	__m256 vyscale 		= _mm256_set1_ps(yscale);
-	__m256 v64			= _mm256_set1_ps(64);
+	__m256 vaccum		= _mm256_set1_ps(EYE_ACCUM_SCALE);
 	__m256i vwidth		= _mm256_set1_epi32(m_width);
 
 	float* samples = (float*)&waveform->m_samples[0];
@@ -380,7 +380,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		__m256i vyfloori	= _mm256_cvtps_epi32(vyfloor);
 
 		//Calculate how much of the pixel's intensity to put in each row
-		__m256 vbin2f		= _mm256_mul_ps(vyfrac, v64);
+		__m256 vbin2f		= _mm256_mul_ps(vyfrac, vaccum);
 		__m256i vbin2i		= _mm256_cvtps_epi32(vbin2f);
 
 		//Final address calculation
@@ -403,7 +403,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 				continue;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			data[off[j]]	 		+= 64 - bin2[j];
+			data[off[j]]	 		+= EYE_ACCUM_SCALE - bin2[j];
 			data[off[j] + m_width]	+= bin2[j];
 		}
 	}
@@ -456,11 +456,11 @@ void EyePattern::DensePackedInnerLoopAVX2(
 
 		//Calculate how much of the pixel's intensity to put in each row
 		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
-		int32_t bin2 = yfrac * 64;
+		int32_t bin2 = yfrac * EYE_ACCUM_SCALE;
 		int64_t* pix = data + y1*m_width + pixel_x_round;
 
 		//Plot each point (this only draws the right half of the eye, we copy to the left later)
-		pix[0] 		 += 64 - bin2;
+		pix[0] 		 += EYE_ACCUM_SCALE - bin2;
 		pix[m_width] += bin2;
 	}
 }
