@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of FilterGraphExecutor
+	@ingroup core
+ */
+
 #include "scopehal.h"
 
 using namespace std;
@@ -65,6 +72,11 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 		return;
 
 	{
+		lock_guard<mutex> lock(m_perfStatsMutex);
+		m_currentExecutionTime.clear();
+	}
+
+	{
 		lock_guard<mutex> lock(m_mutex);
 
 		if(!m_allWorkersComplete)
@@ -91,6 +103,12 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 		lock_guard<mutex> lock2(m_mutex);
 		if(m_runnableNodes.empty())
 			break;
+	}
+
+	//Update global performance stats
+	{
+		lock_guard<mutex> lock(m_perfStatsMutex);
+		m_lastExecutionTime = m_currentExecutionTime;
 	}
 }
 
@@ -260,7 +278,13 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 			}
 
 			//Actually execute the filter
+			double start = GetTime();
 			f->Refresh(cmdbuf, queue);
+			double dt = GetTime() - start;
+			{
+				lock_guard<mutex> slock(m_perfStatsMutex);
+				m_currentExecutionTime[f] = dt * FS_PER_SECOND;
+			}
 
 			//Filter execution has completed, remove it from the running list and mark as completed
 			lock_guard<mutex> lock2(m_mutex);
