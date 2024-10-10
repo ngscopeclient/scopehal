@@ -162,6 +162,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PAM4DemodulatorFilter);
 	AddDecoderClass(PAMEdgeDetectorFilter);
 	AddDecoderClass(ParallelBus);
+	AddDecoderClass(ParallelBusDecoder);
 	AddDecoderClass(PcapngImportFilter);
 	AddDecoderClass(PCIe128b130bDecoder);
 	AddDecoderClass(PCIeDataLinkDecoder);

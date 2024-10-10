@@ -123,6 +123,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PAM4DemodulatorFilter.cpp
 	PAMEdgeDetectorFilter.cpp
 	ParallelBus.cpp
+	ParallelBusDecoder.cpp
 	PcapngImportFilter.cpp
 	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp
