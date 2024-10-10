@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of EyeMask
+	@ingroup datamodel
  */
 
 #include "scopehal.h"
