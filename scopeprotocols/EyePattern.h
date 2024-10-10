@@ -88,7 +88,7 @@ public:
 	size_t GetHeight() const
 	{ return m_height; }
 
-	const EyeMask& GetMask() const
+	EyeMask& GetMask()
 	{ return m_mask; }
 
 	enum ClockPolarity

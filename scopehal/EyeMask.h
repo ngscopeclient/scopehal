@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -33,10 +33,11 @@
 	@brief Declaration of EyeMask, EyeMaskPoint, and EyeMaskPolygon
 	@ingroup datamodel
  */
+
 #ifndef EyeMask_h
 #define EyeMask_h
 
-#include <cairomm/cairomm.h>
+#include "../canvas_ity/src/canvas_ity.hpp"
 
 class EyeDecoder2;
 class EyeWaveform;
@@ -83,6 +84,7 @@ public:
  */
 class EyeMask
 {
+
 public:
 	EyeMask();
 	virtual ~EyeMask();
@@ -99,17 +101,7 @@ public:
 	float GetAllowedHitRate() const
 	{ return m_hitrate; }
 
-	void RenderForDisplay(
-		Cairo::RefPtr<Cairo::Context> cr,
-		EyeWaveform* waveform,
-		float xscale,
-		float xoff,
-		float yscale,
-		float yoff,
-		float height) const;
-
 	void RenderForAnalysis(
-		Cairo::RefPtr<Cairo::Context> cr,
 		EyeWaveform* waveform,
 		float xscale,
 		float xoff,
@@ -123,7 +115,7 @@ public:
 		size_t height,
 		float fullscalerange,
 		float xscale,
-		float xoff) const;
+		float xoff);
 
 	bool empty() const
 	{ return m_polygons.empty(); }
@@ -134,26 +126,20 @@ public:
 	const std::vector<EyeMaskPolygon>& GetPolygons() const
 	{ return m_polygons; }
 
-protected:
-	void RenderInternal(
-		Cairo::RefPtr<Cairo::Context> cr,
-		EyeWaveform* waveform,
-		float xscale,
-		float xoff,
-		float yscale,
-		float yoff,
-		float height) const;
 
+protected:
 	std::string m_fname;
 	std::vector<EyeMaskPolygon> m_polygons;
 
 	float m_hitrate;
-
-	//true = time measured in UIs
-	//false = time measured in ps
-	bool m_timebaseIsRelative;
+	bool m_timebaseIsRelative;	// true = time measured in UIs || false = time measured in ps
 
 	std::string m_maskname;
+
+private:
+    std::unique_ptr< canvas_ity::canvas > canvas;
+    size_t m_width, m_height;
+
 };
 
 #endif

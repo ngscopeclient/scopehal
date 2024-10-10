@@ -225,7 +225,7 @@ public:
 	void SetMaskFile(const std::string& fname);
 
 	///@brief Gets the EyeMask being used for pass/fail testing (may be blank)
-	const EyeMask& GetMask()
+	EyeMask& GetMask()
 	{ return m_mask; }
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
