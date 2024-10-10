@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of FilterParameter
+	@ingroup core
  */
 
 #ifndef FilterParameter_h
@@ -38,6 +39,7 @@
 
 /**
 	@brief An 8B/10B symbol within a pattern, used for trigger matching
+	@ingroup core
  */
 class T8B10BSymbol
 {
@@ -75,8 +77,10 @@ public:
 /**
 	@brief A parameter to a filter
 
-	Parameters are used for scalar inputs, configuration settings, and generally any input a filter takes which is not
-	some kind of waveform.
+	Parameters are used for some scalar inputs, configuration settings, and generally any input a filter takes which is
+	not some kind of waveform.
+
+	@ingroup core
  */
 class FilterParameter
 {

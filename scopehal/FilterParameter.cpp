@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of FilterParameter
+	@ingroup core
  */
 
 #include "scopehal.h"

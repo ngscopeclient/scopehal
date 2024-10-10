@@ -74,6 +74,9 @@ EyeWaveform::~EyeWaveform()
 	m_accumdata = NULL;
 }
 
+/**
+	@brief Normalize the integrated integer buffer into float32 output buffer
+ */
 void EyeWaveform::Normalize()
 {
 	//Preprocessing
@@ -97,9 +100,6 @@ void EyeWaveform::Normalize()
 
 	/*
 		Normalize with saturation
-		Saturation level of 1.0 means mapping all values to [0, 1].
-		2.0 means mapping values to [0, 2] and saturating anything above 1.
-
 		TODO: do this in a shader?
 	 */
 	norm *= m_saturationLevel;
