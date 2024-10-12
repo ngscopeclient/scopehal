@@ -607,7 +607,7 @@ void ThunderScopeOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel:
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC");
 			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 1M");
 			break;
 
@@ -617,7 +617,7 @@ void ThunderScopeOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel:
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC");
 			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 50");
 			break;
 
