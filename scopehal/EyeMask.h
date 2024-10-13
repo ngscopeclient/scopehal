@@ -53,7 +53,7 @@ public:
 	///@brief Default constructor
 	EyeMaskPoint()
 		: m_time(0)
-		, m_voltage(v)
+		, m_voltage(0)
 	{}
 
 	/**
