@@ -49,9 +49,19 @@ class EyeWaveform;
 class EyeMaskPoint
 {
 public:
+
+	///@brief Default constructor
 	EyeMaskPoint()
+		: m_time(0)
+		, m_voltage(v)
 	{}
 
+	/**
+		@brief Initialize a point from a timestamp and voltage
+
+		@param t	Timestamp
+		@param v	Voltage
+	 */
 	EyeMaskPoint(float t, float v)
 	: m_time(t)
 	, m_voltage(v)
@@ -75,6 +85,8 @@ public:
 class EyeMaskPolygon
 {
 public:
+
+	///@brief Set of vertices within the polygon
 	std::vector<EyeMaskPoint> m_points;
 };
 
@@ -92,12 +104,19 @@ public:
 	bool Load(std::string path);
 	bool Load(const YAML::Node& node);
 
+	///@brief Get the filename of the mask
 	std::string GetFileName() const
 	{ return m_fname; }
 
+	///@brief Get the display name of the eye pattern mask
 	std::string GetMaskName() const
 	{ return m_maskname; }
 
+	/**
+		@brief Get the allowed mask hit rate
+
+		Most standards do not allow any mask hits, however some standards do permit a small hit ratio
+	 */
 	float GetAllowedHitRate() const
 	{ return m_hitrate; }
 
@@ -117,26 +136,33 @@ public:
 		float xscale,
 		float xoff);
 
+	///@brief Return true if there are no polygons in the mask
 	bool empty() const
 	{ return m_polygons.empty(); }
 
+	///@brief Returns true if the timebase is in relative units (UI) and false if absolute (time)
 	bool IsTimebaseRelative()
 	{ return m_timebaseIsRelative; }
 
+	///@brief Return the set of polygons in the mask
 	const std::vector<EyeMaskPolygon>& GetPolygons() const
 	{ return m_polygons; }
 
+	///@brief Get the rendered width of the mask
 	size_t GetWidth()
 	{ return m_width; }
 
+	///@brief Get the rendered height of the mask
 	size_t GetHeight()
 	{ return m_height; }
 
-	//Helpers for unit testing,
+	//Helpers for unit testing
 public:
 
 	/**
 		@brief Get the raw image data as RGBA32
+
+		@param pixels	Empty std::vector to be filled with image data
 	 */
 	void GetPixels(std::vector<uint8_t>& pixels)
 	{
@@ -145,19 +171,30 @@ public:
 	}
 
 protected:
+
+	///@brief Filename of the mask
 	std::string m_fname;
+
+	///@brief Set of polygons in the mask
 	std::vector<EyeMaskPolygon> m_polygons;
 
+	///@brief Most recent hit rate
 	float m_hitrate;
-	bool m_timebaseIsRelative;	// true = time measured in UIs || false = time measured in ps
 
+	///@brief true = time measured in UIs || false = time measured in ps
+	bool m_timebaseIsRelative;
+
+	///@brief Human readable name of the mask (e.g. "XFI")
 	std::string m_maskname;
 
-private:
+	///@brief Canvas for rasterizing the mask
     std::unique_ptr< canvas_ity::canvas > m_canvas;
-    size_t m_width;
-    size_t m_height;
 
+	///@brief Current width
+    size_t m_width;
+
+    ///@brief Current height
+    size_t m_height;
 };
 
 #endif

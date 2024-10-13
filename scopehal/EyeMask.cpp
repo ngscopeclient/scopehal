@@ -51,6 +51,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+///@brief Initialize an empty mask
 EyeMask::EyeMask()
 	: m_hitrate(0)
 	, m_timebaseIsRelative(false)
@@ -64,6 +65,13 @@ EyeMask::~EyeMask()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mask file parsing
 
+/**
+	@brief Loads an eye mask from a YAML file
+
+	@param path		Filename of the file
+
+	@return True on success, false on failure
+ */
 bool EyeMask::Load(string path)
 {
 	//Clear out any previous state
@@ -88,7 +96,11 @@ bool EyeMask::Load(string path)
 }
 
 /**
-	@brief Loads the YAML file
+	@brief Loads the mask from a YAML node
+
+	@param node	Root node of the YAML document
+
+	@return True on success, false on failure
  */
 bool EyeMask::Load(const YAML::Node& node)
 {
@@ -168,6 +180,9 @@ bool EyeMask::Load(const YAML::Node& node)
 	return true;
 }
 
+/**
+	@brief Renders the mask to an offscreen buffer we can use for hit testing
+ */
 void EyeMask::RenderForAnalysis(
 		EyeWaveform* waveform,
 		float xscale,
