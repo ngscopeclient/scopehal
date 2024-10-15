@@ -2878,9 +2878,10 @@ bool LeCroyOscilloscope::AcquireData()
 			{
 				if(enabled[i])
 				{
-					analogWaveformData[i] = m_transport->ReadReply();
+					analogWaveformData[i] = m_transport->ReadReply(
+						false,
+						[i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
-					//analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 				}
 			}
 		}

@@ -152,9 +152,12 @@ bool VICPSocketTransport::SendCommand(const string& cmd)
 	return true;
 }
 
-string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/, function<void(float)> progress)	//ignore endOnSemicolon, VICP has different framing
+//ignore endOnSemicolon, VICP uses EOI for framing
+string VICPSocketTransport::ReadReply([[maybe_unused]] bool endOnSemicolon, function<void(float)> progress)
 {
 	string payload;
+	size_t nblocks = 0;
+	size_t expectedBytes = 0;
 	while(true)
 	{
 		//Read the header
@@ -183,7 +186,7 @@ string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/, function<void(flo
 		size_t current_size = payload.size();
 		payload.resize(current_size + len);
 		char* rxbuf = &payload[current_size];
-		ReadRawData(len, (unsigned char*)rxbuf, progress);
+		ReadRawData(len, (unsigned char*)rxbuf);
 
 		//Skip empty blocks, or just newlines
 		if( (len == 0) || (rxbuf[0] == '\n' && len == 1))
@@ -207,12 +210,29 @@ string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/, function<void(flo
 		//Check EOI flag
 		if(header[0] & OP_EOI)
 			break;
+
+		//Calculate expected block length for large (multi block) data chunks
+		if(expectedBytes == 0)
+		{
+			if( (payload.size() >= 16) && (payload.substr(5, 2) == "#9"))
+			{
+				string expectedLength = payload.substr(7, 9) + "\0";
+				expectedBytes = atoi(expectedLength.c_str());
+			}
+		}
+		if(progress)
+			progress(payload.size() * 1.0 / expectedBytes);
+
+		nblocks ++;
 	}
 
 	//make sure there's a null terminator
 	payload += "\0";
 	if(payload.size() > 256)
-		LogTrace("Got (%s): large data block, not printing\n", m_hostname.c_str());
+	{
+		LogTrace("Got (%s): large data block of %zu blocks / %zu bytes, not printing\n",
+			m_hostname.c_str(), nblocks, payload.size());
+	}
 	else
 		LogTrace("Got (%s): %s\n", m_hostname.c_str(), payload.c_str());
 	return payload;
