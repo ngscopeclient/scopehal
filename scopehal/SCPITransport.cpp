@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of SCPITransport
+	@ingroup transports
  */
 
 #include "scopehal.h"

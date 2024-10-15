@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of LeCroyOscilloscope
+	@ingroup scopedrivers
+ */
+
 #include "scopehal.h"
 #include "LeCroyOscilloscope.h"
 #include "base64.h"
@@ -2776,6 +2783,8 @@ bool LeCroyOscilloscope::AcquireData()
 	double* pwtime = nullptr;
 	string digitalWaveformData;
 
+	ChannelsDownloadStarted();
+
 	//Acquire the data (but don't parse it)
 	{
 		lock_guard<recursive_mutex> lock2(m_transport->GetMutex());
@@ -2868,7 +2877,11 @@ bool LeCroyOscilloscope::AcquireData()
 			for(unsigned int i=0; i<m_analogChannelCount; i++)
 			{
 				if(enabled[i])
+				{
 					analogWaveformData[i] = m_transport->ReadReply();
+					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+					//analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+				}
 			}
 		}
 

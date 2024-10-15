@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of SCPISocketTransport
+	@ingroup transports
  */
 
 #include "scopehal.h"
@@ -40,6 +41,12 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Connects to an instrument
+
+	@param args	Arguments, of the format host:port
+				If port number is not specified, defaults to 5025
+ */
 SCPISocketTransport::SCPISocketTransport(const string& args)
 	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 {
@@ -60,6 +67,12 @@ SCPISocketTransport::SCPISocketTransport(const string& args)
 	SharedCtorInit();
 }
 
+/**
+	@brief Connects to an instrument
+
+	@param hostname		IP or hostname of the instrument
+	@param port			Port number of the instrument
+ */
 SCPISocketTransport::SCPISocketTransport(const string& hostname, unsigned short port)
 	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 	, m_hostname(hostname)
@@ -68,6 +81,9 @@ SCPISocketTransport::SCPISocketTransport(const string& hostname, unsigned short 
 	SharedCtorInit();
 }
 
+/**
+	@brief Helper function that actually opens the socket connection
+ */
 void SCPISocketTransport::SharedCtorInit()
 {
 	LogDebug("Connecting to SCPI device at %s:%d\n", m_hostname.c_str(), m_port);
@@ -108,6 +124,7 @@ bool SCPISocketTransport::IsConnected()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
+///@brief Returns the constant transport name "lan"
 string SCPISocketTransport::GetTransportName()
 {
 	return "lan";
@@ -127,7 +144,7 @@ bool SCPISocketTransport::SendCommand(const string& cmd)
 	return m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
 }
 
-string SCPISocketTransport::ReadReply(bool endOnSemicolon)
+string SCPISocketTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
 {
 	//FIXME: there *has* to be a more efficient way to do this...
 	char tmp = ' ';

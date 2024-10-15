@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of LeCroyOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifndef LeCroyOscilloscope_h
 #define LeCroyOscilloscope_h
 
@@ -47,6 +54,8 @@ class CDRNRZPatternTrigger;
 	@brief A Teledyne LeCroy oscilloscope using the MAUI/XStream command set.
 
 	May not work on lower-end instruments that are rebranded third-party hardware.
+
+	@ingroup scopedrivers
  */
 class LeCroyOscilloscope
 	: public virtual SCPIOscilloscope

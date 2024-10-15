@@ -152,7 +152,7 @@ bool VICPSocketTransport::SendCommand(const string& cmd)
 	return true;
 }
 
-string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/)	//ignore endOnSemicolon, VICP has different framing
+string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/, function<void(float)> progress)	//ignore endOnSemicolon, VICP has different framing
 {
 	string payload;
 	while(true)
@@ -183,7 +183,7 @@ string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/)	//ignore endOnSem
 		size_t current_size = payload.size();
 		payload.resize(current_size + len);
 		char* rxbuf = &payload[current_size];
-		ReadRawData(len, (unsigned char*)rxbuf);
+		ReadRawData(len, (unsigned char*)rxbuf, progress);
 
 		//Skip empty blocks, or just newlines
 		if( (len == 0) || (rxbuf[0] == '\n' && len == 1))
@@ -223,10 +223,35 @@ void VICPSocketTransport::SendRawData(size_t len, const unsigned char* buf)
 	m_socket.SendLooped(buf, len);
 }
 
-size_t VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
+size_t VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf, function<void(float)> progress)
 {
-	if(!m_socket.RecvLooped(buf, len))
-		return 0;
+	size_t chunk_size = len;
+	if (progress)
+	{
+		/* carve up the chunk_size into either 1% or 32kB chunks, whichever is larger; later, we'll want RecvLooped to do this for us */
+		chunk_size /= 100;
+		if (chunk_size < 32768)
+			chunk_size = 32768;
+	}
+
+	for (size_t pos = 0; pos < len; )
+	{
+		size_t n = chunk_size;
+		if (n > (len - pos))
+			n = len - pos;
+		if(!m_socket.RecvLooped(buf + pos, n))
+		{
+			LogTrace("Failed to get %zu bytes (@ pos %zu)\n", len, pos);
+			return 0;
+		}
+		pos += n;
+		if (progress)
+		{
+			progress((float)pos / (float)len);
+		}
+	}
+
+	LogTrace("Got %zu bytes\n", len);
 	return len;
 }
 

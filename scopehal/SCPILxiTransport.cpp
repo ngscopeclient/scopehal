@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Tom Verbeure
 	@brief Implementation of SCPILxiTransport
+	@ingroup transports
  */
 
 #ifdef HAS_LXI
@@ -141,7 +142,7 @@ bool SCPILxiTransport::SendCommand(const string& cmd)
 	return (result != LXI_ERROR);
 }
 
-string SCPILxiTransport::ReadReply(bool endOnSemicolon)
+string SCPILxiTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
 {
 	string ret;
 

@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of SCPISocketCANTransport
+	@ingroup transports
  */
 
 #include "scopehal.h"
@@ -150,7 +151,7 @@ bool SCPISocketCANTransport::SendCommand(const string& /*cmd*/)
 	return false;
 }
 
-string SCPISocketCANTransport::ReadReply(bool /*endOnSemicolon*/)
+string SCPISocketCANTransport::ReadReply(bool /*endOnSemicolon*/, [[maybe_unused]] function<void(float)> progress)
 {
 	return "";
 }

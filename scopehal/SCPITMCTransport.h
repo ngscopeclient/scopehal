@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,6 +30,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SCPITMCTransport
+	@ingroup transports
  */
 
 #ifndef SCPITMCTransport_h
@@ -37,6 +38,7 @@
 
 /**
 	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+	@ingroup transports
  */
 class SCPITMCTransport : public SCPITransport
 {
@@ -52,7 +54,7 @@ public:
 	static std::string GetTransportName();
 
 	virtual bool SendCommand(const std::string& cmd) override;
-	virtual std::string ReadReply(bool endOnSemicolon = true) override;
+	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
 	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
 	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 

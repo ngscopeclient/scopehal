@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SCPITransport
+	@ingroup transports
  */
 
 #ifndef SCPITransport_h
@@ -40,6 +41,7 @@
 
 /**
 	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+	@ingroup transports
  */
 class SCPITransport
 {
@@ -74,7 +76,7 @@ public:
 	//Immediate command API
 	virtual void FlushRXBuffer(void);
 	virtual bool SendCommand(const std::string& cmd) =0;
-	virtual std::string ReadReply(bool endOnSemicolon = true) =0;
+	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) =0;
 	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) =0;
 	virtual void SendRawData(size_t len, const unsigned char* buf) =0;
 

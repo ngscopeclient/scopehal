@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of SCPIUARTTransport
+	@ingroup transports
+ */
+
 #include "scopehal.h"
 
 using namespace std;

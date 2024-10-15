@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SCPITwinLanTransport
+	@ingroup transports
  */
 
 #ifndef SCPITwinLanTransport_h

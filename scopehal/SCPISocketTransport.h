@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SCPISocketTransport
+	@ingroup transports
  */
 
 #ifndef SCPISocketTransport_h
@@ -39,7 +40,9 @@
 #include "../xptools/Socket.h"
 
 /**
-	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+	@brief Transport that moves SCPI data over a single TCP socket with no framing
+
+	@ingroup transports
  */
 class SCPISocketTransport : public SCPITransport
 {
@@ -53,7 +56,7 @@ public:
 
 	virtual void FlushRXBuffer(void) override;
 	virtual bool SendCommand(const std::string& cmd) override;
-	virtual std::string ReadReply(bool endOnSemicolon = true) override;
+	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
 	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
 	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
@@ -62,12 +65,20 @@ public:
 
 	TRANSPORT_INITPROC(SCPISocketTransport)
 
+	///@brief Returns the hostname of the connected instrument
 	const std::string& GetHostname()
 	{ return m_hostname; }
 
+	///@brief Returns the port number of the connected instrument
 	unsigned short GetPort()
 	{ return m_port; }
 
+	/**
+		@brief Sets timeouts for the connection
+
+		@param txUs		Send timeout, in microseconds
+		@param rxUs		Receive timeout, in microseconds
+	 */
 	void SetTimeouts(unsigned int txUs, unsigned int rxUs)
 	{
 		m_socket.SetTxTimeout(txUs);
@@ -78,9 +89,13 @@ protected:
 
 	void SharedCtorInit();
 
+	///@brief The socket for commands
 	Socket m_socket;
 
+	///@brief IP or hostname of the instrument
 	std::string m_hostname;
+
+	///@brief TCP port number of the instrument
 	unsigned short m_port;
 };
 

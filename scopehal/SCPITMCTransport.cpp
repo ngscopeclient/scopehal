@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of SCPITMCTransport
+	@ingroup transports
  */
 
 #include <stdio.h>
@@ -138,7 +139,7 @@ bool SCPITMCTransport::SendCommand(const string& cmd)
 	return (result == (int)cmd.length());
 }
 
-string SCPITMCTransport::ReadReply(bool endOnSemicolon)
+string SCPITMCTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
 {
 	string ret;
 
