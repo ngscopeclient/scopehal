@@ -3437,6 +3437,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			case MODEL_WAVERUNNER_9K:
 				ret.push_back(12500 * k);
 				ret.push_back(16 * m);
+				ret.push_back(20 * m);
 				if(m_memoryDepthOption == 128)
 				{
 					ret.push_back(32 * m);
@@ -3581,6 +3582,9 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 	//Sometimes the scope won't set the exact depth we ask for.
 	//Flush the cache to force a read so we know the actual depth we got.
 	m_memoryDepthValid = false;
+
+	//Trigger position can also move when setting depth, so invalidate that too
+	m_triggerOffsetValid = false;
 }
 
 void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
@@ -3589,6 +3593,7 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_sampleRate = rate;
 	m_sampleRateValid = true;
+	m_triggerOffsetValid = false;
 }
 
 bool LeCroyOscilloscope::CanAverage(size_t i)
