@@ -148,6 +148,7 @@ void TransportStaticInit()
 #endif
 	AddTransportClass(SCPITwinLanTransport);
 	AddTransportClass(SCPIUARTTransport);
+	AddTransportClass(SCPIHIDTransport);
 	AddTransportClass(SCPINullTransport);
 	AddTransportClass(VICPSocketTransport);
 

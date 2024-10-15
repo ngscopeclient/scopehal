@@ -84,6 +84,7 @@ set(SCOPEHAL_SOURCES
 	SCPINullTransport.cpp
 	SCPISocketCANTransport.cpp
 	SCPIUARTTransport.cpp
+	SCPIHIDTransport.cpp
 	SCPIDevice.cpp
 
 	IBISParser.cpp
