@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,109 +27,30 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef HIDInstrument_h
+#define HIDInstrument_h
+
 /**
-	@file
-	@author Frederic BORRY
-	@brief Implementation of SCPIHIDTransport
+	@brief Base class for instruments using Modbus communication protocol
  */
-
-#include "scopehal.h"
-
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SCPIHIDTransport::SCPIHIDTransport(const string& args)
+class HIDInstrument 	: public virtual SCPIInstrument
 {
-	//Figure out vendorId, productId and serialNumber
-	char serialNumber[128] = "";
-	bool hasSerial = false;
-	if(3 == sscanf(args.c_str(), "%x:%x:%127s", &m_vendorId, &m_productId, serialNumber))
-	{
-		hasSerial = true;
-		m_serialNumber = serialNumber;
-	}
-	else if(2 == sscanf(args.c_str(), "%x:%x", &m_vendorId, &m_productId))
-	{}	// Noop
-	else
-	{
-		LogError("Invallid HID connection string '%s', please use 0x<vendorId>:0x<productId>[:serialNumber]\n", args.c_str());
-		return;		
-	}
+public:
+	HIDInstrument(SCPITransport* transport, uint8_t slaveAdress=1);
+	virtual ~HIDInstrument();
 
-	LogDebug("Connecting to HID instrument at %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
 
-	if(!m_hid.Connect(m_vendorId, m_productId, hasSerial ? m_serialNumber.c_str() : NULL))
-	{
-		m_hid.Close();
-		LogError("Couldn't connect to HID device %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
-		return;
-	}
-}
+protected:
+	// Make sure several request don't collide before we received the corresponding response
+	std::recursive_mutex m_modbusMutex;
+	
+	uint8_t m_slaveAdress;
+	void Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData);
+	void SendReport(uint8_t reportNumber, std::vector<uint8_t>* data);
+	void ReadReport(size_t reportSize, std::vector<uint8_t>* data);
+	void PushUint16(std::vector<uint8_t>* data, uint16_t value);
+	uint16_t ReadUint16(std::vector<uint8_t>* data, uint8_t index);
 
-SCPIHIDTransport::~SCPIHIDTransport()
-{
-}
+};
 
-bool SCPIHIDTransport::IsConnected()
-{
-	return m_hid.IsValid();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
-
-string SCPIHIDTransport::GetTransportName()
-{
-	return "hid";
-}
-
-string SCPIHIDTransport::GetConnectionString()
-{
-	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
-	return string(tmp);
-}
-
-bool SCPIHIDTransport::SendCommand(const string& cmd)
-{
-	LogTrace("Sending %s\n", cmd.c_str());
-	string tempbuf = cmd + "\n";
-	return m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
-}
-
-string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
-{
-	unsigned char buffer[1024];
-	string ret;
-	if(m_hid.Read((unsigned char*)&buffer, 1024))
-	{
-		buffer[1023] = 0;
-		ret = string((char*)buffer);
-	}
-	LogTrace("Got %s\n", ret.c_str());
-	return ret;
-}
-
-void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
-{
-	m_hid.Write(buf, len);
-	LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
-}
-
-size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
-{
-	if(!m_hid.Read(buf, len))
-	{
-		LogWarning("Error getting %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-		return 0;
-	}
-	LogDebug("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-	return len;
-}
-
-bool SCPIHIDTransport::IsCommandBatchingSupported()
-{
-	return true;
-}
+#endif

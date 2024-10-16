@@ -147,6 +147,7 @@ extern size_t g_maxComputeGroupCount[3];
 #include "RFSignalGenerator.h"
 #include "RFSignalGeneratorChannel.h"
 #include "SCPIInstrument.h"
+#include "HIDInstrument.h"
 #include "SCPIBERT.h"
 #include "SCPIFunctionGenerator.h"
 #include "SCPILoad.h"

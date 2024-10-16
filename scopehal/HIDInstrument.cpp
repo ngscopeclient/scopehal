@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,12 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Frederic BORRY
-	@brief Implementation of SCPIHIDTransport
- */
-
 #include "scopehal.h"
 
 using namespace std;
@@ -40,96 +34,52 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIHIDTransport::SCPIHIDTransport(const string& args)
+HIDInstrument::HIDInstrument(SCPITransport* transport, uint8_t slaveAdress)
+	: SCPIInstrument(transport, false)
 {
-	//Figure out vendorId, productId and serialNumber
-	char serialNumber[128] = "";
-	bool hasSerial = false;
-	if(3 == sscanf(args.c_str(), "%x:%x:%127s", &m_vendorId, &m_productId, serialNumber))
-	{
-		hasSerial = true;
-		m_serialNumber = serialNumber;
-	}
-	else if(2 == sscanf(args.c_str(), "%x:%x", &m_vendorId, &m_productId))
-	{}	// Noop
-	else
-	{
-		LogError("Invallid HID connection string '%s', please use 0x<vendorId>:0x<productId>[:serialNumber]\n", args.c_str());
-		return;		
-	}
+	m_slaveAdress = slaveAdress;
+}
 
-	LogDebug("Connecting to HID instrument at %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
+HIDInstrument::~HIDInstrument()
+{
 
-	if(!m_hid.Connect(m_vendorId, m_productId, hasSerial ? m_serialNumber.c_str() : NULL))
+}
+
+void HIDInstrument::PushUint16(std::vector<uint8_t>* data, uint16_t value)
+{
+	data->push_back(reinterpret_cast<uint8_t *>(&value)[1]);
+	data->push_back(reinterpret_cast<uint8_t *>(&value)[0]);
+}
+
+uint16_t HIDInstrument::ReadUint16(std::vector<uint8_t>* data, uint8_t index)
+{
+	if(!data || data->size() <= ((size_t)(index+1)))
+		return 0;
+	return (static_cast<uint16_t>((*data)[index+1]) + (static_cast<uint16_t>((*data)[index]) << 8)); 
+}
+
+void HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData)
+{	
+	lock_guard<recursive_mutex> lock(m_modbusMutex);
+	SendReport(reportNumber, sendData);
+	ReadReport(responseReportSize,receiveData);
+}
+
+void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
+{	// Send the HID report contained in the data buffer
+	std::vector<uint8_t> buffer;
+	buffer.reserve(data->size()+1);
+	buffer.push_back(reportNumber);
+	buffer.insert(buffer.end(),data->begin(),data->end());
+	m_transport->SendRawData(buffer.size(),buffer.begin().base());
+}
+
+void HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
+{	// Read a HID report with the provided size into the specified buffer
+	data->reserve(reportSize);
+	if(!m_transport->ReadRawData(reportSize,data->begin().base()))
 	{
-		m_hid.Close();
-		LogError("Couldn't connect to HID device %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
+		LogError("Could not read HID report.\n");
 		return;
 	}
-}
-
-SCPIHIDTransport::~SCPIHIDTransport()
-{
-}
-
-bool SCPIHIDTransport::IsConnected()
-{
-	return m_hid.IsValid();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
-
-string SCPIHIDTransport::GetTransportName()
-{
-	return "hid";
-}
-
-string SCPIHIDTransport::GetConnectionString()
-{
-	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
-	return string(tmp);
-}
-
-bool SCPIHIDTransport::SendCommand(const string& cmd)
-{
-	LogTrace("Sending %s\n", cmd.c_str());
-	string tempbuf = cmd + "\n";
-	return m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
-}
-
-string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
-{
-	unsigned char buffer[1024];
-	string ret;
-	if(m_hid.Read((unsigned char*)&buffer, 1024))
-	{
-		buffer[1023] = 0;
-		ret = string((char*)buffer);
-	}
-	LogTrace("Got %s\n", ret.c_str());
-	return ret;
-}
-
-void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
-{
-	m_hid.Write(buf, len);
-	LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
-}
-
-size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
-{
-	if(!m_hid.Read(buf, len))
-	{
-		LogWarning("Error getting %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-		return 0;
-	}
-	LogDebug("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-	return len;
-}
-
-bool SCPIHIDTransport::IsCommandBatchingSupported()
-{
-	return true;
 }

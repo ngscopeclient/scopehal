@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,109 +27,72 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef AlientekPowerSupply_h
+#define AlientekPowerSupply_h
+
 /**
-	@file
-	@author Frederic BORRY
-	@brief Implementation of SCPIHIDTransport
+	@brief A Riden RD6006 power supply or other equivalent model
  */
-
-#include "scopehal.h"
-
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SCPIHIDTransport::SCPIHIDTransport(const string& args)
+class AlientekPowerSupply
+	: public virtual SCPIPowerSupply
+	, public virtual HIDInstrument
 {
-	//Figure out vendorId, productId and serialNumber
-	char serialNumber[128] = "";
-	bool hasSerial = false;
-	if(3 == sscanf(args.c_str(), "%x:%x:%127s", &m_vendorId, &m_productId, serialNumber))
-	{
-		hasSerial = true;
-		m_serialNumber = serialNumber;
-	}
-	else if(2 == sscanf(args.c_str(), "%x:%x", &m_vendorId, &m_productId))
-	{}	// Noop
-	else
-	{
-		LogError("Invallid HID connection string '%s', please use 0x<vendorId>:0x<productId>[:serialNumber]\n", args.c_str());
-		return;		
-	}
+public:
+	AlientekPowerSupply(SCPITransport* transport);
+	virtual ~AlientekPowerSupply();
 
-	LogDebug("Connecting to HID instrument at %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
+	//Device information
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	if(!m_hid.Connect(m_vendorId, m_productId, hasSerial ? m_serialNumber.c_str() : NULL))
-	{
-		m_hid.Close();
-		LogError("Couldn't connect to HID device %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
-		return;
-	}
-}
+	//Device capabilities
+	virtual bool SupportsIndividualOutputSwitching() override;
+	virtual bool SupportsVoltageCurrentControl(int chan) override;
 
-SCPIHIDTransport::~SCPIHIDTransport()
-{
-}
+	//Read sensors
+	virtual double GetPowerVoltageActual(int chan) override;	//actual voltage after current limiting
+	virtual double GetPowerVoltageNominal(int chan) override;	//set point
+	virtual double GetPowerCurrentActual(int chan) override;	//actual current drawn by the load
+	virtual double GetPowerCurrentNominal(int chan) override;	//current limit
+	virtual bool GetPowerChannelActive(int chan) override;
 
-bool SCPIHIDTransport::IsConnected()
-{
-	return m_hid.IsValid();
-}
+	//Configuration
+	virtual void SetPowerVoltage(int chan, double volts) override;
+	virtual void SetPowerCurrent(int chan, double amps) override;
+	virtual void SetPowerChannelActive(int chan, bool on) override;
+	virtual bool IsPowerConstantCurrent(int chan) override;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
+protected:
+	enum Function : uint8_t {
+		DEVICE_INFO = 0x10,  	// 16
+		FIRM_INFO = 0x11,  		// 17
+		START_TRANS = 0x12,  	// 18
+		DATA_TRANS = 0x13,  	// 19
+		END_TRANS = 0x14,  		// 20
+		DEV_UPGRADE = 0x15,  	// 21
+		BASIC_INFO = 0x30,  	// 48
+		BASIC_SET = 0x35,  		// 53
+		SYSTEM_INFO = 0x40,  	// 64
+		SYSTEM_SET = 0x45,  	// 69
+		SCAN_OUT = 0x50,  		// 80
+		SERIAL_OUT = 0x55,  	// 85
+		DISCONNECT = 0x80,  	// 128
+		NONE = 0xFF  			// 255
+	};
 
-string SCPIHIDTransport::GetTransportName()
-{
-	return "hid";
-}
+	enum Operation : uint8_t {
+		OUTPUT = 0x20,  // 32
+		SETTING = 0x40, // 64
+		READ = 0x80  	// 128
+	};
 
-string SCPIHIDTransport::GetConnectionString()
-{
-	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
-	return string(tmp);
-}
+	void SendReceiveReport(Function function, int sequence = -1, std::vector<uint8_t>* data = nullptr);
+	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
 
-bool SCPIHIDTransport::SendCommand(const string& cmd)
-{
-	LogTrace("Sending %s\n", cmd.c_str());
-	string tempbuf = cmd + "\n";
-	return m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
-}
+	uint8_t m_deviceAdress = 0xFB;
 
-string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
-{
-	unsigned char buffer[1024];
-	string ret;
-	if(m_hid.Read((unsigned char*)&buffer, 1024))
-	{
-		buffer[1023] = 0;
-		ret = string((char*)buffer);
-	}
-	LogTrace("Got %s\n", ret.c_str());
-	return ret;
-}
+public:
+	static std::string GetDriverNameInternal();
+	POWER_INITPROC(AlientekPowerSupply);
+};
 
-void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
-{
-	m_hid.Write(buf, len);
-	LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
-}
-
-size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
-{
-	if(!m_hid.Read(buf, len))
-	{
-		LogWarning("Error getting %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-		return 0;
-	}
-	LogDebug("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-	return len;
-}
-
-bool SCPIHIDTransport::IsCommandBatchingSupported()
-{
-	return true;
-}
+#endif

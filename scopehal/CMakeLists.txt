@@ -137,6 +137,7 @@ set(SCOPEHAL_SOURCES
 	SCPIBERT.cpp
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp
+	HIDInstrument.cpp
 	SCPILoad.cpp
 	SCPIMiscInstrument.cpp
 	SCPIMultimeter.cpp
@@ -152,6 +153,7 @@ set(SCOPEHAL_SOURCES
 	RemoteBridgeOscilloscope.cpp
 
 	AgilentOscilloscope.cpp
+	AlientekPowerSupply.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLabsTriggerCrossbar.cpp
 	AntikernelLogicAnalyzer.cpp

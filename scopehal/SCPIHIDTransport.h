@@ -63,8 +63,9 @@ public:
 protected:
 	HID m_hid;
 
-	std::string m_devfile;
-	unsigned int m_baudrate;
+	std::string m_serialNumber;
+	unsigned int m_vendorId;
+	unsigned int m_productId;
 };
 
 #endif
