@@ -88,7 +88,7 @@ string SCPIHIDTransport::GetTransportName()
 string SCPIHIDTransport::GetConnectionString()
 {
 	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
+	snprintf(tmp, sizeof(tmp), "%04x:%04x:%s", m_vendorId, m_productId , m_serialNumber.c_str());
 	return string(tmp);
 }
 
