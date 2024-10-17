@@ -160,6 +160,7 @@
 #include "OneWireDecoder.h"
 #include "OvershootMeasurement.h"
 #include "ParallelBus.h"
+#include "ParallelBusDecoder.h"
 #include "PAM4DemodulatorFilter.h"
 #include "PAMEdgeDetectorFilter.h"
 #include "PcapngImportFilter.h"
