@@ -66,6 +66,11 @@ SCPIHIDTransport::SCPIHIDTransport(const string& args)
 		LogError("Couldn't connect to HID device %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
 		return;
 	}
+
+	m_manufacturerName = m_hid.GetManufacturerName();
+	m_productName = m_hid.GetProductName();
+	// Update serial number with the on from the device
+	m_serialNumber = m_hid.GetSerialNumber();
 }
 
 SCPIHIDTransport::~SCPIHIDTransport()
@@ -96,14 +101,14 @@ bool SCPIHIDTransport::SendCommand(const string& cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 	string tempbuf = cmd + "\n";
-	return m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
+	return (m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length())>=0);
 }
 
 string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
 {
 	unsigned char buffer[1024];
 	string ret;
-	if(m_hid.Read((unsigned char*)&buffer, 1024))
+	if(m_hid.Read((unsigned char*)&buffer, 1024)>=0)
 	{
 		buffer[1023] = 0;
 		ret = string((char*)buffer);
@@ -114,19 +119,23 @@ string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(f
 
 void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
 {
-	m_hid.Write(buf, len);
-	LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
+	int result = m_hid.Write(buf, len);
+	if(result < 0)
+		LogError("Error code %d  while sending %zu bytes: %s\n", result, len,LogHexDump(buf,len).c_str());
+	else
+		LogTrace("Sent %d bytes (requested %zu): %s\n", result, len,LogHexDump(buf,len).c_str());
 }
 
 size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
-	if(!m_hid.Read(buf, len))
+	int result = m_hid.Read(buf, len);
+	if(result < 0)
 	{
-		LogWarning("Error getting %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
+		LogWarning("Error code %d while getting %zu bytes from HID device.\n", result, len);
 		return 0;
 	}
 	LogDebug("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-	return len;
+	return (size_t)result;
 }
 
 bool SCPIHIDTransport::IsCommandBatchingSupported()

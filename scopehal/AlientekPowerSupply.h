@@ -87,8 +87,40 @@ protected:
 
 	void SendReceiveReport(Function function, int sequence = -1, std::vector<uint8_t>* data = nullptr);
 	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
+	void SendGetBasicSetReport();
 
 	uint8_t m_deviceAdress = 0xFB;
+
+
+
+	// @brief Input voltage in V.
+	double m_vIn;
+	// @brief Actual output voltage in V.
+	double m_vOut;
+	// @brief Set output voltage in V.
+	double m_vOutSet;
+	// @brief Actual output current in A.
+	double m_iOut;
+	// @brief Set output current in A.
+	double m_iOutSet;
+	// @brief Max output voltage in V.
+	double m_vOutMax;
+	// @brief Temperature 1 in °C.
+	double m_temp1;
+	// @brief Temperature 2 in °C.
+	double m_temp2;
+	// @brief 5V rail in V.
+	double m_dc5V;
+	// @brief Output mode => 0 = CC, 1 = CV, 2 = OVP/OCP (according to workState)
+	uint8_t m_outMode;
+	// @brief Work state => 1 = OVP, 2 = OCP
+	uint8_t m_workState;
+	// @brief  Over-voltage protection setting in V.
+	double m_ovpSet;
+	// @brief Over-current protection setting in A.
+	double m_ocpSet;
+	// @brief Power state
+	bool m_powerState;
 
 public:
 	static std::string GetDriverNameInternal();

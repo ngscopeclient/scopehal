@@ -45,11 +45,12 @@ protected:
 	std::recursive_mutex m_modbusMutex;
 	
 	uint8_t m_slaveAdress;
-	void Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData);
+	size_t Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData);
 	void SendReport(uint8_t reportNumber, std::vector<uint8_t>* data);
-	void ReadReport(size_t reportSize, std::vector<uint8_t>* data);
+	size_t ReadReport(size_t reportSize, std::vector<uint8_t>* data);
 	void PushUint16(std::vector<uint8_t>* data, uint16_t value);
 	uint16_t ReadUint16(std::vector<uint8_t>* data, uint8_t index);
+	uint8_t ReadUint8(std::vector<uint8_t>* data, uint8_t index);
 
 };
 

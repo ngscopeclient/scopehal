@@ -40,27 +40,37 @@ AlientekPowerSupply::AlientekPowerSupply(SCPITransport* transport)
 {
 	// Only one channel on Ridden PSU
 	m_channels.push_back(new PowerSupplyChannel("CH1", this, "#008000", 0));
-	m_vendor = "Alientek";
+
+	auto hidTransport = dynamic_cast<SCPIHIDTransport*>(transport);
+	if(hidTransport)
+	{
+		m_vendor = hidTransport->GetManufacturerName();
+		m_model =  hidTransport->GetProductName();
+		m_serial = hidTransport->GetSerialNumber();
+	}
+	else
+	{
+		m_vendor = "Alientek";
+		m_model = "DP-100";
+	}
 
 	SendReceiveReport(Function::SYSTEM_INFO);
 	SendReceiveReport(Function::DEVICE_INFO);
 	SendReceiveReport(Function::BASIC_INFO);
-/*	// Read model number
-	uint16_t modelNumber = ReadRegister(REGISTER_MODEL);
-	m_model = string("RD") + to_string(modelNumber/10) +"-" + to_string(modelNumber%10);
-	// Read serial number
-	uint16_t seriallNumber = ReadRegister(REGISTER_SERIAL);
-	m_serial = to_string(seriallNumber);
-	// Read firmware version number
-	float firmwareVersion = ((float)ReadRegister(0x03))/100;
-	m_fwVersion = to_string(firmwareVersion);
-	// Unlock remote control
-	WriteRegister(REGISTER_LOCK,0x00); */
+
+	SendGetBasicSetReport();
 }
 
 AlientekPowerSupply::~AlientekPowerSupply()
 {
 
+}
+
+void AlientekPowerSupply::SendGetBasicSetReport()
+{
+	std::vector<uint8_t> data;
+	data.push_back(Operation::READ);
+	SendReceiveReport(Function::BASIC_SET,0,&data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,8 +105,10 @@ bool AlientekPowerSupply::SupportsVoltageCurrentControl(int chan)
 bool AlientekPowerSupply::IsPowerConstantCurrent(int chan)
 {
 	if(chan == 0)
-		//return (ReadRegister(REGISTER_ERROR)==0x02);
-		return false;
+	{
+		SendReceiveReport(Function::BASIC_INFO);
+		return (m_outMode == 0);
+	}
 	else
 		return false;
 }
@@ -105,16 +117,16 @@ double AlientekPowerSupply::GetPowerVoltageActual(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return 0;
-	//return ((double)ReadRegister(REGISTER_V_OUT))/100;
+	SendReceiveReport(Function::BASIC_INFO);
+	return m_vOut;
 }
 
 double AlientekPowerSupply::GetPowerVoltageNominal(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return 0;
-	//return ((double)ReadRegister(REGISTER_V_SET))/100;
+	SendGetBasicSetReport();
+	return m_vOutSet;
 }
 
 double AlientekPowerSupply::GetPowerCurrentActual(int chan)
@@ -122,24 +134,24 @@ double AlientekPowerSupply::GetPowerCurrentActual(int chan)
 	if(chan != 0)
 		return 0;
 
-	return 0;
-	//return ((double)ReadRegister(REGISTER_I_OUT))/1000;
+	SendReceiveReport(Function::BASIC_INFO);
+	return m_iOut;
 }
 
 double AlientekPowerSupply::GetPowerCurrentNominal(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return 0;
-	//return ((double)ReadRegister(REGISTER_I_SET))/1000;
+	SendGetBasicSetReport();
+	return m_iOutSet;
 }
 
 bool AlientekPowerSupply::GetPowerChannelActive(int chan)
 {
 	if(chan != 0)
 		return false;
-	return false;
-	//return (ReadRegister(REGISTER_ON_OFF)==0x0001);
+	SendGetBasicSetReport();
+	return m_powerState;
 }
 
 void AlientekPowerSupply::SetPowerVoltage(int chan, double /*volts*/)
@@ -165,33 +177,6 @@ void AlientekPowerSupply::SetPowerChannelActive(int chan, bool /*on*/)
 	return;
 	//WriteRegister(REGISTER_ON_OFF, (on ? 0x01 : 0x00));
 }
-
-/*
-uint8_t HIDInstrument::ReadRegisters(uint16_t address, std::vector<uint16_t>* result, uint8_t count)
-{
-	if(!result)
-		return 0;
-	uint16_t byteCount = count*2;
-	std::vector<uint8_t> data;
-	// Adress to read
-	PushUint16(&data,address);
-	// Number of registers to read (1)
-	PushUint16(&data,count);
-	Converse(ReadAnalogOutputHoldingRegisters,&data);
-	// Response data should be the 2 bytes of the requested register
-	if(data.size()!=byteCount)
-	{
-		LogError("Invalid response length: %llu, expected %d.\n",data.size(),byteCount);
-		return 0;
-	}
-	result->reserve(count);
-	for(int i = 0 ; i < count ; i++)
-	{
-		result->push_back(ReadUint16(&data,2*i));
-	}
-	return count;
-}
-*/
 
 void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std::vector<uint8_t>* data)
 {	// Report has the form:
@@ -228,6 +213,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 	sendData.push_back(reinterpret_cast<const uint8_t *>(&crc)[0]);
 	sendData.push_back(reinterpret_cast<const uint8_t *>(&crc)[1]);
 
+#define HEADER_LENGTH	4
 	std::vector<uint8_t> receiveData;
 	// Report response has the form :
 	// - deviceAdr
@@ -237,17 +223,97 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 	// - content (= contentLenth bytes)
 	// - checksum (2 bytes)
 	// Response size position is 3 and 2 bytes have to be added to content length for the checksum
-	Converse(0,64,&sendData,&receiveData);
-
+	// Maximum report size is around 40 bytes + crc and header => 64 bytes are enough
+	size_t bytesRead = Converse(0,64,&sendData,&receiveData);
+	if(bytesRead < HEADER_LENGTH+1 /*|| receiveData.size() < HEADER_LENGTH+1*/)
+	{
+		LogError("Invalid report length %llu: missing data.\n",bytesRead);
+		return;
+	}
 	// Read received data
-	// TODO
+	//uint8_t deviceAdress  = receiveData[0];
+	uint8_t reportFunction  = receiveData[1];
+	//uint8_t sequence      = receiveData[2];
+	//uint8_t contentLength = receiveData[3];
+	switch(reportFunction)
+	{
+		case Function::BASIC_INFO:
+			if(bytesRead < HEADER_LENGTH+15)
+			{
+				LogError("Invalid BasicInfo report length: %llu.\n",bytesRead);
+				return;
+			}
+			m_vIn		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+0))/1000;
+			m_vOut 		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+2))/1000;
+			m_iOut 		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+4))/1000;
+			m_vOutMax 	= ((double)ReadUint16(&receiveData,HEADER_LENGTH+6))/1000;
+			m_temp1 	= ((double)ReadUint16(&receiveData,HEADER_LENGTH+8))/10;
+			m_temp2 	= ((double)ReadUint16(&receiveData,HEADER_LENGTH+10))/10;
+			m_dc5V		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+12))/1000;
+			m_outMode 	= ReadUint8(&receiveData,HEADER_LENGTH+14);
+			m_workState = ReadUint8(&receiveData,HEADER_LENGTH+15);
+			break;
+		case Function::BASIC_SET:
+			if(bytesRead < HEADER_LENGTH+9)
+			{
+				LogError("Invalid BasicSettings report length: %llu.\n",bytesRead);
+				return;
+			}
+			{
+				//uint8_t ack 	= ReadUint8(&receiveData,HEADER_LENGTH+0);
+				m_powerState	= (bool)ReadUint8(&receiveData,HEADER_LENGTH+1);
+				m_vOutSet 		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+2))/1000;
+				m_iOutSet	 	= ((double)ReadUint16(&receiveData,HEADER_LENGTH+4))/1000;
+				m_ovpSet		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+6))/1000;
+				m_ocpSet		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+8))/1000;
+			}
+			break;
+		case Function::SYSTEM_INFO:
+			if(bytesRead < HEADER_LENGTH+7)
+			{
+				LogError("Invalid SystemInfo report length: %llu.\n",bytesRead);
+				return;
+			}
+			{
+				double otp 			= ((double)ReadUint16(&receiveData,HEADER_LENGTH+0));
+				double opp 			= ((double)ReadUint16(&receiveData,HEADER_LENGTH+2))/10;
+				uint8_t backlight	= ReadUint8(&receiveData,HEADER_LENGTH+4);
+				uint8_t volume		= ReadUint8(&receiveData,HEADER_LENGTH+5);
+				uint8_t revProt		= ReadUint8(&receiveData,HEADER_LENGTH+6);
+				uint8_t audioOut	= ReadUint8(&receiveData,HEADER_LENGTH+7);
+				LogDebug("SysInfo: otp = %f, opp= %f, backlight = %d, volume = %d, revProt=%d, audio=%d\n",otp,opp,backlight,volume,revProt,audioOut);
+			}
+			break;
+		case Function::DEVICE_INFO:
+			if(bytesRead < HEADER_LENGTH+39)
+			{
+				LogError("Invalid DeviceInfo report length: %llu.\n",bytesRead);
+				return;
+			}
+			{
+				std::string deviceName(receiveData.begin()+HEADER_LENGTH+0,receiveData.begin()+HEADER_LENGTH+15);
+				double hardwareVersion = ((double)ReadUint16(&receiveData,HEADER_LENGTH+16))/10;
+				double firmwareVersion = ((double)ReadUint16(&receiveData,HEADER_LENGTH+18))/10;
+				uint16_t bootVersion = ((double)ReadUint16(&receiveData,HEADER_LENGTH+20))/10;
+				uint16_t runVersion  = ((double)ReadUint16(&receiveData,HEADER_LENGTH+22))/10;
+				std::string serialNumber(receiveData.begin()+HEADER_LENGTH+24,receiveData.begin()+HEADER_LENGTH+24+11);
+				uint16_t year		= ReadUint16(&receiveData,HEADER_LENGTH+36);
+				uint8_t month		= ReadUint8(&receiveData,HEADER_LENGTH+38);
+				uint8_t day			= ReadUint8(&receiveData,HEADER_LENGTH+39);
+				LogDebug("DeviceInfo: name = %s, hwVer = %f, fwVer= %f, bootVer = %d, runVer = %d, serial=%s, %d/%d/%d\n",
+				deviceName.c_str(),hardwareVersion,firmwareVersion,bootVersion,runVersion,serialNumber.c_str(),year,month,day);
+			}
+			break;
+		default:
+			LogWarning("Unsuportd function %x\n",reportFunction);
+			break;
+
+	}
 }
-
-
 
 uint16_t AlientekPowerSupply::CalculateCRC(const uint8_t *buff, size_t len)
 {
-  /*static const uint16_t wCRCTable[] = {
+  static const uint16_t wCRCTable[] = {
       0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301, 0X03C0, 0X0280, 0XC241, 0XC601,
       0X06C0, 0X0780, 0XC741, 0X0500, 0XC5C1, 0XC481, 0X0440, 0XCC01, 0X0CC0,
       0X0D80, 0XCD41, 0X0F00, 0XCFC1, 0XCE81, 0X0E40, 0X0A00, 0XCAC1, 0XCB81,
@@ -286,24 +352,6 @@ uint16_t AlientekPowerSupply::CalculateCRC(const uint8_t *buff, size_t len)
     wCRCWord >>= 8;
     wCRCWord ^= wCRCTable[nTemp];
   }
-  return wCRCWord;*/
-  uint16_t crc = 0xFFFF;
-
-  for (size_t i = 0 ; i < len ; i++) 
-  {
-	uint8_t data = buff[i];
-    crc = crc ^ data;
-    for (int j = 0; j < 8; j++) 
-	{
-      uint8_t odd = crc & 0x0001;
-      crc = crc >> 1;
-      if (odd) 
-	  {
-        crc = crc ^ 0xA001;
-      }
-    }
-  }
-
-  return crc;
+  return wCRCWord;
 }
 

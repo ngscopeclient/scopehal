@@ -58,6 +58,15 @@ public:
 	virtual bool IsCommandBatchingSupported() override;
 	virtual bool IsConnected() override;
 
+	std::string GetManufacturerName()
+	{ return m_manufacturerName; }
+
+	std::string GetProductName()
+	{ return m_productName; }
+
+	std::string GetSerialNumber()
+	{ return m_serialNumber; }
+
 	TRANSPORT_INITPROC(SCPIHIDTransport)
 
 protected:
@@ -66,6 +75,8 @@ protected:
 	std::string m_serialNumber;
 	unsigned int m_vendorId;
 	unsigned int m_productId;
+	std::string m_manufacturerName;
+	std::string m_productName;
 };
 
 #endif

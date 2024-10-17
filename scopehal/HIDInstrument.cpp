@@ -47,22 +47,29 @@ HIDInstrument::~HIDInstrument()
 
 void HIDInstrument::PushUint16(std::vector<uint8_t>* data, uint16_t value)
 {
-	data->push_back(reinterpret_cast<uint8_t *>(&value)[1]);
 	data->push_back(reinterpret_cast<uint8_t *>(&value)[0]);
+	data->push_back(reinterpret_cast<uint8_t *>(&value)[1]);
 }
 
 uint16_t HIDInstrument::ReadUint16(std::vector<uint8_t>* data, uint8_t index)
 {
 	if(!data || data->size() <= ((size_t)(index+1)))
 		return 0;
-	return (static_cast<uint16_t>((*data)[index+1]) + (static_cast<uint16_t>((*data)[index]) << 8)); 
+	return (static_cast<uint16_t>((*data)[index]) + (static_cast<uint16_t>((*data)[index+1]) << 8)); 
 }
 
-void HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData)
+uint8_t HIDInstrument::ReadUint8(std::vector<uint8_t>* data, uint8_t index)
+{
+	if(!data || data->size() <= ((size_t)(index)))
+		return 0;
+	return (*data)[index]; 
+}
+
+size_t HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData)
 {	
 	lock_guard<recursive_mutex> lock(m_modbusMutex);
 	SendReport(reportNumber, sendData);
-	ReadReport(responseReportSize,receiveData);
+	return ReadReport(responseReportSize,receiveData);
 }
 
 void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
@@ -74,12 +81,15 @@ void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 	m_transport->SendRawData(buffer.size(),buffer.begin().base());
 }
 
-void HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
+size_t HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
 {	// Read a HID report with the provided size into the specified buffer
-	data->reserve(reportSize);
-	if(!m_transport->ReadRawData(reportSize,data->begin().base()))
+	data->resize(reportSize);
+	size_t result = m_transport->ReadRawData(reportSize,data->begin().base());
+	// Update vector size according to bytes actually read
+	data->resize(result);
+	if(result == 0)
 	{
 		LogError("Could not read HID report.\n");
-		return;
 	}
+	return result;
 }
