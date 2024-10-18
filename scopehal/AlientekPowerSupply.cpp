@@ -257,7 +257,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 	size_t bytesRead = Converse(0,64,&sendData,&receiveData);
 	if(bytesRead < HEADER_LENGTH+1 /*|| receiveData.size() < HEADER_LENGTH+1*/)
 	{
-		LogError("Invalid report length %llu: missing data.\n",bytesRead);
+		LogError("Invalid report length %zu: missing data.\n",bytesRead);
 		return;
 	}
 	// Read received data
@@ -270,7 +270,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 		case Function::BASIC_INFO:
 			if(bytesRead < HEADER_LENGTH+15)
 			{
-				LogError("Invalid BasicInfo report length: %llu.\n",bytesRead);
+				LogError("Invalid BasicInfo report length: %zu.\n",bytesRead);
 				return;
 			}
 			m_vIn		= ((double)ReadUint16(&receiveData,HEADER_LENGTH+0))/1000;
@@ -288,7 +288,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 				return; // This is a response to a write message, ignore it
 			if(bytesRead < HEADER_LENGTH+9)
 			{
-				LogError("Invalid BasicSettings report length: %llu.\n",bytesRead);
+				LogError("Invalid BasicSettings report length: %zu.\n",bytesRead);
 				return;
 			}
 			{
@@ -303,7 +303,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 		case Function::SYSTEM_INFO:
 			if(bytesRead < HEADER_LENGTH+7)
 			{
-				LogError("Invalid SystemInfo report length: %llu.\n",bytesRead);
+				LogError("Invalid SystemInfo report length: %zu.\n",bytesRead);
 				return;
 			}
 			{
@@ -319,7 +319,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 		case Function::DEVICE_INFO:
 			if(bytesRead < HEADER_LENGTH+39)
 			{
-				LogError("Invalid DeviceInfo report length: %llu.\n",bytesRead);
+				LogError("Invalid DeviceInfo report length: %zu.\n",bytesRead);
 				return;
 			}
 			{
