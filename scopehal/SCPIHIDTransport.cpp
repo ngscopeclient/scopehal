@@ -124,10 +124,10 @@ void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
 	int result = m_hid.Write(buf, len);
 	if(result < 0)
 		LogError("Error code %d  while sending %zu bytes.\n", result, len);
-		//LogError("Error code %d  while sending %zu bytes: %s\n", result, len,LogHexDump(buf,len).c_str());
+		//LogError("Error code %d  while sending %zu bytes: %s\n", result, len, LogHexDump(buf,len).c_str());
 	else
-		LogTrace("Sent %d bytes (requested %zu)\n", result);
-		//LogTrace("Sent %d bytes (requested %zu): %s\n", result, len,LogHexDump(buf,len).c_str());
+		LogTrace("Sent %d bytes (requested %zu)\n", result, len);
+		//LogTrace("Sent %d bytes (requested %zu): %s\n", result, len, LogHexDump(buf,len).c_str());
 }
 
 size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
