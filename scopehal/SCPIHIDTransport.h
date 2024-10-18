@@ -77,6 +77,10 @@ protected:
 	unsigned int m_productId;
 	std::string m_manufacturerName;
 	std::string m_productName;
+
+	// Transport mutex
+	std::recursive_mutex m_transportMutex;
+
 };
 
 #endif

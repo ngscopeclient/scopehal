@@ -38,7 +38,7 @@ using namespace std;
 AlientekPowerSupply::AlientekPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport, false), SCPIInstrument(transport, false), HIDInstrument(transport)
 {
-	// Only one channel on Ridden PSU
+	// Only one channel on Alientek PSU
 	m_channels.push_back(new PowerSupplyChannel("CH1", this, "#008000", 0));
 
 	auto hidTransport = dynamic_cast<SCPIHIDTransport*>(transport);
@@ -57,7 +57,6 @@ AlientekPowerSupply::AlientekPowerSupply(SCPITransport* transport)
 	SendReceiveReport(Function::SYSTEM_INFO);
 	SendReceiveReport(Function::DEVICE_INFO);
 	SendReceiveReport(Function::BASIC_INFO);
-
 	SendGetBasicSetReport();
 }
 
@@ -70,6 +69,18 @@ void AlientekPowerSupply::SendGetBasicSetReport()
 {
 	std::vector<uint8_t> data;
 	data.push_back(Operation::READ);
+	SendReceiveReport(Function::BASIC_SET,0,&data);
+}
+
+void AlientekPowerSupply::SendSetBasicSetReport()
+{
+	std::vector<uint8_t> data;
+	data.push_back(Operation::OUTPUT);
+	data.push_back(m_powerState);
+	PushUint16(&data,(uint16_t)std::round(m_vOutSet*1000));
+	PushUint16(&data,(uint16_t)std::round(m_iOutSet*1000));
+	PushUint16(&data,(uint16_t)std::round(m_ovpSet*1000));
+	PushUint16(&data,(uint16_t)std::round(m_ocpSet*1000));
 	SendReceiveReport(Function::BASIC_SET,0,&data);
 }
 
@@ -154,32 +165,51 @@ bool AlientekPowerSupply::GetPowerChannelActive(int chan)
 	return m_powerState;
 }
 
-void AlientekPowerSupply::SetPowerVoltage(int chan, double /*volts*/)
+void AlientekPowerSupply::SetPowerVoltage(int chan, double volts)
 {
 	if(chan != 0)
 		return;
-	return;
-	//WriteRegister(REGISTER_V_SET,(uint16_t)(volts*100));
+	// Prevent the value from changing during operation
+	lock_guard<recursive_mutex> lock(m_hidMutex);
+	m_vOutSet = volts;
+	SendSetBasicSetReport();
 }
 
-void AlientekPowerSupply::SetPowerCurrent(int chan, double /*amps*/)
+void AlientekPowerSupply::SetPowerCurrent(int chan, double amps)
 {
 	if(chan != 0)
 		return;
-	return;
-	//WriteRegister(REGISTER_I_SET,(uint16_t)(amps*1000));
+	// Prevent the value from changing during operation
+	lock_guard<recursive_mutex> lock(m_hidMutex);
+	m_iOutSet = amps;
+	SendSetBasicSetReport();
 }
 
-void AlientekPowerSupply::SetPowerChannelActive(int chan, bool /*on*/)
+void AlientekPowerSupply::SetPowerChannelActive(int chan, bool on)
 {
 	if(chan != 0)
 		return;
-	return;
-	//WriteRegister(REGISTER_ON_OFF, (on ? 0x01 : 0x00));
+	// Prevent the value from changing during operation
+	lock_guard<recursive_mutex> lock(m_hidMutex);
+	m_powerState = (uint8_t)on;
+	SendSetBasicSetReport();
 }
 
 void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std::vector<uint8_t>* data)
-{	// Report has the form:
+{	// Check cache
+	if(function == Function::BASIC_INFO)
+	{
+		if(chrono::system_clock::now() < m_nextBasicInfoUpdate)
+			return; // Keep current values
+		m_nextBasicInfoUpdate = chrono::system_clock::now() + m_basicInfoCacheDuration;
+	}
+	else if (function == Function::BASIC_SET && (*data)[0] != Operation::OUTPUT)
+	{	// No caching for write operation
+		if(chrono::system_clock::now() < m_nextBasicSetUpdate)
+			return; // Keep current values
+		m_nextBasicSetUpdate = chrono::system_clock::now() + m_basicSetCacheDuration;
+	}
+	// Report has the form:
 	// - deviceAdr
 	// - function
 	// - sequenceNumber (optionnal)
@@ -254,6 +284,8 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 			m_workState = ReadUint8(&receiveData,HEADER_LENGTH+15);
 			break;
 		case Function::BASIC_SET:
+			if(bytesRead >= HEADER_LENGTH && receiveData[HEADER_LENGTH-1] == 1)
+				return; // This is a response to a write message, ignore it
 			if(bytesRead < HEADER_LENGTH+9)
 			{
 				LogError("Invalid BasicSettings report length: %llu.\n",bytesRead);

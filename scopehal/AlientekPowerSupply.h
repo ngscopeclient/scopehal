@@ -88,8 +88,16 @@ protected:
 	void SendReceiveReport(Function function, int sequence = -1, std::vector<uint8_t>* data = nullptr);
 	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
 	void SendGetBasicSetReport();
+	void SendSetBasicSetReport();
 
 	uint8_t m_deviceAdress = 0xFB;
+
+
+	// Cache management for BASIC_INFO and BASIC_SET functions
+	std::chrono::system_clock::time_point m_nextBasicInfoUpdate;
+	std::chrono::milliseconds m_basicInfoCacheDuration = std::chrono::milliseconds(10); // 100 Hz
+	std::chrono::system_clock::time_point m_nextBasicSetUpdate;
+	std::chrono::milliseconds m_basicSetCacheDuration = std::chrono::milliseconds(1000); // 1 Hz => not supposed to change in lock mode
 
 
 

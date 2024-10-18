@@ -99,18 +99,19 @@ string SCPIHIDTransport::GetConnectionString()
 
 bool SCPIHIDTransport::SendCommand(const string& cmd)
 {
+	lock_guard<recursive_mutex> lock(m_transportMutex);
 	LogTrace("Sending %s\n", cmd.c_str());
 	string tempbuf = cmd + "\n";
 	return (m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length())>=0);
 }
 
 string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
-{
-	unsigned char buffer[1024];
+{	// Max HID report size is 1024 byte according to literature
+	unsigned char buffer[1025];
 	string ret;
 	if(m_hid.Read((unsigned char*)&buffer, 1024)>=0)
 	{
-		buffer[1023] = 0;
+		buffer[1024] = 0;
 		ret = string((char*)buffer);
 	}
 	LogTrace("Got %s\n", ret.c_str());
@@ -119,11 +120,14 @@ string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(f
 
 void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
 {
+	lock_guard<recursive_mutex> lock(m_transportMutex);
 	int result = m_hid.Write(buf, len);
 	if(result < 0)
-		LogError("Error code %d  while sending %zu bytes: %s\n", result, len,LogHexDump(buf,len).c_str());
+		LogError("Error code %d  while sending %zu bytes.\n", result, len);
+		//LogError("Error code %d  while sending %zu bytes: %s\n", result, len,LogHexDump(buf,len).c_str());
 	else
-		LogTrace("Sent %d bytes (requested %zu): %s\n", result, len,LogHexDump(buf,len).c_str());
+		LogTrace("Sent %d bytes (requested %zu)\n", result);
+		//LogTrace("Sent %d bytes (requested %zu): %s\n", result, len,LogHexDump(buf,len).c_str());
 }
 
 size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
@@ -134,7 +138,8 @@ size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::functi
 		LogWarning("Error code %d while getting %zu bytes from HID device.\n", result, len);
 		return 0;
 	}
-	LogDebug("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
+	LogTrace("Got %zu bytes.\n", len);
+	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
 	return (size_t)result;
 }
 

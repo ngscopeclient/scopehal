@@ -67,13 +67,14 @@ uint8_t HIDInstrument::ReadUint8(std::vector<uint8_t>* data, uint8_t index)
 
 size_t HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData)
 {	
-	lock_guard<recursive_mutex> lock(m_modbusMutex);
+	lock_guard<recursive_mutex> lock(m_hidMutex);
 	SendReport(reportNumber, sendData);
 	return ReadReport(responseReportSize,receiveData);
 }
 
 void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 {	// Send the HID report contained in the data buffer
+	lock_guard<recursive_mutex> lock(m_hidMutex);
 	std::vector<uint8_t> buffer;
 	buffer.reserve(data->size()+1);
 	buffer.push_back(reportNumber);
@@ -83,6 +84,7 @@ void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 
 size_t HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
 {	// Read a HID report with the provided size into the specified buffer
+	lock_guard<recursive_mutex> lock(m_hidMutex);
 	data->resize(reportSize);
 	size_t result = m_transport->ReadRawData(reportSize,data->begin().base());
 	// Update vector size according to bytes actually read

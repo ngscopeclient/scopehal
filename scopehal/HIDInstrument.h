@@ -42,7 +42,7 @@ public:
 
 protected:
 	// Make sure several request don't collide before we received the corresponding response
-	std::recursive_mutex m_modbusMutex;
+	std::recursive_mutex m_hidMutex;
 	
 	uint8_t m_slaveAdress;
 	size_t Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData);
