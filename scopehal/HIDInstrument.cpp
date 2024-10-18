@@ -75,11 +75,15 @@ size_t HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, 
 void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 {	// Send the HID report contained in the data buffer
 	lock_guard<recursive_mutex> lock(m_hidMutex);
-	std::vector<uint8_t> buffer;
-	buffer.reserve(data->size()+1);
-	buffer.push_back(reportNumber);
-	buffer.insert(buffer.end(),data->begin(),data->end());
-	m_transport->SendRawData(buffer.size(),buffer.begin().base());
+	if(data)
+	{
+		std::vector<uint8_t> buffer(data->size()+1);
+		buffer.push_back(reportNumber);
+		buffer.insert(buffer.end(),data->begin(),data->end());
+		m_transport->SendRawData(buffer.size(),buffer.begin().base());
+	}
+	else
+		LogError("SendReport calld with null data buffer, ignoring.\n");
 }
 
 size_t HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
