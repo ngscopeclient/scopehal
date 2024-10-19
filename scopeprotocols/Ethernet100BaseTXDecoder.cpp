@@ -241,6 +241,24 @@ void Ethernet100BaseTXDecoder::Refresh()
 			i += 5;
 			continue;
 		}
+		else if(code == 0x04)
+		{
+			LogTrace("Found TX error at %zu\n", i);
+
+			//TX error
+			EthernetFrameSegment segment;
+			segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
+			cap->m_offsets.push_back(current_start * cap->m_timescale);
+			uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
+			cap->m_durations.push_back((end - current_start) * cap->m_timescale);
+			cap->m_samples.push_back(segment);
+
+			//reset for the next one
+			starts.clear();
+			ends.clear();
+			bytes.clear();
+			continue;
+		}
 		else if(code == 0x0d)
 		{
 			//This is a /T/. Next code should be 0x07, /R/ - end of frame.

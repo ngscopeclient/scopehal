@@ -59,7 +59,8 @@ public:
 		TYPE_NO_CARRIER,
 		TYPE_REMOTE_FAULT,
 		TYPE_LOCAL_FAULT,
-		TYPE_LINK_INTERRUPTION
+		TYPE_LINK_INTERRUPTION,
+		TYPE_TX_ERROR
 	} m_type;
 
 	std::vector<uint8_t> m_data;

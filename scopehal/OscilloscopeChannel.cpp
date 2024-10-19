@@ -48,6 +48,9 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Unit xunit,
 	size_t index)
 	: InstrumentChannel(scope, hwname, color, xunit, index)
+	, m_downloadState(DownloadState::DOWNLOAD_UNKNOWN)
+	, m_downloadProgress(0.0)
+	, m_downloadStartTime(0.0)
 	, m_refcount(0)
 {
 }

@@ -547,6 +547,7 @@ std::string EthernetWaveform::GetColor(size_t i)
 
 		//Signal has entirely disappeared, or fault condition reported
 		case EthernetFrameSegment::TYPE_NO_CARRIER:
+		case EthernetFrameSegment::TYPE_TX_ERROR:
 		case EthernetFrameSegment::TYPE_REMOTE_FAULT:
 		case EthernetFrameSegment::TYPE_LOCAL_FAULT:
 		case EthernetFrameSegment::TYPE_LINK_INTERRUPTION:
@@ -565,6 +566,9 @@ string EthernetWaveform::GetText(size_t i)
 	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
+		case EthernetFrameSegment::TYPE_TX_ERROR:
+			return "ERROR";
+
 		case EthernetFrameSegment::TYPE_PREAMBLE:
 			return "PREAMBLE";
 
