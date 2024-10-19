@@ -78,7 +78,9 @@ void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 	if(data)
 	{
 		std::vector<uint8_t> buffer;
-		buffer.reserve(data->size()+1);
+		// This breaks compilation with latest CXX compiler on Windows:
+		// error: 'void operator delete(void*, std::size_t)' called on pointer '<unknown>' with nonzero offset [1, 9223372036854775807] [-Werror=free-nonheap-object]
+		// buffer.reserve(data->size()+1);
 		buffer.push_back(reportNumber);
 		buffer.insert(buffer.end(),data->begin(),data->end());
 		m_transport->SendRawData(buffer.size(),buffer.begin().base());
