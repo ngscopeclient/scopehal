@@ -120,16 +120,20 @@ string SCPIUARTTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] functi
 void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	m_uart.Write(buf, len);
+	//LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
+	LogTrace("Sent %zu bytes.\n", len);
 }
 
 size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
 	if(!m_uart.Read(buf, len))
 		return 0;
+	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
+	LogTrace("Got %zu bytes.\n", len);
 	return len;
 }
 
 bool SCPIUARTTransport::IsCommandBatchingSupported()
 {
-	return true;
+	return false;
 }

@@ -145,5 +145,5 @@ size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::functi
 
 bool SCPIHIDTransport::IsCommandBatchingSupported()
 {
-	return true;
+	return false;
 }

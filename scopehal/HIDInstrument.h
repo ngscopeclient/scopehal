@@ -36,7 +36,7 @@
 class HIDInstrument 	: public virtual SCPIInstrument
 {
 public:
-	HIDInstrument(SCPITransport* transport, uint8_t slaveAdress=1);
+	HIDInstrument(SCPITransport* transport);
 	virtual ~HIDInstrument();
 
 
@@ -44,7 +44,6 @@ protected:
 	// Make sure several request don't collide before we received the corresponding response
 	std::recursive_mutex m_hidMutex;
 	
-	uint8_t m_slaveAdress;
 	size_t Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData);
 	void SendReport(uint8_t reportNumber, std::vector<uint8_t>* data);
 	size_t ReadReport(size_t reportSize, std::vector<uint8_t>* data);

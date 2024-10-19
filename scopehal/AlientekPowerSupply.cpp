@@ -39,7 +39,7 @@ AlientekPowerSupply::AlientekPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport, false), SCPIInstrument(transport, false), HIDInstrument(transport)
 {
 	// Only one channel on Alientek PSU
-	m_channels.push_back(new PowerSupplyChannel("CH1", this, "#008000", 0));
+	m_channels.push_back(new PowerSupplyChannel("CH1", this, "#00C100", 0));
 
 	auto hidTransport = dynamic_cast<SCPIHIDTransport*>(transport);
 	if(hidTransport)
@@ -67,8 +67,7 @@ AlientekPowerSupply::~AlientekPowerSupply()
 
 void AlientekPowerSupply::SendGetBasicSetReport()
 {
-	std::vector<uint8_t> data;
-	data.push_back(Operation::READ);
+	std::vector<uint8_t> data(1,Operation::READ);
 	SendReceiveReport(Function::BASIC_SET,0,&data);
 }
 
@@ -115,13 +114,10 @@ bool AlientekPowerSupply::SupportsVoltageCurrentControl(int chan)
 
 bool AlientekPowerSupply::IsPowerConstantCurrent(int chan)
 {
-	if(chan == 0)
-	{
-		SendReceiveReport(Function::BASIC_INFO);
-		return (m_outMode == 0);
-	}
-	else
+	if(chan != 0)
 		return false;
+	SendReceiveReport(Function::BASIC_INFO);
+	return (m_outMode == 0);
 }
 
 double AlientekPowerSupply::GetPowerVoltageActual(int chan)
@@ -144,7 +140,6 @@ double AlientekPowerSupply::GetPowerCurrentActual(int chan)
 {
 	if(chan != 0)
 		return 0;
-
 	SendReceiveReport(Function::BASIC_INFO);
 	return m_iOut;
 }
@@ -240,8 +235,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 
 	// CRC
 	uint16_t crc = CalculateCRC(sendData.begin().base(), sendData.size());
-	sendData.push_back(reinterpret_cast<const uint8_t *>(&crc)[0]);
-	sendData.push_back(reinterpret_cast<const uint8_t *>(&crc)[1]);
+	PushUint16(&sendData,crc);
 
 #define HEADER_LENGTH	4
 	std::vector<uint8_t> receiveData;
@@ -255,7 +249,7 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 	// Response size position is 3 and 2 bytes have to be added to content length for the checksum
 	// Maximum report size is around 40 bytes + crc and header => 64 bytes are enough
 	size_t bytesRead = Converse(0,64,&sendData,&receiveData);
-	if(bytesRead < HEADER_LENGTH+1 /*|| receiveData.size() < HEADER_LENGTH+1*/)
+	if(bytesRead < HEADER_LENGTH+1)
 	{
 		LogError("Invalid report length %zu: missing data.\n",bytesRead);
 		return;

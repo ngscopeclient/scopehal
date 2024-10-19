@@ -34,10 +34,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-HIDInstrument::HIDInstrument(SCPITransport* transport, uint8_t slaveAdress)
+HIDInstrument::HIDInstrument(SCPITransport* transport)
 	: SCPIInstrument(transport, false)
 {
-	m_slaveAdress = slaveAdress;
 }
 
 HIDInstrument::~HIDInstrument()
@@ -86,7 +85,7 @@ void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 		m_transport->SendRawData(buffer.size(),buffer.begin().base());
 	}
 	else
-		LogError("SendReport calld with null data buffer, ignoring.\n");
+		LogError("SendReport called with null data buffer, ignoring.\n");
 }
 
 size_t HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
