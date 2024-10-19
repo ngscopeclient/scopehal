@@ -77,7 +77,8 @@ void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 	lock_guard<recursive_mutex> lock(m_hidMutex);
 	if(data)
 	{
-		std::vector<uint8_t> buffer(data->size()+1);
+		std::vector<uint8_t> buffer;
+		buffer.reserve(data->size()+1);
 		buffer.push_back(reportNumber);
 		buffer.insert(buffer.end(),data->begin(),data->end());
 		m_transport->SendRawData(buffer.size(),buffer.begin().base());

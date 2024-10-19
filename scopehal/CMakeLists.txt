@@ -238,7 +238,6 @@ target_link_libraries(scopehal
 	glslang::glslang
 	glslang::SPIRV
 	glfw
-	hidapi
 	${WIN_LIBS}
 	)
 
