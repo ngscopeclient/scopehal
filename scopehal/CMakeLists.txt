@@ -167,6 +167,7 @@ set(SCOPEHAL_SOURCES
 	LeCroyFWPOscilloscope.cpp
 	MockOscilloscope.cpp
 	MultiLaneBERT.cpp
+	OwonXDGFunctionGenerator.cpp
 	PicoOscilloscope.cpp
 	PicoVNA.cpp
 	RigolFunctionGenerator.cpp
