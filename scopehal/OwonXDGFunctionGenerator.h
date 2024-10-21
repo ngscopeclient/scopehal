@@ -27,9 +27,17 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Frederic BORRY
+	@brief Owon XDG Function Generator series driver
+ */
 #ifndef OwonXDGFunctionGenerator_h
 #define OwonXDGFunctionGenerator_h
 
+/**
+	@brief Owon XDG Function Generator series driver class
+ */
 class OwonXDGFunctionGenerator : public virtual SCPIFunctionGenerator
 {
 public:
@@ -63,6 +71,10 @@ public:
 	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
 
 	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
+	virtual float GetFunctionChannelRiseTime(int chan) override;
+	virtual void SetFunctionChannelRiseTime(int chan, float fs) override;
+	virtual float GetFunctionChannelFallTime(int chan) override;
+	virtual void SetFunctionChannelFallTime(int chan, float fs) override;
 
 	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
 	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;

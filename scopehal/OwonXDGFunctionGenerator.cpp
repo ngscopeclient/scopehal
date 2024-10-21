@@ -27,6 +27,11 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Frederic BORRY
+	@brief Owon XDG Function Generator series driver
+ */
 #include "scopehal.h"
 #include "OwonXDGFunctionGenerator.h"
 
@@ -446,7 +451,33 @@ void OwonXDGFunctionGenerator::SetFunctionChannelDutyCycle(int chan, float duty)
 
 bool OwonXDGFunctionGenerator::HasFunctionRiseFallTimeControls(int /*chan*/)
 {
-	return false;
+	return true;
+}
+
+float OwonXDGFunctionGenerator::GetFunctionChannelRiseTime(int chan)
+{
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":PULS:TRAN:LEAD?"));
+	return stof(reply) * FS_PER_SECOND;
+}
+
+void OwonXDGFunctionGenerator::SetFunctionChannelRiseTime(int chan, float fs)
+{
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "%.10f", fs * SECONDS_PER_FS);
+	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":PULS:TRAN:LEAD " + tmp);
+}
+
+float OwonXDGFunctionGenerator::GetFunctionChannelFallTime(int chan)
+{
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":PULS:TRAN:TRA?"));
+	return stof(reply) * FS_PER_SECOND;
+}
+
+void OwonXDGFunctionGenerator::SetFunctionChannelFallTime(int chan, float fs)
+{
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "%.10f", fs * SECONDS_PER_FS);
+	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":PULS:TRAN:TRA " + tmp);
 }
 
 FunctionGenerator::OutputImpedance OwonXDGFunctionGenerator::GetFunctionChannelOutputImpedance(int chan)
