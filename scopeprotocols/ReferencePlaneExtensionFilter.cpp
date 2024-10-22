@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of ReferencePlaneExtensionFilter
+	@ingroup rf
  */
 #include "../scopehal/scopehal.h"
 #include "SParameterFilter.h"
@@ -153,7 +154,9 @@ void ReferencePlaneExtensionFilter::Refresh()
 					double phase_frac = fmodf(phase_fs / period_fs, 1);
 					double phase_deg = phase_frac * 360;
 
-					double phase_shifted = sang_in->m_samples[i] + phase_deg;
+					double phase_shifted = fmodf(sang_in->m_samples[i] + phase_deg, 360);
+					if(phase_shifted > 180)
+						phase_shifted -= 360;
 					ang_out->m_samples[i] = phase_shifted;
 				}
 			}
@@ -172,7 +175,9 @@ void ReferencePlaneExtensionFilter::Refresh()
 					double phase_frac = fmodf(phase_fs / period_fs, 1);
 					double phase_deg = phase_frac * 360;
 
-					double phase_shifted = uang_in->m_samples[i] + phase_deg;
+					double phase_shifted = fmodf(uang_in->m_samples[i] + phase_deg, 360);
+					if(phase_shifted > 180)
+						phase_shifted -= 360;
 					ang_out->m_samples[i] = phase_shifted;
 				}
 			}
