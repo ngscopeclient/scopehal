@@ -31,6 +31,8 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of StreamDescriptor
+
+	@ingroup core
  */
 #ifndef StreamDescriptor_h
 #define StreamDescriptor_h
@@ -52,6 +54,10 @@ public:
 		: m_channel(channel)
 		, m_stream(stream)
 	{}
+
+	///@return True if this is an invalid stream (index greater than the highest allowed value)
+	bool IsOutOfRange()
+	{ return (m_stream >= m_channel->GetStreamCount()); }
 
 	operator bool() const
 	{ return (m_channel != NULL); }
