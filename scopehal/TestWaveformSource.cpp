@@ -145,10 +145,9 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	for(size_t i=0; i<depth; i++)
 	{
 		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
-		if (i % 1024 == 0)
-		{
+
+		if( (i % 1024 == 0) && downloadCallback)
 			downloadCallback((float)i / (float)depth);
-		}
 	}
 
 	return ret;
@@ -195,11 +194,8 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 		ret->m_samples[i] = scale *
 			(sinf(i*radians_per_sample1 + startphase1) + sinf(i*radians_per_sample2 + startphase2))
 			+ noise(m_rng);
-		if (i % 1024 == 0)
-		{
+		if( (i % 1024 == 0) && downloadCallback)
 			downloadCallback((float)i / (float)depth);
-		}
-
 	}
 
 	return ret;
@@ -270,10 +266,8 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 			ret->m_samples[i] = last_voltage + delta*frac;
 		}
 
-		if (i % 1024 == 0)
-		{
+		if( (i % 1024 == 0) && downloadCallback)
 			downloadCallback((float)i / (float)depth);
-		}
 	}
 
 	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
@@ -352,10 +346,8 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 			ret->m_samples[i] = last_voltage + delta*frac;
 		}
 
-		if (i % 1024 == 0)
-		{
+		if( (i % 1024 == 0) && downloadCallback)
 			downloadCallback((float)i / (float)depth);
-		}
 	}
 
 	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
