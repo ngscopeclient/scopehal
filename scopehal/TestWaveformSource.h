@@ -62,8 +62,8 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
-		std::function<void(float)> downloadCallback,
-		float noise_stdev = 0.01);
+		float noise_stdev = 0.01,
+		std::function<void(float)> downloadCallback = nullptr);
 
 	WaveformBase* GenerateNoisySinewaveSum(
 		float amplitude,
@@ -73,8 +73,8 @@ public:
 		float period2,
 		int64_t sampleperiod,
 		size_t depth,
-		std::function<void(float)> downloadCallback,
-		float noise_stdev = 0.01);
+		float noise_stdev = 0.01,
+		std::function<void(float)> downloadCallback = nullptr);
 
 	WaveformBase* GeneratePRBS31(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -83,9 +83,9 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
-		std::function<void(float)> downloadCallback,
 		bool lpf = true,
-		float noise_stdev = 0.01);
+		float noise_stdev = 0.01,
+		std::function<void(float)> downloadCallback = nullptr);
 
 	WaveformBase* Generate8b10b(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -94,9 +94,9 @@ public:
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
-		std::function<void(float)> downloadCallback,
 		bool lpf = true,
-		float noise_stdev = 0.01);
+		float noise_stdev = 0.01,
+		std::function<void(float)> downloadCallback = nullptr);
 
 	WaveformBase* GenerateStep(
 		float vlo,

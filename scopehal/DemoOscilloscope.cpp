@@ -544,25 +544,23 @@ bool DemoOscilloscope::AcquireData()
 		{
 			case 0:
 				waveforms[i] = m_source[i]->GenerateNoisySinewave(
-					0.9, 0.0, 1e6, sampleperiod, depth, updateProgress, noise[0]);
+					0.9, 0.0, 1e6, sampleperiod, depth, noise[0], updateProgress);
 				break;
 
 			case 1:
 				waveforms[i] = m_source[i]->GenerateNoisySinewaveSum(
-					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, updateProgress, noise[1]);
+					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1], updateProgress);
 				break;
 
 			case 2:
 
 				waveforms[i] = m_source[i]->GeneratePRBS31(
-					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, 
-					updateProgress,
-					lpf2, noise[2]);
+					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2], updateProgress);
 				break;
 
 			case 3:
 				waveforms[i] = m_source[i]->Generate8b10b(
-					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, updateProgress, lpf3, noise[3]);
+					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, lpf3, noise[3], updateProgress);
 				break;
 
 			default:

@@ -114,12 +114,13 @@ WaveformBase* TestWaveformSource::GenerateStep(
 /**
 	@brief Generates a sinewave with AWGN added
 
-	@param amplitude	P-P amplitude of the waveform in volts
-	@param startphase	Starting phase in radians
-	@param period		Period of the sine, in femtoseconds
-	@param sampleperiod	Interval between samples, in femtoseconds
-	@param depth		Total number of samples to generate
-	@param noise_stdev	Standard deviation of the AWGN in volts
+	@param amplitude		P-P amplitude of the waveform in volts
+	@param startphase		Starting phase in radians
+	@param period			Period of the sine, in femtoseconds
+	@param sampleperiod		Interval between samples, in femtoseconds
+	@param depth			Total number of samples to generate
+	@param noise_stdev		Standard deviation of the AWGN in volts
+	@param downloadCallback	Callback for download progress
  */
 WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float amplitude,
@@ -127,8 +128,8 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(float)> downloadCallback,
-	float noise_stdev)
+	float noise_stdev,
+	std::function<void(float)> downloadCallback)
 {
 	auto ret = new UniformAnalogWaveform("NoisySine");
 	ret->m_timescale = sampleperiod;
@@ -156,14 +157,15 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 /**
 	@brief Generates a sum of two sinewaves with AWGN added
 
-	@param amplitude	P-P amplitude of the waveform in volts
-	@param startphase1	Starting phase of the first sine in radians
-	@param startphase2	Starting phase of the second sine in radians
-	@param period1		Period of the first sine, in femtoseconds
-	@param period2		Period of the second sine, in femtoseconds
-	@param sampleperiod	Interval between samples, in femtoseconds
-	@param depth		Total number of samples to generate
-	@param noise_stdev	Standard deviation of the AWGN in volts
+	@param amplitude		P-P amplitude of the waveform in volts
+	@param startphase1		Starting phase of the first sine in radians
+	@param startphase2		Starting phase of the second sine in radians
+	@param period1			Period of the first sine, in femtoseconds
+	@param period2			Period of the second sine, in femtoseconds
+	@param sampleperiod		Interval between samples, in femtoseconds
+	@param depth			Total number of samples to generate
+	@param noise_stdev		Standard deviation of the AWGN in volts
+	@param downloadCallback	Callback for download progress
  */
 WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	float amplitude,
@@ -173,8 +175,8 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	float period2,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(float)> downloadCallback,
-	float noise_stdev)
+	float noise_stdev,
+	std::function<void(float)> downloadCallback)
 {
 	auto ret = new UniformAnalogWaveform("NoisySineSum");
 	ret->m_timescale = sampleperiod;
@@ -204,14 +206,15 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 /**
 	@brief Generates a PRBS-31 waveform through a lossy channel with AWGN
 
-	@param cmdBuf		Vulkan command buffer to use for channel emulation
-	@param queue		Vulkan queue to use for channel emulation
-	@param amplitude	P-P amplitude of the waveform in volts
-	@param period		Unit interval, in femtoseconds
-	@param sampleperiod	Interval between samples, in femtoseconds
-	@param depth		Total number of samples to generate
-	@param lpf			Emulate a lossy channel if true, no channel emulation if false
-	@param noise_stdev	Standard deviation of the AWGN in volts
+	@param cmdBuf			Vulkan command buffer to use for channel emulation
+	@param queue			Vulkan queue to use for channel emulation
+	@param amplitude		P-P amplitude of the waveform in volts
+	@param period			Unit interval, in femtoseconds
+	@param sampleperiod		Interval between samples, in femtoseconds
+	@param depth			Total number of samples to generate
+	@param lpf				Emulate a lossy channel if true, no channel emulation if false
+	@param noise_stdev		Standard deviation of the AWGN in volts
+	@param downloadCallback	Callback for download progress
  */
 WaveformBase* TestWaveformSource::GeneratePRBS31(
 	vk::raii::CommandBuffer& cmdBuf,
@@ -220,9 +223,9 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(float)> downloadCallback,
 	bool lpf,
-	float noise_stdev
+	float noise_stdev,
+	std::function<void(float)> downloadCallback
 	)
 {
 	auto ret = new UniformAnalogWaveform("PRBS31");
@@ -278,14 +281,15 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 /**
 	@brief Generates a K28.5 D16.2 (1000base-X / SGMII idle) waveform through a lossy channel with AWGN
 
-	@param cmdBuf		Vulkan command buffer to use for channel emulation
-	@param queue		Vulkan queue to use for channel emulation
-	@param amplitude	P-P amplitude of the waveform in volts
-	@param period		Unit interval, in femtoseconds
-	@param sampleperiod	Interval between samples, in femtoseconds
-	@param depth		Total number of samples to generate
-	@param lpf			Emulate a lossy channel if true, no channel emulation if false
-	@param noise_stdev	Standard deviation of the AWGN in volts
+	@param cmdBuf			Vulkan command buffer to use for channel emulation
+	@param queue			Vulkan queue to use for channel emulation
+	@param amplitude		P-P amplitude of the waveform in volts
+	@param period			Unit interval, in femtoseconds
+	@param sampleperiod		Interval between samples, in femtoseconds
+	@param depth			Total number of samples to generate
+	@param lpf				Emulate a lossy channel if true, no channel emulation if false
+	@param noise_stdev		Standard deviation of the AWGN in volts
+	@param downloadCallback	Callback for download progress
  */
 WaveformBase* TestWaveformSource::Generate8b10b(
 	vk::raii::CommandBuffer& cmdBuf,
@@ -294,9 +298,9 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	std::function<void(float)> downloadCallback,
 	bool lpf,
-	float noise_stdev)
+	float noise_stdev,
+	std::function<void(float)> downloadCallback)
 {
 	auto ret = new UniformAnalogWaveform("8B10B");
 	ret->m_timescale = sampleperiod;
