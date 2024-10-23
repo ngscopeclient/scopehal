@@ -52,7 +52,7 @@ public:
 protected:
 
 	/**
-		@brief Helper function to push a uint16 to a std::vector of bytes, as two consecutive bytes (either little-endian or big-edian according to littleEndian parameter)
+		@brief Helper function to push a uint16 to a std::vector of bytes, as two consecutive bytes (either little-endian or big-endian according to littleEndian parameter)
 
 		@param data 		the vector to push data to
 		@param value 		the value to push
