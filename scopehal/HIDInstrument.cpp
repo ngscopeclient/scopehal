@@ -55,7 +55,7 @@ HIDInstrument::~HIDInstrument()
 size_t HIDInstrument::Converse(
 	uint8_t reportNumber,
 	size_t responseReportSize,
-	vector<uint8_t>* sendData,
+	const vector<uint8_t>& sendData,
 	vector<uint8_t>* receiveData)
 {
 	lock_guard<recursive_mutex> lock(m_hidMutex);
@@ -69,22 +69,17 @@ size_t HIDInstrument::Converse(
 	@param reportNumber	HID report number
 	@param data			Data buffer to send
  */
-void HIDInstrument::SendReport(uint8_t reportNumber, vector<uint8_t>* data)
+void HIDInstrument::SendReport(uint8_t reportNumber, const vector<uint8_t>& data)
 {
 	// Send the HID report contained in the data buffer
 	lock_guard<recursive_mutex> lock(m_hidMutex);
-	if(data)
-	{
-		vector<uint8_t> buffer;
-		// This breaks compilation with latest CXX compiler on Windows:
-		// error: 'void operator delete(void*, size_t)' called on pointer '<unknown>' with nonzero offset [1, 9223372036854775807] [-Werror=free-nonheap-object]
-		// buffer.reserve(data->size()+1);
-		buffer.push_back(reportNumber);
-		buffer.insert(buffer.end(),data->begin(),data->end());
-		m_transport->SendRawData(buffer.size(),buffer.begin().base());
-	}
-	else
-		LogError("SendReport called with null data buffer, ignoring.\n");
+	vector<uint8_t> buffer;
+	// This breaks compilation with latest CXX compiler on Windows:
+	// error: 'void operator delete(void*, size_t)' called on pointer '<unknown>' with nonzero offset [1, 9223372036854775807] [-Werror=free-nonheap-object]
+	// buffer.reserve(data.size()+1);
+	buffer.push_back(reportNumber);
+	buffer.insert(buffer.end(),data.begin(),data.end());
+	m_transport->SendRawData(buffer.size(),buffer.begin().base());
 }
 
 size_t HIDInstrument::ReadReport(size_t reportSize, vector<uint8_t>* data)

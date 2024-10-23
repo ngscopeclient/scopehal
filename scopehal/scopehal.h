@@ -131,6 +131,7 @@ extern size_t g_maxComputeGroupCount[3];
 #include "Trigger.h"
 
 #include "BERT.h"
+#include "BinaryDriver.h"
 #include "DigitalIOChannel.h"
 #include "DigitalInputChannel.h"
 #include "DigitalOutputChannel.h"

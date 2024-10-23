@@ -97,7 +97,6 @@ protected:
 	};
 
 	void SendReceiveReport(Function function, int sequence = -1, std::vector<uint8_t>* data = nullptr);
-	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
 	void SendGetBasicSetReport();
 	void SendSetBasicSetReport();
 

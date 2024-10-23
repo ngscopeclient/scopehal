@@ -115,6 +115,7 @@ set(SCOPEHAL_SOURCES
 	BERTInputChannel.cpp
 	BERTInputChannelWithDataCapture.cpp
 	BERTOutputChannel.cpp
+	BinaryDriver.cpp
 	BufferedSwitchMatrixInputChannel.cpp
 	BufferedSwitchMatrixIOChannel.cpp
 	BufferedSwitchMatrixOutputChannel.cpp
