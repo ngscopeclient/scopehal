@@ -37,6 +37,7 @@
 #include <libgen.h>
 
 #include "AgilentOscilloscope.h"
+#include "AlientekPowerSupply.h"
 #include "HP662xAPowerSupply.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
@@ -149,6 +150,7 @@ void TransportStaticInit()
 #endif
 	AddTransportClass(SCPITwinLanTransport);
 	AddTransportClass(SCPIUARTTransport);
+	AddTransportClass(SCPIHIDTransport);
 	AddTransportClass(SCPINullTransport);
 	AddTransportClass(VICPSocketTransport);
 
@@ -254,6 +256,7 @@ void DriverStaticInit()
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 	AddPowerSupplyDriverClass(SiglentPowerSupply);
 	AddPowerSupplyDriverClass(HP662xAPowerSupply);
+	AddPowerSupplyDriverClass(AlientekPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,9 +29,8 @@
 
 /**
 	@file
-	@author Alyssa Milburn
-	@brief Implementation of SCPIUARTTransport
-	@ingroup transports
+	@author Frederic BORRY
+	@brief Implementation of SCPIHIDTransport
  */
 
 #include "scopehal.h"
@@ -41,99 +40,110 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIUARTTransport::SCPIUARTTransport(const string& args)
+SCPIHIDTransport::SCPIHIDTransport(const string& args)
 {
-	char devfile[128];
-	unsigned int baudrate = 0;
-	if(2 != sscanf(args.c_str(), "%127[^:]:%u", devfile, &baudrate))
+	//Figure out vendorId, productId and serialNumber
+	char serialNumber[128] = "";
+	bool hasSerial = false;
+	if(3 == sscanf(args.c_str(), "%x:%x:%127s", &m_vendorId, &m_productId, serialNumber))
 	{
-		//default if port not specified
-		m_devfile = args;
-		m_baudrate = 115200;
+		hasSerial = true;
+		m_serialNumber = serialNumber;
 	}
+	else if(2 == sscanf(args.c_str(), "%x:%x", &m_vendorId, &m_productId))
+	{}	// Noop
 	else
 	{
-		m_devfile = devfile;
-		m_baudrate = baudrate;
+		LogError("Invallid HID connection string '%s', please use 0x<vendorId>:0x<productId>[:serialNumber]\n", args.c_str());
+		return;		
 	}
 
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_devfile.c_str(), m_baudrate);
+	LogDebug("Connecting to HID instrument at %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
 
-	if(!m_uart.Connect(m_devfile, m_baudrate))
+	if(!m_hid.Connect(m_vendorId, m_productId, hasSerial ? m_serialNumber.c_str() : NULL))
 	{
-		m_uart.Close();
-		LogError("Couldn't connect to UART\n");
+		m_hid.Close();
+		LogError("Couldn't connect to HID device %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
 		return;
 	}
+
+	m_manufacturerName = m_hid.GetManufacturerName();
+	m_productName = m_hid.GetProductName();
+	// Update serial number with the on from the device
+	m_serialNumber = m_hid.GetSerialNumber();
 }
 
-SCPIUARTTransport::~SCPIUARTTransport()
+SCPIHIDTransport::~SCPIHIDTransport()
 {
 }
 
-bool SCPIUARTTransport::IsConnected()
+bool SCPIHIDTransport::IsConnected()
 {
-	return m_uart.IsValid();
+	return m_hid.IsValid();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
-string SCPIUARTTransport::GetTransportName()
+string SCPIHIDTransport::GetTransportName()
 {
-	return "uart";
+	return "hid";
 }
 
-string SCPIUARTTransport::GetConnectionString()
+string SCPIHIDTransport::GetConnectionString()
 {
 	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%s:%u", m_devfile.c_str(), m_baudrate);
+	snprintf(tmp, sizeof(tmp), "%04x:%04x:%s", m_vendorId, m_productId , m_serialNumber.c_str());
 	return string(tmp);
 }
 
-bool SCPIUARTTransport::SendCommand(const string& cmd)
+bool SCPIHIDTransport::SendCommand(const string& cmd)
 {
+	lock_guard<recursive_mutex> lock(m_transportMutex);
 	LogTrace("Sending %s\n", cmd.c_str());
 	string tempbuf = cmd + "\n";
-	return m_uart.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
+	return (m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length())>=0);
 }
 
-string SCPIUARTTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
-{
-	//FIXME: there *has* to be a more efficient way to do this...
-	// (see the same code in Socket)
-	char tmp = ' ';
+string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
+{	// Max HID report size is 1024 byte according to literature
+	unsigned char buffer[1025];
 	string ret;
-	while(true)
+	if(m_hid.Read((unsigned char*)&buffer, 1024)>=0)
 	{
-		if(!m_uart.Read((unsigned char*)&tmp, 1))
-			break;
-		if( (tmp == '\n') || ( (tmp == ';') && endOnSemicolon ) )
-			break;
-		else
-			ret += tmp;
+		buffer[1024] = 0;
+		ret = string((char*)buffer);
 	}
 	LogTrace("Got %s\n", ret.c_str());
 	return ret;
 }
 
-void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
+void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
 {
-	m_uart.Write(buf, len);
-	//LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
-	LogTrace("Sent %zu bytes.\n", len);
+	lock_guard<recursive_mutex> lock(m_transportMutex);
+	int result = m_hid.Write(buf, len);
+	if(result < 0)
+		LogError("Error code %d  while sending %zu bytes.\n", result, len);
+		//LogError("Error code %d  while sending %zu bytes: %s\n", result, len, LogHexDump(buf,len).c_str());
+	else
+		LogTrace("Sent %d bytes (requested %zu)\n", result, len);
+		//LogTrace("Sent %d bytes (requested %zu): %s\n", result, len, LogHexDump(buf,len).c_str());
 }
 
-size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
+size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
 {
-	if(!m_uart.Read(buf, len))
+	int result = m_hid.Read(buf, len);
+	if(result < 0)
+	{
+		LogWarning("Error code %d while getting %zu bytes from HID device.\n", result, len);
 		return 0;
-	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
+	}
 	LogTrace("Got %zu bytes.\n", len);
-	return len;
+	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
+	return (size_t)result;
 }
 
-bool SCPIUARTTransport::IsCommandBatchingSupported()
+bool SCPIHIDTransport::IsCommandBatchingSupported()
 {
 	return false;
 }

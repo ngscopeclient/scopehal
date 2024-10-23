@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,13 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Alyssa Milburn
-	@brief Implementation of SCPIUARTTransport
-	@ingroup transports
- */
-
 #include "scopehal.h"
 
 using namespace std;
@@ -41,99 +34,70 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIUARTTransport::SCPIUARTTransport(const string& args)
+HIDInstrument::HIDInstrument(SCPITransport* transport)
+	: SCPIInstrument(transport, false)
 {
-	char devfile[128];
-	unsigned int baudrate = 0;
-	if(2 != sscanf(args.c_str(), "%127[^:]:%u", devfile, &baudrate))
+}
+
+HIDInstrument::~HIDInstrument()
+{
+
+}
+
+void HIDInstrument::PushUint16(std::vector<uint8_t>* data, uint16_t value)
+{
+	data->push_back(reinterpret_cast<uint8_t *>(&value)[0]);
+	data->push_back(reinterpret_cast<uint8_t *>(&value)[1]);
+}
+
+uint16_t HIDInstrument::ReadUint16(std::vector<uint8_t>* data, uint8_t index)
+{
+	if(!data || data->size() <= ((size_t)(index+1)))
+		return 0;
+	return (static_cast<uint16_t>((*data)[index]) + (static_cast<uint16_t>((*data)[index+1]) << 8)); 
+}
+
+uint8_t HIDInstrument::ReadUint8(std::vector<uint8_t>* data, uint8_t index)
+{
+	if(!data || data->size() <= ((size_t)(index)))
+		return 0;
+	return (*data)[index]; 
+}
+
+size_t HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData)
+{	
+	lock_guard<recursive_mutex> lock(m_hidMutex);
+	SendReport(reportNumber, sendData);
+	return ReadReport(responseReportSize,receiveData);
+}
+
+void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
+{	// Send the HID report contained in the data buffer
+	lock_guard<recursive_mutex> lock(m_hidMutex);
+	if(data)
 	{
-		//default if port not specified
-		m_devfile = args;
-		m_baudrate = 115200;
+		std::vector<uint8_t> buffer;
+		// This breaks compilation with latest CXX compiler on Windows:
+		// error: 'void operator delete(void*, std::size_t)' called on pointer '<unknown>' with nonzero offset [1, 9223372036854775807] [-Werror=free-nonheap-object]
+		// buffer.reserve(data->size()+1);
+		buffer.push_back(reportNumber);
+		buffer.insert(buffer.end(),data->begin(),data->end());
+		m_transport->SendRawData(buffer.size(),buffer.begin().base());
 	}
 	else
+		LogError("SendReport called with null data buffer, ignoring.\n");
+}
+
+size_t HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
+{	// Read a HID report with the provided size into the specified buffer
+	lock_guard<recursive_mutex> lock(m_hidMutex);
+	data->resize(reportSize);
+	size_t result = m_transport->ReadRawData(reportSize,data->begin().base());
+	// Update vector size according to bytes actually read
+	data->resize(result);
+	if(result == 0)
 	{
-		m_devfile = devfile;
-		m_baudrate = baudrate;
+		LogError("Could not read HID report.\n");
 	}
-
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_devfile.c_str(), m_baudrate);
-
-	if(!m_uart.Connect(m_devfile, m_baudrate))
-	{
-		m_uart.Close();
-		LogError("Couldn't connect to UART\n");
-		return;
-	}
-}
-
-SCPIUARTTransport::~SCPIUARTTransport()
-{
-}
-
-bool SCPIUARTTransport::IsConnected()
-{
-	return m_uart.IsValid();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
-
-string SCPIUARTTransport::GetTransportName()
-{
-	return "uart";
-}
-
-string SCPIUARTTransport::GetConnectionString()
-{
-	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%s:%u", m_devfile.c_str(), m_baudrate);
-	return string(tmp);
-}
-
-bool SCPIUARTTransport::SendCommand(const string& cmd)
-{
-	LogTrace("Sending %s\n", cmd.c_str());
-	string tempbuf = cmd + "\n";
-	return m_uart.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
-}
-
-string SCPIUARTTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
-{
-	//FIXME: there *has* to be a more efficient way to do this...
-	// (see the same code in Socket)
-	char tmp = ' ';
-	string ret;
-	while(true)
-	{
-		if(!m_uart.Read((unsigned char*)&tmp, 1))
-			break;
-		if( (tmp == '\n') || ( (tmp == ';') && endOnSemicolon ) )
-			break;
-		else
-			ret += tmp;
-	}
-	LogTrace("Got %s\n", ret.c_str());
-	return ret;
-}
-
-void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
-{
-	m_uart.Write(buf, len);
-	//LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
-	LogTrace("Sent %zu bytes.\n", len);
-}
-
-size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
-{
-	if(!m_uart.Read(buf, len))
-		return 0;
-	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-	LogTrace("Got %zu bytes.\n", len);
-	return len;
-}
-
-bool SCPIUARTTransport::IsCommandBatchingSupported()
-{
-	return false;
+	return result;
 }

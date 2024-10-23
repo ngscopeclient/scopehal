@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,111 +29,58 @@
 
 /**
 	@file
-	@author Alyssa Milburn
-	@brief Implementation of SCPIUARTTransport
-	@ingroup transports
+	@author Frederic BORRY
+	@brief Declaration of SCPIHIDTransport
  */
 
-#include "scopehal.h"
+#ifndef SCPIHIDTransport_h
+#define SCPIHIDTransport_h
 
-using namespace std;
+#include "../xptools/HID.h"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SCPIUARTTransport::SCPIUARTTransport(const string& args)
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPIHIDTransport : public SCPITransport
 {
-	char devfile[128];
-	unsigned int baudrate = 0;
-	if(2 != sscanf(args.c_str(), "%127[^:]:%u", devfile, &baudrate))
-	{
-		//default if port not specified
-		m_devfile = args;
-		m_baudrate = 115200;
-	}
-	else
-	{
-		m_devfile = devfile;
-		m_baudrate = baudrate;
-	}
+public:
+	SCPIHIDTransport(const std::string& args);
+	virtual ~SCPIHIDTransport();
 
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_devfile.c_str(), m_baudrate);
+	virtual std::string GetConnectionString() override;
+	static std::string GetTransportName();
 
-	if(!m_uart.Connect(m_devfile, m_baudrate))
-	{
-		m_uart.Close();
-		LogError("Couldn't connect to UART\n");
-		return;
-	}
-}
+	virtual bool SendCommand(const std::string& cmd) override;
+	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
+	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
+	virtual void SendRawData(size_t len, const unsigned char* buf) override;
 
-SCPIUARTTransport::~SCPIUARTTransport()
-{
-}
+	virtual bool IsCommandBatchingSupported() override;
+	virtual bool IsConnected() override;
 
-bool SCPIUARTTransport::IsConnected()
-{
-	return m_uart.IsValid();
-}
+	std::string GetManufacturerName()
+	{ return m_manufacturerName; }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual transport code
+	std::string GetProductName()
+	{ return m_productName; }
 
-string SCPIUARTTransport::GetTransportName()
-{
-	return "uart";
-}
+	std::string GetSerialNumber()
+	{ return m_serialNumber; }
 
-string SCPIUARTTransport::GetConnectionString()
-{
-	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%s:%u", m_devfile.c_str(), m_baudrate);
-	return string(tmp);
-}
+	TRANSPORT_INITPROC(SCPIHIDTransport)
 
-bool SCPIUARTTransport::SendCommand(const string& cmd)
-{
-	LogTrace("Sending %s\n", cmd.c_str());
-	string tempbuf = cmd + "\n";
-	return m_uart.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
-}
+protected:
+	HID m_hid;
 
-string SCPIUARTTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
-{
-	//FIXME: there *has* to be a more efficient way to do this...
-	// (see the same code in Socket)
-	char tmp = ' ';
-	string ret;
-	while(true)
-	{
-		if(!m_uart.Read((unsigned char*)&tmp, 1))
-			break;
-		if( (tmp == '\n') || ( (tmp == ';') && endOnSemicolon ) )
-			break;
-		else
-			ret += tmp;
-	}
-	LogTrace("Got %s\n", ret.c_str());
-	return ret;
-}
+	std::string m_serialNumber;
+	unsigned int m_vendorId;
+	unsigned int m_productId;
+	std::string m_manufacturerName;
+	std::string m_productName;
 
-void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
-{
-	m_uart.Write(buf, len);
-	//LogTrace("Sent %zu bytes: %s\n", len,LogHexDump(buf,len).c_str());
-	LogTrace("Sent %zu bytes.\n", len);
-}
+	// Transport mutex
+	std::recursive_mutex m_transportMutex;
 
-size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
-{
-	if(!m_uart.Read(buf, len))
-		return 0;
-	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
-	LogTrace("Got %zu bytes.\n", len);
-	return len;
-}
+};
 
-bool SCPIUARTTransport::IsCommandBatchingSupported()
-{
-	return false;
-}
+#endif
