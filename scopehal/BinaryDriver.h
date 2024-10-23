@@ -56,7 +56,7 @@ protected:
 
 		@param data 		the vector to push data to
 		@param value 		the value to push
-		@param littleEndian push data in little-endia format if true (default), big-endian otherwise
+		@param littleEndian push data in little-endian format if true (default), big-endian otherwise
 
 	 */
 	void PushUint16(std::vector<uint8_t>* data, uint16_t value, bool littleEndian = true)
@@ -70,7 +70,7 @@ protected:
 
 		@param data			Input vector
 		@param index		Byte index to read
-		@param littleEndian push data in little-endia format if true (default), big-endian otherwise
+		@param littleEndian push data in little-endian format if true (default), big-endian otherwise
 
 		@return			data[index] if in bounds, or 0 if out of bounds
 	 */
