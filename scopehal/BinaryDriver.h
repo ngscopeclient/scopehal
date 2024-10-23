@@ -30,34 +30,73 @@
 /**
 	@file
 	@author Frederic BORRY
-	@brief Declaration of HIDInstrument
+	@brief Helper class for binary driver: provides methods for handling binary data
 
 	@ingroup core
  */
 
-#ifndef HIDInstrument_h
-#define HIDInstrument_h
+#ifndef BinaryDriver_h
+#define BinaryDriver_h
 
 /**
-	@brief Base class for instruments using USB HID communication protocol
+	@brief Helper class for binary driver: provides methods for handling binary data
 	@ingroup core
  */
-class HIDInstrument 	: public virtual SCPIInstrument, public BinaryDriver
+class BinaryDriver
 {
 public:
-	HIDInstrument(SCPITransport* transport);
-	virtual ~HIDInstrument();
+	BinaryDriver();
+	~BinaryDriver();
 
 
 protected:
 
-	///@brief Mutex to make sure several requests don't collide before we received the corresponding response
-	std::recursive_mutex m_hidMutex;
+	/**
+		@brief Helper function to push a uint16 to a std::vector of bytes, as two consecutive bytes (either little-endian or big-edian according to littleEndian parameter)
 
-	size_t Converse(uint8_t reportNumber, size_t responseReportSize, const std::vector<uint8_t>& sendData, std::vector<uint8_t>* receiveData);
-	void SendReport(uint8_t reportNumber, const std::vector<uint8_t>& data);
-	size_t ReadReport(size_t reportSize, std::vector<uint8_t>* data);
+		@param data 		the vector to push data to
+		@param value 		the value to push
+		@param littleEndian push data in little-endia format if true (default), big-endian otherwise
 
+	 */
+	void PushUint16(std::vector<uint8_t>* data, uint16_t value, bool littleEndian = true)
+	{
+		data->push_back(reinterpret_cast<uint8_t *>(&value)[littleEndian ? 0 : 1]);
+		data->push_back(reinterpret_cast<uint8_t *>(&value)[littleEndian ? 1 : 0]);
+	}
+
+	/**
+		@brief Bounds-checked read of a 16-bit value from a byte vector
+
+		@param data			Input vector
+		@param index		Byte index to read
+		@param littleEndian push data in little-endia format if true (default), big-endian otherwise
+
+		@return			data[index] if in bounds, or 0 if out of bounds
+	 */
+	uint16_t ReadUint16(const std::vector<uint8_t>& data, uint8_t index, bool littleEndian = true)
+	{
+		if(data.size() <= ((size_t)(index+1)))
+			return 0;
+		return (static_cast<uint16_t>(data[littleEndian ? index : (index+1)]) + (static_cast<uint16_t>(data[littleEndian ? (index+1) : index]) << 8));
+	}
+
+	/**
+		@brief Bounds-checked read of an 8-bit value from a byte vector
+
+		@param data		Input vector
+		@param index	Byte index to read
+
+		@return			data[index] if in bounds, or 0 if out of bounds
+	 */
+	uint8_t ReadUint8(const std::vector<uint8_t>& data, uint8_t index)
+	{
+		if(data.size() <= ((size_t)(index)))
+			return 0;
+		return data[index];
+	}
+
+	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
 };
 
 #endif
