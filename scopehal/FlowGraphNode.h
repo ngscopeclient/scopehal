@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of FlowGraphNode
+	@ingroup core
  */
 #ifndef FlowGraphNode_h
 #define FlowGraphNode_h
@@ -45,6 +46,7 @@ class StreamDescriptor;
 
 /**
 	@brief Abstract base class for a node in the signal flow graph.
+	@ingroup core
 
 	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters.
  */
@@ -73,17 +75,29 @@ protected:
 	//Parameters
 public:
 	FilterParameter& GetParameter(std::string s);
+
+	///@brief Short name for a map of strings to parameters
 	typedef std::map<std::string, FilterParameter> ParameterMapType;
 
+	/**
+		@brief Checks if we have a parameter with a given name
+
+		@param s	Name of the parameter
+
+		@return		True if found, false if not found
+	 */
 	bool HasParameter(std::string s)
 	{ return (m_parameters.find(s) != m_parameters.end()); }
 
+	///@brief Returns an iterator to the beginning of our parameter map
 	ParameterMapType::iterator GetParamBegin()
 	{ return m_parameters.begin(); }
 
+	///@brief Returns an iterator to the end of our parameter map
 	ParameterMapType::iterator GetParamEnd()
 	{ return m_parameters.end(); }
 
+	///@brief Returns the number of parameter we have
 	size_t GetParamCount()
 	{ return m_parameters.size(); }
 

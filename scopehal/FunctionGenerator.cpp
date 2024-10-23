@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of FunctionGenerator
+	@ingroup core
+ */
+
 #include "scopehal.h"
 #include "FunctionGenerator.h"
 
@@ -49,6 +56,13 @@ FunctionGenerator::~FunctionGenerator()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // String helpers for enums
 
+/**
+	@brief Converts a WaveShape enum to a human readable name
+
+	@param shape	Input WaveShape value
+
+	@return String name
+ */
 string FunctionGenerator::GetNameOfShape(WaveShape shape)
 {
 	switch(shape)
@@ -194,6 +208,13 @@ string FunctionGenerator::GetNameOfShape(WaveShape shape)
 	}
 }
 
+/**
+	@brief Converts a human readable name to a WaveShape
+
+	@param name	Input name
+
+	@return The WaveShape corresponding to that name
+ */
 FunctionGenerator::WaveShape FunctionGenerator::GetShapeOfName(const string& name)
 {
 	if(name =="Sine")
@@ -348,6 +369,13 @@ bool FunctionGenerator::AcquireData()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+/**
+	@brief Converts an OutputImpedance enum to a human readable name
+
+	@param shape	OutputImpedance value
+
+	@return String name
+ */
 string FunctionGenerator::GetNameOfImpedance(OutputImpedance imp)
 {
 	switch(imp)
@@ -363,6 +391,13 @@ string FunctionGenerator::GetNameOfImpedance(OutputImpedance imp)
 	}
 }
 
+/**
+	@brief Converts a human readable name to an OutputImpedance
+
+	@param name	Input name
+
+	@return The OutputImpedance corresponding to that name
+ */
 FunctionGenerator::OutputImpedance FunctionGenerator::GetImpedanceOfName(const string& name)
 {
 	if(name == "Hi-Z")
@@ -375,6 +410,12 @@ FunctionGenerator::OutputImpedance FunctionGenerator::GetImpedanceOfName(const s
 		return IMPEDANCE_HIGH_Z;
 }
 
+/**
+	@brief Serializes this instrument's configuration to a YAML node.
+
+	@param node		Output YAML node for the instrument
+	@param idmap	Map of object IDs to objects
+ */
 void FunctionGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
 	for(size_t i=0; i<GetChannelCount(); i++)
@@ -416,8 +457,19 @@ void FunctionGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& tabl
 	}
 }
 
+/**
+	@brief Validate instrument and channel configuration from a save file
+
+	This function is allowed to load low-risk settings that are unlikely to cause damage to an attached DUT, but
+	not increase output amplitude or perform riskier configuration changes.
+
+	@param version	File format version
+	@param node		YAML node for the instrument
+	@param idmap	Map of object IDs to objects
+	@param list		Warnings generated during the preload process
+ */
 void FunctionGenerator::DoPreLoadConfiguration(
-	int /*version*/,
+	[[maybe_unused]] int version,
 	const YAML::Node& node,
 	IDTable& idmap,
 	ConfigWarningList& list)
@@ -489,7 +541,17 @@ void FunctionGenerator::DoPreLoadConfiguration(
 	}
 }
 
-void FunctionGenerator::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+/**
+	@brief Load instrument and channel configuration from a save file
+
+	@param version	File format version
+	@param node		YAML node for the instrument
+	@param idmap	Map of object IDs to objects
+ */
+void FunctionGenerator::DoLoadConfiguration(
+	[[maybe_unused]] int version,
+	const YAML::Node& node,
+	[[maybe_unused]] IDTable& idmap)
 {
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
