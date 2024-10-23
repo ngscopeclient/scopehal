@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,14 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Frederic BORRY
+	@brief Implementation of HIDInstrument
+
+	@ingroup core
+ */
+
 #include "scopehal.h"
 
 using namespace std;
@@ -44,41 +52,32 @@ HIDInstrument::~HIDInstrument()
 
 }
 
-void HIDInstrument::PushUint16(std::vector<uint8_t>* data, uint16_t value)
+size_t HIDInstrument::Converse(
+	uint8_t reportNumber,
+	size_t responseReportSize,
+	vector<uint8_t>* sendData,
+	vector<uint8_t>* receiveData)
 {
-	data->push_back(reinterpret_cast<uint8_t *>(&value)[0]);
-	data->push_back(reinterpret_cast<uint8_t *>(&value)[1]);
-}
-
-uint16_t HIDInstrument::ReadUint16(std::vector<uint8_t>* data, uint8_t index)
-{
-	if(!data || data->size() <= ((size_t)(index+1)))
-		return 0;
-	return (static_cast<uint16_t>((*data)[index]) + (static_cast<uint16_t>((*data)[index+1]) << 8)); 
-}
-
-uint8_t HIDInstrument::ReadUint8(std::vector<uint8_t>* data, uint8_t index)
-{
-	if(!data || data->size() <= ((size_t)(index)))
-		return 0;
-	return (*data)[index]; 
-}
-
-size_t HIDInstrument::Converse(uint8_t reportNumber, size_t responseReportSize, std::vector<uint8_t>* sendData, std::vector<uint8_t>* receiveData)
-{	
 	lock_guard<recursive_mutex> lock(m_hidMutex);
 	SendReport(reportNumber, sendData);
 	return ReadReport(responseReportSize,receiveData);
 }
 
-void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
-{	// Send the HID report contained in the data buffer
+/**
+	@brief Send a HID report
+
+	@param reportNumber	HID report number
+	@param data			Data buffer to send
+ */
+void HIDInstrument::SendReport(uint8_t reportNumber, vector<uint8_t>* data)
+{
+	// Send the HID report contained in the data buffer
 	lock_guard<recursive_mutex> lock(m_hidMutex);
 	if(data)
 	{
-		std::vector<uint8_t> buffer;
+		vector<uint8_t> buffer;
 		// This breaks compilation with latest CXX compiler on Windows:
-		// error: 'void operator delete(void*, std::size_t)' called on pointer '<unknown>' with nonzero offset [1, 9223372036854775807] [-Werror=free-nonheap-object]
+		// error: 'void operator delete(void*, size_t)' called on pointer '<unknown>' with nonzero offset [1, 9223372036854775807] [-Werror=free-nonheap-object]
 		// buffer.reserve(data->size()+1);
 		buffer.push_back(reportNumber);
 		buffer.insert(buffer.end(),data->begin(),data->end());
@@ -88,8 +87,9 @@ void HIDInstrument::SendReport(uint8_t reportNumber, std::vector<uint8_t>* data)
 		LogError("SendReport called with null data buffer, ignoring.\n");
 }
 
-size_t HIDInstrument::ReadReport(size_t reportSize, std::vector<uint8_t>* data)
-{	// Read a HID report with the provided size into the specified buffer
+size_t HIDInstrument::ReadReport(size_t reportSize, vector<uint8_t>* data)
+{
+	// Read a HID report with the provided size into the specified buffer
 	lock_guard<recursive_mutex> lock(m_hidMutex);
 	data->resize(reportSize);
 	size_t result = m_transport->ReadRawData(reportSize,data->begin().base());

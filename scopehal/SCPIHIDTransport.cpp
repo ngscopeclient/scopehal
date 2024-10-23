@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,8 @@
 	@file
 	@author Frederic BORRY
 	@brief Implementation of SCPIHIDTransport
+
+	@ingroup transports
  */
 
 #include "scopehal.h"
@@ -40,6 +42,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a new HID transport
+
+	@param args	Argument string, either hex vid:pid or vid:pid:serial
+ */
 SCPIHIDTransport::SCPIHIDTransport(const string& args)
 {
 	//Figure out vendorId, productId and serialNumber
@@ -55,7 +62,7 @@ SCPIHIDTransport::SCPIHIDTransport(const string& args)
 	else
 	{
 		LogError("Invallid HID connection string '%s', please use 0x<vendorId>:0x<productId>[:serialNumber]\n", args.c_str());
-		return;		
+		return;
 	}
 
 	LogDebug("Connecting to HID instrument at %04x:%04x:%s\n", m_vendorId, m_productId , m_serialNumber.c_str());
@@ -85,6 +92,7 @@ bool SCPIHIDTransport::IsConnected()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
+///@brief Returns the constant name "hid"
 string SCPIHIDTransport::GetTransportName()
 {
 	return "hid";
@@ -105,7 +113,9 @@ bool SCPIHIDTransport::SendCommand(const string& cmd)
 	return (m_hid.Write((unsigned char*)tempbuf.c_str(), tempbuf.length())>=0);
 }
 
-string SCPIHIDTransport::ReadReply(bool /*endOnSemicolon*/, std::function<void(float)> /*progress*/)
+string SCPIHIDTransport::ReadReply(
+	[[maybe_unused]] bool endOnSemicolon,
+	[[maybe_unused]] function<void(float)> progress)
 {	// Max HID report size is 1024 byte according to literature
 	unsigned char buffer[1025];
 	string ret;
@@ -123,14 +133,21 @@ void SCPIHIDTransport::SendRawData(size_t len, const unsigned char* buf)
 	lock_guard<recursive_mutex> lock(m_transportMutex);
 	int result = m_hid.Write(buf, len);
 	if(result < 0)
+	{
 		LogError("Error code %d  while sending %zu bytes.\n", result, len);
 		//LogError("Error code %d  while sending %zu bytes: %s\n", result, len, LogHexDump(buf,len).c_str());
+	}
 	else
+	{
 		LogTrace("Sent %d bytes (requested %zu)\n", result, len);
 		//LogTrace("Sent %d bytes (requested %zu): %s\n", result, len, LogHexDump(buf,len).c_str());
+	}
 }
 
-size_t SCPIHIDTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
+size_t SCPIHIDTransport::ReadRawData(
+	size_t len,
+	unsigned char* buf,
+	[[maybe_unused]] function<void(float)> progress)
 {
 	int result = m_hid.Read(buf, len);
 	if(result < 0)

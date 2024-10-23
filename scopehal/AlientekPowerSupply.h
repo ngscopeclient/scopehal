@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Frederic BORRY
+	@brief Declaration of AlientekPowerSupply
+
+	@ingroup psudrivers
+ */
+
 #ifndef AlientekPowerSupply_h
 #define AlientekPowerSupply_h
 
 /**
-	@brief A Riden RD6006 power supply or other equivalent model
+	@brief An Alientek DP-100 power supply or other equivalent model
+	@ingroup psudrivers
  */
 class AlientekPowerSupply
 	: public virtual SCPIPowerSupply
@@ -62,7 +71,8 @@ public:
 	virtual bool IsPowerConstantCurrent(int chan) override;
 
 protected:
-	enum Function : uint8_t {
+	enum Function : uint8_t
+	{
 		DEVICE_INFO = 0x10,  	// 16
 		FIRM_INFO = 0x11,  		// 17
 		START_TRANS = 0x12,  	// 18
@@ -79,7 +89,8 @@ protected:
 		NONE = 0xFF  			// 255
 	};
 
-	enum Operation : uint8_t {
+	enum Operation : uint8_t
+	{
 		OUTPUT = 0x20,  // 32
 		SETTING = 0x40, // 64
 		READ = 0x80  	// 128
@@ -92,42 +103,52 @@ protected:
 
 	uint8_t m_deviceAdress = 0xFB;
 
-
 	// Cache management for BASIC_INFO and BASIC_SET functions
 	std::chrono::system_clock::time_point m_nextBasicInfoUpdate;
 	std::chrono::milliseconds m_basicInfoCacheDuration = std::chrono::milliseconds(10); // 100 Hz
 	std::chrono::system_clock::time_point m_nextBasicSetUpdate;
 	std::chrono::milliseconds m_basicSetCacheDuration = std::chrono::milliseconds(1000); // 1 Hz => not supposed to change in lock mode
 
-
-
-	// @brief Input voltage in V.
+	///@brief Input voltage in V.
 	double m_vIn;
-	// @brief Actual output voltage in V.
+
+	///@brief Actual output voltage in V.
 	double m_vOut;
-	// @brief Set output voltage in V.
+
+	///@brief Set output voltage in V.
 	double m_vOutSet;
-	// @brief Actual output current in A.
+
+	///@brief Actual output current in A.
 	double m_iOut;
-	// @brief Set output current in A.
+
+	///@brief Set output current in A.
 	double m_iOutSet;
-	// @brief Max output voltage in V.
+
+	///@brief Max output voltage in V.
 	double m_vOutMax;
-	// @brief Temperature 1 in °C.
+
+	///@brief Temperature 1 in °C.
 	double m_temp1;
-	// @brief Temperature 2 in °C.
+
+	///@brief Temperature 2 in °C.
 	double m_temp2;
-	// @brief 5V rail in V.
+
+	///@brief 5V rail in V.
 	double m_dc5V;
-	// @brief Output mode => 0 = CC, 1 = CV, 2 = OVP/OCP (according to workState)
+
+	///@brief Output mode => 0 = CC, 1 = CV, 2 = OVP/OCP (according to workState)
 	uint8_t m_outMode;
-	// @brief Work state => 1 = OVP, 2 = OCP
+
+	///@brief Work state => 1 = OVP, 2 = OCP
 	uint8_t m_workState;
-	// @brief  Over-voltage protection setting in V.
+
+	///@brief  Over-voltage protection setting in V.
 	double m_ovpSet;
-	// @brief Over-current protection setting in A.
+
+	///@brief Over-current protection setting in A.
 	double m_ocpSet;
-	// @brief Power state
+
+	///@brief Power state
 	bool m_powerState;
 
 public:

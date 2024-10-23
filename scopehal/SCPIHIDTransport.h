@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,8 @@
 	@file
 	@author Frederic BORRY
 	@brief Declaration of SCPIHIDTransport
+
+	@ingroup transports
  */
 
 #ifndef SCPIHIDTransport_h
@@ -39,7 +41,9 @@
 #include "../xptools/HID.h"
 
 /**
-	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+	@brief Transport for instruments attached via USB HID
+
+	@ingroup transports
  */
 class SCPIHIDTransport : public SCPITransport
 {

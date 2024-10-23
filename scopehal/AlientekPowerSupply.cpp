@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -26,6 +26,14 @@
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
+
+/**
+	@file
+	@author Frederic BORRY
+	@brief Implementation of AlientekPowerSupply
+
+	@ingroup psudrivers
+ */
 
 #include "scopehal.h"
 #include "AlientekPowerSupply.h"
@@ -86,12 +94,13 @@ void AlientekPowerSupply::SendSetBasicSetReport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
+///@brief Return the constant driver name "alientek_dp"
 string AlientekPowerSupply::GetDriverNameInternal()
 {
 	return "alientek_dp";
 }
 
-uint32_t AlientekPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t AlientekPowerSupply::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_PSU;
 }
@@ -191,7 +200,8 @@ void AlientekPowerSupply::SetPowerChannelActive(int chan, bool on)
 }
 
 void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std::vector<uint8_t>* data)
-{	// Check cache
+{
+	// Check cache
 	if(function == Function::BASIC_INFO)
 	{
 		if(chrono::system_clock::now() < m_nextBasicInfoUpdate)
@@ -223,13 +233,15 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 	else
 		sendData.push_back(1);
 	if(data && data->size() > 0)
-	{	// Data length
+	{
+		// Data length
 		sendData.push_back(data->size());
 		// Data
 		sendData.insert(sendData.end(),data->begin(),data->end());
 	}
 	else
-	{	// Data length = 0
+	{
+		// Data length = 0
 		sendData.push_back(0);
 	}
 
@@ -339,7 +351,8 @@ void AlientekPowerSupply::SendReceiveReport(Function function, int sequence, std
 
 uint16_t AlientekPowerSupply::CalculateCRC(const uint8_t *buff, size_t len)
 {
-  static const uint16_t wCRCTable[] = {
+  static const uint16_t wCRCTable[] =
+  {
       0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301, 0X03C0, 0X0280, 0XC241, 0XC601,
       0X06C0, 0X0780, 0XC741, 0X0500, 0XC5C1, 0XC481, 0X0440, 0XCC01, 0X0CC0,
       0X0D80, 0XCD41, 0X0F00, 0XCFC1, 0XCE81, 0X0E40, 0X0A00, 0XCAC1, 0XCB81,
@@ -373,11 +386,11 @@ uint16_t AlientekPowerSupply::CalculateCRC(const uint8_t *buff, size_t len)
   uint8_t nTemp;
   uint16_t wCRCWord = 0xFFFF;
 
-  while (len--) {
+  while (len--)
+  {
     nTemp = *buff++ ^ wCRCWord;
     wCRCWord >>= 8;
     wCRCWord ^= wCRCTable[nTemp];
   }
   return wCRCWord;
 }
-
