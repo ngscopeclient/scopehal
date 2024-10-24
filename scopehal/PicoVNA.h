@@ -57,6 +57,8 @@ public:
 
 	//Channel configuration
 
+	virtual void FlushConfigCache() override;
+
 	//Triggering
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
@@ -89,6 +91,8 @@ protected:
 
 	int64_t m_rbw;
 	int64_t m_sampleDepth;
+
+	bool m_sampleDepthValid;
 
 public:
 	static std::string GetDriverNameInternal();

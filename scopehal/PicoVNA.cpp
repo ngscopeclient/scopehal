@@ -89,9 +89,10 @@ PicoVNA::PicoVNA(SCPITransport* transport)
 	//Get initial number of points
 	auto spoints = Trim(m_transport->SendCommandQueuedWithReply("SENS:SWE:POIN?"));
 	m_sampleDepth = stoi(spoints);
+	m_sampleDepthValid = true;
 
-	//Immediate trigger
-	m_transport->SendCommandQueuedWithReply("TRIG:SOUR IMM");
+	//Don't do continuous sweeps
+	//m_transport->SendCommandQueued(":INIT:CONT 0");
 }
 
 /**
@@ -151,6 +152,12 @@ Oscilloscope::TriggerMode PicoVNA::PollTrigger()
 	//Always report "triggered" so we can block on AcquireData() in ScopeThread
 	//TODO: peek function of some sort?
 	return TRIGGER_MODE_TRIGGERED;
+}
+
+void PicoVNA::FlushConfigCache()
+{
+	SCPIVNA::FlushConfigCache();
+	m_sampleDepthValid = false;
 }
 
 bool PicoVNA::AcquireData()
@@ -295,11 +302,9 @@ bool PicoVNA::AcquireData()
 				return false;
 			}
 
-			int nchan = 2*(rxPort-1) + (txPort-1);
-			ChannelsDownloadStatusUpdate(
-				nchan,
-				InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS,
-				(updateLastSample * 1.0) / numPointsAllocated);
+			int nchan = 2*(rxPort) + (txPort);
+			float progress = (updateLastSample * 1.0) / numPointsAllocated;
+			ChannelsDownloadStatusUpdate(nchan, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress);
 		}
 
 		expectedFirstSample = updateLastSample + 1;
@@ -390,7 +395,7 @@ bool PicoVNA::AcquireData()
 
 	//If continuous trigger, re-arm for another acquisition
 	else if(m_triggerArmed)
-		m_transport->SendCommandQueued("INIT");
+		m_transport->SendCommandQueued(":INIT");
 
 	ChannelsDownloadFinished();
 
@@ -399,7 +404,7 @@ bool PicoVNA::AcquireData()
 
 void PicoVNA::Start()
 {
-	m_transport->SendCommandQueued("INIT");
+	m_transport->SendCommandQueued(":INIT");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 
@@ -408,7 +413,7 @@ void PicoVNA::Start()
 
 void PicoVNA::StartSingleTrigger()
 {
-	m_transport->SendCommandQueued("INIT");
+	m_transport->SendCommandQueued(":INIT");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 
@@ -426,7 +431,7 @@ void PicoVNA::Stop()
 
 void PicoVNA::ForceTrigger()
 {
-	m_transport->SendCommandQueued("INIT");
+	m_transport->SendCommandQueued(":INIT");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 
@@ -452,11 +457,18 @@ vector<uint64_t> PicoVNA::GetSampleDepthsNonInterleaved()
 
 uint64_t PicoVNA::GetSampleDepth()
 {
+	if(!m_sampleDepthValid)
+	{
+		auto depth = atoi(m_transport->SendCommandQueuedWithReply(":SENS:SWE:POIN?").c_str());
+		m_sampleDepth = depth;
+		m_sampleDepthValid = true;
+	}
 	return m_sampleDepth;
 }
 
 void PicoVNA::SetSampleDepth(uint64_t depth)
 {
+	m_transport->SendCommandQueued(string(":SENS:SWE:POIN ") + to_string(depth));
 }
 
 void PicoVNA::PullTrigger()
