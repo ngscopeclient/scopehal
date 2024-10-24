@@ -43,20 +43,25 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a new edge trigger
+
+	@param scope	The scope this trigger will be used on
+ */
 EdgeTrigger::EdgeTrigger(Oscilloscope* scope)
 	: Trigger(scope)
+	, m_edgetype(m_parameters["Edge"])
 {
 	CreateInput("din");
 
-	m_typename = "Edge";
-	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_typename].AddEnumValue("Rising", EDGE_RISING);
-	m_parameters[m_typename].AddEnumValue("Falling", EDGE_FALLING);
-	m_parameters[m_typename].AddEnumValue("Any", EDGE_ANY);
+	m_edgetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_edgetype.AddEnumValue("Rising", EDGE_RISING);
+	m_edgetype.AddEnumValue("Falling", EDGE_FALLING);
+	m_edgetype.AddEnumValue("Any", EDGE_ANY);
 
 	//Only Agilent scopes are known to support this
 	if(dynamic_cast<AgilentOscilloscope*>(scope) != NULL)
-		m_parameters[m_typename].AddEnumValue("Alternating", EDGE_ALTERNATING);
+		m_edgetype.AddEnumValue("Alternating", EDGE_ALTERNATING);
 }
 
 EdgeTrigger::~EdgeTrigger()
@@ -67,6 +72,7 @@ EdgeTrigger::~EdgeTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant trigger name "edge"
 string EdgeTrigger::GetTriggerName()
 {
 	return "Edge";

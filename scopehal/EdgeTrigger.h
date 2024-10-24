@@ -46,27 +46,45 @@ public:
 	EdgeTrigger(Oscilloscope* scope);
 	virtual ~EdgeTrigger();
 
+	///@brief Types of edges to trogger on
 	enum EdgeType
 	{
+		///@brief Low to high transition
 		EDGE_RISING,
+
+		///@brief High to low transition
 		EDGE_FALLING,
+
+		///@brief Either rising or falling transition
 		EDGE_ANY,
+
+		/**
+			@brief Trigger on rising edge, then falling, then rising again, and so on
+
+			Not widely supported, only known to be implemented by a handful of Agilent models
+		 */
 		EDGE_ALTERNATING
 	};
 
+	/**
+		@brief Set the type of the edge to trigger on
+
+		@param type	Edge type
+	 */
 	void SetType(EdgeType type)
-	{ m_parameters[m_typename].SetIntVal(type); }
+	{ m_edgetype.SetIntVal(type); }
 
+	///@brief Gets the currently selected edge type
 	EdgeType GetType()
-	{ return (EdgeType) m_parameters[m_typename].GetIntVal(); }
+	{ return (EdgeType) m_edgetype.GetIntVal(); }
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(EdgeTrigger);
 
 protected:
-	std::string m_typename;
+	FilterParameter& m_edgetype;
 };
 
 #endif
