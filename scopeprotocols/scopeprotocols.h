@@ -217,6 +217,7 @@
 #include "TouchstoneImportFilter.h"
 #include "TRCImportFilter.h"
 #include "TrendFilter.h"
+#include "TwoPortShuntThroughFilter.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryFilter.h"
 #include "UndershootMeasurement.h"

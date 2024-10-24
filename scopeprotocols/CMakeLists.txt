@@ -179,6 +179,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TouchstoneImportFilter.cpp
 	TRCImportFilter.cpp
 	TrendFilter.cpp
+	TwoPortShuntThroughFilter.cpp
 	UartClockRecoveryFilter.cpp
 	UARTDecoder.cpp
 	UndershootMeasurement.cpp
