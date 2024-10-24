@@ -27,6 +27,14 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of PicoVNA
+	@ingroup vnadrivers
+ */
+
+
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
@@ -227,6 +235,9 @@ bool PicoVNA::AcquireData()
 
 			first = false;
 			numPointsAllocated = numPoints;
+
+			//Start progress update
+			ChannelsDownloadStarted();
 		}
 
 		//If a continuation, we expect the same number of points we started with
@@ -283,13 +294,23 @@ bool PicoVNA::AcquireData()
 			{
 				return false;
 			}
+
+			int nchan = 2*(rxPort-1) + (txPort-1);
+			ChannelsDownloadStatusUpdate(
+				nchan,
+				InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS,
+				(updateLastSample * 1.0) / numPointsAllocated);
 		}
 
 		expectedFirstSample = updateLastSample + 1;
 
 		//Did we read the last sample?
 		if(expectedFirstSample >= numPointsAllocated)
+		{
+			for(size_t i=0; i<4; i++)
+				ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 			break;
+		}
 	}
 
 	float sweepSpanmHz = sweepStopmHz - sweepStartmHz;
@@ -370,6 +391,8 @@ bool PicoVNA::AcquireData()
 	//If continuous trigger, re-arm for another acquisition
 	else if(m_triggerArmed)
 		m_transport->SendCommandQueued("INIT");
+
+	ChannelsDownloadFinished();
 
 	return !skipping;
 }
