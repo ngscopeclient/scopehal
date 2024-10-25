@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Mike Walters
+	@brief Implementation of DCAEdgeTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "DCAEdgeTrigger.h"
 #include "AgilentOscilloscope.h"
@@ -36,15 +43,20 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a new trigger
+
+	@param scope	The instrument this trigger is being created for
+ */
 DCAEdgeTrigger::DCAEdgeTrigger(Oscilloscope* scope)
 	: Trigger(scope)
+	, m_type(m_parameters["Edge"])
 {
 	CreateInput("din");
 
-	m_typename = "Edge";
-	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_typename].AddEnumValue("Rising", EDGE_RISING);
-	m_parameters[m_typename].AddEnumValue("Falling", EDGE_FALLING);
+	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_type.AddEnumValue("Rising", EDGE_RISING);
+	m_type.AddEnumValue("Falling", EDGE_FALLING);
 }
 
 DCAEdgeTrigger::~DCAEdgeTrigger()
@@ -55,6 +67,7 @@ DCAEdgeTrigger::~DCAEdgeTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant trigger name "DCA Edge"
 string DCAEdgeTrigger::GetTriggerName()
 {
 	return "DCA Edge";

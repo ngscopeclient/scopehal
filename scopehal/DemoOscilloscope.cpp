@@ -31,6 +31,8 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of DemoOscilloscope
+
+	@ingroup scopedrivers
  */
 
 #include "scopehal.h"

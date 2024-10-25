@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,12 +31,15 @@
 	@file
 	@author Mike Walters
 	@brief Declaration of DCAEdgeTrigger
+	@ingroup triggers
  */
 #ifndef DCAEdgeTrigger_h
 #define DCAEdgeTrigger_h
 
 /**
-	@brief Simple edge trigger
+	@brief Simple edge trigger for Agilent DCA oscilloscopes
+
+	@ingroup triggers
  */
 class DCAEdgeTrigger : public Trigger
 {
@@ -44,17 +47,27 @@ public:
 	DCAEdgeTrigger(Oscilloscope* scope);
 	virtual ~DCAEdgeTrigger();
 
+	///@brief Types of edges to trigger on
 	enum EdgeType
 	{
+		///@brief Low to high transition
 		EDGE_RISING,
-		EDGE_FALLING,
-	};
 
+		///@brief High to low transition
+		EDGE_FALLING
+	}
+
+	/**
+		@brief Set the type of the edge to trigger on
+
+		@param type	Edge type
+	 */
 	void SetType(EdgeType type)
-	{ m_parameters[m_typename].SetIntVal(type); }
+	{ m_type.SetIntVal(type); }
 
+	///@brief Gets the currently selected edge type
 	EdgeType GetType()
-	{ return (EdgeType) m_parameters[m_typename].GetIntVal(); }
+	{ return (EdgeType) m_type.GetIntVal(); }
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -62,7 +75,9 @@ public:
 	TRIGGER_INITPROC(DCAEdgeTrigger);
 
 protected:
-	std::string m_typename;
+
+	///@brief Edge type
+	FilterParameter& m_type;
 };
 
 #endif

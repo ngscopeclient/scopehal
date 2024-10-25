@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of DemoOscilloscope
+	@ingroup scopedrivers
  */
 
 #ifndef DemoOscilloscope_h
@@ -41,6 +42,7 @@
 
 /**
 	@brief Simulated oscilloscope for demonstrations and testing
+	@ingroup scopedrivers
 
 	Four channels:
 	* 1 GHz sine
