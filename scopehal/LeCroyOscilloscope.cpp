@@ -2984,6 +2984,8 @@ bool LeCroyOscilloscope::AcquireData()
 	double dt = GetTime() - start;
 	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
 
+	ChannelsDownloadFinished();
+
 	return true;
 }
 
