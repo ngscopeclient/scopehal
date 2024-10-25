@@ -46,7 +46,7 @@ public:
 	EdgeTrigger(Oscilloscope* scope);
 	virtual ~EdgeTrigger();
 
-	///@brief Types of edges to trogger on
+	///@brief Types of edges to trigger on
 	enum EdgeType
 	{
 		///@brief Low to high transition
@@ -84,6 +84,8 @@ public:
 	TRIGGER_INITPROC(EdgeTrigger);
 
 protected:
+
+	///@brief Type of edge to trigger on
 	FilterParameter& m_edgetype;
 };
 

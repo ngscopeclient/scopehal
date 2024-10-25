@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of DSLabsOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifndef DSLabsOscilloscope_h
 #define DSLabsOscilloscope_h
 
@@ -35,6 +41,7 @@
 
 /**
 	@brief DSLabsOscilloscope - driver for talking to the scopehal-dslabs-bridge daemons
+	@ingroup scopedrivers
  */
 class DSLabsOscilloscope : public RemoteBridgeOscilloscope
 {

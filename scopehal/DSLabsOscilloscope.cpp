@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of DSLabsOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
@@ -46,6 +52,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITwinLanTransport pointing at a scopehal-dslabs-bridge instance
+ */
 DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -151,7 +162,11 @@ void DSLabsOscilloscope::ResetPerCaptureDiagnostics()
 }
 
 /**
-	@brief Color the channels based on Pico's standard color sequence (blue-red-green-yellow-purple-gray-cyan-magenta)
+	@brief Get a channel color based on DreamSource's standard color sequence
+
+	(blue-red-green-yellow-purple-gray-cyan-magenta)
+
+	@param i	Channel index
  */
 string DSLabsOscilloscope::GetChannelColor(size_t i)
 {

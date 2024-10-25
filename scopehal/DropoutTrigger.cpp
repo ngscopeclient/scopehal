@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of DropoutTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "DropoutTrigger.h"
 #include "LeCroyOscilloscope.h"
@@ -38,26 +45,32 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DropoutTrigger::DropoutTrigger(Oscilloscope* scope) : Trigger(scope)
+/**
+	@brief Initialize the trigger
+
+	@param scope	The scope this trigger will be used with
+ */
+DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
+	: Trigger(scope)
+	, m_type(m_parameters["Edge"])
+	, m_time(m_parameters["Dropout Time"])
+	, m_reset(m_parameters["Reset Mode"])
 {
 	CreateInput("din");
 
-	m_typename = "Edge";
-	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_typename].AddEnumValue("Rising", EDGE_RISING);
-	m_parameters[m_typename].AddEnumValue("Falling", EDGE_FALLING);
+	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_type.AddEnumValue("Rising", EDGE_RISING);
+	m_type.AddEnumValue("Falling", EDGE_FALLING);
 	if(dynamic_cast<TektronixOscilloscope*>(scope))
-		m_parameters[m_typename].AddEnumValue("Any", EDGE_ANY);
+		m_type.AddEnumValue("Any", EDGE_ANY);
 
-	m_timename = "Dropout Time";
-	m_parameters[m_timename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_time = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_resetname = "Reset Mode";
 	if((dynamic_cast<LeCroyOscilloscope*>(scope)) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope)))
 	{
-		m_parameters[m_resetname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-		m_parameters[m_resetname].AddEnumValue("Opposite Edge", RESET_OPPOSITE);
-		m_parameters[m_resetname].AddEnumValue("None", RESET_NONE);
+		m_reset = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_reset.AddEnumValue("Opposite Edge", RESET_OPPOSITE);
+		m_reset.AddEnumValue("None", RESET_NONE);
 	}
 }
 
@@ -68,6 +81,7 @@ DropoutTrigger::~DropoutTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Returns the constant trigger name "Dropout"
 string DropoutTrigger::GetTriggerName()
 {
 	return "Dropout";

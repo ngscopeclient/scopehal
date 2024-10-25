@@ -27,11 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of DigitalIOChannel
+	@ingroup core
+ */
+
 #ifndef DigitalIOChannel_h
 #define DigitalIOChannel_h
 
 /**
-	@brief A digital I/O channel (GPIO or similar)
+	@brief A digital I/O channel (GPIO, buffered switch matrix output, pattern generator output, etc.)
+
+	@ingroup core
  */
 class DigitalIOChannel : public InstrumentChannel
 {

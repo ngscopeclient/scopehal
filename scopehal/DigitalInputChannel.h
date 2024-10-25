@@ -27,11 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of DigitalInputChannel
+	@ingroup core
+ */
+
 #ifndef DigitalInputChannel_h
 #define DigitalInputChannel_h
 
 /**
 	@brief A digital input channel (GPIO, buffered mux path, etc)
+
+	@ingroup core
  */
 class DigitalInputChannel : public InstrumentChannel
 {

@@ -27,6 +27,14 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of DigitalIOChannel
+	@ingroup core
+ */
+
+
 #include "scopehal.h"
 
 using namespace std;
@@ -34,6 +42,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a digital I/O channel
+
+	@param hwname	Internal hardware name of the channel (should match SCPI name if applicable)
+	@param parent	The instrument this channel is part of
+	@param color	Display color for the channel in plots and the filter graph
+	@param index	Position of this channel within m_channels of the parent instrument
+ */
 DigitalIOChannel::DigitalIOChannel(
 	const string& hwname,
 	Instrument* parent,

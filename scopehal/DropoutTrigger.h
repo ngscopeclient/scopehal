@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,12 +31,14 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of DropoutTrigger
+	@ingroup triggers
  */
 #ifndef DropoutTrigger_h
 #define DropoutTrigger_h
 
 /**
 	@brief Trigger when a signal stops toggling for some amount of time
+	@ingroup triggers
  */
 class DropoutTrigger : public Trigger
 {
@@ -44,46 +46,82 @@ public:
 	DropoutTrigger(Oscilloscope* scope);
 	virtual ~DropoutTrigger();
 
+	///@brief Types of edges to trigger on
 	enum EdgeType
 	{
+		///@brief Low to high transition
 		EDGE_RISING,
+
+		///@brief High to low transition
 		EDGE_FALLING,
+
+		///@brief Either rising or falling transition
 		EDGE_ANY
 	};
 
+	/**
+		@brief Set the type of the edge to look for
+
+		@param type	Edge type
+	 */
 	void SetType(EdgeType type)
-	{ m_parameters[m_typename].SetIntVal(type); }
+	{ m_type.SetIntVal(type); }
 
+	///@brief Get the currently selected edge type
 	EdgeType GetType()
-	{ return (EdgeType) m_parameters[m_typename].GetIntVal(); }
+	{ return (EdgeType) m_type.GetIntVal(); }
 
+	///@brief Type of edge to reset on
 	enum ResetType
 	{
-		RESET_OPPOSITE,	//
+		///@brief Reset on the opposite kind of edge
+		RESET_OPPOSITE,
+
+		///@brief Normal behavior
 		RESET_NONE
 	};
 
+	/**
+		@brief Set the edge to reset on
+
+		TODO: document what this means more
+
+		@param type	Reset type
+	 */
 	void SetResetType(ResetType type)
-	{ m_parameters[m_resetname].SetIntVal(type); }
+	{ m_reset.SetIntVal(type); }
 
+	///@brief Get the currently selected reset type
 	ResetType GetResetType()
-	{ return (ResetType) m_parameters[m_resetname].GetIntVal(); }
+	{ return (ResetType) m_reset.GetIntVal(); }
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
+	///@brief Get the timeout for a quiet period on the bus to be considered a dropout
 	int64_t GetDropoutTime()
-	{ return m_parameters[m_timename].GetIntVal(); }
+	{ return m_time.GetIntVal(); }
 
+	/**
+		@brief Set the timeout for a quiet period on the bus to be considered a dropout
+
+		@param t	Dropout time, in fs
+	 */
 	void SetDropoutTime(int64_t t)
-	{ m_parameters[m_timename].SetIntVal(t); }
+	{ m_time.SetIntVal(t); }
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(DropoutTrigger);
 
 protected:
-	std::string m_typename;
-	std::string m_timename;
-	std::string m_resetname;
+
+	///@brief Target edge type
+	FilterParameter& m_type;
+
+	///@brief Dropout time
+	FilterParameter& m_time;
+
+	///@brief Reset mode
+	FilterParameter& m_reset;
 };
 
 #endif
