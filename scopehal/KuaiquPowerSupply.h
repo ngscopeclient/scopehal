@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of KuaiquPowerSupply
+	@ingroup psudrivers
+ */
+
 #ifndef KuaiquPowerSupply_h
 #define KuaiquPowerSupply_h
 
 /**
 	@brief A KUAIQU power supply
+	@ingroup psudrivers
  */
 class KuaiquPowerSupply
 	: public virtual SCPIPowerSupply

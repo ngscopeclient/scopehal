@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of RidenPowerSupply
+	@ingroup psudrivers
+ */
+
 #ifndef RidenPowerSupply_h
 #define RidenPowerSupply_h
 
 /**
 	@brief A Riden RD6006 power supply or other equivalent model
+	@ingroup psudrivers
  */
 class RidenPowerSupply
 	: public virtual SCPIPowerSupply
@@ -62,7 +69,8 @@ public:
 	virtual bool IsPowerConstantCurrent(int chan) override;
 
 protected:
-	enum Registers : uint8_t {
+	enum Registers : uint8_t
+	{
 		REGISTER_MODEL    = 0x00,
 		REGISTER_SERIAL   = 0x02,
 		REGISTER_FIRMWARE = 0x03,
@@ -79,11 +87,9 @@ protected:
 		REGISTER_V_INPUT = 0x0E,
 		REGISTER_LOCK    = 0x0F,
 		REGISTER_ERROR   = 0x10,
-		
+
 		REGISTER_ON_OFF  = 0x12
 	};
-
-
 
 public:
 	static std::string GetDriverNameInternal();

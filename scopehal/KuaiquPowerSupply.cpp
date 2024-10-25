@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of KuaiquPowerSupply
+	@ingroup psudrivers
+ */
+
 #include "scopehal.h"
 #include "KuaiquPowerSupply.h"
 
@@ -35,6 +41,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport connected to the instrument
+ */
 KuaiquPowerSupply::KuaiquPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport, false), SCPIInstrument(transport, false)
 {
@@ -56,7 +67,8 @@ KuaiquPowerSupply::KuaiquPowerSupply(SCPITransport* transport)
 }
 
 KuaiquPowerSupply::~KuaiquPowerSupply()
-{	// Unlock PSI front pannel on exit
+{
+	// Unlock PSI front pannel on exit
 	SendSimpleCommand(COMMAND_LOCK_OFF);
 }
 
@@ -110,7 +122,7 @@ double KuaiquPowerSupply::SendReadValueCommand(Command command)
 	{
 		if(readConstantCurrentState)
 		{
-			m_constantCurrent = result.at(1) == 'C'; 
+			m_constantCurrent = result.at(1) == 'C';
 		}
 		double floatResult;
 		int intPart = std::stoi(result.substr(3,3));
@@ -175,17 +187,16 @@ std::string KuaiquPowerSupply::SendCommand(Command command, std::string commandS
 	return result;
 }
 
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
+///@brief Return the constant driver name strnig "kuaiqu_psu"
 string KuaiquPowerSupply::GetDriverNameInternal()
 {
 	return "kuaiqu_psu";
 }
 
-uint32_t KuaiquPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t KuaiquPowerSupply::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_PSU;
 }

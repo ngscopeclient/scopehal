@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of ModbusInstrument
+	@ingroup core
+ */
+
 #ifndef ModbusInstrument_h
 #define ModbusInstrument_h
 
 /**
 	@brief Base class for instruments using Modbus communication protocol
+	@ingroup core
  */
 class ModbusInstrument 	: public virtual SCPIInstrument
 {
@@ -44,7 +51,8 @@ public:
 	virtual uint8_t ReadRegisters(uint16_t address, std::vector<uint16_t>* data, uint8_t count);
 
 protected:
-	enum ModbusFunction : uint8_t {
+	enum ModbusFunction : uint8_t
+	{
 		// Reading functions
 		ReadDiscreteOutputCoils = 0x01,
 		ReadDiscreteInputContacts = 0x02,
@@ -65,7 +73,7 @@ protected:
 
 	// Make sure several request don't collide before we received the corresponding response
 	std::recursive_mutex m_modbusMutex;
-	
+
 	uint8_t m_slaveAdress;
 	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
 	void Converse(ModbusFunction function, std::vector<uint8_t>* data);
@@ -73,7 +81,6 @@ protected:
 	void ReadResponse(ModbusFunction function, std::vector<uint8_t>* data);
 	void PushUint16(std::vector<uint8_t>* data, uint16_t value);
 	uint16_t ReadUint16(std::vector<uint8_t>* data, uint8_t index);
-
 };
 
 #endif

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of RidenPowerSupply
+	@ingroup psudrivers
+ */
+
 #include "scopehal.h"
 #include "RidenPowerSupply.h"
 
@@ -35,18 +41,23 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport connected to the instrument
+ */
 RidenPowerSupply::RidenPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport, false), SCPIInstrument(transport, false), ModbusInstrument(transport)
 {
-	// Only one channel on Ridden PSU
+	// Only one channel on Riden PSU
 	m_channels.push_back(new PowerSupplyChannel("CH1", this, "#008000", 0));
 	m_vendor = "Riden";
 	// Read model number
 	uint16_t modelNumber = ReadRegister(REGISTER_MODEL);
 	m_model = string("RD") + to_string(modelNumber/10) +"-" + to_string(modelNumber%10);
 	// Read serial number
-	uint16_t seriallNumber = ReadRegister(REGISTER_SERIAL);
-	m_serial = to_string(seriallNumber);
+	uint16_t serialNumber = ReadRegister(REGISTER_SERIAL);
+	m_serial = to_string(serialNumber);
 	// Read firmware version number
 	float firmwareVersion = ((float)ReadRegister(0x03))/100;
 	m_fwVersion = to_string(firmwareVersion);
@@ -62,12 +73,13 @@ RidenPowerSupply::~RidenPowerSupply()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
+///@brief Return the constant driver name "riden_rd"
 string RidenPowerSupply::GetDriverNameInternal()
 {
 	return "riden_rd";
 }
 
-uint32_t RidenPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t RidenPowerSupply::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_PSU;
 }
