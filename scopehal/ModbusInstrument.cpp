@@ -80,9 +80,9 @@ uint16_t ModbusInstrument::ReadRegister(uint16_t address)
 	PushUint16(&data,0x0001);
 	Converse(ReadAnalogOutputHoldingRegisters,&data);
 	// Response data should be the 2 bytes of the requested register
-	if(data.size()<2)
+	if(data.size() < 2)
 	{
-		LogError("Invalid response length: %llu, expected 2.\n",data.size());
+		LogError("Invalid response length: %zu, expected 2.\n", data.size());
 		return 0;
 	}
 	return ReadUint16(&data,0);
@@ -97,9 +97,9 @@ uint16_t ModbusInstrument::WriteRegister(uint16_t address, uint16_t value)
 	PushUint16(&data,value);
 	Converse(WriteSingleAnalogOutputRegister,&data);
 	// Response data should be the 4 bytes (2 adress bytes and 2 bytes for the requested register)
-	if(data.size()<4)
+	if(data.size() < 4)
 	{
-		LogError("Invalid response length: %llu, expected 4.\n",data.size());
+		LogError("Invalid response length: %zu, expected 4.\n",data.size());
 		return 0;
 	}
 	return ReadUint16(&data,2);
@@ -117,9 +117,9 @@ uint8_t ModbusInstrument::ReadRegisters(uint16_t address, std::vector<uint16_t>*
 	PushUint16(&data,count);
 	Converse(ReadAnalogOutputHoldingRegisters,&data);
 	// Response data should be the 2 bytes of the requested register
-	if(data.size()!=byteCount)
+	if(data.size() != byteCount)
 	{
-		LogError("Invalid response length: %llu, expected %d.\n",data.size(),byteCount);
+		LogError("Invalid response length: %zu, expected %d.\n",data.size(),byteCount);
 		return 0;
 	}
 	result->reserve(count);
