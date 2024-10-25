@@ -27,11 +27,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of Multimeter
+	@ingroup core
+ */
 #ifndef Multimeter_h
 #define Multimeter_h
 
 /**
 	@brief A multimeter
+	@ingroup core
 
 	The distinction between multimeters and oscilloscopes can be blurry at times. For the moment, libscopehal considers
 	an instrument a meter if it outputs a scalar, and an oscilloscope if it outputs a vector, regardless of sample rate

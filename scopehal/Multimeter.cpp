@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of Multimeter
+	@ingroup core
+ */
+
 #include "scopehal.h"
 #include "Multimeter.h"
 
