@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of DigilentOscilloscope
+	@ingroup scopedrivers
+ */
+
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
@@ -38,10 +45,14 @@
 
 using namespace std;
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITwinLanTransport pointing to a scopehal-waveforms-bridge instance
+ */
 DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -152,6 +163,9 @@ string DigilentOscilloscope::GetChannelColor(size_t i)
 	}
 }
 
+/**
+	@brief Parse model name text to figure out what the scope is
+ */
 void DigilentOscilloscope::IdentifyHardware()
 {
 	if(m_model.find("Analog Discovery Pro") == 0)
@@ -186,7 +200,7 @@ unsigned int DigilentOscilloscope::GetInstrumentTypes() const
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t DigilentOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t DigilentOscilloscope::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
@@ -194,6 +208,7 @@ uint32_t DigilentOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Device interface functions
 
+///@brief Return the constant driver name "digilent"
 string DigilentOscilloscope::GetDriverNameInternal()
 {
 	return "digilent";
@@ -204,7 +219,7 @@ void DigilentOscilloscope::FlushConfigCache()
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 }
 
-vector<OscilloscopeChannel::CouplingType> DigilentOscilloscope::GetAvailableCouplings(size_t /*i*/)
+vector<OscilloscopeChannel::CouplingType> DigilentOscilloscope::GetAvailableCouplings([[maybe_unused]] size_t i)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
@@ -236,12 +251,12 @@ void DigilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_transport->SendCommand(buf);
 }
 
-unsigned int DigilentOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int DigilentOscilloscope::GetChannelBandwidthLimit([[maybe_unused]] size_t i)
 {
 	return 0;
 }
 
-void DigilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+void DigilentOscilloscope::SetChannelBandwidthLimit([[maybe_unused]] size_t i, [[maybe_unused]] unsigned int limit_mhz)
 {
 }
 
@@ -519,7 +534,7 @@ bool DigilentOscilloscope::IsInterleaving()
 	return false;
 }
 
-bool DigilentOscilloscope::SetInterleaving(bool /*combine*/)
+bool DigilentOscilloscope::SetInterleaving([[maybe_unused]] bool combine)
 {
 	//not supported
 	return false;
@@ -544,7 +559,7 @@ vector<Oscilloscope::AnalogBank> DigilentOscilloscope::GetAnalogBanks()
 	return banks;
 }
 
-Oscilloscope::AnalogBank DigilentOscilloscope::GetAnalogBank(size_t /*channel*/)
+Oscilloscope::AnalogBank DigilentOscilloscope::GetAnalogBank([[maybe_unused]] size_t channel)
 {
 	AnalogBank bank;
 	return bank;
@@ -555,23 +570,23 @@ bool DigilentOscilloscope::IsADCModeConfigurable()
 	return false;
 }
 
-vector<string> DigilentOscilloscope::GetADCModeNames(size_t /*channel*/)
+vector<string> DigilentOscilloscope::GetADCModeNames([[maybe_unused]] size_t channel)
 {
 	vector<string> ret;
 	return ret;
 }
 
-size_t DigilentOscilloscope::GetADCMode(size_t /*channel*/)
+size_t DigilentOscilloscope::GetADCMode([[maybe_unused]] size_t channel)
 {
 	return 0;
 }
 
-void DigilentOscilloscope::SetADCMode(size_t /*channel*/, size_t /*mode*/)
+void DigilentOscilloscope::SetADCMode([[maybe_unused]] size_t channel, [[maybe_unused]] size_t mode)
 {
 	//not supported
 }
 
-bool DigilentOscilloscope::CanEnableChannel(size_t /*channel*/)
+bool DigilentOscilloscope::CanEnableChannel([[maybe_unused]] size_t channel)
 {
 	//all channels always available, no resource sharing
 	return true;
@@ -586,7 +601,7 @@ vector<Oscilloscope::DigitalBank> DigilentOscilloscope::GetDigitalBanks()
 	return banks;
 }
 
-Oscilloscope::DigitalBank DigilentOscilloscope::GetDigitalBank(size_t /*channel*/)
+Oscilloscope::DigitalBank DigilentOscilloscope::GetDigitalBank([[maybe_unused]] size_t channel)
 {
 	DigitalBank ret;
 	return ret;
@@ -602,22 +617,22 @@ bool DigilentOscilloscope::IsDigitalThresholdConfigurable()
 	return false;
 }
 
-float DigilentOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
+float DigilentOscilloscope::GetDigitalHysteresis([[maybe_unused]] size_t channel)
 {
 	return 0;
 }
 
-float DigilentOscilloscope::GetDigitalThreshold(size_t /*channel*/)
+float DigilentOscilloscope::GetDigitalThreshold([[maybe_unused]] size_t channel)
 {
 	return 0;
 }
 
-void DigilentOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
+void DigilentOscilloscope::SetDigitalHysteresis([[maybe_unused]] size_t channel, [[maybe_unused]] float level)
 {
 
 }
 
-void DigilentOscilloscope::SetDigitalThreshold(size_t /*channel*/, float /*level*/)
+void DigilentOscilloscope::SetDigitalThreshold([[maybe_unused]] size_t channel, [[maybe_unused]] float level)
 {
 
 }

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of DemoPowerSupply
+
+	@ingroup psudrivers
+ */
+
 #ifndef DemoPowerSupply_h
 #define DemoPowerSupply_h
 
 /**
-	@brief A Rohde & Schwarz HMC804x power supply
+	@brief A simulated power supply for demonstration
+
+	@ingroup psudrivers
  */
 class DemoPowerSupply
 	: public virtual SCPIPowerSupply
@@ -81,7 +90,8 @@ protected:
 	double m_voltages[m_numChans];
 	double m_currents[m_numChans];
 	bool m_enabled[m_numChans];
-	enum {
+	enum
+	{
 		OCP_OFF,
 		OCP_ENABLED,
 		OCP_TRIPPED

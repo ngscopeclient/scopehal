@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of DemoPowerSupply
+
+	@ingroup psudrivers
+ */
+
 #include "scopehal.h"
 #include "DemoPowerSupply.h"
 
@@ -35,6 +42,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPINullTransport object (this driver does not connect to real hardware)
+ */
 DemoPowerSupply::DemoPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
@@ -65,12 +77,13 @@ DemoPowerSupply::~DemoPowerSupply()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
+///@brief Return the constant driver name string "demopsu"
 string DemoPowerSupply::GetDriverNameInternal()
 {
 	return "demopsu";
 }
 
-uint32_t DemoPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t DemoPowerSupply::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_PSU;
 }

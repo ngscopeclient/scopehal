@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,9 +27,23 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of DensityFunctionWaveform
+
+	@ingroup datamodel
+ */
+
 #include "scopehal.h"
 #include "DensityFunctionWaveform.h"
 
+/**
+	@brief Initialize a new density function waveform of a given size
+
+	@param width	Bitmap width, in pixels
+	@param height	Bitmap height, in pixels
+ */
 DensityFunctionWaveform::DensityFunctionWaveform(size_t width, size_t height)
 	: m_width(width)
 	, m_height(height)

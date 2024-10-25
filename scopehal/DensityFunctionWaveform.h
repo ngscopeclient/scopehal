@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,7 +30,9 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DensityFunction
+	@brief Declaration of DensityFunctionWaveform
+
+	@ingroup datamodel
  */
 
 #ifndef DensityFunctionWaveform_h
@@ -40,8 +42,10 @@
 
 /**
 	@brief Base class for waveforms such as eye patterns, spectrograms, and waterfalls which are conceptually a 2D bitmap
+	@ingroup datamodel
 
-	Internally, the image data is represented as an AcceleratorBuffer<float> storing 2D sample values.
+	Internally, the image data is represented as an AcceleratorBuffer<float> storing one float32 sample values per
+	pixel in row major order (samples 0...width-1 of row 0, then samples 0...width-1 of row 1, etc).
  */
 class DensityFunctionWaveform : public WaveformBase
 {
@@ -55,56 +59,66 @@ public:
 	DensityFunctionWaveform& operator=(const DensityFunctionWaveform&) =delete;
 
 	//nothing to do if not gpu accelerated
-	virtual void Rename(const std::string& /*name*/ = "")
+	virtual void Rename([[maybe_unused]] const std::string& name = "")
 	{}
 
+	///@brief Returns a pointer to the CPU-side sample data buffer
 	float* GetData()
 	{
 		m_outdata.PrepareForCpuAccess();
 		return m_outdata.GetCpuPointer();
 	}
 
+	///@brief Returns a reference to the output data buffer object
 	AcceleratorBuffer<float>& GetOutData()
 	{ return m_outdata; }
 
+	///@brief Returns the height of the bitmap in pixels
 	size_t GetHeight()
 	{ return m_height; }
 
+	///@brief Returns the width of the bitmap in pixels
 	size_t GetWidth()
 	{ return m_width; }
 
 	//Unused virtual methods from WaveformBase that we have to override
-	virtual void clear()
+	virtual void clear() override
 	{}
 
-	virtual void Resize(size_t /*unused*/)
+	virtual void Resize([[maybe_unused]] size_t unused) override
 	{}
 
-	virtual void PrepareForCpuAccess()
+	virtual void PrepareForCpuAccess() override
 	{ m_outdata.PrepareForCpuAccess(); }
 
-	virtual void PrepareForGpuAccess()
+	virtual void PrepareForGpuAccess() override
 	{ m_outdata.PrepareForGpuAccess();}
 
-	virtual void MarkSamplesModifiedFromCpu()
+	virtual void MarkSamplesModifiedFromCpu() override
 	{ m_outdata.MarkModifiedFromCpu(); }
 
-	virtual void MarkSamplesModifiedFromGpu()
+	virtual void MarkSamplesModifiedFromGpu() override
 	{ m_outdata.MarkModifiedFromGpu(); }
 
-	virtual void MarkModifiedFromCpu()
+	virtual void MarkModifiedFromCpu() override
 	{ m_outdata.MarkModifiedFromCpu(); }
 
-	virtual void MarkModifiedFromGpu()
+	virtual void MarkModifiedFromGpu() override
 	{ m_outdata.MarkModifiedFromGpu(); }
 
-	virtual size_t size() const
+	//we have no linear sample buffer so return 0
+	virtual size_t size() const override
 	{ return 0; }
 
 protected:
+
+	///@brief Buffer width, in pixels
 	size_t m_width;
+
+	///@brief Buffer height, in pixels
 	size_t m_height;
 
+	///@brief Pixel buffer
 	AcceleratorBuffer<float> m_outdata;
 };
 

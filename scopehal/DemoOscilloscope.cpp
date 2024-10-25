@@ -42,6 +42,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPINullTransport since this driver does not connect to physical hardware
+ */
 DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
@@ -159,6 +164,7 @@ string DemoOscilloscope::GetTransportConnectionString()
 	return "";
 }
 
+///@brief Return the constant driver name "demopsu"
 string DemoOscilloscope::GetDriverNameInternal()
 {
 	return "demo";
@@ -169,7 +175,7 @@ unsigned int DemoOscilloscope::GetInstrumentTypes() const
 	return INST_OSCILLOSCOPE;
 }
 
-uint32_t DemoOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t DemoOscilloscope::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
