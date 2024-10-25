@@ -55,7 +55,7 @@ public:
 
 		///@brief High to low transition
 		EDGE_FALLING
-	}
+	};
 
 	/**
 		@brief Set the type of the edge to trigger on

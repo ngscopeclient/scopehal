@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Mike Walters
+	@brief Implementation of NthEdgeBurstTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "NthEdgeBurstTrigger.h"
 
@@ -35,21 +42,26 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the trigger
+
+	@param scope	The instrument this trigger is being created for
+ */
 NthEdgeBurstTrigger::NthEdgeBurstTrigger(Oscilloscope* scope)
 	: Trigger(scope)
+	, m_edgetype(m_parameters["Slope"])
+	, m_idletime(m_parameters["Idle time"])
+	, m_edgenumber(m_parameters["Edge number"])
 {
 	CreateInput("din");
 
-	m_slopename = "Slope";
-	m_parameters[m_slopename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
-	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
+	m_edgetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_edgetype.AddEnumValue("Rising", EDGE_RISING);
+	m_edgetype.AddEnumValue("Falling", EDGE_FALLING);
 
-	m_idletimename = "Idle time";
-	m_parameters[m_idletimename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_idletime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_edgenumbername = "Edge number";
-	m_parameters[m_edgenumbername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_edgenumber = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 
 }
 
@@ -61,6 +73,7 @@ NthEdgeBurstTrigger::~NthEdgeBurstTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Returns the constant trigger name "Nth Edge Burst"
 string NthEdgeBurstTrigger::GetTriggerName()
 {
 	return "Nth Edge Burst";

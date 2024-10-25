@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,12 +31,14 @@
 	@file
 	@author Mike Walters
 	@brief Declaration of NthEdgeBurstTrigger
+	@ingroup triggers
  */
 #ifndef NthEdgeBurstTrigger_h
 #define NthEdgeBurstTrigger_h
 
 /**
-	@brief Nth Edge Burst Trigger
+	@brief Nth Edge Burst Trigger: triggers on a specific edge within a burst
+	@ingroup triggers
  */
 class NthEdgeBurstTrigger : public Trigger
 {
@@ -44,29 +46,51 @@ public:
 	NthEdgeBurstTrigger(Oscilloscope* scope);
 	virtual ~NthEdgeBurstTrigger();
 
+	///@brief Types of edges to trigger on
 	enum EdgeType
 	{
+		///@brief Low to high transition
 		EDGE_RISING,
-		EDGE_FALLING,
+
+		///@brief High to low transition
+		EDGE_FALLING
 	};
 
+	/**
+		@brief Set the type of the edge to trigger on
+
+		@param type	Edge type
+	 */
 	void SetSlope(EdgeType type)
-	{ m_parameters[m_slopename].SetIntVal(type); }
+	{ m_edgetype.SetIntVal(type); }
 
+	///@brief Gets the currently selected edge type
 	EdgeType GetSlope()
-	{ return (EdgeType) m_parameters[m_slopename].GetIntVal(); }
+	{ return (EdgeType) m_edgetype.GetIntVal(); }
 
+	/**
+		@brief Set the minimum idle time between bursts
+
+		@param idle	Idle time, in femtoseconds
+	 */
 	void SetIdleTime(int64_t idle)
-	{ m_parameters[m_idletimename].SetIntVal(idle); }
+	{ m_idletime.SetIntVal(idle); }
 
+	///@brief Gets the idle time between bursts, in femtoseconds
 	int64_t GetIdleTime()
-	{ return m_parameters[m_idletimename].GetIntVal(); }
+	{ return m_idletime.GetIntVal(); }
 
+	/**
+		@brief Set the index of the edge to trigger on
+
+		@param edge	Target edge index
+	 */
 	void SetEdgeNumber(int64_t edge)
-	{ m_parameters[m_edgenumbername].SetIntVal(edge); }
+	{ m_edgenumber.SetIntVal(edge); }
 
+	///@brief Get the index of the edge to trigger on
 	int64_t GetEdgeNumber()
-	{ return m_parameters[m_edgenumbername].GetIntVal(); }
+	{ return m_edgenumber.GetIntVal(); }
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -74,9 +98,15 @@ public:
 	TRIGGER_INITPROC(NthEdgeBurstTrigger);
 
 protected:
-	std::string m_slopename;
-	std::string m_idletimename;
-	std::string m_edgenumbername;
+
+	///@brief Edge type
+	FilterParameter& m_edgetype;
+
+	///@brief Idle time before a burst is considered to have ended
+	FilterParameter& m_idletime;
+
+	///@brief Index of target edge within the burst
+	FilterParameter& m_edgenumber;
 };
 
 #endif

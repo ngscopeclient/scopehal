@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,33 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of CSVStreamInstrument
+	@ingroup miscdrivers
+ */
+
 #ifndef CSVStreamInstrument_h
 #define CSVStreamInstrument_h
 
 /**
 	@brief A miscellaneous instrument which streams scalar data over CSV
+
+	Typically used to plot real time system state (voltages, temperatures, ADC values, etc) from a microcontroller over
+	a UART or SWO trace interface.
+
+	The instrument protocol is a unidirectional stream of line oriented comma-separated-value (CSV) rather than SCPI.
+
+	At any time, the instrument may send lines with one or more of the following formats, separated by \n characters.
+	Lines not starting with these magic keywords are ignored.
+
+	* CSV-NAME,ch1name,ch2name, ... : assign human readable names to channels
+	* CSV-UNIT,V,A, ... : specify unit associated with each channel
+	* CSV-DATA,1.23,3.14, ... : specify latest measurement value for each channel.
+	It is not possible to perform partial updates of a single channel without updating the others.
+
+	@ingroup miscdrivers
  */
 class CSVStreamInstrument
 	: public virtual SCPIMiscInstrument

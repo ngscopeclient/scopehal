@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of MultimeterChannel
+	@ingroup datamodel
+ */
+
 #include "scopehal.h"
 
 using namespace std;
@@ -34,6 +41,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a digital input channel
+
+	@param parent	The instrument this channel is part of
+	@param hwname	Internal hardware name of the channel (should match SCPI name if applicable)
+	@param color	Display color for the channel in plots and the filter graph
+	@param index	Position of this channel within m_channels of the parent instrument
+ */
 MultimeterChannel::MultimeterChannel(
 	Multimeter* parent,
 	const string& hwname,
@@ -49,6 +64,9 @@ MultimeterChannel::~MultimeterChannel()
 {
 }
 
+/**
+	@brief Fetch the latest readings from hardware into our stream outputs
+ */
 void MultimeterChannel::Update()
 {
 	auto meter = GetMeter();

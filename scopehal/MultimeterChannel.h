@@ -27,15 +27,19 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of MultimeterChannel
+	@ingroup datamodel
+ */
 #ifndef MultimeterChannel_h
 #define MultimeterChannel_h
 
 /**
 	@brief A single channel of a multimeter
 
-	Meter channels can overlap with scope channels, which (by convention) use stream index zero for waveform data.
-
-	So our meter channel reading can get a bit tricky to update.
+	@ingroup datamodel
  */
 class MultimeterChannel : public InstrumentChannel
 {
@@ -49,21 +53,28 @@ public:
 
 	virtual ~MultimeterChannel();
 
+	///@brief Return the Multimeter this channel is attached to
 	Multimeter* GetMeter()
 	{ return dynamic_cast<Multimeter*>(m_instrument); }
 
 	void Update();
 
+	///@brief Return the value of our primary measurement
 	float GetPrimaryValue()
 	{ return GetScalarValue(m_primaryStream); }
 
+	///@brief Return the value of our secondary measurement, if applicable
 	float GetSecondaryValue()
 	{ return GetScalarValue(m_secondaryStream); }
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
 
 protected:
+
+	///@brief Index of our primary output
 	size_t m_primaryStream;
+
+	///@brief Index of our secondary output
 	size_t m_secondaryStream;
 
 };

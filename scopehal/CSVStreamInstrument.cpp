@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of CSVStreamInstrument
+	@ingroup miscdrivers
+ */
+
 #include "scopehal.h"
 #include "CSVStreamInstrument.h"
 
@@ -35,6 +42,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport pointing at the instrument
+ */
 CSVStreamInstrument::CSVStreamInstrument(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
@@ -76,6 +88,7 @@ uint32_t CSVStreamInstrument::GetInstrumentTypesForChannel(size_t /*i*/) const
 	return INST_MISC;
 }
 
+///@brief Returns the constant driver name "csvstream"
 string CSVStreamInstrument::GetDriverNameInternal()
 {
 	return "csvstream";
@@ -85,10 +98,10 @@ string CSVStreamInstrument::GetDriverNameInternal()
 // Serialization
 
 void CSVStreamInstrument::DoPreLoadConfiguration(
-	int /*version*/,
+	[[maybe_unused]] int version,
 	const YAML::Node& node,
 	IDTable& idmap,
-	ConfigWarningList& /*list*/)
+	[[maybe_unused]] ConfigWarningList& list)
 {
 	m_channels.clear();
 
