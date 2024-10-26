@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of MultiLaneBERT
+	@ingroup bertdrivers
+ */
+
 #include "scopehal.h"
 #include "MultiLaneBERT.h"
 #include "EyeWaveform.h"
@@ -36,6 +43,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITwinLanTransport connected to scopehal-mlbert-bridge
+ */
 MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -60,6 +72,9 @@ MultiLaneBERT::~MultiLaneBERT()
 
 }
 
+/**
+	@brief Do initialization after the constructor finishes
+ */
 void MultiLaneBERT::PostCtorInit()
 {
 	auto sthis = dynamic_pointer_cast<SCPIBERT>(shared_from_this());
@@ -105,12 +120,13 @@ void MultiLaneBERT::PostCtorInit()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Instrument config
 
+///@brief Return the constant driver name "mlbert"
 string MultiLaneBERT::GetDriverNameInternal()
 {
 	return "mlbert";
 }
 
-uint32_t MultiLaneBERT::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t MultiLaneBERT::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_BERT;
 }
@@ -221,7 +237,7 @@ void MultiLaneBERT::SetRxCTLEGainStep(size_t i, size_t step)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TX pattern generator control
 
-vector<BERT::Pattern> MultiLaneBERT::GetAvailableTxPatterns(size_t /*i*/)
+vector<BERT::Pattern> MultiLaneBERT::GetAvailableTxPatterns([[maybe_unused]] size_t i)
 {
 	vector<Pattern> ret;
 	ret.push_back(PATTERN_PRBS7);
@@ -306,7 +322,7 @@ void MultiLaneBERT::SetTxInvert(size_t i, bool invert)
 	m_txInvert[i] = invert;
 }
 
-vector<float> MultiLaneBERT::GetAvailableTxDriveStrengths(size_t /*i*/)
+vector<float> MultiLaneBERT::GetAvailableTxDriveStrengths([[maybe_unused]] size_t i)
 {
 	vector<float> ret;
 	ret.push_back(0.0);

@@ -27,11 +27,19 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of MultiLaneBERT
+	@ingroup bertdrivers
+ */
+
 #ifndef MultiLaneBERT_h
 #define MultiLaneBERT_h
 
 /**
 	@brief A MultiLANE BERT accessed via scopehal-mlbert-bridge
+	@ingroup bertdrivers
  */
 class MultiLaneBERT
 	: public virtual SCPIBERT
@@ -111,40 +119,92 @@ public:
 
 protected:
 
+	///@brief Index of the first receive channel
 	int m_rxChannelBase;
 
-	//Cached settings
+	///@brief Active transmit pattern
 	Pattern m_txPattern[4];
+
+	///@brief Active receive pattern
 	Pattern m_rxPattern[4];
+
+	///@brief Transmit invert flag
 	bool m_txInvert[4];
+
+	///@brief Receive invert flag
 	bool m_rxInvert[4];
+
+	///@brief TX drive strength
 	float m_txDrive[4];
+
+	///@brief Transmit enable flag
 	bool m_txEnable[4];
+
+	///@brief TX FFE pre-cursor coefficient
 	float m_txPreCursor[4];
+
+	///@brief TX FFE post-cursor coefficient
 	float m_txPostCursor[4];
+
+	///@brief RX pattern lock state
 	bool m_rxLock[4];
+
+	///@brief Bit pattern for TX custom-pattern mode
 	uint64_t m_txCustomPattern;
+
+	///@brief Reference clock output mux selector
 	size_t m_refclkOutMux;
+
+	///@brief CTLE gain step selected for each RX channel
 	size_t m_rxCtleGainSteps[4];
+
+	///@brief BER integration period
 	int64_t m_integrationLength;
+
+	///@brief Sample X position for BER measurements
 	int64_t m_sampleX[4];
+
+	///@brief Sample Y position for BER measurements
 	float m_sampleY[4];
+
+	///@brief True if using external reference clock, false if internal
 	bool m_useExternalRefclk;
 
+	///@brief Mux selectors for reference clock output
 	enum RefclkMuxSelectors
 	{
+		///@brief Lane 0 recovered clock, 1/8 rate
 		RX0_DIV8,
+
+		///@brief Lane 0 recovered clock, 1/16 rate
 		RX0_DIV16,
+
+		///@brief Lane 1 recovered clock, 1/8 rate
 		RX1_DIV8,
+
+		///@brief Lane 1 recovered clock, 1/16 rate
 		RX1_DIV16,
+
+		///@brief Lane 2 recovered clock, 1/8 rate
 		RX2_DIV8,
+
+		///@brief Lane 2 recovered clock, 1/16 rate
 		RX2_DIV16,
+
+		///@brief Lane 3 recovered clock, 1/8 rate
 		RX3_DIV8,
+
+		///@brief Lane 3 recovered clock, 1/16 rate
 		RX3_DIV16,
-		LO_DIV32_OR_80,	//div32 in low rate, div80 in high rate
+
+		///@brief TX local oscillator divided by 32 (in low rate mode) or 80 (in high rate mode)
+		LO_DIV32_OR_80,
+
+		///@brief Custom pattern generator output
 		SERDES
 	};
 
+	///@brief Current data rate, in bits/sec
 	uint64_t m_dataRate;
 
 public:
