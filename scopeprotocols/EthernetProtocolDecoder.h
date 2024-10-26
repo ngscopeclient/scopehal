@@ -105,10 +105,6 @@ protected:
 		std::vector<uint64_t>& ends,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS = false);
-
-	std::string m_outfile;
-	std::string m_cachedOutputFname;
-	FILE* m_fpOut;
 };
 
 #endif

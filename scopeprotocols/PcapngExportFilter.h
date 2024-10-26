@@ -30,55 +30,31 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ExportFilter
+	@brief Declaration of PcapngExportFilter
+	@ingroup export
  */
-#ifndef ExportFilter_h
-#define ExportFilter_h
+#ifndef PcapngExportFilter_h
+#define PcapngExportFilter_h
 
-#include "../scopehal/ActionProvider.h"
+#include "ExportFilter.h"
+#include "EthernetProtocolDecoder.h"
 
-/**
-	@brief Base class for filters providing file-export functionality
- */
-class ExportFilter
-	: public Filter
-	, public ActionProvider
+class PcapngExportFilter : public ExportFilter
 {
 public:
-	ExportFilter(const std::string& color);
-	virtual ~ExportFilter();
+	PcapngExportFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	static std::string GetProtocolName();
 
-	virtual std::vector<std::string> EnumActions() override;
-	virtual bool PerformAction(const std::string& id) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	PROTOCOL_DECODER_INITPROC(PcapngExportFilter)
 
 protected:
+	virtual void Export() override;
 
-	/**
-		@brief Clears the output file
-	 */
-	virtual void Clear();
-
-	/**
-		@brief Writes the current inputs to the output file in the appropriate format
-	 */
-	virtual void Export() =0;
-
-	enum ExportMode_t
-	{
-		MODE_CONTINUOUS_APPEND,
-		MODE_CONTINUOUS_OVERWRITE,
-		MODE_MANUAL_APPEND,
-		MODE_MANUAL_OVERWRITE
-	};
-
-	std::string m_fname;
-	std::string m_mode;
-
-	FILE* m_fp;
-
-	void OnFileNameChanged();
+	void ExportEthernet(EthernetWaveform* wfm);
+	void ExportPacket(std::vector<uint8_t>& packet, time_t timestamp, int64_t fs);
 };
 
 #endif
