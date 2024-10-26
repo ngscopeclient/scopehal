@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of LoadChannel
+	@ingroup datamodel
+ */
+
 #include "scopehal.h"
 #include "LoadChannel.h"
 

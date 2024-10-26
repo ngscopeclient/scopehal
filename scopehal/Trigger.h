@@ -125,7 +125,7 @@ protected:
 #define TRIGGER_INITPROC(T) \
 	static Trigger* CreateInstance(Oscilloscope* scope) \
 	{ return new T(scope); } \
-	virtual std::string GetTriggerDisplayName() \
+	virtual std::string GetTriggerDisplayName() override \
 	{ return GetTriggerName(); }
 
 #define AddTriggerClass(T) Trigger::DoAddTriggerClass(T::GetTriggerName(), T::CreateInstance)

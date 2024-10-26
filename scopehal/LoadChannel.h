@@ -27,11 +27,19 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of LoadChannel
+	@ingroup datamodel
+ */
+
 #ifndef LoadChannel_h
 #define LoadChannel_h
 
 /**
-	@brief A single channel of a power supply
+	@brief A single channel of an active load
+	@ingroup datamodel
  */
 class LoadChannel : public InstrumentChannel
 {
