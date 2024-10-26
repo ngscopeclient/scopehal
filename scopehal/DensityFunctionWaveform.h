@@ -59,7 +59,7 @@ public:
 	DensityFunctionWaveform& operator=(const DensityFunctionWaveform&) =delete;
 
 	//nothing to do if not gpu accelerated
-	virtual void Rename([[maybe_unused]] const std::string& name = "")
+	virtual void Rename([[maybe_unused]] const std::string& name = "") override
 	{}
 
 	///@brief Returns a pointer to the CPU-side sample data buffer

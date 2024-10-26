@@ -48,7 +48,7 @@ public:
 	WindowTrigger(Oscilloscope* scope);
 	virtual ~WindowTrigger();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	/**
 		@brief Type of level crossing to detect for "stay inside" and "stay outside" windows
