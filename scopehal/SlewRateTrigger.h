@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SlewRateTrigger
+	@ingroup triggers
  */
 #ifndef SlewRateTrigger_h
 #define SlewRateTrigger_h
@@ -39,6 +40,7 @@
 
 /**
 	@brief Slew rate trigger - trigger when an edge rate meets the specified conditions
+	@ingroup triggers
  */
 class SlewRateTrigger : public TwoLevelTrigger
 {
@@ -46,7 +48,7 @@ public:
 	SlewRateTrigger(Oscilloscope* scope);
 	virtual ~SlewRateTrigger();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(SlewRateTrigger);

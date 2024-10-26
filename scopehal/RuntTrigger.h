@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of RuntTrigger
+	@ingroup triggers
  */
 #ifndef RuntTrigger_h
 #define RuntTrigger_h
@@ -39,6 +40,7 @@
 
 /**
 	@brief Runt trigger - trigger when a pulse of a given width crosses one threshold but not the second
+	@ingroup triggers
  */
 class RuntTrigger : public TwoLevelTrigger
 {
@@ -46,7 +48,7 @@ public:
 	RuntTrigger(Oscilloscope* scope);
 	virtual ~RuntTrigger();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(RuntTrigger);
