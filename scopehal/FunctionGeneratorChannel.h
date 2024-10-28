@@ -27,11 +27,19 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of FunctionGeneratorChannel
+	@ingroup datamodel
+ */
+
 #ifndef FunctionGeneratorChannel_h
 #define FunctionGeneratorChannel_h
 
 /**
 	@brief A single channel of a function generator
+	@ingroup datamodel
  */
 class FunctionGeneratorChannel : public InstrumentChannel
 {
@@ -45,12 +53,14 @@ public:
 
 	virtual ~FunctionGeneratorChannel();
 
+	///@brief Get the function generator this instrument is part of
 	FunctionGenerator* GetFunctionGenerator()
 	{ return dynamic_cast<FunctionGenerator*>(m_instrument); }
 
-	//Well defined stream IDs used by FunctionGeneratorChannel
+	///@brief Well defined stream IDs used by FunctionGeneratorChannel
 	enum StreamIndexes
 	{
+		///@brief Operating frequency
 		STREAM_FREQUENCY
 	};
 

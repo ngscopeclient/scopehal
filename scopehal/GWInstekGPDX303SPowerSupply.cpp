@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of GWInstekGPDX303SPowerSupply
+	@ingroup psudrivers
+ */
+
 #include <bitset>
 #include "scopehal.h"
 #include "GWInstekGPDX303SPowerSupply.h"
@@ -36,6 +42,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport pointing to the PSU
+ */
 GWInstekGPDX303SPowerSupply::GWInstekGPDX303SPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
@@ -61,12 +72,13 @@ GWInstekGPDX303SPowerSupply::~GWInstekGPDX303SPowerSupply()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
+///@brief Return the constant driver name "gwinstek_gpdx303s"
 string GWInstekGPDX303SPowerSupply::GetDriverNameInternal()
 {
 	return "gwinstek_gpdx303s";
 }
 
-uint32_t GWInstekGPDX303SPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t GWInstekGPDX303SPowerSupply::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_PSU;
 }
@@ -94,6 +106,9 @@ bool GWInstekGPDX303SPowerSupply::IsPowerConstantCurrent(int chan)
 	return !reg[7 - chan];
 }
 
+/**
+	@brief Helper method to return the status register as a set of bits
+ */
 bitset<8> GWInstekGPDX303SPowerSupply::GetStatusRegister()
 {
 	//Get status register

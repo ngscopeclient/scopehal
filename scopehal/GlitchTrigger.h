@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of GlitchTrigger
+	@ingroup triggers
  */
 #ifndef GlitchTrigger_h
 #define GlitchTrigger_h
@@ -39,6 +40,7 @@
 
 /**
 	@brief Trigger on a glitch meeting certain width criteria
+	@ingroup triggers
  */
 class GlitchTrigger : public EdgeTrigger
 {
@@ -49,28 +51,54 @@ public:
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(GlitchTrigger);
 
+	/**
+		@brief Set the condition for the glitch
+
+		@param type		Search condition
+						May be CONDITION_LESS to only trigger on glitches shorter than the upper bound, or
+						CONDITION_BETWEEN to trigger on glitches between upper and lower bounds in length
+	 */
 	void SetCondition(Condition type)
-	{ m_parameters[m_conditionname].SetIntVal(type); }
+	{ m_condition.SetIntVal(type); }
 
+	///@brief Get the desired glitch condition
 	Condition GetCondition()
-	{ return (Condition) m_parameters[m_conditionname].GetIntVal(); }
+	{ return (Condition) m_condition.GetIntVal(); }
 
+	///@brief Get the lower bound, in fs, for a pulse to be considered a glitch
 	int64_t GetLowerBound()
-	{ return m_parameters[m_lowername].GetIntVal(); }
+	{ return m_lowerBound.GetIntVal(); }
 
+	/**
+		@brief Set the duration of the shortest pulse that will be considered a glitch
+
+		@param bound	Lower bound, in fs
+	 */
 	void SetLowerBound(int64_t bound)
-	{ m_parameters[m_lowername].SetIntVal(bound); }
+	{ m_lowerBound.SetIntVal(bound); }
 
+	///@brief Get the upper bound, in fs, for a pulse to be considered a glitch
 	int64_t GetUpperBound()
-	{ return m_parameters[m_uppername].GetIntVal(); }
+	{ return m_upperBound.GetIntVal(); }
 
+	/**
+		@brief Set the duration of the longest pulse that will be considered a glitch
+
+		@param bound	Upper bound, in fs
+	 */
 	void SetUpperBound(int64_t bound)
-	{ m_parameters[m_uppername].SetIntVal(bound); }
+	{ m_upperBound.SetIntVal(bound); }
 
 protected:
-	std::string m_conditionname;
-	std::string m_lowername;
-	std::string m_uppername;
+
+	///@brief Condition to look for
+	FilterParameter m_condition;
+
+	///@brief Lower voltage level for glitch detector
+	FilterParameter m_lowerBound;
+
+	///@brief Upper voltage level for glitch detector
+	FilterParameter m_upperBound;
 };
 
 #endif

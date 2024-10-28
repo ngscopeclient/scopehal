@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of GWInstekGPDX303SPowerSupply
+	@ingroup psudrivers
+ */
+
 #ifndef GWInstekGPDX303SPowerSupply_h
 #define GWInstekGPDX303SPowerSupply_h
 
@@ -39,6 +45,7 @@
 
 /**
 	@brief A GW Instek GPD-(X)303S power supply
+	@ingroup psudrivers
  */
 class GWInstekGPDX303SPowerSupply
 	: public virtual SCPIPowerSupply

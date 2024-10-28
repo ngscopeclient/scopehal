@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of GlitchTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "GlitchTrigger.h"
 #include "LeCroyOscilloscope.h"
@@ -37,19 +44,24 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the trigger
+
+	@param scope	The instrument this trigger is to be used with
+ */
 GlitchTrigger::GlitchTrigger(Oscilloscope* scope)
 	: EdgeTrigger(scope)
-	, m_conditionname("Condition")
-	, m_lowername("Lower Bound")
-	, m_uppername("Upper Bound")
+	, m_condition(m_parameters["Condition"])
+	, m_lowerBound(m_parameters["Lower Bound"])
+	, m_upperBound(m_parameters["Upper Bound"])
 {
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_lowerBound = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_upperBound = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+	m_condition = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_condition.AddEnumValue("Less than", CONDITION_LESS);
+	m_condition.AddEnumValue("Between", CONDITION_BETWEEN);
 }
 
 GlitchTrigger::~GlitchTrigger()
@@ -60,6 +72,7 @@ GlitchTrigger::~GlitchTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant trigger type name "Glitch"
 string GlitchTrigger::GetTriggerName()
 {
 	return "Glitch";

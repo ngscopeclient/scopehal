@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of FunctionGeneratorChannel
+	@ingroup datamodel
+ */
+
 #include "scopehal.h"
 
 using namespace std;
@@ -34,6 +41,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a function generator channel
+
+	@param gen		The instrument this channel is part of
+	@param hwname	Internal hardware name of the channel (should match SCPI name if applicable)
+	@param color	Display color for the channel in plots and the filter graph
+	@param index	Position of this channel within m_channels of the parent instrument
+ */
 FunctionGeneratorChannel::FunctionGeneratorChannel(
 	FunctionGenerator* gen,
 	const string& hwname,
@@ -78,7 +93,9 @@ bool FunctionGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream
 }
 
 
-void FunctionGeneratorChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void FunctionGeneratorChannel::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	auto freqIn = GetInput(STREAM_FREQUENCY);
 	if(freqIn && (freqIn.GetYAxisUnits() == Unit::UNIT_HZ))

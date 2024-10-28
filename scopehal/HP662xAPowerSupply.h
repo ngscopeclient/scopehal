@@ -27,11 +27,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Declaration of HP662xAPowerSupply
+	@ingroup psudrivers
+ */
+
 #ifndef HP662xAPowerSupply_h
 #define HP662xAPowerSupply_h
 
 /**
 	@brief A HP 662xA power supply
+	@ingroup psudrivers
  */
 class HP662xAPowerSupply
 	: public virtual SCPIPowerSupply
@@ -73,9 +80,6 @@ protected:
 	void ChannelCommand(const char* command, int chan, int arg);
 	void ChannelCommand(const char* command, int chan, double arg);
 	int GetStatusRegister(int chan);
-
-
-	int m_activeChannel;
 
 public:
 	static std::string GetDriverNameInternal();

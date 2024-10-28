@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of MockOscilloscope
+	@ingroup scopedrivers
  */
 
 #ifndef MockOscilloscope_h
@@ -38,6 +39,7 @@
 
 /**
 	@brief Fake oscilloscope driver used for offline waveform analysis
+	@ingroup scopedrivers
  */
 class MockOscilloscope : public Oscilloscope
 {

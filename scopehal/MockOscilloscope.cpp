@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Implementation of MockOscilloscope
+	@ingroup scopedrivers
  */
 
 #include "scopehal.h"

@@ -27,6 +27,12 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Implementation of HP662xAPowerSupply
+	@ingroup psudrivers
+ */
+
 #include "scopehal.h"
 #include "HP662xAPowerSupply.h"
 
@@ -35,10 +41,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver
+
+	@param transport	SCPITransport pointing to the PSU
+ */
 HP662xAPowerSupply::HP662xAPowerSupply(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
-	, m_activeChannel(-1)
 {
 	// This instrument predates SCPI, use alternate commands to identify
 	bool succeeded = false;
@@ -95,12 +105,13 @@ HP662xAPowerSupply::~HP662xAPowerSupply()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
+///@brief Return the constant driver name "hp_66xxa"
 string HP662xAPowerSupply::GetDriverNameInternal()
 {
 	return "hp_66xxa";
 }
 
-uint32_t HP662xAPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t HP662xAPowerSupply::GetInstrumentTypesForChannel([[maybe_unused]] size_t i) const
 {
 	return INST_PSU;
 }
@@ -130,7 +141,6 @@ bool HP662xAPowerSupply::SupportsOvercurrentShutdown()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual hardware interfacing
-
 
 void HP662xAPowerSupply::ChannelCommand(const char* command, int chan)
 {

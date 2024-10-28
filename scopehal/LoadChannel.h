@@ -53,6 +53,7 @@ public:
 
 	virtual ~LoadChannel();
 
+	///@brief Get the parent load of this channel
 	Load* GetLoad()
 	{ return dynamic_cast<Load*>(m_instrument); }
 
@@ -66,20 +67,28 @@ public:
 		waveform?? need to learn more about this
 	 */
 
-	//Well defined stream IDs used by LoadChannel
+	///@brief Well defined stream IDs used by LoadChannel
 	enum StreamIndexes
 	{
+		///@brief Actual voltage being supplied to the load
 		STREAM_VOLTAGE_MEASURED,
+
+		///@brief Actual current being drawn by the load
 		STREAM_CURRENT_MEASURED,
+
+		///@brief Set point of the load (voltage, current, power, or resistance depending on operating mode)
 		STREAM_SET_POINT
 	};
 
+	///@brief Return the most recent (cached) voltage measurement
 	float GetVoltageMeasured()
 	{ return GetScalarValue(STREAM_VOLTAGE_MEASURED); }
 
+	///@brief Return the most recent (current) current measurement
 	float GetCurrentMeasured()
 	{ return GetScalarValue(STREAM_CURRENT_MEASURED); }
 
+	///@brief Return the the set point of the load voltage measurement
 	float GetSetPoint()
 	{ return GetScalarValue(STREAM_SET_POINT); }
 

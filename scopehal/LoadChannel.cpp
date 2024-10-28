@@ -42,6 +42,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize a load channel
+
+	@param hwname	Internal hardware name of the channel (should match SCPI name if applicable)
+	@param load		The instrument this channel is part of
+	@param color	Display color for the channel in plots and the filter graph
+	@param index	Position of this channel within m_channels of the parent instrument
+ */
 LoadChannel::LoadChannel(
 	const string& hwname,
 	Load* load,
@@ -79,7 +87,9 @@ bool LoadChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 }
 
 
-void LoadChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void LoadChannel::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	auto setPointIn = GetInput(0);
 	if(setPointIn)

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -26,6 +26,13 @@
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
+
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of Load
+	@ingroup core
+ */
 
 #include "scopehal.h"
 #include "Load.h"
@@ -71,6 +78,12 @@ bool Load::AcquireData()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+/**
+	@brief Convert a LoadMode to a printable string
+
+	@param mode	Input mode
+	@return	Text equivalent of mode
+ */
 string Load::GetNameOfLoadMode(LoadMode mode)
 {
 	switch(mode)
@@ -92,6 +105,14 @@ string Load::GetNameOfLoadMode(LoadMode mode)
 	}
 }
 
+/**
+	@brief Convert a printable string to a LoadMode
+
+	If an invalid input is provided, returns MODE_CONSTANT_CURRENT.
+
+	@param name	Name of the mode
+	@return	Enumerated equivalent ofname
+ */
 Load::LoadMode Load::GetLoadModeOfName(const string& name)
 {
 	if(name == "Constant current")
@@ -108,6 +129,9 @@ Load::LoadMode Load::GetLoadModeOfName(const string& name)
 		return MODE_CONSTANT_CURRENT;
 }
 
+/**
+	@brief Serializes this multimeter's configuration to a YAML node.
+ */
 void Load::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
 	//If we're derived from load class but not a load, do nothing
@@ -155,7 +179,10 @@ void Load::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	}
 }
 
-void Load::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& idmap)
+/**
+	@brief Load instrument and channel configuration from a save file
+ */
+void Load::DoLoadConfiguration([[maybe_unused]] int version, const YAML::Node& node, IDTable& idmap)
 {
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
@@ -176,10 +203,13 @@ void Load::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable&
 	}
 }
 
+/**
+	@brief Validate instrument and channel configuration from a save file
+ */
 void Load::DoPreLoadConfiguration(
-	int /*version*/,
+	[[maybe_unused]] int version,
 	const YAML::Node& node,
-	IDTable& /*idmap*/,
+	[[maybe_unused]] IDTable& idmap,
 	ConfigWarningList& list)
 {
 	//If we're derived from load class but not a load, do nothing

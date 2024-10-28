@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,11 +27,19 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of Load
+	@ingroup core
+ */
+
 #ifndef Load_h
 #define Load_h
 
 /**
-	@brief A generic electronic load
+	@brief Base class for all electronic load drivers
+	@ingroup core
  */
 class Load : public virtual Instrument
 {
@@ -49,21 +57,34 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Operating modes
 
+	///@brief Operating modes for the load
 	enum LoadMode
 	{
+		///@brief Draw a constant current regardless of supplied voltage
 		MODE_CONSTANT_CURRENT,
+
+		///@brief Draw as much current as needed for the input voltage to drop to the specified level
 		MODE_CONSTANT_VOLTAGE,
+
+		///@brief Emulate a fixed resistance
 		MODE_CONSTANT_RESISTANCE,
+
+		///@brief Draw a constant power regardless of supplied voltage
 		MODE_CONSTANT_POWER
 	};
 
 	/**
 		@brief Returns the operating mode of the load
+
+		@param channel	Index of the channel to query
 	 */
 	virtual LoadMode GetLoadMode(size_t channel) =0;
 
 	/**
 		@brief Sets the operating mode of the load
+
+		@param channel	Channel index
+		@param mode		Operating mode
 	 */
 	virtual void SetLoadMode(size_t channel, LoadMode mode) =0;
 
@@ -77,11 +98,15 @@ public:
 		@brief Returns a sorted list of operating ranges for the load's current scale, in amps
 
 		For example, returning [1, 10] means the load supports one mode with 1A full scale range and one with 10A range.
+
+		@param channel	Index of the channel to query
 	 */
 	virtual std::vector<float> GetLoadCurrentRanges(size_t channel) =0;
 
 	/**
 		@brief Returns the index of the load's selected current range, as returned by GetLoadCurrentRanges()
+
+		@param channel	Index of the channel to query
 	 */
 	virtual size_t GetLoadCurrentRange(size_t channel) =0;
 
@@ -90,11 +115,15 @@ public:
 
 		For example, returning [10, 250] means the load supports one mode with 10V full scale range and one with
 		250V range.
+
+		@param channel	Index of the channel to query
 	 */
 	virtual std::vector<float> GetLoadVoltageRanges(size_t channel) =0;
 
 	/**
 		@brief Returns the index of the load's selected voltage range, as returned by GetLoadVoltageRanges()
+
+		@param channel	Index of the channel to query
 	 */
 	virtual size_t GetLoadVoltageRange(size_t channel) =0;
 
@@ -119,11 +148,16 @@ public:
 
 	/**
 		@brief Returns true if the load is enabled (sinking power) and false if disabled (no load)
+
+		@param channel	Index of the channel to query
 	 */
 	virtual bool GetLoadActive(size_t channel) =0;
 
 	/**
 		@brief Turns the load on or off
+
+		@param channel	Index of the channel to query
+		@param active	True to turn the load on, false to turn it off
 	 */
 	virtual void SetLoadActive(size_t channel, bool active) =0;
 
@@ -131,6 +165,8 @@ public:
 		@brief Gets the set point for the channel
 
 		Units vary depending on operating mode: amps (CC), volts (CV), ohms (CR), watts (CP).
+
+		@param channel	Index of the channel to query
 	 */
 	virtual float GetLoadSetPoint(size_t channel) =0;
 
@@ -138,6 +174,9 @@ public:
 		@brief Sets the set point for the channel
 
 		Units vary depending on operating mode: amps (CC), volts (CV), ohms (CR), watts (CP).
+
+		@param channel	Index of the channel to query
+		@param target	Desired operating current/voltage/resistance/power depending on the operating mode
 	 */
 	virtual void SetLoadSetPoint(size_t channel, float target) =0;
 
@@ -148,12 +187,16 @@ public:
 protected:
 
 	/**
-		@brief Get the measured voltage of the load
+		@brief Get the measured voltage of the load (uncached instantaneous measurement)
+
+		@param channel	Index of the channel to query
 	 */
 	virtual float GetLoadVoltageActual(size_t channel) =0;
 
 	/**
-		@brief Get the measured current of the load
+		@brief Get the measured current of the load (uncached instantaneous measurement)
+
+		@param channel	Index of the channel to query
 	 */
 	virtual float GetLoadCurrentActual(size_t channel) =0;
 
@@ -161,19 +204,8 @@ protected:
 	// Configuration storage
 
 protected:
-	/**
-		@brief Serializes this multimeter's configuration to a YAML node.
-	 */
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
-
-	/**
-		@brief Load instrument and channel configuration from a save file
-	 */
 	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
-
-	/**
-		@brief Validate instrument and channel configuration from a save file
-	 */
 	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
 };
 
