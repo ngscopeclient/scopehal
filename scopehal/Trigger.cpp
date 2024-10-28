@@ -50,9 +50,9 @@ Trigger::CreateMapType Trigger::m_createprocs;
  */
 Trigger::Trigger(Oscilloscope* scope)
 	: m_scope(scope)
-	, m_levelname("Level")
+	, m_level(m_parameters["Lower Level"])
 {
-	m_parameters[m_levelname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 }
 
 Trigger::~Trigger()

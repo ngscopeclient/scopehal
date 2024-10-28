@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of ImportFilter
+	@ingroup core
+ */
+
 #include "../scopehal/scopehal.h"
 #include "ImportFilter.h"
 
@@ -35,6 +42,12 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Base class constructor
+
+	@param color	Display color for the filter
+	@param xunit	Default X axis unit
+ */
 ImportFilter::ImportFilter(const string& color, Unit xunit)
 	: Filter(color, CAT_GENERATION, xunit)
 {
@@ -43,7 +56,9 @@ ImportFilter::ImportFilter(const string& color, Unit xunit)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool ImportFilter::ValidateChannel(
+	[[maybe_unused]] size_t i,
+	[[maybe_unused]] StreamDescriptor stream)
 {
 	//no inputs
 	return false;
@@ -86,6 +101,8 @@ void ImportFilter::Refresh()
 	imported waveforms.
 
 	This function doesn't actually generate a uniform waveform, the caller has to take care of that.
+
+	@param wfm	The waveform to attempt normalization on
  */
 bool ImportFilter::TryNormalizeTimebase(SparseWaveformBase* wfm)
 {

@@ -50,7 +50,7 @@ public:
 
 	///@brief Get the trigger level
 	float GetLevel()
-	{ return m_parameters[m_levelname].GetFloatVal(); }
+	{ return m_level.GetFloatVal(); }
 
 	/**
 		@brief Sets the trigger level
@@ -58,7 +58,7 @@ public:
 		@param level	Trigger level
 	 */
 	void SetLevel(float level)
-	{ m_parameters[m_levelname].SetFloatVal(level); }
+	{ m_level.SetFloatVal(level); }
 
 	///@brief Gets the scope this trigger is attached to
 	Oscilloscope* GetScope()
@@ -100,8 +100,8 @@ protected:
 	///@brief The scope this trigger is part of
 	Oscilloscope* m_scope;
 
-	///@brief Name of the "trigger level" parameter
-	std::string m_levelname;
+	///@brief "Trigger level" parameter
+	FilterParameter& m_level;
 
 public:
 	virtual std::string GetTriggerDisplayName() =0;

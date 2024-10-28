@@ -49,14 +49,9 @@ using namespace std;
  */
 TwoLevelTrigger::TwoLevelTrigger(Oscilloscope* scope)
 	: Trigger(scope)
+	, m_lowerLevel(m_parameters["Lower Level"])
 {
-	//Redefine the upper level signal name
-	m_parameters.clear();
-	m_levelname = "Upper Level";
-	m_parameters[m_levelname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-
-	m_lowername = "Lower Level";
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_lowerLevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 }
 
 TwoLevelTrigger::~TwoLevelTrigger()

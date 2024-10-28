@@ -83,11 +83,11 @@ public:
 		@param type		Selected parity mode
 	 */
 	void SetParityType(ParityType type)
-	{ m_parameters[m_ptypename].SetIntVal(type); }
+	{ m_parity.SetIntVal(type); }
 
 	///@brief Get the currently selected parity mode
 	ParityType GetParityType()
-	{ return (ParityType) m_parameters[m_ptypename].GetIntVal(); }
+	{ return (ParityType) m_parity.GetIntVal(); }
 
 	///@brief What kind of pattern to match
 	enum MatchType
@@ -111,11 +111,11 @@ public:
 		@param type		Type of pattern to look for
 	 */
 	void SetMatchType(MatchType type)
-	{ m_parameters[m_typename].SetIntVal(type); }
+	{ m_matchtype.SetIntVal(type); }
 
 	///@brief Returns the currently selected match mode
 	MatchType GetMatchType()
-	{ return (MatchType) m_parameters[m_typename].GetIntVal(); }
+	{ return (MatchType) m_matchtype.GetIntVal(); }
 
 	///@brief Polarity of the port
 	enum Polarity
@@ -133,15 +133,15 @@ public:
 		@param type		Desired polarity
 	 */
 	void SetPolarity(Polarity type)
-	{ m_parameters[m_polarname].SetIntVal(type); }
+	{ m_polarity.SetIntVal(type); }
 
 	///@brief Get the current trigger polarity
 	Polarity GetPolarity()
-	{ return (Polarity) m_parameters[m_polarname].GetIntVal(); }
+	{ return (Polarity) m_polarity.GetIntVal(); }
 
 	///@brief Get the current baud rate
 	int64_t GetBitRate()
-	{ return m_parameters[m_baudname].GetIntVal(); }
+	{ return m_baudrate.GetIntVal(); }
 
 	/**
 		@brief Sets the baud rate
@@ -149,11 +149,11 @@ public:
 		@param t	Desired baud rate
 	 */
 	void SetBitRate(int64_t t)
-	{ m_parameters[m_baudname].SetIntVal(t); }
+	{ m_baudrate.SetIntVal(t); }
 
 	///@brief Get the length of the stop bit, in UI
 	float GetStopBits()
-	{ return m_parameters[m_stopname].GetFloatVal(); }
+	{ return m_stoptype.GetFloatVal(); }
 
 	/**
 		@brief Set the length of the stop bit
@@ -161,7 +161,7 @@ public:
 		@param n	Length of the stop bit, in UI
 	 */
 	void SetStopBits(float n)
-	{ m_parameters[m_stopname].SetFloatVal(n); }
+	{ m_stoptype.SetFloatVal(n); }
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
@@ -170,20 +170,20 @@ public:
 
 protected:
 
-	///@brief Name of the "baud rate" parameter
-	std::string m_baudname;
+	///@brief Baud rate
+	FilterParameter& m_baudrate;
 
-	///@brief Name of the "parity type" parameter
-	std::string m_ptypename;
+	///@brief Parity type
+	FilterParameter& m_parity;
 
-	///@brief Name of the "match type" parameter
-	std::string m_typename;
+	///@brief Match type
+	FilterParameter& m_matchtype;
 
-	///@brief Name of the "stop bits" parameter
-	std::string m_stopname;
+	///@brief Stop type
+	FilterParameter& m_stoptype;
 
-	///@brief Name of the "polarity" parameter
-	std::string m_polarname;
+	///@brief Polarity
+	FilterParameter& m_polarity;
 };
 
 #endif

@@ -97,6 +97,7 @@ bool VICPSocketTransport::IsConnected()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
+///@brief Return the constant transport name string "vicp"
 string VICPSocketTransport::GetTransportName()
 {
 	return "vicp";

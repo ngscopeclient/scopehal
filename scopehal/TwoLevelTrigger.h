@@ -67,7 +67,7 @@ public:
 
 	///@brief Gets the lower of the two trigger levels
 	float GetLowerBound()
-	{ return m_parameters[m_lowername].GetFloatVal(); }
+	{ return m_lowerLevel.GetFloatVal(); }
 
 	/**
 		@brief Sets the lower trigger level
@@ -75,12 +75,12 @@ public:
 		@param level	Trigger level
 	 */
 	void SetLowerBound(float level)
-	{ m_parameters[m_lowername].SetFloatVal(level); }
+	{ m_lowerLevel.SetFloatVal(level); }
 
 protected:
 
-	///@brief Name of the "lower threshold" parameter
-	std::string m_lowername;
+	///@brief Lower voltage threshold
+	FilterParameter& m_lowerLevel;
 };
 
 #endif

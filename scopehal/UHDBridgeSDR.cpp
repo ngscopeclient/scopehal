@@ -161,6 +161,7 @@ bool UHDBridgeSDR::HasFrequencyControls()
 	return true;
 }
 
+///@brief Return the constant driver name string "uhdbridge"
 string UHDBridgeSDR::GetDriverNameInternal()
 {
 	return "uhdbridge";

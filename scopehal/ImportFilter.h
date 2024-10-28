@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,12 +31,14 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of ImportFilter
+	@ingroup core
  */
 #ifndef ImportFilter_h
 #define ImportFilter_h
 
 /**
 	@brief Helper base class for filters that import a waveform from a file.
+	@ingroup core
 
 	Note that not all import filters derive from this class (e.g. some derive from SParameterSourceFilter instead).
  */
@@ -45,14 +47,15 @@ class ImportFilter : public Filter
 public:
 	ImportFilter(const std::string& color, Unit xunit = Unit(Unit::UNIT_FS));
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
-	virtual void SetDefaultName();
+	virtual void SetDefaultName() override;
 
-	virtual bool NeedsConfig();
+	virtual bool NeedsConfig() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
+	///@brief Returns the name of the parameter for our file name
 	std::string GetFileNameParameter()
 	{ return m_fpname; }
 

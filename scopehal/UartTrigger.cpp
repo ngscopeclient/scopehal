@@ -50,37 +50,37 @@ using namespace std;
  */
 UartTrigger::UartTrigger(Oscilloscope* scope)
 	: SerialTrigger(scope)
+	, m_baudrate(m_parameters["Bit Rate"])
+	, m_parity(m_parameters["Parity Mode"])
+	, m_matchtype(m_parameters["Trigger Type"])
+	, m_stoptype(m_parameters["Stop Bits"])
+	, m_polarity(m_parameters["Polarity"])
 {
 	CreateInput("din");
 
-	m_baudname = "Bit Rate";
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_baudrate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 
-	m_ptypename = "Parity Mode";
-	m_parameters[m_ptypename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_ptypename].AddEnumValue("None", PARITY_NONE);
-	m_parameters[m_ptypename].AddEnumValue("Even", PARITY_EVEN);
-	m_parameters[m_ptypename].AddEnumValue("Odd", PARITY_ODD);
+	m_parity = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parity.AddEnumValue("None", PARITY_NONE);
+	m_parity.AddEnumValue("Even", PARITY_EVEN);
+	m_parity.AddEnumValue("Odd", PARITY_ODD);
 
 	//Constant 0/1 parity bits are not supported by some scopes as they're pretty rare
-	if(dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL)
+	if(dynamic_cast<SiglentSCPIOscilloscope*>(scope) != nullptr)
 	{
-		m_parameters[m_ptypename].AddEnumValue("Mark", PARITY_MARK);
-		m_parameters[m_ptypename].AddEnumValue("Space", PARITY_SPACE);
+		m_parity.AddEnumValue("Mark", PARITY_MARK);
+		m_parity.AddEnumValue("Space", PARITY_SPACE);
 	}
 
-	m_typename = "Trigger Type";
-	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_typename].AddEnumValue("Data", TYPE_DATA);
-	m_parameters[m_typename].AddEnumValue("Parity error", TYPE_PARITY_ERR);
+	m_matchtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_matchtype.AddEnumValue("Data", TYPE_DATA);
+	m_matchtype.AddEnumValue("Parity error", TYPE_PARITY_ERR);
 
-	m_stopname = "Stop Bits";
-	m_parameters[m_stopname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_UI));
+	m_stoptype = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_UI));
 
-	m_polarname = "Polarity";
-	m_parameters[m_polarname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_polarname].AddEnumValue("Idle High", IDLE_HIGH);
-	m_parameters[m_polarname].AddEnumValue("Idle Low", IDLE_LOW);
+	m_polarity = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_polarity.AddEnumValue("Idle High", IDLE_HIGH);
+	m_polarity.AddEnumValue("Idle Low", IDLE_LOW);
 }
 
 UartTrigger::~UartTrigger()

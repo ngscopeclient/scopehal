@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,16 +42,23 @@
 /**
 	@brief Gets the waveform attached to the specified input.
 
-	This function is safe to call on a NULL input and will return NULL in that case.
+	This function is safe to call on a null input and will return null in that case.
+
+	@param i	Input index
+
+	@return		Data from the channel if applicable, null if no data or no input connected
  */
 inline WaveformBase* FlowGraphNode::GetInputWaveform(size_t i)
 {
 	auto chan = m_inputs[i].m_channel;
-	if(chan == NULL)
-		return NULL;
+	if(chan == nullptr)
+		return nullptr;
 	return chan->GetData(m_inputs[i].m_stream);
 }
 
+/**
+	@brief Get the type of stream (if connected). Returns STREAM_TYPE_ANALOG if null.
+ */
 inline Stream::StreamType StreamDescriptor::GetType()
 {
 	if(m_channel == nullptr)
