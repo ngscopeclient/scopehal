@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SiglentVectorSignalGenerator
+	@ingroup rfgendrivers
+ */
+
 #ifndef SiglentVectorSignalGenerator_h
 #define SiglentVectorSignalGenerator_h
 
@@ -34,6 +41,8 @@
 	@brief Siglent vector signal generators
 
 	Tested on SSG5000X-V series. May also support 3000X but not tested.
+
+	@ingroup rfgendrivers
  */
 class SiglentVectorSignalGenerator
 	: public virtual SCPIRFSignalGenerator

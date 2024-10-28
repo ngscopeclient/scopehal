@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,12 +31,15 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SParameterFilter
+	@ingroup core
  */
 #ifndef SParameterFilter_h
 #define SParameterFilter_h
 
 /**
 	@brief A filter that takes a set of S-parameters as input and outputs another set of S-parameters
+
+	@ingroup core
  */
 class SParameterFilter : public SParameterSourceFilter
 {

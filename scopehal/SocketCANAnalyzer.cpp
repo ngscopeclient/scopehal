@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of SocketCANAnalyzer
+	@ingroup scopedrivers
+ */
+
 #include "scopehal.h"
 #include "SocketCANAnalyzer.h"
 #include "EdgeTrigger.h"
@@ -41,6 +48,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the driver_ver
+
+	@param transport	SCPISocketCANTransport pointing to the desired CAN interface
+ */
 SocketCANAnalyzer::SocketCANAnalyzer(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
@@ -61,6 +73,7 @@ SocketCANAnalyzer::~SocketCANAnalyzer()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant driver name "socketcan"
 string SocketCANAnalyzer::GetDriverNameInternal()
 {
 	return "socketcan";
@@ -172,6 +185,7 @@ Oscilloscope::TriggerMode SocketCANAnalyzer::PollTrigger()
 	return TRIGGER_MODE_TRIGGERED;
 }
 
+///@brief Return true if we are appending to an existing waveform rather than acquiring a completely new one
 bool SocketCANAnalyzer::IsAppendingToWaveform()
 {
 	return m_appendingNext;

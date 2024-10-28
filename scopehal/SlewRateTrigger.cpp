@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of SlewRateTrigger
+	@ingroup triggers
+ */
+
 #include "scopehal.h"
 #include "SlewRateTrigger.h"
 #include "LeCroyOscilloscope.h"
@@ -38,45 +45,53 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+/**
+	@brief Initialize the trigger
+
+	@param scope	The scope this trigger will be used with
+ */
 SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
 	: TwoLevelTrigger(scope)
-	, m_conditionname("Condition")
-	, m_lowerintname("Lower Interval")
-	, m_upperintname("Upper Interval")
-	, m_slopename("Edge Slope")
+	, m_condition(m_parameters["Condition"])
+	, m_lowerInterval(m_parameters["Lower Interval"])
+	, m_upperInterval(m_parameters["Upper Interval"])
+	, m_slope(m_parameters["Edge Slope"])
 {
 	CreateInput("in");
 
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
+	m_condition = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_condition.AddEnumValue("Less than", CONDITION_LESS);
+	m_condition.AddEnumValue("Greater than", CONDITION_GREATER);
 
-	m_parameters[m_slopename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
-	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
+	m_lowerInterval = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_upperInterval = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+
+	m_slope = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_slope.AddEnumValue("Rising", EDGE_RISING);
+	m_slope.AddEnumValue("Falling", EDGE_FALLING);
 
 	//Make/model specific options
-	if((dynamic_cast<LeCroyOscilloscope*>(scope) != NULL) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL))
+	if((dynamic_cast<LeCroyOscilloscope*>(scope) != nullptr) ||
+		(dynamic_cast<SiglentSCPIOscilloscope*>(scope) != nullptr))
 	{
-		m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
-
-		//Upper interval only present on LeCroy
-		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+		m_condition.AddEnumValue("Between", CONDITION_BETWEEN);
+		m_condition.AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 	}
 
-	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
+	else if(dynamic_cast<TektronixOscilloscope*>(scope) != nullptr)
 	{
-		m_lowerintname = "Time Limit";
+		m_slope.AddEnumValue("Any", EDGE_ANY);
 
-		m_parameters[m_slopename].AddEnumValue("Any", EDGE_ANY);
+		m_condition.AddEnumValue("Equal", CONDITION_EQUAL);
+		m_condition.AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
 
-		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
-		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
+		m_upperInterval.MarkHidden();
 	}
 
-	//must come after model specific config since we change parameter names
-	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	else
+	{
+		m_upperInterval.MarkHidden();
+	}
 }
 
 SlewRateTrigger::~SlewRateTrigger()
@@ -86,6 +101,7 @@ SlewRateTrigger::~SlewRateTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant trigger name "Slew Rate"
 string SlewRateTrigger::GetTriggerName()
 {
 	return "Slew Rate";

@@ -50,27 +50,33 @@ using namespace std;
  */
 WindowTrigger::WindowTrigger(Oscilloscope* scope)
 	: TwoLevelTrigger(scope)
-	, m_widthName("Time Limit")
-	, m_crossingName("Edge")
-	, m_windowName("Condition")
+	, m_width(m_parameters["Time Limit"])
+	, m_crossingType(m_parameters["Edge"])
+	, m_windowType(m_parameters["Condition"])
 {
 	CreateInput("din");
 
 	if(dynamic_cast<TektronixOscilloscope*>(scope))
 	{
-		m_parameters[m_widthName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+		m_width = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-		m_parameters[m_crossingName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-		m_parameters[m_crossingName].AddEnumValue("Upper", CROSS_UPPER);
-		m_parameters[m_crossingName].AddEnumValue("Lower", CROSS_LOWER);
-		m_parameters[m_crossingName].AddEnumValue("Either", CROSS_EITHER);
-		m_parameters[m_crossingName].AddEnumValue("None", CROSS_NONE);
+		m_crossingType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_crossingType.AddEnumValue("Upper", CROSS_UPPER);
+		m_crossingType.AddEnumValue("Lower", CROSS_LOWER);
+		m_crossingType.AddEnumValue("Either", CROSS_EITHER);
+		m_crossingType.AddEnumValue("None", CROSS_NONE);
 
-		m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-		m_parameters[m_windowName].AddEnumValue("Enter", WINDOW_ENTER);
-		m_parameters[m_windowName].AddEnumValue("Exit", WINDOW_EXIT);
-		m_parameters[m_windowName].AddEnumValue("Exit (timed)", WINDOW_EXIT_TIMED);
-		m_parameters[m_windowName].AddEnumValue("Enter (timed)", WINDOW_ENTER_TIMED);
+		m_windowType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_windowType.AddEnumValue("Enter", WINDOW_ENTER);
+		m_windowType.AddEnumValue("Exit", WINDOW_EXIT);
+		m_windowType.AddEnumValue("Exit (timed)", WINDOW_EXIT_TIMED);
+		m_windowType.AddEnumValue("Enter (timed)", WINDOW_ENTER_TIMED);
+	}
+
+	//Mark the extra parameters as hidden
+	else
+	{
+		m_width.MarkHidden();
 	}
 }
 
@@ -82,6 +88,7 @@ WindowTrigger::~WindowTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant trigger name "Window"
 string WindowTrigger::GetTriggerName()
 {
 	return "Window";

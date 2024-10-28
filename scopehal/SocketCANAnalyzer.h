@@ -27,6 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SocketCANAnalyzer
+	@ingroup scopedrivers
+ */
+
 #ifndef SocketCANAnalyzer_h
 #define SocketCANAnalyzer_h
 
@@ -34,6 +41,10 @@
 
 class EdgeTrigger;
 
+/**
+	@brief Protocol analyzer driver for Linux SocketCAN API
+	@ingroup scopedrivers
+ */
 class SocketCANAnalyzer
 	: public virtual SCPIOscilloscope
 {
@@ -101,12 +112,20 @@ public:
 	virtual bool IsAppendingToWaveform() override;
 
 protected:
+
+	///@brief True if the trigger is armed
 	bool m_triggerArmed;
+
+	///@brief True if most recent trigger was a single-shot
 	bool m_triggerOneShot;
 
+	///@brief True if we are appending to the previous waveform
 	bool m_appendingNext;
 
+	///@brief Trigger timestamp, integer part
 	int64_t m_startSec;
+
+	///@brief Trigger timestamp, fractional part
 	int64_t m_startNsec;
 
 public:

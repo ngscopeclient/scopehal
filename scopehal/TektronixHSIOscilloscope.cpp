@@ -70,6 +70,7 @@ TektronixHSIOscilloscope::~TektronixHSIOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+///@brief Return the constant driver name "tektronix.hsi"
 string TektronixHSIOscilloscope::GetDriverNameInternal()
 {
 	return "tektronix.hsi";

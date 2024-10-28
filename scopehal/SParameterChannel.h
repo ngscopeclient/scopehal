@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,17 +31,28 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of SParameterChannel
+	@ingroup datamodel
  */
 
 #ifndef SParameterChannel_h
 #define SParameterChannel_h
 
 /**
-	@brief An OscilloscopeChannel containing S-parameter data
+	@brief An OscilloscopeChannel containing S-parameter data in dB/degrees format
+	@ingroup datamodel
  */
 class SParameterChannel : public OscilloscopeChannel
 {
 public:
+
+	/**
+		@brief Initialize the channel
+
+		@param scope	Parent instrument
+		@param hwname	Hardware name of the channel
+		@param color	Display color for the channel
+		@param index	Index of the channel within the instrument
+	 */
 	SParameterChannel(Oscilloscope* scope,
 		const std::string& hwname,
 		const std::string& color,

@@ -88,19 +88,19 @@ public:
 
 	/// @brief Sets the crossing direction (only used for "stay inside" and "stay outside" window types)
 	void SetCrossingDirection(Crossing dir)
-	{ m_parameters[m_crossingName].SetIntVal(dir); }
+	{ m_crossingType.SetIntVal(dir); }
 
 	///@brief Gets the selected crossing direction
 	Crossing GetCrossingDirection()
-	{ return (Crossing)m_parameters[m_crossingName].GetIntVal(); }
+	{ return (Crossing)m_crossingType.GetIntVal(); }
 
 	/// @brief Sets the type of window
 	void SetWindowType(WindowType type)
-	{ m_parameters[m_windowName].SetIntVal(type); }
+	{ m_windowType.SetIntVal(type); }
 
 	///@brief Gets the type of window
 	WindowType GetWindowType()
-	{ return (WindowType)m_parameters[m_windowName].GetIntVal(); }
+	{ return (WindowType)m_windowType.GetIntVal(); }
 
 	/**
 		@brief Sets the time the signal needs to stay in/outside the window
@@ -108,25 +108,25 @@ public:
 		Only used for WINDOW_ENTER_TIMED and WINDOW_EXIT_TIMED
 	 */
 	void SetWidth(int64_t ps)
-	{ m_parameters[m_widthName].SetIntVal(ps); }
+	{ m_width.SetIntVal(ps); }
 
 	///@brief Gets the time the signal needs to stay in / outside the winodw
 	int64_t GetWidth()
-	{ return m_parameters[m_widthName].GetIntVal(); }
+	{ return m_width.GetIntVal(); }
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(WindowTrigger);
 
 protected:
 
-	///@brief Name of the "width" parameter
-	std::string m_widthName;
+	///@brief Time the signal needs to stay in / outside the window
+	FilterParameter& m_width;
 
-	///@brief Name of the "crossing type" parameter
-	std::string m_crossingName;
+	///@brief Crossing direction for stay-inside and stay-outside types
+	FilterParameter& m_crossingType;
 
-	///@brief Name of the "window type" parameter
-	std::string m_windowName;
+	///@brief Condition to trigger on
+	FilterParameter& m_windowType;
 };
 
 #endif
