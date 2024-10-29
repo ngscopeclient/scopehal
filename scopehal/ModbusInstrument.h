@@ -40,7 +40,7 @@
 	@brief Base class for instruments using Modbus communication protocol
 	@ingroup core
  */
-class ModbusInstrument 	: public virtual SCPIInstrument
+class ModbusInstrument 	: public virtual SCPIInstrument, public BinaryDriver
 {
 public:
 	ModbusInstrument(SCPITransport* transport, uint8_t slaveAdress=1);
@@ -75,12 +75,9 @@ protected:
 	std::recursive_mutex m_modbusMutex;
 
 	uint8_t m_slaveAdress;
-	uint16_t CalculateCRC(const uint8_t *buff, size_t len);
 	void Converse(ModbusFunction function, std::vector<uint8_t>* data);
-	void SendCommand(ModbusFunction function, std::vector<uint8_t>* data);
+	void SendCommand(ModbusFunction function, const std::vector<uint8_t> &data);
 	void ReadResponse(ModbusFunction function, std::vector<uint8_t>* data);
-	void PushUint16(std::vector<uint8_t>* data, uint16_t value);
-	uint16_t ReadUint16(std::vector<uint8_t>* data, uint8_t index);
 };
 
 #endif
