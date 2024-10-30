@@ -60,7 +60,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "../log/log.h"
-#include "ScopehalUtil.h"
+#include "../xptools/TimeUtil.h"
 
 #include "config.h"
 
