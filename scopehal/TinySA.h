@@ -104,6 +104,7 @@ protected:
 	std::string ConverseString(const std::string commandString);
 	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length);
 	int64_t ConverseRbwValue(bool sendValue = false, int64_t value = 0);
+	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue = false);
 
 	static void RemoveCR(std::string &toClean)
 	{

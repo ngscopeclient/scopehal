@@ -89,15 +89,15 @@ TinySA::TinySA(SCPITransport* transport)
 	switch (m_tinySAModel)
 	{
 		case TINY_SA_ULTRA:
-			m_freqMin = 1000000L; 		//100kHz
-			m_freqMax = 6000000000L;	//6GHz
+			m_freqMin = 0L; 			// Doc says 100kHz, but sweep can start from 0Hz
+			m_freqMax = 13000000000L;	// Doc says 6GHz, but sweep seem to be able to go up to 12.0726 GHz => let the device decide
 			m_rbwMin  = 200L; 			//200Hz
 			m_rbwMax  = 850000L;		//850kHz
 			m_modelDbmOffset = 174;
 			break;
 		case TINY_SA:
-			m_freqMin = 1000000L; 		//100kHz
-			m_freqMax = 350000000L;		//350MHz
+			m_freqMin = 0L; 			// Doc says 100kHz, but sweep can start from 0Hz
+			m_freqMax = 6000000000L;	// Doc says 350MHz, but might be higher => let the device decide
 			m_rbwMin  = 1L; 			//1kHz
 			m_rbwMax  = 600000L;		//600kHz
 			m_modelDbmOffset = 128;
@@ -105,9 +105,7 @@ TinySA::TinySA(SCPITransport* transport)
 			break;
 	}
 	// Get span information, format is "<start> <stop> <points>"
-	string sweep = ConverseSingle("sweep");
-	sscanf(sweep.c_str(), "%lld %lld", &m_sweepStart, &m_sweepStop);
-	LogDebug("Found sweep start %lld / stop %lld\n",m_sweepStart,m_sweepStop);
+	ConverseSweep(m_sweepStart,m_sweepStop);
 	// Read rbw
 	m_rbw = ConverseRbwValue();
 	// Init channel range and offet
@@ -168,6 +166,7 @@ std::string TinySA::ConverseString(const std::string commandString)
 {
 	string result = "";
 	// Lock guard
+	LogTrace("Sending command: '%s'.\n",commandString.c_str());
 	lock_guard<recursive_mutex> lock(m_transportMutex);
 	m_transport->SendCommand(commandString+"\r\n");
 	// Read untill we get  "ch>\r\n"
@@ -260,7 +259,6 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 				LogError("A timeout occurred while reading data from device.\n");
 				break;
 			}
-			// TODO tiemout
 		}
 	}
 	return dataRead;
@@ -276,9 +274,9 @@ int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 		if(lines > 1)
 		{	// Value was rejected
 			LogWarning("Error while sending rbw value %lld: \"%s\".\n",value,reply[0].c_str());
-			// Clear reply for next use
-			reply.clear();
 		}
+		// Clear reply for next use
+		reply.clear();
 	}
 	// Get currently configured rbw
 	lines = ConverseMultiple("rbw",reply);
@@ -292,6 +290,41 @@ int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 	sscanf(reply[1].c_str(), "%lldkHz", &rbw);
 	LogDebug("Found rbw value = %lld\n",rbw);
 	return rbw;
+}
+
+bool TinySA::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue)
+{
+	size_t lines;
+	vector<string> reply;
+	int64_t origStartValue = sweepStart;
+	int64_t origStopValue = sweepStop;
+	if(setValue)
+	{	
+		// Send start value
+		lines = ConverseMultiple("sweep start "+std::to_string(sweepStart),reply);
+		if(lines > 1)
+		{	// Value was rejected
+			LogWarning("Error while sending sweep start value %lld: \"%s\".\n",sweepStart,reply[0].c_str());
+		}
+		// Send stop value
+		lines = ConverseMultiple("sweep stop "+ std::to_string(sweepStop) ,reply);
+		if(lines > 1)
+		{	// Value was rejected
+			LogWarning("Error while sending sweep stop value %lld: \"%s\".\n",sweepStop,reply[0].c_str());
+		}
+		// Clear reply for next use
+		reply.clear();
+	}
+	// Get currently configured sweep
+	lines = ConverseMultiple("sweep",reply);
+	if(lines < 1)
+	{
+		LogWarning("Error while requesting sweep values: no lines returned.\n");
+		return false;
+	}
+	sscanf(reply[0].c_str(), "%lld %lld", &sweepStart, &sweepStop);
+	LogDebug("Found sweep start %lld / stop %lld.\n",sweepStart,sweepStop);
+	return setValue && ((origStartValue != sweepStart) || (origStopValue != sweepStop));
 }
 
 
@@ -485,6 +518,7 @@ void TinySA::SetResolutionBandwidth(int64_t rbw)
 
 void TinySA::SetSpan(int64_t span)
 {
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	//Calculate requested start/stop
 	auto freq = GetCenterFrequency(0);
 	m_sweepStart = freq - span/2;
@@ -493,15 +527,19 @@ void TinySA::SetSpan(int64_t span)
 	//Clamp to instrument limits
 	m_sweepStart = max(m_freqMin, m_sweepStart);
 	m_sweepStop = min(m_freqMax, m_sweepStop);
+
+	// Send and read back the values to/from the devices to check boundaries
+	ConverseSweep(m_sweepStart,m_sweepStop,true);
 }
 
 int64_t TinySA::GetSpan()
-{	// TODO
+{
 	return m_sweepStop - m_sweepStart;
 }
 
 void TinySA::SetCenterFrequency([[maybe_unused]] size_t channel, int64_t freq)
-{	// TODO
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	//Calculate requested start/stop
 	int64_t span = GetSpan();
 	m_sweepStart = freq - span/2;
@@ -510,6 +548,9 @@ void TinySA::SetCenterFrequency([[maybe_unused]] size_t channel, int64_t freq)
 	//Clamp to instrument limits
 	m_sweepStart = max(m_freqMin, m_sweepStart);
 	m_sweepStop = min(m_freqMax, m_sweepStop);
+
+	// Send and read back the values to/from the devices to check boundaries
+	ConverseSweep(m_sweepStart,m_sweepStop,true);
 }
 
 int64_t TinySA::GetCenterFrequency([[maybe_unused]] size_t channel)
