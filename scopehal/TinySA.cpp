@@ -518,7 +518,6 @@ void TinySA::SetResolutionBandwidth(int64_t rbw)
 
 void TinySA::SetSpan(int64_t span)
 {
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	//Calculate requested start/stop
 	auto freq = GetCenterFrequency(0);
 	m_sweepStart = freq - span/2;
@@ -539,7 +538,6 @@ int64_t TinySA::GetSpan()
 
 void TinySA::SetCenterFrequency([[maybe_unused]] size_t channel, int64_t freq)
 {
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	//Calculate requested start/stop
 	int64_t span = GetSpan();
 	m_sweepStart = freq - span/2;
