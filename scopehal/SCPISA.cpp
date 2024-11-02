@@ -189,7 +189,7 @@ void SCPISA::SetSampleRate([[maybe_unused]] uint64_t rate)
 
 uint64_t SCPISA::GetSampleRate()
 {
-	return 1;
+	return 0;
 }
 
 unsigned int SCPISA::GetInstrumentTypes() const
