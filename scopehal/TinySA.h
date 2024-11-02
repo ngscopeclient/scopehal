@@ -62,8 +62,6 @@ public:
 
 	//Channel configuration
 
-	virtual void FlushConfigCache() override;
-
 	//Triggering
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
@@ -93,27 +91,51 @@ public:
 	virtual int64_t GetResolutionBandwidth() override;
 
 protected:
+	enum Model {
+		TINY_SA,
+		TINY_SA_ULTRA
+	};
+
 	// Make sure several request don't collide before we received the corresponding response
 	std::recursive_mutex m_transportMutex;
 
 	std::string ConverseSingle(const std::string commandString);
 	size_t ConverseMultiple(const std::string commandString, std::vector<std::string> &readLines);
 	std::string ConverseString(const std::string commandString);
-	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data);
+	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length);
+	int64_t ConverseRbwValue(bool sendValue = false, int64_t value = 0);
+
+	static void RemoveCR(std::string &toClean)
+	{
+		toClean.erase( std::remove(toClean.begin(), toClean.end(), '\r'), toClean.end() );
+	}
 
 	//config cache
 	std::string GetChannelColor(size_t i);
 
+
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	bool m_sampleDepthValid;
 	int64_t m_sampleDepth;
-	bool m_rbwValid;
 	int64_t m_rbw;
+	int64_t m_rbwMin;
+	int64_t m_rbwMax;
+
+	Model m_tinySAModel;
+	// Span control
+	int64_t m_sweepStart;
+	int64_t m_sweepStop;
+
+	int64_t m_freqMin;
+	int64_t m_freqMax;
+	// dbm offset to apply on values received from the device (model depedant)
+	int64_t m_modelDbmOffset;
 
 	inline static const std::string TRAILER_STRING = "ch> ";
 	inline static const size_t TRAILER_STRING_LENGTH = TRAILER_STRING.size();
+	inline static const std::string EOL_STRING = "\r\n";
+	inline static const size_t EOL_STRING_LENGTH = EOL_STRING.size();
 	static const size_t MAX_RESPONSE_SIZE = 100*1024;
 
 public:

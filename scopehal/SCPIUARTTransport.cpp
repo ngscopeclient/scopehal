@@ -124,10 +124,31 @@ void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
 	LogTrace("Sent %zu bytes.\n", len);
 }
 
-size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
+size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress)
 {
-	if(!m_uart.Read(buf, len))
-		return 0;
+	size_t chunk_size = len;
+	if (progress)
+	{
+		/* carve up the chunk_size into 1% of data block */
+		chunk_size /= 100;
+	}
+
+	for (size_t pos = 0; pos < len; )
+	{
+		size_t n = chunk_size;
+		if (n > (len - pos))
+			n = len - pos;
+		if(!m_uart.Read(buf + pos, n))
+		{
+			LogTrace("Failed to get %zu bytes (@ pos %zu)\n", len, pos);
+			return 0;
+		}
+		pos += n;
+		if (progress)
+		{
+			progress((float)pos / (float)len);
+		}
+	}
 	//LogTrace("Got %zu bytes: %s\n", len, LogHexDump(buf,len).c_str());
 	LogTrace("Got %zu bytes.\n", len);
 	return len;
