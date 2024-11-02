@@ -139,7 +139,7 @@ size_t TinySA::ConverseMultiple(const std::string commandString, std::vector<str
 		}
         else if (!curLine.empty()) 
 		{
-			LogDebug("Pusshing back line \"%s\".\n",curLine.c_str());
+			LogTrace("Pusshing back line \"%s\".\n",curLine.c_str());
             readLines.push_back(curLine);
 			size++;
         }
@@ -206,6 +206,7 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 	size_t dataRead = 0;
 	// Prepare buffer size
 	data.resize(length);
+	double start = GetTime();
 	while(true)
 	{	
 		if(inFooter || inHeader)
@@ -214,7 +215,12 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 			if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
 			{
 				// We might have to wait for the sweep to start to get a response
-				// TODO timeout
+				if(GetTime()-start >= COMMUNICATION_TIMEOUT)
+				{
+					// Timeout
+					LogError("A timeout occurred while reading data from device.\n");
+					break;
+				}
 				continue;
 			}
 			bytesRead++;
@@ -248,6 +254,12 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 			dataRead += m_transport->ReadRawData(length,data.begin().base(),[this] (float progress) { ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 			if(dataRead >= length)
 				inFooter = true;
+			else if(GetTime()-start >= COMMUNICATION_TIMEOUT)
+			{
+				// Timeout
+				LogError("A timeout occurred while reading data from device.\n");
+				break;
+			}
 			// TODO tiemout
 		}
 	}
