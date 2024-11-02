@@ -64,24 +64,48 @@ public:
 	virtual float GetChannelOffset(size_t i, size_t stream) override;
 	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
 
+	//Triggering
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
+
 	//Timebase
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
+	virtual uint64_t GetSampleRate() override;
+	virtual void SetSampleRate(uint64_t rate) override;
 	virtual void SetTriggerOffset(int64_t offset) override;
 	virtual int64_t GetTriggerOffset() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
-	virtual uint64_t GetSampleRate() override;
-	virtual void SetSampleRate(uint64_t rate) override;
 
 	virtual bool HasFrequencyControls() override;
 	virtual bool HasTimebaseControls() override;
 
+	virtual void SetResolutionBandwidth(int64_t rbw);
+	virtual int64_t GetResolutionBandwidth() override;
+
 protected:
 	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
 	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
+
+	bool m_triggerArmed = false;
+	bool m_triggerOneShot = false;
+
+	int64_t m_sampleDepth = 0;
+	int64_t m_rbw = 0;
+
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation

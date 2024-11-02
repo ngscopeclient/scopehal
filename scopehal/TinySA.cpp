@@ -51,10 +51,6 @@ using namespace std;
 TinySA::TinySA(SCPITransport* transport)
 	: SCPIDevice(transport,false)
 	, SCPIInstrument(transport,false)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
-	, m_sampleDepth(0)
-	, m_rbw(0)
 {
 	std::vector<string> info;
 	string version =  ConverseSingle("version");
@@ -352,17 +348,6 @@ string TinySA::GetDriverNameInternal()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device interface functions
 
-OscilloscopeChannel* TinySA::GetExternalTrigger()
-{
-	return NULL;
-}
-
-Oscilloscope::TriggerMode TinySA::PollTrigger()
-{
-	//Always report "triggered" so we can block on AcquireData() in ScopeThread
-	return TRIGGER_MODE_TRIGGERED;
-}
-
 bool TinySA::AcquireData()
 {
 	// LogDebug("Acquiring data\n");
@@ -446,36 +431,6 @@ bool TinySA::AcquireData()
 	return true;
 }
 
-
-void TinySA::Start()
-{
-	m_triggerArmed = true;
-	m_triggerOneShot = false;
-}
-
-void TinySA::StartSingleTrigger()
-{
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
-}
-
-void TinySA::Stop()
-{
-	m_triggerArmed = false;
-	m_triggerOneShot = false;
-}
-
-void TinySA::ForceTrigger()
-{
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
-}
-
-bool TinySA::IsTriggerArmed()
-{
-	return m_triggerArmed;
-}
-
 vector<uint64_t> TinySA::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
@@ -491,33 +446,8 @@ vector<uint64_t> TinySA::GetSampleDepthsNonInterleaved()
 	return ret;
 }
 
-uint64_t TinySA::GetSampleDepth()
-{
-	return m_sampleDepth;
-}
-
-void TinySA::SetSampleDepth(uint64_t depth)
-{
-	m_sampleDepth = depth;
-}
-
-void TinySA::PullTrigger()
-{
-	//pulling not needed, we always have a valid trigger cached
-}
-
-void TinySA::PushTrigger()
-{
-	//do nothing
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Spectrum analyzer mode
-
-int64_t TinySA::GetResolutionBandwidth()
-{
-	return m_rbw;
-}
 
 void TinySA::SetResolutionBandwidth(int64_t rbw)
 {	

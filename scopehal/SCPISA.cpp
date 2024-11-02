@@ -229,3 +229,83 @@ void SCPISA::SetChannelOffset(size_t i, size_t stream, float offset)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
 }
+
+// Trigger management
+
+OscilloscopeChannel* SCPISA::GetExternalTrigger()
+{
+	return NULL;
+}
+
+Oscilloscope::TriggerMode SCPISA::PollTrigger()
+{
+	return m_triggerArmed ? TRIGGER_MODE_TRIGGERED : TRIGGER_MODE_STOP;
+}
+void SCPISA::Start()
+{
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+}
+
+void SCPISA::StartSingleTrigger()
+{
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+}
+
+void SCPISA::Stop()
+{
+	m_triggerArmed = false;
+	m_triggerOneShot = false;
+}
+
+void SCPISA::ForceTrigger()
+{
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+}
+
+bool SCPISA::IsTriggerArmed()
+{
+	return m_triggerArmed;
+}
+
+void SCPISA::PullTrigger()
+{
+	//pulling not needed, we always have a valid trigger cached
+}
+
+void SCPISA::PushTrigger()
+{
+	//do nothing
+}
+
+// Sample depth management
+
+vector<uint64_t> SCPISA::GetSampleDepthsNonInterleaved()
+{
+	vector<uint64_t> ret;
+	return ret;
+}
+
+uint64_t SCPISA::GetSampleDepth()
+{
+	return m_sampleDepth;
+}
+
+void SCPISA::SetSampleDepth(uint64_t depth)
+{
+	m_sampleDepth = depth;
+}
+
+// RBW management
+int64_t SCPISA::GetResolutionBandwidth()
+{
+	return m_rbw;
+}
+
+void SCPISA::SetResolutionBandwidth(int64_t rbw)
+{	
+	m_rbw = rbw;
+}
+

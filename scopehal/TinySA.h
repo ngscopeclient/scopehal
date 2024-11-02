@@ -62,33 +62,20 @@ public:
 
 	//Channel configuration
 
-	//Triggering
-	virtual OscilloscopeChannel* GetExternalTrigger() override;
-	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	//Data acquisition
 	virtual bool AcquireData() override;
-	virtual void Start() override;
-	virtual void StartSingleTrigger() override;
-	virtual void Stop() override;
-	virtual void ForceTrigger() override;
-	virtual bool IsTriggerArmed() override;
-	virtual void PushTrigger() override;
-	virtual void PullTrigger() override;
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration
 
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
-	virtual uint64_t GetSampleDepth() override;
-	virtual void SetSampleDepth(uint64_t depth) override;
 	virtual void SetSpan(int64_t span) override;
 	virtual int64_t GetSpan() override;
 	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
 	virtual int64_t GetCenterFrequency(size_t channel) override;
 
-	//TODO: Sweep configuration ?
-	virtual void SetResolutionBandwidth(int64_t rbw);
-	virtual int64_t GetResolutionBandwidth() override;
+	virtual void SetResolutionBandwidth(int64_t rbw) override;
 
 protected:
 	enum Model {
@@ -111,15 +98,8 @@ protected:
 		toClean.erase( std::remove(toClean.begin(), toClean.end(), '\r'), toClean.end() );
 	}
 
-	//config cache
 	std::string GetChannelColor(size_t i);
 
-
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
-	int64_t m_sampleDepth;
-	int64_t m_rbw;
 	int64_t m_rbwMin;
 	int64_t m_rbwMax;
 
