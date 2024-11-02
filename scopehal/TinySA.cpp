@@ -172,10 +172,20 @@ std::string TinySA::ConverseString(const std::string commandString)
 	// Read untill we get  "ch>\r\n"
 	char tmp = ' ';
 	size_t bytesRead = 0;
+	double start = GetTime();
 	while(true)
 	{	// Consume response until we find the end delimiter
 		if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
-			break;
+		{
+			// We might have to wait for a bit to get a response
+			if(GetTime()-start >= COMMUNICATION_TIMEOUT)
+			{
+				// Timeout
+				LogError("A timeout occurred while reading data from device.\n");
+				break;
+			}
+			continue;
+		}
 		result += tmp;
 		bytesRead++;
 		if(bytesRead > MAX_RESPONSE_SIZE)
@@ -268,9 +278,10 @@ int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 {
 	size_t lines;
 	vector<string> reply;
+	float kHzValue = ((float)value)/1000;
 	if(sendValue)
 	{
-		lines = ConverseMultiple("rbw "+std::to_string(value),reply);
+		lines = ConverseMultiple("rbw "+std::to_string(kHzValue),reply);
 		if(lines > 1)
 		{	// Value was rejected
 			LogWarning("Error while sending rbw value %lld: \"%s\".\n",value,reply[0].c_str());
@@ -285,11 +296,12 @@ int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 		LogWarning("Error while requesting rbw: returned only %zu lines.\n",lines);
 		return 0;
 	}
-	// First line is for usage, get the actual rbw value from second line
+	// First line is for usage, get the actual rbw value from second line, the unit can be Hz or KHz
 	int64_t rbw;
 	sscanf(reply[1].c_str(), "%lldkHz", &rbw);
-	LogDebug("Found rbw value = %lld\n",rbw);
-	return rbw;
+	bool isKhz = (reply[1].find("kHz") != std::string::npos);
+	LogDebug("Found rbw value = %lld %s.\n",rbw,isKhz ? "kHz" : "Hz");
+	return isKhz ? (rbw*1000) : rbw;
 }
 
 bool TinySA::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue)
@@ -512,8 +524,8 @@ void TinySA::SetResolutionBandwidth(int64_t rbw)
 	//Clamp to instrument limits
 	m_rbw = max(m_rbwMin, rbw);
 	m_rbw = min(m_rbwMax, m_rbw);
-	// Send rbw in kHz and read actual return
-	m_rbw = ConverseRbwValue(true, (m_rbw/1000));
+	// Send rbw and read actual return
+	m_rbw = ConverseRbwValue(true, m_rbw);
 }
 
 void TinySA::SetSpan(int64_t span)
