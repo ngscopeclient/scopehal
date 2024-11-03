@@ -127,10 +127,12 @@ void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
 size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress)
 {
 	size_t chunk_size = len;
-	if (progress)
+	if (progress && len > 1)
 	{
 		/* carve up the chunk_size into 1% of data block */
 		chunk_size /= 100;
+		if (chunk_size < 2)
+			chunk_size = 2;	// Always read at least 2 bytes at once since one single byte can block on Windows system
 	}
 
 	for (size_t pos = 0; pos < len; )
@@ -140,8 +142,8 @@ size_t SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf, std::funct
 			n = len - pos;
 		if(!m_uart.Read(buf + pos, n))
 		{
-			LogTrace("Failed to get %zu bytes (@ pos %zu)\n", len, pos);
-			return 0;
+			LogTrace("Failed to get %zu bytes out of %zu (@ pos %zu)\n", n, len, pos);
+			return pos;
 		}
 		pos += n;
 		if (progress)
