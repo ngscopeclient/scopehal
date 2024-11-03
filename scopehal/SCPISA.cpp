@@ -32,7 +32,7 @@
 
 using namespace std;
 
-//SCPISA::VNACreateMapType SCPISA::m_vnacreateprocs;
+//SCPISA::SACreateMapType SCPISA::m_vnacreateprocs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -49,7 +49,7 @@ SCPISA::~SCPISA()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 /*
-void SCPISA::DoAddDriverClass(string name, VNACreateProcType proc)
+void SCPISA::DoAddDriverClass(string name, SACreateProcType proc)
 {
 	m_vnacreateprocs[name] = proc;
 }
@@ -60,12 +60,12 @@ void SCPISA::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPISA> SCPISA::CreateVNA(string driver, SCPITransport* transport)
+shared_ptr<SCPISA> SCPISA::CreateSA(string driver, SCPITransport* transport)
 {
 	if(m_vnacreateprocs.find(driver) != m_vnacreateprocs.end())
 		return m_vnacreateprocs[driver](transport);
 
-	LogError("Invalid VNA driver name \"%s\"\n", driver.c_str());
+	LogError("Invalid SA driver name \"%s\"\n", driver.c_str());
 	return nullptr;
 }
 */

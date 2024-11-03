@@ -113,7 +113,13 @@ TinySA::~TinySA()
 {
 }
 
-
+/**
+ * @brief Converse with the device : send a command and read the reply over several lines
+ * 
+ * @param commandString the command string to send
+ * @param readLines a verctor to store the reply lines
+ * @return size_t the number of lines received from the device
+ */
 size_t TinySA::ConverseMultiple(const std::string commandString, std::vector<string> &readLines)
 {
 	stringstream ss(ConverseString(commandString));
@@ -141,6 +147,12 @@ size_t TinySA::ConverseMultiple(const std::string commandString, std::vector<str
 	return size;
 }
 
+/**
+ * @brief Converse with the device by sending a command and receiving a single line response
+ * 
+ * @param commandString the command string to send
+ * @return std::string the received response
+ */
 std::string TinySA::ConverseSingle(const std::string commandString)
 {
 	stringstream ss(ConverseString(commandString));
@@ -158,6 +170,12 @@ std::string TinySA::ConverseSingle(const std::string commandString)
 	return result;
 }
 
+/**
+ * @brief Base method to converse with the device
+ * 
+ * @param commandString the command string to send to the device
+ * @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
+ */
 std::string TinySA::ConverseString(const std::string commandString)
 {
 	string result = "";
@@ -196,6 +214,14 @@ std::string TinySA::ConverseString(const std::string commandString)
 	return result;
 }
 
+/**
+ * @brief Special method used to converse with the device with a binary response (e.g. spanraw command)
+ * 
+ * @param commandString the command string to send
+ * @param data a vector to store the binary data received from the device
+ * @param length the length of binary data expected from the device
+ * @return size_t the number of bytes actually read from the device
+ */
 size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length)
 {
 	string header;
@@ -270,6 +296,13 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 	return dataRead;
 }
 
+/**
+ * @brief Set and/or read the rbw value from the device
+ * 
+ * @param sendValue true if the rbw value hase to be set
+ * @param value the value to set
+ * @return int64_t the rbw value read from the device
+ */
 int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 {
 	size_t lines;
@@ -300,6 +333,14 @@ int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 	return isKhz ? (rbw*1000) : rbw;
 }
 
+/**
+ * @brief Set and/or read the sweep values from the device
+ * 
+ * @param sweepStart the sweep start value (in/out)
+ * @param sweepStop the sweep stop value (in/out)
+ * @param setValue tru is the values have to be set on the device
+ * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
+ */
 bool TinySA::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue)
 {
 	size_t lines;
@@ -342,7 +383,7 @@ bool TinySA::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValu
 ///@brief Return the constant driver name string "tektronix"
 string TinySA::GetDriverNameInternal()
 {
-	return "tiny-sa";
+	return "tiny_sa";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

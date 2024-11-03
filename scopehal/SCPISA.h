@@ -110,24 +110,24 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	//typedef std::shared_ptr<SCPISA> (*VNACreateProcType)(SCPITransport*);
-	//static void DoAddDriverClass(std::string name, VNACreateProcType proc);
+	//typedef std::shared_ptr<SCPISA> (*SACreateProcType)(SCPITransport*);
+	//static void DoAddDriverClass(std::string name, SACreateProcType proc);
 
 	//static void EnumDrivers(std::vector<std::string>& names);
-	//static std::shared_ptr<SCPISA> CreateVNA(std::string driver, SCPITransport* transport);
+	//static std::shared_ptr<SCPISA> CreateSA(std::string driver, SCPITransport* transport);
 
 	//Class enumeration
-	//typedef std::map< std::string, VNACreateProcType > VNACreateMapType;
-	//static VNACreateMapType m_vnacreateprocs;
+	//typedef std::map< std::string, SACreateProcType > SACreateMapType;
+	//static SACreateMapType m_vnacreateprocs;
 };
 
 /*
-#define VNA_INITPROC(T) \
+#define SA_INITPROC(T) \
 	static std::shared_ptr<SCPISA> CreateInstance(SCPITransport* transport) \
 	{	return std::make_shared<T>(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
-#define AddVNADriverClass(T) SCPISA::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+#define AddSADriverClass(T) SCPISA::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
 */
 #endif
