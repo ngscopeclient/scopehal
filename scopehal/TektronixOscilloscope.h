@@ -316,7 +316,7 @@ protected:
 	std::map<int, bool> m_channelsEnabled;
 
 	///@brief Cached map of <channel ID, center frequency>
-	std::map<int, int64_t> m_channelsCenterFrequency;
+	std::map<int, int64_t> m_channelCenterFrequencies;
 
 	///@brief True if m_triggerChannel is valid, false if out of sync
 	bool m_triggerChannelValid;
