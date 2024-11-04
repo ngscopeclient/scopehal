@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -209,7 +209,7 @@ FunctionGenerator::WaveShape OwonXDGFunctionGenerator::GetFunctionChannelShape(i
 		return SHAPE_SAWTOOTH_UP;
 	else if(reply == "PULS")
 		return SHAPE_PULSE;
-	else if(reply == "PRNoise")
+	else if(reply == "PRNoise" || reply == "PRN" )
 		return SHAPE_NOISE;
 	else if(reply == "DC")
 		return SHAPE_DC;
@@ -259,7 +259,7 @@ FunctionGenerator::WaveShape OwonXDGFunctionGenerator::GetFunctionChannelShape(i
 		return SHAPE_ASIN;
 	else if(reply == "ATan")
 		return SHAPE_ATAN;
-	else if(reply == "ACot")
+	else if(reply == "ACot" || reply == "Acot")
 		return SHAPE_ACOT;
 	else if(reply == "Bartlett")
 		return SHAPE_BARTLETT;
