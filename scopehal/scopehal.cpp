@@ -57,6 +57,7 @@
 #include "TektronixOscilloscope.h"
 #include "TektronixHSIOscilloscope.h"
 #include "ThunderScopeOscilloscope.h"
+#include "TinySA.h"
 
 #include "AntikernelLabsTriggerCrossbar.h"
 #include "MultiLaneBERT.h"
@@ -239,6 +240,7 @@ void DriverStaticInit()
 	AddDriverClass(TektronixOscilloscope);
 	AddDriverClass(TektronixHSIOscilloscope);
 	AddDriverClass(ThunderScopeOscilloscope);
+	AddDriverClass(TinySA);
 #ifdef __linux
 	AddDriverClass(SocketCANAnalyzer);
 #endif

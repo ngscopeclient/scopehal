@@ -145,6 +145,7 @@ set(SCOPEHAL_SOURCES
 	SCPIOscilloscope.cpp
 	SCPIPowerSupply.cpp
 	SCPIRFSignalGenerator.cpp
+	SCPISA.cpp
 	SCPISDR.cpp
 	SCPISpectrometer.cpp
 	SCPIVNA.cpp
@@ -183,6 +184,7 @@ set(SCOPEHAL_SOURCES
 	TektronixOscilloscope.cpp
 	TektronixHSIOscilloscope.cpp
 	ThunderScopeOscilloscope.cpp
+	TinySA.cpp
 	UHDBridgeSDR.cpp
 	HP662xAPowerSupply.cpp
 	RigolDP8xxPowerSupply.cpp
