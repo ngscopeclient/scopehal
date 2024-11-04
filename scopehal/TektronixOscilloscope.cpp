@@ -63,6 +63,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_sampleDepth(0)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
+	, m_spanValid(false)
+	, m_span(0)
 	, m_rbwValid(false)
 	, m_rbw(0)
 	, m_dmmAutorangeValid(false)
@@ -436,6 +438,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_probeTypes.clear();
 	m_channelDeskew.clear();
 	m_channelUnits.clear();
+	m_channelCenterFrequencies.clear();
 
 	//Clear cached display name of all channels
 	for(auto c : m_channels)
@@ -447,6 +450,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_sampleRateValid = false;
 	m_sampleDepthValid = false;
 	m_triggerOffsetValid = false;
+	m_spanValid = false;
 	m_rbwValid = false;
 	m_dmmAutorangeValid = false;
 	m_dmmChannelValid = false;
@@ -3674,6 +3678,13 @@ bool TektronixOscilloscope::HasFrequencyControls()
 
 void TektronixOscilloscope::SetSpan(int64_t span)
 {
+	//Update the cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_span = span;
+		m_spanValid = true;
+	}
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -3688,19 +3699,31 @@ void TektronixOscilloscope::SetSpan(int64_t span)
 
 int64_t TektronixOscilloscope::GetSpan()
 {
+	if(m_spanValid)
+		return m_span;
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return round(stod(m_transport->SendCommandQueuedWithReply("SV:SPAN?")));
-
+			m_span = round(stod(m_transport->SendCommandQueuedWithReply("SV:SPAN?")));
+			break;
 		default:
-			return 1;
+			m_span = 1;
 	}
+
+	m_spanValid = true;
+	return m_span;
 }
 
 void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 {
+	//Update cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelCenterFrequencies[channel] = freq;
+	}
+
 	if(channel < m_spectrumChannelBase)
 		return;
 
@@ -3719,19 +3742,35 @@ void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 
 int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
 {
-	if(channel < m_spectrumChannelBase)
-		return 0;
-
-	switch(m_family)
+	//Check cache
 	{
-		case FAMILY_MSO5:
-		case FAMILY_MSO6:
-			return round(stof(m_transport->SendCommandQueuedWithReply(
-				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY?")));
-
-		default:
-			return 0;
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelCenterFrequencies.find(channel) != m_channelCenterFrequencies.end())
+			return m_channelCenterFrequencies[channel];
 	}
+
+	int64_t centerFrequency;
+	if(channel < m_spectrumChannelBase)
+		centerFrequency =  0;
+	else
+	{
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				centerFrequency = round(stof(m_transport->SendCommandQueuedWithReply(
+					string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY?")));
+				break;
+			default:
+				centerFrequency = 0;
+				break;
+		}
+	}
+
+	//Update cache
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelCenterFrequencies[channel] = centerFrequency;
+	return centerFrequency;
 }
 
 void TektronixOscilloscope::SetResolutionBandwidth(int64_t rbw)

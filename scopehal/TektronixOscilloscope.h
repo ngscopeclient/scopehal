@@ -315,6 +315,9 @@ protected:
 	///@brief Cached map of <channel ID, enable flag>
 	std::map<int, bool> m_channelsEnabled;
 
+	///@brief Cached map of <channel ID, center frequency>
+	std::map<int, int64_t> m_channelCenterFrequencies;
+
 	///@brief True if m_triggerChannel is valid, false if out of sync
 	bool m_triggerChannelValid;
 
@@ -338,6 +341,12 @@ protected:
 
 	///@brief Offset from start of wavefrom to trigger position
 	int64_t m_triggerOffset;
+
+	///@brief True if span is valid, false if out of sync
+	bool m_spanValid;
+
+	///@brief Span value for frequency control
+	int64_t m_span;
 
 	std::map<size_t, int64_t> m_channelDeskew;
 	std::map<size_t, ProbeType> m_probeTypes;
