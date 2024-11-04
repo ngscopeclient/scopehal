@@ -30,81 +30,90 @@
 /**
 	@file
 	@author Frederic Borry
-	@brief Declaration of TinySA
-
-	@ingroup scopedrivers
+	@brief Declaration of NanoVNA
+	@ingroup vnadrivers
  */
 
-#ifndef TinySA_h
-#define TinySA_h
+#ifndef NanoVNA_h
+#define NanoVNA_h
+
+class EdgeTrigger;
 
 /**
-	@brief Driver for TinySA and TinySA Ultra Spectrum Analizers
-	@ingroup scopedrivers
-
-	TinySA and TinySA Ultra are hobyist low-cost Spectrum Analizer designed by Erik Kaashoek: https://tinysa.org/
-	They can be connected to a PC via a USB COM port.
-
+	@brief NanoVNA - driver for talking to a NanoVNA using the NanoVNA 5 software
+	@ingroup vnadrivers
  */
-class TinySA
-	: public virtual SCPISA
-	, public virtual CommandLineDriver
+class NanoVNA : public virtual SCPIVNA, public virtual CommandLineDriver
 {
 public:
-	TinySA(SCPITransport* transport);
-	virtual ~TinySA();
+	NanoVNA(SCPITransport* transport);
+	virtual ~NanoVNA();
 
 	//not copyable or assignable
-	TinySA(const TinySA& rhs) =delete;
-	TinySA& operator=(const TinySA& rhs) =delete;
-
+	NanoVNA(const NanoVNA& rhs) =delete;
+	NanoVNA& operator=(const NanoVNA& rhs) =delete;
 
 public:
 
 	//Channel configuration
 
-	//Data acquisition
+	//Triggering
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
 	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
 
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Spectrum analyzer configuration
-
+	//Timebase
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
 	virtual void SetSpan(int64_t span) override;
 	virtual int64_t GetSpan() override;
 	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
 	virtual int64_t GetCenterFrequency(size_t channel) override;
 
+	//TODO: Sweep configuration
+	virtual int64_t GetResolutionBandwidth() override;
 	virtual void SetResolutionBandwidth(int64_t rbw) override;
 
 protected:
+	// Device communication methods and members
 	enum Model {
-		TINY_SA,
-		TINY_SA_ULTRA
+		MODEL_UNKNOWN,
+		MODEL_NANOVNA,
+		MODEL_NANOVNA_F,
+		MODEL_NANOVNA_H,
+		MODEL_NANOVNA_H4,
+		MODEL_NANOVNA_F_V2,
+		MODEL_NANOVNA_V2
 	};
-
-	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length);
-	int64_t ConverseRbwValue(bool sendValue = false, int64_t value = 0);
 
 	std::string GetChannelColor(size_t i);
 
-	int64_t m_rbwMin;
-	int64_t m_rbwMax;
+	bool m_triggerArmed = false;
+	bool m_triggerOneShot = false;
 
-	Model m_tinySAModel;
+	int64_t m_sampleDepth = 0;
+	int64_t m_rbw = 0;
+
+	Model m_nanoVNAModel = MODEL_UNKNOWN;
+
 	// Span control
 	int64_t m_sweepStart;
 	int64_t m_sweepStop;
 
-	int64_t m_freqMin;
 	int64_t m_freqMax;
-	// dbm offset to apply on values received from the device (model depedant)
-	int64_t m_modelDbmOffset;
+	int64_t m_freqMin;
 
 public:
 	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC(TinySA)
+	VNA_INITPROC(NanoVNA)
 };
 
 #endif

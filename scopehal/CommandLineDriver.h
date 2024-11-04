@@ -29,82 +29,85 @@
 
 /**
 	@file
-	@author Frederic Borry
-	@brief Declaration of TinySA
+	@author Frederic BORRY
+	@brief Helper class for command line drivers: provides helper methods for command line based communication with devices like NanoVNA or TinySA
 
-	@ingroup scopedrivers
+	@ingroup core
  */
 
-#ifndef TinySA_h
-#define TinySA_h
+#ifndef CommandLineDriver_h
+#define CommandLineDriver_h
 
 /**
-	@brief Driver for TinySA and TinySA Ultra Spectrum Analizers
-	@ingroup scopedrivers
-
-	TinySA and TinySA Ultra are hobyist low-cost Spectrum Analizer designed by Erik Kaashoek: https://tinysa.org/
-	They can be connected to a PC via a USB COM port.
-
+	@brief Helper class for command line drivers: provides helper methods for command line based communication with devices like NanoVNA or TinySA
+	@ingroup core
  */
-class TinySA
-	: public virtual SCPISA
-	, public virtual CommandLineDriver
+class CommandLineDriver: public virtual SCPIDevice
 {
 public:
-	TinySA(SCPITransport* transport);
-	virtual ~TinySA();
+	CommandLineDriver(SCPITransport* transport);
+	~CommandLineDriver();
 
-	//not copyable or assignable
-	TinySA(const TinySA& rhs) =delete;
-	TinySA& operator=(const TinySA& rhs) =delete;
-
-
-public:
-
-	//Channel configuration
-
-	//Data acquisition
-	virtual bool AcquireData() override;
-
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Spectrum analyzer configuration
-
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
-	virtual void SetSpan(int64_t span) override;
-	virtual int64_t GetSpan() override;
-	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
-	virtual int64_t GetCenterFrequency(size_t channel) override;
-
-	virtual void SetResolutionBandwidth(int64_t rbw) override;
 
 protected:
-	enum Model {
-		TINY_SA,
-		TINY_SA_ULTRA
-	};
+	// Make sure several request don't collide before we received the corresponding response
+	std::recursive_mutex m_transportMutex;
 
-	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length);
-	int64_t ConverseRbwValue(bool sendValue = false, int64_t value = 0);
+	/**
+	 * @brief Converse with the device : send a command and read the reply over several lines
+	 *
+	 * @param commandString the command string to send
+	 * @param readLines a verctor to store the reply lines
+	 * @param hasEcho true (default value) if the device is expected to echo the sent command
+	 * @return size_t the number of lines received from the device
+	 */
+	std::string ConverseSingle(const std::string commandString, bool hasEcho = true);
 
-	std::string GetChannelColor(size_t i);
 
-	int64_t m_rbwMin;
-	int64_t m_rbwMax;
+	/**
+	 * @brief Converse with the device by sending a command and receiving a single line response
+	 *
+	 * @param commandString the command string to send
+	 * @return std::string the received response
+	 * @param hasEcho true (default value) if the device is expected to echo the sent command
+	 * @return size_t the number of lines received from the device
+	 */
+	size_t ConverseMultiple(const std::string commandString, std::vector<std::string> &readLines, bool hasEcho = true);
 
-	Model m_tinySAModel;
-	// Span control
-	int64_t m_sweepStart;
-	int64_t m_sweepStop;
+	/**
+	 * @brief Set and/or read the sweep values from the device
+	 *
+	 * @param sweepStart the sweep start value (in/out)
+	 * @param sweepStop the sweep stop value (in/out)
+	 * @param setValue tru is the values have to be set on the device
+	 * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
+	 */
+	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue = false);
 
-	int64_t m_freqMin;
-	int64_t m_freqMax;
-	// dbm offset to apply on values received from the device (model depedant)
-	int64_t m_modelDbmOffset;
+	/**
+	 * @brief Base method to converse with the device
+	 *
+	 * @param commandString the command string to send to the device
+	 * @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
+	 */
+	std::string ConverseString(const std::string commandString);
 
-public:
-	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC(TinySA)
+	/**
+	 * @brief Remove CR from the provided line
+	 * 
+	 * @param toClean the line to remove the CR from (in/out)
+	 */
+	static void RemoveCR(std::string &toClean)
+	{
+		toClean.erase( std::remove(toClean.begin(), toClean.end(), '\r'), toClean.end() );
+	}
+
+	size_t m_maxResponseSize;
+	double m_communicationTimeout;
+
+	inline static const std::string TRAILER_STRING = "ch> ";
+	inline static const size_t TRAILER_STRING_LENGTH = TRAILER_STRING.size();
+	inline static const std::string EOL_STRING = "\r\n";
+	inline static const size_t EOL_STRING_LENGTH = EOL_STRING.size();
 };
-
 #endif

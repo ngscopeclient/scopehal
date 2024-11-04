@@ -52,7 +52,12 @@ using namespace std;
 TinySA::TinySA(SCPITransport* transport)
 	: SCPIDevice(transport,false)
 	, SCPIInstrument(transport,false)
+	, CommandLineDriver(transport)
 {
+
+	m_maxResponseSize = 100*1024;
+	 // 30s has a sweep with low rbw can take several minutes and we may have to wait that long between each data reception)
+	m_communicationTimeout = 30;
 	std::vector<string> info;
 	string version =  ConverseSingle("version");
 	if(version.empty())
@@ -115,107 +120,6 @@ TinySA::~TinySA()
 }
 
 /**
- * @brief Converse with the device : send a command and read the reply over several lines
- *
- * @param commandString the command string to send
- * @param readLines a verctor to store the reply lines
- * @return size_t the number of lines received from the device
- */
-size_t TinySA::ConverseMultiple(const std::string commandString, std::vector<string> &readLines)
-{
-	stringstream ss(ConverseString(commandString));
-	string curLine;
-	bool firstLine = true;
-	size_t size = 0;
-    while (getline(ss, curLine))
-	{
-		// Remove remaining \r
-		RemoveCR(curLine);
-		if(firstLine)
-		{
-			// First line is always an echo of the sent command
-			if(curLine.compare(commandString) != 0)
-				LogWarning("Unexpected response \"%s\" to command string \"%s\".\n",curLine.c_str(),commandString.c_str());
-			firstLine = false;
-		}
-        else if (!curLine.empty())
-		{
-			LogTrace("Pusshing back line \"%s\".\n",curLine.c_str());
-            readLines.push_back(curLine);
-			size++;
-        }
-    }
-	return size;
-}
-
-/**
- * @brief Converse with the device by sending a command and receiving a single line response
- *
- * @param commandString the command string to send
- * @return std::string the received response
- */
-std::string TinySA::ConverseSingle(const std::string commandString)
-{
-	stringstream ss(ConverseString(commandString));
-	string result;
-	// Read first line (echo of command string)
-	getline(ss,result);
-	// Remove remaining \r
-	RemoveCR(result);
-	if(result.compare(commandString) != 0)
-		LogWarning("Unexpected response \"%s\" to command string \"%s\".\n",result.c_str(),commandString.c_str());
-	// Get second line as result
-	getline(ss,result);
-	// Remove remaining \r
-	RemoveCR(result);
-	return result;
-}
-
-/**
- * @brief Base method to converse with the device
- *
- * @param commandString the command string to send to the device
- * @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
- */
-std::string TinySA::ConverseString(const std::string commandString)
-{
-	string result = "";
-	// Lock guard
-	LogTrace("Sending command: '%s'.\n",commandString.c_str());
-	lock_guard<recursive_mutex> lock(m_transportMutex);
-	m_transport->SendCommand(commandString+"\r\n");
-	// Read untill we get  "ch>\r\n"
-	char tmp = ' ';
-	size_t bytesRead = 0;
-	double start = GetTime();
-	while(true)
-	{	// Consume response until we find the end delimiter
-		if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
-		{
-			// We might have to wait for a bit to get a response
-			if(GetTime()-start >= COMMUNICATION_TIMEOUT)
-			{
-				// Timeout
-				LogError("A timeout occurred while reading data from device.\n");
-				break;
-			}
-			continue;
-		}
-		result += tmp;
-		bytesRead++;
-		if(bytesRead > MAX_RESPONSE_SIZE)
-		{
-			LogError("Error while reading data from TinySA: response too long (%zu bytes).\n",bytesRead);
-			break;
-		}
-		if(result.size()>=TRAILER_STRING_LENGTH && (0 == result.compare (result.length() - TRAILER_STRING_LENGTH, TRAILER_STRING_LENGTH, TRAILER_STRING)))
-			break;
-	}
-	//LogDebug("Received: %s\n",result.c_str());
-	return result;
-}
-
-/**
  * @brief Special method used to converse with the device with a binary response (e.g. spanraw command)
  *
  * @param commandString the command string to send
@@ -249,7 +153,7 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 			if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
 			{
 				// We might have to wait for the sweep to start to get a response
-				if(GetTime()-lastActivity >= COMMUNICATION_TIMEOUT)
+				if(GetTime()-lastActivity >= m_communicationTimeout)
 				{
 					// Timeout
 					LogError("A timeout occurred while reading data from device.\n");
@@ -258,7 +162,7 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 				continue;
 			}
 			bytesRead++;
-			if(bytesRead > MAX_RESPONSE_SIZE)
+			if(bytesRead > m_maxResponseSize)
 			{
 				LogError("Error while reading data from TinySA: response too long (%zu bytes).\n",bytesRead);
 				break;
@@ -300,7 +204,7 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 			}
 			if(dataRead >= length)
 				inFooter = true;
-			else if(GetTime()-lastActivity >= COMMUNICATION_TIMEOUT)
+			else if(GetTime()-lastActivity >= m_communicationTimeout)
 			{
 				// Timeout
 				LogError("A timeout occurred while reading data from device.\n");
@@ -347,50 +251,6 @@ int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 	LogDebug("Found rbw value = %" PRIi64 " %s.\n",rbw,isKhz ? "kHz" : "Hz");
 	return isKhz ? (rbw*1000) : rbw;
 }
-
-/**
- * @brief Set and/or read the sweep values from the device
- *
- * @param sweepStart the sweep start value (in/out)
- * @param sweepStop the sweep stop value (in/out)
- * @param setValue tru is the values have to be set on the device
- * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
- */
-bool TinySA::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue)
-{
-	size_t lines;
-	vector<string> reply;
-	int64_t origStartValue = sweepStart;
-	int64_t origStopValue = sweepStop;
-	if(setValue)
-	{
-		// Send start value
-		lines = ConverseMultiple("sweep start "+std::to_string(sweepStart),reply);
-		if(lines > 1)
-		{	// Value was rejected
-			LogWarning("Error while sending sweep start value %" PRIi64 ": \"%s\".\n",sweepStart,reply[0].c_str());
-		}
-		// Send stop value
-		lines = ConverseMultiple("sweep stop "+ std::to_string(sweepStop) ,reply);
-		if(lines > 1)
-		{	// Value was rejected
-			LogWarning("Error while sending sweep stop value %" PRIi64 ": \"%s\".\n",sweepStop,reply[0].c_str());
-		}
-		// Clear reply for next use
-		reply.clear();
-	}
-	// Get currently configured sweep
-	lines = ConverseMultiple("sweep",reply);
-	if(lines < 1)
-	{
-		LogWarning("Error while requesting sweep values: no lines returned.\n");
-		return false;
-	}
-	sscanf(reply[0].c_str(), "%" SCNi64 " %" SCNi64, &sweepStart, &sweepStop);
-	LogDebug("Found sweep start %" PRIi64 " / stop %" PRIi64 ".\n",sweepStart,sweepStop);
-	return setValue && ((origStartValue != sweepStart) || (origStopValue != sweepStop));
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors

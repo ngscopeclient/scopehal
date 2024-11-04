@@ -119,6 +119,7 @@ set(SCOPEHAL_SOURCES
 	BufferedSwitchMatrixIOChannel.cpp
 	BufferedSwitchMatrixOutputChannel.cpp
 	CANChannel.cpp
+	CommandLineDriver.cpp
 	DigitalIOChannel.cpp
 	DigitalInputChannel.cpp
 	DigitalOutputChannel.cpp
@@ -172,6 +173,7 @@ set(SCOPEHAL_SOURCES
 	LeCroyFWPOscilloscope.cpp
 	MockOscilloscope.cpp
 	MultiLaneBERT.cpp
+	NanoVNA.cpp
 	OwonXDGFunctionGenerator.cpp
 	PicoOscilloscope.cpp
 	PicoVNA.cpp
