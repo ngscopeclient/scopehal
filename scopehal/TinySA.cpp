@@ -37,6 +37,7 @@
 
 #include "scopehal.h"
 #include "TinySA.h"
+#include <cinttypes>
 
 using namespace std;
 

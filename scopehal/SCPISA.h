@@ -93,7 +93,7 @@ public:
 	virtual bool HasFrequencyControls() override;
 	virtual bool HasTimebaseControls() override;
 
-	virtual void SetResolutionBandwidth(int64_t rbw);
+	virtual void SetResolutionBandwidth(int64_t rbw) override;
 	virtual int64_t GetResolutionBandwidth() override;
 
 protected:
