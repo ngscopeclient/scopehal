@@ -118,7 +118,7 @@ protected:
 	inline static const std::string EOL_STRING = "\r\n";
 	inline static const size_t EOL_STRING_LENGTH = EOL_STRING.size();
 	static const size_t MAX_RESPONSE_SIZE = 100*1024;
-	inline static const double COMMUNICATION_TIMEOUT = 0.5; // 500ms
+	inline static const double COMMUNICATION_TIMEOUT = 30; // 30s has a sweep with low rbw can take several minutes and we may have to wait that long between each data reception
 
 public:
 	static std::string GetDriverNameInternal();

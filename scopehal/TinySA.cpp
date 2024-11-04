@@ -233,11 +233,13 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 	m_transport->SendCommand(commandString+"\r\n");
 	// Read untill we get  "ch>\r\n"
 	char tmp = ' ';
-	size_t bytesRead = 0;
-	size_t dataRead = 0;
+	size_t bytesRead = 0; 	// Bytes read since the begining of this conversation
+	size_t dataRead = 0;	// Number of binary data bytes read so far
+	size_t newBytes = 0;	// Bumber of binary data read in the current read loop
+	size_t toRead;			// Total number of binary data bytes to read
 	// Prepare buffer size
 	data.resize(length);
-	double start = GetTime();
+	double lastActivity = GetTime();
 	while(true)
 	{
 		if(inFooter || inHeader)
@@ -246,7 +248,7 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 			if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
 			{
 				// We might have to wait for the sweep to start to get a response
-				if(GetTime()-start >= COMMUNICATION_TIMEOUT)
+				if(GetTime()-lastActivity >= COMMUNICATION_TIMEOUT)
 				{
 					// Timeout
 					LogError("A timeout occurred while reading data from device.\n");
@@ -282,10 +284,22 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 		else
 		{
 			// Read binary data
-			dataRead += m_transport->ReadRawData(length,data.begin().base(),[this] (float progress) { ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+			// We need to read at least 3 bytes at once or we will lose some of them
+			toRead = min((size_t)3,length-dataRead);
+			if(dataRead == 0)
+				toRead+=1; // Read leading '{' in addition to first data at the beginning of the frame
+			newBytes = m_transport->ReadRawData(toRead,data.begin().base()+dataRead);
+			// Update progress (we're not using progress from ReadRawData since we need to be able to drive the number of bytes to be read at each step)
+			ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, ((float)dataRead + ((float)newBytes)) / (float)length);
+			if(newBytes > 0)
+			{
+				// Sweep with low rbw can take several minutes => reset timeout as long as we receive data from the device
+				lastActivity = GetTime();
+				dataRead+=newBytes; 
+			}
 			if(dataRead >= length)
 				inFooter = true;
-			else if(GetTime()-start >= COMMUNICATION_TIMEOUT)
+			else if(GetTime()-lastActivity >= COMMUNICATION_TIMEOUT)
 			{
 				// Timeout
 				LogError("A timeout occurred while reading data from device.\n");
