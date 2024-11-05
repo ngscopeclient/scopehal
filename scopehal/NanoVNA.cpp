@@ -100,25 +100,29 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 	switch (m_nanoVNAModel)
 	{
 		case MODEL_NANOVNA_F_V2:
-			m_freqMax = 3000000000L;	// 1.5GHz
+			m_freqMax = 3000000000L;	// 3GHz
 			m_freqMin = 10000L;
 			m_sampleDepth = 301;
+			m_maxDeviceSampleDepth = 301;
 			break;
 		case MODEL_NANOVNA_F:
 		case MODEL_NANOVNA_H:
 			m_freqMax = 1500000000L;	// 1.5GHz
 			m_freqMin = 10000L;
 			m_sampleDepth = 301;
+			m_maxDeviceSampleDepth = 301;
 			break;
 		case MODEL_NANOVNA_H4:
 			m_freqMax = 1500000000L;	// 1.5GHz
 			m_freqMin = 10000L;
 			m_sampleDepth = 401;
+			m_maxDeviceSampleDepth = 401;
 			break;
 		case MODEL_NANOVNA:
 			m_freqMax = 300000000L;		// 300 MHz
 			m_freqMin = 10000L;
 			m_sampleDepth = 101;
+			m_maxDeviceSampleDepth = 101;
 		default:
 			break;
 	}
@@ -242,13 +246,11 @@ vector<uint64_t> NanoVNA::GetSampleDepthsNonInterleaved()
 	ret.push_back(101);
 	ret.push_back(201);
 	ret.push_back(301);
-	// TODO handle higher sample depth with multiple sweeps
-/*	ret.push_back(501);
+	ret.push_back(501);
 	ret.push_back(1001);
 	ret.push_back(2001);
 	ret.push_back(5001);
-	ret.push_back(10001);*/
-
+	ret.push_back(10001);
 	return ret;
 }
 
@@ -266,11 +268,21 @@ bool NanoVNA::AcquireData()
 {
 
 	// LogDebug("Acquiring data\n");
+
+	// Notify about download operation start
+	ChannelsDownloadStarted();
+
 	// Store sample depth value
 	size_t npoints = m_sampleDepth;
 	string command = "scan " + std::to_string(m_sweepStart) + " " + std::to_string(m_sweepStop) + " " + std::to_string(npoints) + " 0b110";
 	std::vector<string> values;
-	size_t read = ConverseMultiple(command,values);
+	auto progress = [this/*, page, pages*/] (float fprogress) {
+		float linear_progress = fprogress;// ((float)page + fprogress) / (float)pages;
+		// We're downloading both channels at the same time
+		ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+		ChannelsDownloadStatusUpdate(1, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+	};
+	size_t read = ConverseMultiple(command,values,true,progress,npoints+1);
 	if(read != (npoints+1))
 	{
 		LogError("Invalid number of acquired bytes: %zu, expected %zu. Ingoring capture.\n",read,npoints);

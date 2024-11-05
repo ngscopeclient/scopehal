@@ -50,30 +50,31 @@ CommandLineDriver::~CommandLineDriver()
 {
 }
 
-size_t CommandLineDriver::ConverseMultiple(const std::string commandString, std::vector<string> &readLines, bool hasEcho)
+size_t CommandLineDriver::ConverseMultiple(const std::string commandString, std::vector<string> &readLines, bool hasEcho, std::function<void(float)> progress, size_t expecedLines)
 {
-	stringstream ss(ConverseString(commandString));
+	stringstream ss(ConverseString(commandString,progress,expecedLines));
 	string curLine;
 	bool firstLine = true;
 	size_t size = 0;
-  while (getline(ss, curLine))
+	while(getline(ss, curLine))
 	{
 		// Remove remaining \r
 		RemoveCR(curLine);
 		if(hasEcho && firstLine)
 		{
-      // First line is always an echo of the sent command
-      if(curLine.compare(commandString) != 0)
-        LogWarning("Unexpected response \"%s\" to command string \"%s\".\n",curLine.c_str(),commandString.c_str());
+			// First line is always an echo of the sent command
+			if(curLine.compare(commandString) != 0)
+				LogWarning(
+					"Unexpected response \"%s\" to command string \"%s\".\n", curLine.c_str(), commandString.c_str());
 			firstLine = false;
 		}
-    else if (!curLine.empty())
+		else if(!curLine.empty())
 		{
-			LogTrace("Pusshing back line \"%s\".\n",curLine.c_str());
-      readLines.push_back(curLine);
+			LogTrace("Pusshing back line \"%s\".\n", curLine.c_str());
+			readLines.push_back(curLine);
 			size++;
-    }
-  }
+		}
+	}
 	return size;
 }
 
@@ -81,23 +82,23 @@ std::string CommandLineDriver::ConverseSingle(const std::string commandString, b
 {
 	stringstream ss(ConverseString(commandString));
 	string result;
-  if(hasEcho)
-  {
-    // Read first line (echo of command string)
-    getline(ss,result);
-    // Remove remaining \r
-    RemoveCR(result);
-    if(result.compare(commandString) != 0)
-      LogWarning("Unexpected response \"%s\" to command string \"%s\".\n",result.c_str(),commandString.c_str());
-  }
+	if(hasEcho)
+	{
+		// Read first line (echo of command string)
+		getline(ss, result);
+		// Remove remaining \r
+		RemoveCR(result);
+		if(result.compare(commandString) != 0)
+			LogWarning("Unexpected response \"%s\" to command string \"%s\".\n", result.c_str(), commandString.c_str());
+	}
 	// Get second line as result
-	getline(ss,result);
+	getline(ss, result);
 	// Remove remaining \r
 	RemoveCR(result);
 	return result;
 }
 
-std::string CommandLineDriver::ConverseString(const std::string commandString)
+std::string CommandLineDriver::ConverseString(const std::string commandString, std::function<void(float)> progress, size_t expecedLines)
 {
 	string result = "";
 	// Lock guard
@@ -107,6 +108,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString)
 	// Read untill we get  "ch>\r\n"
 	char tmp = ' ';
 	size_t bytesRead = 0;
+	size_t linesRead = 0;
 	double start = GetTime();
 	while(true)
 	{	// Consume response until we find the end delimiter
@@ -122,6 +124,11 @@ std::string CommandLineDriver::ConverseString(const std::string commandString)
 			continue;
 		}
 		result += tmp;
+		if(progress && (tmp = '\n'))
+		{
+			linesRead++;
+			progress((float)linesRead/(float)expecedLines);
+		}
 		bytesRead++;
 		if(bytesRead > m_maxResponseSize)
 		{

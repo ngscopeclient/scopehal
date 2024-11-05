@@ -70,9 +70,11 @@ protected:
 	 * @param commandString the command string to send
 	 * @return std::string the received response
 	 * @param hasEcho true (default value) if the device is expected to echo the sent command
+	 * @param progress (optional) download progress function
+	 * @param expectedLines (optional) the number of lines expected from the device
 	 * @return size_t the number of lines received from the device
 	 */
-	size_t ConverseMultiple(const std::string commandString, std::vector<std::string> &readLines, bool hasEcho = true);
+	size_t ConverseMultiple(const std::string commandString, std::vector<std::string> &readLines, bool hasEcho = true, std::function<void(float)> progress = nullptr, size_t expecedLines = 0);
 
 	/**
 	 * @brief Set and/or read the sweep values from the device
@@ -88,9 +90,11 @@ protected:
 	 * @brief Base method to converse with the device
 	 *
 	 * @param commandString the command string to send to the device
+	 * @param progress (optional) download progress function
+	 * @param expectedLines (optional) the number of lines expected from the device
 	 * @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
 	 */
-	std::string ConverseString(const std::string commandString);
+	std::string ConverseString(const std::string commandString, std::function<void(float)> progress = nullptr, size_t expecedLines = 0);
 
 	/**
 	 * @brief Remove CR from the provided line
@@ -105,9 +109,13 @@ protected:
 	size_t m_maxResponseSize;
 	double m_communicationTimeout;
 
+	// @brief Trailer string expected at the end of a response from the device (command prompt)
 	inline static const std::string TRAILER_STRING = "ch> ";
+	// @brief Legth of the trailer string expected at the end of a response from the device (command prompt)
 	inline static const size_t TRAILER_STRING_LENGTH = TRAILER_STRING.size();
+	// @brief End Of Line string
 	inline static const std::string EOL_STRING = "\r\n";
+	// @brief Size of the EOL string
 	inline static const size_t EOL_STRING_LENGTH = EOL_STRING.size();
 };
 #endif

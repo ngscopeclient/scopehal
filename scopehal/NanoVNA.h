@@ -100,6 +100,7 @@ protected:
 	bool m_triggerOneShot = false;
 
 	int64_t m_sampleDepth = 0;
+	int64_t m_maxDeviceSampleDepth = 0;
 	int64_t m_rbw = 0;
 
 	Model m_nanoVNAModel = MODEL_UNKNOWN;
