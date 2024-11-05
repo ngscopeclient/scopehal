@@ -81,10 +81,25 @@ protected:
 	 *
 	 * @param sweepStart the sweep start value (in/out)
 	 * @param sweepStop the sweep stop value (in/out)
-	 * @param setValue tru is the values have to be set on the device
+	 * @param points the number of points (in/out)
+	 * @param setFreqValues (optional, defaults to false) true is the sweep frequency values have to be set on the device
 	 * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
 	 */
-	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue = false);
+	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, int64_t &points, bool setFreqValues = false);
+
+	/**
+	 * @brief Set and/or read the sweep values from the device
+	 *
+	 * @param sweepStart the sweep start value (in/out)
+	 * @param sweepStop the sweep stop value (in/out)
+	 * @param setFreqValues (optional, defaults to false) true is the sweep frequency values have to be set on the device
+	 * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
+	 */
+	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setFreqValues = false)
+	{
+		int64_t unused;
+		return ConverseSweep(sweepStart, sweepStop, unused, setFreqValues);
+	}
 
 	/**
 	 * @brief Base method to converse with the device
@@ -95,6 +110,7 @@ protected:
 	 * @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
 	 */
 	std::string ConverseString(const std::string commandString, std::function<void(float)> progress = nullptr, size_t expecedLines = 0);
+
 
 	/**
 	 * @brief Remove CR from the provided line

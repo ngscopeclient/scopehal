@@ -105,7 +105,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 	LogTrace("Sending command: '%s'.\n",commandString.c_str());
 	lock_guard<recursive_mutex> lock(m_transportMutex);
 	m_transport->SendCommand(commandString+"\r\n");
-	// Read untill we get  "ch>\r\n"
+	// Read until we get  "ch>\r\n"
 	char tmp = ' ';
 	size_t bytesRead = 0;
 	size_t linesRead = 0;
@@ -142,7 +142,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 	return result;
 }
 
-bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setValue)
+bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, int64_t &points, bool setValue)
 {
 	size_t lines;
 	vector<string> reply;

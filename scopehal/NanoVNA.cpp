@@ -100,34 +100,30 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 	switch (m_nanoVNAModel)
 	{
 		case MODEL_NANOVNA_F_V2:
-			m_freqMax = 3000000000L;	// 3GHz
 			m_freqMin = 10000L;
-			m_sampleDepth = 301;
+			m_freqMax = 3000000000L;	// 3GHz
 			m_maxDeviceSampleDepth = 301;
 			break;
 		case MODEL_NANOVNA_F:
 		case MODEL_NANOVNA_H:
-			m_freqMax = 1500000000L;	// 1.5GHz
 			m_freqMin = 10000L;
-			m_sampleDepth = 301;
+			m_freqMax = 1500000000L;	// 1.5GHz
 			m_maxDeviceSampleDepth = 301;
 			break;
 		case MODEL_NANOVNA_H4:
-			m_freqMax = 1500000000L;	// 1.5GHz
 			m_freqMin = 10000L;
-			m_sampleDepth = 401;
+			m_freqMax = 1500000000L;	// 1.5GHz
 			m_maxDeviceSampleDepth = 401;
 			break;
 		case MODEL_NANOVNA:
-			m_freqMax = 300000000L;		// 300 MHz
 			m_freqMin = 10000L;
-			m_sampleDepth = 101;
+			m_freqMax = 300000000L;		// 300 MHz
 			m_maxDeviceSampleDepth = 101;
 		default:
 			break;
 	}
 	// Get span information, format is "<start> <stop> <points>"
-	ConverseSweep(m_sweepStart,m_sweepStop);
+	ConverseSweep(m_sweepStart,m_sweepStop,m_sampleDepth);
 
 	//Add analog channel objects
 	for(size_t dest = 1; dest<=2; dest ++)
@@ -154,9 +150,6 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 		SetChannelOffset(ichan, 1, 0);
 	}
 
-	//Get initial number of points
-	// TODO
-
 }
 
 /**
@@ -164,7 +157,7 @@ NanoVNA::NanoVNA(SCPITransport* transport)
  */
 string NanoVNA::GetChannelColor(size_t i)
 {
-	switch(i % 8)
+	switch(i)
 	{
 		case 0:
 			return "#ffff00";
