@@ -124,7 +124,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 			continue;
 		}
 		result += tmp;
-		if(progress && (tmp = '\n'))
+		if(progress && (tmp == '\n'))
 		{
 			linesRead++;
 			progress((float)linesRead/(float)expecedLines);
@@ -142,7 +142,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 	return result;
 }
 
-bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, int64_t &points, bool setValue)
+bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop,[[maybe_unused]] int64_t &points, bool setValue)
 {
 	size_t lines;
 	vector<string> reply;
