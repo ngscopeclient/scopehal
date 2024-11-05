@@ -267,6 +267,10 @@ string TinySA::GetDriverNameInternal()
 bool TinySA::AcquireData()
 {
 	// LogDebug("Acquiring data\n");
+
+	// Notify about download operation start
+	ChannelsDownloadStarted();
+
 	// Store sample depth value
 	size_t nsamples = m_sampleDepth;
 	string command = "scanraw " + std::to_string(m_sweepStart) + " " + std::to_string(m_sweepStop) + " " + std::to_string(nsamples);
