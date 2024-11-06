@@ -346,6 +346,17 @@ bool NanoVNA::AcquireData()
 		pageSize = npoints;
 		pageSpan = span;
 	}
+	// Check for low rbw to see if we need to split more
+	if(m_rbw <= 100 && pageSpan > 50000000)
+	{
+		// For rbw < 100 Hz we need a pageSpan < 50MHz
+		// We will paginate with 11 points pages and one point overlaping between each page
+		pages = (npoints-1)/10;
+		pageSpan = span / pages;
+		pageSize = 11;
+
+	}
+
 	size_t read = 0;
 	int64_t pageStart;
 	int64_t pageStop;
