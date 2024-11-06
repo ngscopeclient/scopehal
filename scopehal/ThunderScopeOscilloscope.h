@@ -67,6 +67,7 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten) override;
 	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual bool CanEnableChannel(size_t i) override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
@@ -136,6 +137,9 @@ protected:
 
 	///@brief Buffer for storing channel clip state
 	AcceleratorBuffer<uint32_t> m_clippingBuffer;
+
+	///@brief Bandwidth limiters
+	std::vector<unsigned int> m_bandwidthLimits;
 
 public:
 

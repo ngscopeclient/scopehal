@@ -158,6 +158,11 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
+
+	//set initial bandwidth on all channels to full
+	m_bandwidthLimits.resize(4);
+	for(size_t i=0; i<4; i++)
+		SetChannelBandwidthLimit(i, 0);
 }
 
 /**
@@ -245,13 +250,36 @@ void ThunderScopeOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelOffsets[i] *= delta;
 }
 
-unsigned int ThunderScopeOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int ThunderScopeOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
-	return 0;
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_bandwidthLimits[i];
 }
 
-void ThunderScopeOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+void ThunderScopeOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_bandwidthLimits[i] = limit_mhz;
+	}
+
+	if(limit_mhz == 0)
+		m_transport->SendCommandQueued(string(":") + m_channels[i]->GetHwname() + ":BAND FULL");
+	else
+		m_transport->SendCommandQueued(string(":") + m_channels[i]->GetHwname() + ":BAND " + to_string(limit_mhz) + "M");
+}
+
+vector<unsigned int> ThunderScopeOscilloscope::GetChannelBandwidthLimiters([[maybe_unused]] size_t i)
+{
+	vector<unsigned int> ret;
+	ret.push_back(20);
+	ret.push_back(100);
+	ret.push_back(200);
+	ret.push_back(350);
+	ret.push_back(650);
+	ret.push_back(750);
+	ret.push_back(0);
+	return ret;
 }
 
 OscilloscopeChannel* ThunderScopeOscilloscope::GetExternalTrigger()
