@@ -111,7 +111,8 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 	size_t linesRead = 0;
 	double start = GetTime();
 	while(true)
-	{	// Consume response until we find the end delimiter
+	{	
+		// Consume response until we find the end delimiter
 		if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
 		{
 			// We might have to wait for a bit to get a response
@@ -132,7 +133,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 		bytesRead++;
 		if(bytesRead > m_maxResponseSize)
 		{
-			LogError("Error while reading data from TinySA: response too long (%zu bytes).\n",bytesRead);
+			LogError("Error while reading data from device: response too long (%zu bytes).\n",bytesRead);
 			break;
 		}
 		if(result.size()>=TRAILER_STRING_LENGTH && (0 == result.compare (result.length() - TRAILER_STRING_LENGTH, TRAILER_STRING_LENGTH, TRAILER_STRING)))
@@ -172,8 +173,31 @@ bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop,[[
 		LogWarning("Error while requesting sweep values: no lines returned.\n");
 		return false;
 	}
-	sscanf(reply[0].c_str(), "%" SCNi64 " %" SCNi64, &sweepStart, &sweepStop);
+	sscanf(reply[0].c_str(), "%" SCNi64 " %" SCNi64 " %" SCNi64, &sweepStart, &sweepStop, &points);
 	LogDebug("Found sweep start %" PRIi64 " / stop %" PRIi64 ".\n",sweepStart,sweepStop);
 	return setValue && ((origStartValue != sweepStart) || (origStopValue != sweepStop));
 }
 
+std::string CommandLineDriver::DrainTransport()
+{
+	string result;
+	char tmp = ' ';
+	size_t bytesRead = 0;
+	while(true)
+	{	
+		// Consume response until we find the end delimiter
+		if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
+		{
+			break;
+		}
+		result += tmp;
+		bytesRead++;
+		if(bytesRead > m_maxResponseSize)
+		{
+			LogError("Error while reading data from device: response too long (%zu bytes).\n",bytesRead);
+			break;
+		}
+	}
+	LogTrace("Drained data from console transport: %s\n",result.c_str());
+	return result;
+}

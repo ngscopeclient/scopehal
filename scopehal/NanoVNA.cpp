@@ -61,6 +61,9 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 	m_maxResponseSize = 100*1024;
 	 // 30s has a sweep with low rbw can take several minutes and we may have to wait that long between each data reception)
 	m_communicationTimeout = 30;
+	// Drain transport (the devices sends a prompt upon connection)
+	DrainTransport();
+
 	std::vector<string> info;
 	string version =  ConverseSingle("version");
 	if(version.empty())
@@ -135,7 +138,7 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 			m_maxDeviceSampleDepth = 101;
 			break;
 	}
-	// Setup rbw values
+	// Setup rbw values : some model need a divider valuen others need an actual frequency value
 	switch (m_nanoVNAModel)
 	{
 		case MODEL_NANOVNA_D:
@@ -333,7 +336,7 @@ bool NanoVNA::AcquireData()
 	size_t read = ConverseMultiple(command,values,true,progress,npoints+1);
 	if(read != (npoints+1))
 	{
-		LogError("Invalid number of acquired bytes: %zu, expected %zu. Ingoring capture.\n",read,npoints);
+		LogError("Invalid number of acquired bytes: %zu, expected %zu. Ingoring capture.\n",read,npoints+1);
 		return false;
 	}
 
@@ -429,7 +432,7 @@ void NanoVNA::SendBandwidthValue(int64_t bandwidth)
 {
 	// Get currently configured rbw
 	string response = ConverseSingle("bandwidth "+std::to_string(bandwidth));
-	LogDebug("Bandwidth response = %s.\n",response.c_str());
+	LogTrace("Bandwidth response = %s.\n",response.c_str());
 }
 
 

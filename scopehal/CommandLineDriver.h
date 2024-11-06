@@ -111,6 +111,12 @@ protected:
 	 */
 	std::string ConverseString(const std::string commandString, std::function<void(float)> progress = nullptr, size_t expecedLines = 0);
 
+	/**
+	 * @brief Consume any pending data from the transport layer
+	 * 
+	 * @return the consumed data
+	 */
+	std::string DrainTransport();
 
 	/**
 	 * @brief Remove CR from the provided line
