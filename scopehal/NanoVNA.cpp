@@ -55,7 +55,7 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 	, CommandLineDriver(transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
-	, m_rbw(1)
+	, m_rbw(1000)
 {
 	
 	m_maxResponseSize = 100*1024;
@@ -74,11 +74,13 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 	LogDebug("Version = %s\n",m_fwVersion.c_str());
 
 	// Get model out of first line of info command response
-	string infoLine = ConverseSingle("info");
-	size_t pos = infoLine.rfind("NanoVNA");
+	string infoLine = ConverseString("info");
+	size_t pos = infoLine.find("NanoVNA");
  	if (pos!=std::string::npos)
 	{
-		m_model = infoLine.substr(pos);
+		string rest = infoLine.substr(pos);
+		pos = rest.find_first_of(" \r\n\t");
+		m_model = pos!=std::string::npos ? rest.substr(0,pos) : rest;
 		LogDebug("Model = %s\n",m_model.c_str());
 		if(m_model.find("-H 4")!= std::string::npos)
 			m_nanoVNAModel = Model::MODEL_NANOVNA_H4;
@@ -87,9 +89,17 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 		else if(m_model.find("-F_V2")!= std::string::npos)
 			m_nanoVNAModel = Model::MODEL_NANOVNA_F_V2;
 		else if(m_model.find("-F")!= std::string::npos)
-			m_nanoVNAModel = Model::MODEL_NANOVNA_F;
+		{
+			if(infoLine.find("deepelec")!=std::string::npos)
+				m_nanoVNAModel = Model::MODEL_NANOVNA_F_DEEPELEC;
+			else
+				m_nanoVNAModel = Model::MODEL_NANOVNA_F;
+		}
+		else if(m_model.find("-D")!= std::string::npos)
+			m_nanoVNAModel = Model::MODEL_NANOVNA_D;
 		else
 			m_nanoVNAModel = MODEL_NANOVNA;
+		LogDebug("Model# = %d\n",m_nanoVNAModel);
 	}
 	else
 	{
@@ -97,6 +107,7 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 		m_nanoVNAModel = MODEL_UNKNOWN;
 	}
 
+	// Setup device specific values
 	switch (m_nanoVNAModel)
 	{
 		case MODEL_NANOVNA_F_V2:
@@ -106,6 +117,8 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 			break;
 		case MODEL_NANOVNA_F:
 		case MODEL_NANOVNA_H:
+		case MODEL_NANOVNA_D:
+		case MODEL_NANOVNA_F_DEEPELEC:
 			m_freqMin = 10000L;
 			m_freqMax = 1500000000L;	// 1.5GHz
 			m_maxDeviceSampleDepth = 301;
@@ -116,12 +129,54 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 			m_maxDeviceSampleDepth = 401;
 			break;
 		case MODEL_NANOVNA:
+		default:
 			m_freqMin = 10000L;
 			m_freqMax = 300000000L;		// 300 MHz
 			m_maxDeviceSampleDepth = 101;
-		default:
 			break;
 	}
+	// Setup rbw values
+	switch (m_nanoVNAModel)
+	{
+		case MODEL_NANOVNA_D:
+			m_rbwValues[10]=363;
+			m_rbwValues[33]=117;
+			m_rbwValues[50]=78;
+			m_rbwValues[100]=39;
+			m_rbwValues[200]=19;
+			m_rbwValues[250]=15;
+			m_rbwValues[333]=11;
+			m_rbwValues[500]=7;
+			m_rbwValues[1000]=3;
+			m_rbwValues[2000]=1;
+			m_rbwValues[4000]=0;
+			break;
+		case MODEL_NANOVNA_F_DEEPELEC:
+			m_rbwValues[10]=90;
+			m_rbwValues[33]=29;
+			m_rbwValues[50]=19;
+			m_rbwValues[100]=9;
+			m_rbwValues[200]=4;
+			m_rbwValues[250]=3;
+			m_rbwValues[333]=2;
+			m_rbwValues[500]=1;
+			m_rbwValues[1000]=0;
+			break;
+		case MODEL_NANOVNA_F_V2:
+		case MODEL_NANOVNA_F:
+		case MODEL_NANOVNA_H:
+		case MODEL_NANOVNA_H4:
+		case MODEL_NANOVNA:
+		default:
+			m_rbwValues[10]=10;
+			m_rbwValues[30]=30;
+			m_rbwValues[100]=100;
+			m_rbwValues[300]=300;
+			m_rbwValues[1000]=1000;
+			break;
+	}
+
+
 	// Get span information, format is "<start> <stop> <points>"
 	ConverseSweep(m_sweepStart,m_sweepStop,m_sampleDepth);
 
@@ -365,6 +420,19 @@ bool NanoVNA::AcquireData()
 	return true;
 }
 
+/**
+ * @brief Set the bandwidth value
+ *
+ * @param bandwidth the value to set
+ */
+void NanoVNA::SendBandwidthValue(int64_t bandwidth)
+{
+	// Get currently configured rbw
+	string response = ConverseSingle("bandwidth "+std::to_string(bandwidth));
+	LogDebug("Bandwidth response = %s.\n",response.c_str());
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Spectrum analyzer mode
 
@@ -375,13 +443,17 @@ int64_t NanoVNA::GetResolutionBandwidth()
 
 void NanoVNA::SetResolutionBandwidth(int64_t rbw)
 {
-	//Clamp to instrument limits
-	//m_rbw = max(m_rbwMin, rbw);
-	//m_rbw = min(m_rbwMax, m_rbw);
-	m_rbw = rbw;
-	// Send rbw and read actual return
-	// TODO
-	//m_rbw = ConverseRbwValue(true, m_rbw);
+	int64_t valueToSend = 0;
+	for(auto it = m_rbwValues.begin(); it != m_rbwValues.end(); ++it)
+	{
+		if(rbw<=it->first || it == std::prev(m_rbwValues.end()))
+		{
+			m_rbw = it->first;
+			valueToSend = it->second;
+			break;
+		}
+	}
+	SendBandwidthValue(valueToSend);
 }
 
 void NanoVNA::SetSpan(int64_t span)

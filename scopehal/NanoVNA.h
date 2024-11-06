@@ -73,12 +73,12 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
 	virtual uint64_t GetSampleDepth() override;
 	virtual void SetSampleDepth(uint64_t depth) override;
+	// Sweep configuration
 	virtual void SetSpan(int64_t span) override;
 	virtual int64_t GetSpan() override;
 	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
 	virtual int64_t GetCenterFrequency(size_t channel) override;
-
-	//TODO: Sweep configuration
+	// Rbw
 	virtual int64_t GetResolutionBandwidth() override;
 	virtual void SetResolutionBandwidth(int64_t rbw) override;
 
@@ -87,12 +87,16 @@ protected:
 	enum Model {
 		MODEL_UNKNOWN,
 		MODEL_NANOVNA,
+		MODEL_NANOVNA_D,
+		MODEL_NANOVNA_F_DEEPELEC,
 		MODEL_NANOVNA_F,
 		MODEL_NANOVNA_H,
 		MODEL_NANOVNA_H4,
 		MODEL_NANOVNA_F_V2,
 		MODEL_NANOVNA_V2
 	};
+
+	void SendBandwidthValue(int64_t bandwidth);
 
 	std::string GetChannelColor(size_t i);
 
@@ -102,6 +106,7 @@ protected:
 	int64_t m_sampleDepth = 0;
 	int64_t m_maxDeviceSampleDepth = 0;
 	int64_t m_rbw = 0;
+	std::map<int64_t,int64_t> m_rbwValues;
 
 	Model m_nanoVNAModel = MODEL_UNKNOWN;
 
