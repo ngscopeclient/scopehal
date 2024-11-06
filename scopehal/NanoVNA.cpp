@@ -298,6 +298,7 @@ vector<uint64_t> NanoVNA::GetSampleDepthsNonInterleaved()
 	ret.push_back(201);
 	ret.push_back(301);
 	ret.push_back(501);
+	ret.push_back(801);
 	ret.push_back(1001);
 	ret.push_back(2001);
 	ret.push_back(5001);
@@ -323,17 +324,53 @@ bool NanoVNA::AcquireData()
 	// Notify about download operation start
 	ChannelsDownloadStarted();
 
-	// Store sample depth value
+	// Store sample sweep values
 	size_t npoints = m_sampleDepth;
-	string command = "scan " + std::to_string(m_sweepStart) + " " + std::to_string(m_sweepStop) + " " + std::to_string(npoints) + " 0b110";
+	int64_t start = m_sweepStart;
+	int64_t stop = m_sweepStop;
+	int64_t span = stop-start;
+	int64_t pageSpan;
+	size_t pages;
+	size_t pageSize;
+	if(npoints > m_maxDeviceSampleDepth)
+	{	
+		// We will paginate with 101 points pages and one point overlaping between each page
+		pages = (npoints-1)/100;
+		pageSpan = span / pages;
+		pageSize = 101;
+	}
+	else
+	{	
+		// Single page sweep
+		pages = 1;
+		pageSize = npoints;
+		pageSpan = span;
+	}
+	size_t read = 0;
+	int64_t pageStart;
+	int64_t pageStop;
 	std::vector<string> values;
-	auto progress = [this/*, page, pages*/] (float fprogress) {
-		float linear_progress = fprogress;// ((float)page + fprogress) / (float)pages;
-		// We're downloading both channels at the same time
-		ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
-		ChannelsDownloadStatusUpdate(1, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
-	};
-	size_t read = ConverseMultiple(command,values,true,progress,npoints+1);
+	values.reserve(npoints);
+	for(size_t currentPage = 0 ; currentPage < pages ; currentPage++)
+	{
+		pageStart = start + currentPage * pageSpan;
+		pageStop  = pageStart + pageSpan;
+		string command = "scan " + std::to_string(pageStart) + " " + std::to_string(pageStop) + " " + std::to_string(pageSize) + " 0b110";
+		auto progress = [this, currentPage, pages] (float fprogress) {
+			float linear_progress = ((float)currentPage + fprogress) / (float)pages;
+			// We're downloading both channels at the same time
+			ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+			ChannelsDownloadStatusUpdate(1, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+		};
+		read += ConverseMultiple(command,values,true,progress,pageSize+1);
+		if(currentPage < (pages-1))
+		{
+			// Not last page => remove last point that will be overlapping with next page + remove command prompt
+			values.pop_back();
+			values.pop_back();
+			read-=2;
+		}
+	}
 	if(read != (npoints+1))
 	{
 		LogError("Invalid number of acquired bytes: %zu, expected %zu. Ingoring capture.\n",read,npoints+1);

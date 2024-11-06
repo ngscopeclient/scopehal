@@ -104,7 +104,7 @@ protected:
 	bool m_triggerOneShot = false;
 
 	int64_t m_sampleDepth = 0;
-	int64_t m_maxDeviceSampleDepth = 0;
+	size_t m_maxDeviceSampleDepth = 0;
 	int64_t m_rbw = 0;
 	std::map<int64_t,int64_t> m_rbwValues;
 
