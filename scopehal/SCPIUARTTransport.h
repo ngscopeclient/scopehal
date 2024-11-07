@@ -67,6 +67,7 @@ protected:
 
 	std::string m_devfile;
 	unsigned int m_baudrate;
+	bool m_dtrEnable;
 };
 
 #endif
