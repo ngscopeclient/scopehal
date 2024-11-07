@@ -405,19 +405,17 @@ bool NanoVNA::AcquireData()
 			points.push_back(stof(value[j]));
 		}
 		data.push_back(points);
+		//LogTrace("Pushing back data: %.9f,%.9f,%.9f,%.9f.\n",data[i][0],data[i][1],data[i][2],data[i][3]);
 	}
 
 	SequenceSet s;
 	double tstart = GetTime();
 	int64_t fs = (tstart - floor(tstart)) * FS_PER_SECOND;
 
+	int64_t stepsize = (stop - start) / npoints;
+
 	for(size_t dest = 0; dest<2; dest ++)
 	{
-		//Hardware name of the channel
-		string chname = "S" + to_string(dest+1) + "1";
-
-		int64_t stepsize = (m_sweepStop - m_sweepStart) / npoints;
-
 		//Create the waveforms
 		auto mcap = new UniformAnalogWaveform;
 		mcap->m_timescale = stepsize;
@@ -438,8 +436,8 @@ bool NanoVNA::AcquireData()
 		acap->Resize(npoints);
 		for(size_t i=0; i<npoints; i++)
 		{
-			float real = data[i][dest];
-			float imag = data[i][dest+1];
+			float real = data[i][(dest*2)];
+			float imag = data[i][(dest*2)+1];
 
 			float mag = sqrt(real*real + imag*imag);
 			float angle = atan2(imag, real);
