@@ -183,6 +183,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(QSGMIIDecoder);
 	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(QuadratureDecoder);
+	AddDecoderClass(RISFilter);
 	AddDecoderClass(RiseMeasurement);
 	AddDecoderClass(RMSMeasurement);
 	AddDecoderClass(RjBUjFilter);

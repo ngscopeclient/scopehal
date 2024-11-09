@@ -185,6 +185,7 @@
 #include "QSGMIIDecoder.h"
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"
+#include "RISFilter.h"
 #include "RiseMeasurement.h"
 #include "SawtoothGeneratorFilter.h"
 #include "ScalarPulseDelayFilter.h"
