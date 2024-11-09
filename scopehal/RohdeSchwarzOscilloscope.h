@@ -95,6 +95,13 @@ public:
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
+	enum Series
+	{
+		SERIES_RTE,
+		SERIES_RTM,
+		SERIES_UNKNOWN
+	} m_series;
+
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 

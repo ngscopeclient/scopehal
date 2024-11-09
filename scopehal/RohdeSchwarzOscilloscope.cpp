@@ -52,9 +52,24 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-	//Last digit of the model number is the number of channels
-	int model_number = atoi(m_model.c_str() + 3);	//FIXME: are all series IDs 3 chars e.g. "RTM"?
-	int nchans = model_number % 10;
+	int nchans = 0;
+
+	if(m_model.find("RTE") == 0)
+	{
+		//RTE scopes don't give a full model name over IDN
+		m_series = SERIES_RTE;
+		nchans = 4;
+	}
+	else if(m_model.find("RTM") == 0)
+	{
+		m_series = SERIES_RTM;
+
+		//Last digit of the model number is the number of channels
+		int model_number = atoi(m_model.c_str() + 3);	//FIXME: are all series IDs 3 chars e.g. "RTM"?
+		nchans = model_number % 10;
+	}
+	else
+		m_series = SERIES_UNKNOWN;
 
 	for(int i=0; i<nchans; i++)
 	{
@@ -432,8 +447,8 @@ void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*
 OscilloscopeChannel* RohdeSchwarzOscilloscope::GetExternalTrigger()
 {
 	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::GetExternalTrigger unimplemented\n");
-	return NULL;
+	//LogWarning("RohdeSchwarzOscilloscope::GetExternalTrigger unimplemented\n");
+	return nullptr;
 }
 
 float RohdeSchwarzOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
@@ -758,23 +773,52 @@ void RohdeSchwarzOscilloscope::PullEdgeTrigger()
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//Source
-	//This is a bit annoying because the hwname's used here are DIFFERENT than everywhere else!
-	m_transport->SendCommand("TRIG:A:SOUR?");
-	string reply = m_transport->ReadReply();
-	if(reply.find("CH") == 0)
-		et->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(atoi(reply.c_str()+2) - 1), 0), true);
-	else if(reply == "EXT")
-		et->SetInput(0, StreamDescriptor(m_extTrigChannel, 0), true);
-	else
-		LogWarning("Unknown trigger source %s\n", reply.c_str());
+	switch(m_series)
+	{
+		case SERIES_RTM:
+			{
+				//Source
+				//This is a bit annoying because the hwname's used here are DIFFERENT than everywhere else!
+				m_transport->SendCommand("TRIG:A:SOUR?");
+				string reply = m_transport->ReadReply();
+				if(reply.find("CH") == 0)
+					et->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(atoi(reply.c_str()+2) - 1), 0), true);
+				else if(reply == "EXT")
+					et->SetInput(0, StreamDescriptor(m_extTrigChannel, 0), true);
+				else
+					LogWarning("Unknown trigger source %s\n", reply.c_str());
 
-	//Level
-	m_transport->SendCommand("TRIG:A:LEV?");
-	reply = m_transport->ReadReply();
-	et->SetLevel(stof(reply));
+				//Level
+				m_transport->SendCommand("TRIG:A:LEV?");
+				reply = m_transport->ReadReply();
+				et->SetLevel(stof(reply));
 
-	//TODO: Edge slope
+				//TODO: Edge slope
+			}
+			break;
+
+		case SERIES_RTE:
+			{
+				m_transport->SendCommand("TRIG1:SOUR?");
+				string reply = m_transport->ReadReply();
+				if(reply.find("CH") == 0)
+					et->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(atoi(reply.c_str()+2) - 1), 0), true);
+				else if(reply == "EXT")
+					et->SetInput(0, StreamDescriptor(m_extTrigChannel, 0), true);
+				else
+					LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+				//Level
+				m_transport->SendCommand("TRIG1:LEV?");
+				reply = m_transport->ReadReply();
+				et->SetLevel(stof(reply));
+			}
+			break;
+
+		default:
+			LogWarning("PulLEdgeTrigger unimplemented for this series\n");
+			return;
+	}
 }
 
 void RohdeSchwarzOscilloscope::PushTrigger()
