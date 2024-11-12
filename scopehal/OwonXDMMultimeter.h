@@ -79,26 +79,6 @@ protected:
 	MeasurementTypes m_mode;
 	MeasurementTypes m_secmode;
 
-	/**
-	 * @brief Remove CR from the provided line
-	 * 
-	 * @param toClean the line to remove the CR from (in/out)
-	 */
-	static void RemoveCR(std::string &toClean)
-	{
-		toClean.erase( std::remove(toClean.begin(), toClean.end(), '\r'), toClean.end() );
-	}
-
-	/**
-	 * @brief Remove quotes from the provided line
-	 * 
-	 * @param toClean the line to remove the quotes from (in/out)
-	 */
-	static void RemoveQuotes(std::string &toClean)
-	{
-		toClean.erase( std::remove(toClean.begin(), toClean.end(), '"'), toClean.end() );
-	}
-
 public:
 	static std::string GetDriverNameInternal();
 	METER_INITPROC(OwonXDMMultimeter)

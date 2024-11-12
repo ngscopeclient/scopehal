@@ -109,8 +109,7 @@ int OwonXDMMultimeter::GetMeterDigits()
 bool OwonXDMMultimeter::GetMeterAutoRange()
 {
 	string reply = m_transport->SendCommandQueuedWithReply("AUTO?");
-	RemoveCR(reply);
-	return (reply == "1");
+	return (Trim(reply) == "1");
 }
 
 void OwonXDMMultimeter::SetMeterAutoRange(bool enable)
@@ -138,8 +137,7 @@ double OwonXDMMultimeter::GetMeterValue()
 	string value;
 	while(true)
 	{
-		value = m_transport->SendCommandQueuedWithReply("MEAS1?");
-		RemoveCR(value);
+		value = Trim(m_transport->SendCommandQueuedWithReply("MEAS1?"));
 		if(value.empty()||(value.find("NON")!=std::string::npos))
 		{
 			LogWarning("Failed to read value: got '%s'\n",value.c_str());
@@ -161,8 +159,7 @@ double OwonXDMMultimeter::GetSecondaryMeterValue()
 	string value;
 	while(true)
 	{
-		value = m_transport->SendCommandQueuedWithReply("MEAS2?");
-		RemoveCR(value);
+		value = Trim(m_transport->SendCommandQueuedWithReply("MEAS2?"));
 		if((value.find("NON")!=std::string::npos))
 		{
 			// No secondary reading at this point
@@ -195,9 +192,7 @@ Multimeter::MeasurementTypes OwonXDMMultimeter::GetMeterMode()
 	if(m_modeValid)
 		return m_mode;
 
-	auto smode = m_transport->SendCommandQueuedWithReply("FUNC?");
-	RemoveCR(smode);
-	RemoveQuotes(smode);
+	auto smode = TrimQuotes(Trim(m_transport->SendCommandQueuedWithReply("FUNC?")));
 
 	//Default to no alternate mode
 	m_secmode = NONE;
@@ -235,9 +230,7 @@ Multimeter::MeasurementTypes OwonXDMMultimeter::GetMeterMode()
 	}
 
 	// Get secondary measure
-	smode = m_transport->SendCommandQueuedWithReply("FUNC2?");
-	RemoveCR(smode);
-	RemoveQuotes(smode);
+	smode = TrimQuotes(Trim(m_transport->SendCommandQueuedWithReply("FUNC2?")));
 
 	if(smode.find("FREQ")!=std::string::npos)
 		m_secmode = FREQUENCY;
