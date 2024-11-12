@@ -67,7 +67,10 @@ vector<string> CANAnalyzerFilter::GetHeaders()
 
 bool CANAnalyzerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if(stream.m_channel == nullptr)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
