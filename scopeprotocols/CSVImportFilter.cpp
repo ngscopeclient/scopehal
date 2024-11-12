@@ -185,7 +185,8 @@ void CSVImportFilter::OnFileNameChanged()
 							(c != ',') && (c != '.') && (c != '-') && (c != 'e') && (c != '+'))
 						{
 							headerRow = true;
-							LogTrace("Found header row: %s\n", line);
+							auto trimline = Trim(line);
+							LogTrace("Found header row: %s\n", trimline.c_str());
 							break;
 						}
 					}
