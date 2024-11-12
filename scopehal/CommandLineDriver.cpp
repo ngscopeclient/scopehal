@@ -59,7 +59,7 @@ size_t CommandLineDriver::ConverseMultiple(const std::string commandString, std:
 	while(getline(ss, curLine))
 	{
 		// Remove remaining \r
-		RemoveCR(curLine);
+		curLine = Trim(curLine);
 		if(hasEcho && firstLine)
 		{
 			// First line is always an echo of the sent command
@@ -87,14 +87,14 @@ std::string CommandLineDriver::ConverseSingle(const std::string commandString, b
 		// Read first line (echo of command string)
 		getline(ss, result);
 		// Remove remaining \r
-		RemoveCR(result);
+		result = Trim(result);
 		if(result.compare(commandString) != 0)
 			LogWarning("Unexpected response \"%s\" to command string \"%s\".\n", result.c_str(), commandString.c_str());
 	}
 	// Get second line as result
 	getline(ss, result);
 	// Remove remaining \r
-	RemoveCR(result);
+	result = Trim(result);
 	return result;
 }
 

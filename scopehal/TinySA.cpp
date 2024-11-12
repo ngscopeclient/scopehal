@@ -120,12 +120,12 @@ TinySA::~TinySA()
 }
 
 /**
- * @brief Special method used to converse with the device with a binary response (e.g. spanraw command)
- *
- * @param commandString the command string to send
- * @param data a vector to store the binary data received from the device
- * @param length the length of binary data expected from the device
- * @return size_t the number of bytes actually read from the device
+   @brief Special method used to converse with the device with a binary response (e.g. spanraw command)
+
+   @param commandString the command string to send
+   @param data a vector to store the binary data received from the device
+   @param length the length of binary data expected from the device
+   @return size_t the number of bytes actually read from the device
  */
 size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length)
 {
@@ -216,11 +216,11 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 }
 
 /**
- * @brief Set and/or read the rbw value from the device
- *
- * @param sendValue true if the rbw value hase to be set
- * @param value the value to set
- * @return int64_t the rbw value read from the device
+   @brief Set and/or read the rbw value from the device
+
+   @param sendValue true if the rbw value hase to be set
+   @param value the value to set
+   @return int64_t the rbw value read from the device
  */
 int64_t TinySA::ConverseRbwValue(bool sendValue, int64_t value)
 {

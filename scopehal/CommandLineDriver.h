@@ -54,46 +54,46 @@ protected:
 	std::recursive_mutex m_transportMutex;
 
 	/**
-	 * @brief Converse with the device : send a command and read the reply over several lines
-	 *
-	 * @param commandString the command string to send
-	 * @param readLines a verctor to store the reply lines
-	 * @param hasEcho true (default value) if the device is expected to echo the sent command
-	 * @return size_t the number of lines received from the device
+   	   @brief Converse with the device : send a command and read the reply over several lines
+
+   	   @param commandString the command string to send
+   	   @param readLines a verctor to store the reply lines
+   	   @param hasEcho true (default value) if the device is expected to echo the sent command
+   	   @return size_t the number of lines received from the device
 	 */
 	std::string ConverseSingle(const std::string commandString, bool hasEcho = true);
 
 
 	/**
-	 * @brief Converse with the device by sending a command and receiving a single line response
-	 *
-	 * @param commandString the command string to send
-	 * @return std::string the received response
-	 * @param hasEcho true (default value) if the device is expected to echo the sent command
-	 * @param progress (optional) download progress function
-	 * @param expectedLines (optional) the number of lines expected from the device
-	 * @return size_t the number of lines received from the device
+   	   @brief Converse with the device by sending a command and receiving a single line response
+
+   	   @param commandString the command string to send
+   	   @return std::string the received response
+   	   @param hasEcho true (default value) if the device is expected to echo the sent command
+   	   @param progress (optional) download progress function
+   	   @param expectedLines (optional) the number of lines expected from the device
+   	   @return size_t the number of lines received from the device
 	 */
 	size_t ConverseMultiple(const std::string commandString, std::vector<std::string> &readLines, bool hasEcho = true, std::function<void(float)> progress = nullptr, size_t expecedLines = 0);
 
 	/**
-	 * @brief Set and/or read the sweep values from the device
-	 *
-	 * @param sweepStart the sweep start value (in/out)
-	 * @param sweepStop the sweep stop value (in/out)
-	 * @param points the number of points (in/out)
-	 * @param setFreqValues (optional, defaults to false) true is the sweep frequency values have to be set on the device
-	 * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
+   	   @brief Set and/or read the sweep values from the device
+
+   	   @param sweepStart the sweep start value (in/out)
+   	   @param sweepStop the sweep stop value (in/out)
+   	   @param points the number of points (in/out)
+   	   @param setFreqValues (optional, defaults to false) true is the sweep frequency values have to be set on the device
+   	   @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
 	 */
 	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, int64_t &points, bool setFreqValues = false);
 
 	/**
-	 * @brief Set and/or read the sweep values from the device
-	 *
-	 * @param sweepStart the sweep start value (in/out)
-	 * @param sweepStop the sweep stop value (in/out)
-	 * @param setFreqValues (optional, defaults to false) true is the sweep frequency values have to be set on the device
-	 * @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
+   	   @brief Set and/or read the sweep values from the device
+
+   	   @param sweepStart the sweep start value (in/out)
+   	   @param sweepStop the sweep stop value (in/out)
+   	   @param setFreqValues (optional, defaults to false) true is the sweep frequency values have to be set on the device
+   	   @return true is the value returned by the device is different from the one that shoudl have been set (e.g. out of range)
 	 */
 	bool ConverseSweep(int64_t &sweepStart, int64_t &sweepStop, bool setFreqValues = false)
 	{
@@ -102,31 +102,21 @@ protected:
 	}
 
 	/**
-	 * @brief Base method to converse with the device
-	 *
-	 * @param commandString the command string to send to the device
-	 * @param progress (optional) download progress function
-	 * @param expectedLines (optional) the number of lines expected from the device
-	 * @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
+   	   @brief Base method to converse with the device
+
+   	   @param commandString the command string to send to the device
+   	   @param progress (optional) download progress function
+   	   @param expectedLines (optional) the number of lines expected from the device
+   	   @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
 	 */
 	std::string ConverseString(const std::string commandString, std::function<void(float)> progress = nullptr, size_t expecedLines = 0);
 
 	/**
-	 * @brief Consume any pending data from the transport layer
-	 * 
-	 * @return the consumed data
+   	   @brief Consume any pending data from the transport layer
+   	   
+   	   @return the consumed data
 	 */
 	std::string DrainTransport();
-
-	/**
-	 * @brief Remove CR from the provided line
-	 * 
-	 * @param toClean the line to remove the CR from (in/out)
-	 */
-	static void RemoveCR(std::string &toClean)
-	{
-		toClean.erase( std::remove(toClean.begin(), toClean.end(), '\r'), toClean.end() );
-	}
 
 	size_t m_maxResponseSize;
 	double m_communicationTimeout;

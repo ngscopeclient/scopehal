@@ -470,9 +470,9 @@ bool NanoVNA::AcquireData()
 }
 
 /**
- * @brief Set the bandwidth value
- *
- * @param bandwidth the value to set
+   @brief Set the bandwidth value
+
+   @param bandwidth the value to set
  */
 void NanoVNA::SendBandwidthValue(int64_t bandwidth)
 {
