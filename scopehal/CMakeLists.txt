@@ -173,6 +173,7 @@ set(SCOPEHAL_SOURCES
 	MockOscilloscope.cpp
 	MultiLaneBERT.cpp
 	OwonXDGFunctionGenerator.cpp
+	OwonXDMMultimeter.cpp
 	PicoOscilloscope.cpp
 	PicoVNA.cpp
 	RigolFunctionGenerator.cpp

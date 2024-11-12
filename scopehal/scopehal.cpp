@@ -65,6 +65,7 @@
 #include "CSVStreamInstrument.h"
 #include "SocketCANAnalyzer.h"
 
+#include "OwonXDMMultimeter.h"
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
 #include "OwonXDGFunctionGenerator.h"
@@ -252,6 +253,7 @@ void DriverStaticInit()
 
 	AddMiscInstrumentDriverClass(CSVStreamInstrument);
 
+	AddMultimeterDriverClass(OwonXDMMultimeter);
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 
 	AddPowerSupplyDriverClass(DemoPowerSupply);
