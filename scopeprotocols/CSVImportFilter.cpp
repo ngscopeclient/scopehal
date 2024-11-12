@@ -195,6 +195,10 @@ void CSVImportFilter::OnFileNameChanged()
 						fields.push_back(tmp);
 				}
 
+				//If this is a header row, don't also try to parse it as a timestamp
+				if(headerRow)
+					continue;
+
 				//Load timestamp
 				if(!foundTimestamp)
 				{
