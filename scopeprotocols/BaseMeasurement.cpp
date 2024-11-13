@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,9 @@ using namespace std;
 BaseMeasurement::BaseMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	CreateInput("din");
 }
 
@@ -47,7 +49,7 @@ BaseMeasurement::BaseMeasurement(const string& color)
 
 bool BaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -75,11 +77,15 @@ void BaseMeasurement::Refresh()
 	auto sin = dynamic_cast<SparseAnalogWaveform*>(in);
 	if(!uin && !sin)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 	size_t len = in->size();
 	PrepareForCpuAccess(sin, uin);
+
+	//Copy input unit to output
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
 
 	//Make a histogram of the waveform
 	float vmin = GetMinVoltage(sin, uin);
@@ -184,4 +190,10 @@ void BaseMeasurement::Refresh()
 	}
 
 	cap->MarkModifiedFromCpu();
+
+	//Compute average
+	double sum = 0;
+	for(auto f : samples)
+		sum += f;
+	m_streams[1].m_value = sum / samples.size();
 }
