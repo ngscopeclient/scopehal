@@ -52,6 +52,7 @@
 #include <thread>
 #include <memory>
 #include <climits>
+#include <cinttypes>
 #include <set>
 #include <float.h>
 
