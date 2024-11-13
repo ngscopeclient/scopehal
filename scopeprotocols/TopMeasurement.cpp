@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,9 @@ using namespace std;
 TopMeasurement::TopMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	CreateInput("din");
 }
 
@@ -150,4 +152,10 @@ void TopMeasurement::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+
+	//Compute average
+	double finalsum = 0;
+	for(auto f : cap->m_samples)
+		finalsum += f;
+	m_streams[1].m_value = finalsum / cap->m_samples.size();
 }
