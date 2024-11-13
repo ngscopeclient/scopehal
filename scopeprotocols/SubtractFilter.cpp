@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -92,11 +92,10 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		DoRefreshVectorVector(cmdBuf, queue);
 	else if(!veca && !vecb)
 		DoRefreshScalarScalar();
+	else if(veca)
+		DoRefreshScalarVector(1, 0);
 	else
-	{
-		LogWarning("[SubtractFilter::Refresh] Scalar - vector case not yet implemented\n");
-		SetData(nullptr, 0);
-	}
+		DoRefreshScalarVector(0, 1);
 }
 
 void SubtractFilter::DoRefreshScalarScalar()
@@ -232,6 +231,70 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 			scap->m_samples.MarkModifiedFromGpu();
 		else
 			ucap->m_samples.MarkModifiedFromGpu();
+	}
+}
+
+void SubtractFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
+	float scale = GetInput(iScalar).GetScalarValue();
+	auto din = GetInputWaveform(iVector);
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	din->PrepareForCpuAccess();
+	auto len = din->size();
+
+	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	if(sparse)
+	{
+		//Set up the output waveform
+		auto cap = SetupSparseOutputWaveform(sparse, 0, 0, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		//subtract is slightly more complex than adding because we have to keep the order right
+		float* fin = (float*)__builtin_assume_aligned(sparse->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		if(iScalar == 1)
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = fin[i] - scale;
+		}
+		else
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = scale - fin[i];
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(uniform, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		if(iScalar == 1)
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = fin[i] - scale;
+		}
+		else
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = scale - fin[i];
+		}
+
+		cap->MarkModifiedFromCpu();
 	}
 }
 
