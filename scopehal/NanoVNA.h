@@ -29,45 +29,97 @@
 
 /**
 	@file
-	@author Alyssa Milburn
-	@brief Declaration of SCPIUARTTransport
-	@ingroup transports
+	@author Frederic Borry
+	@brief Declaration of NanoVNA
+	@ingroup vnadrivers
  */
 
-#ifndef SCPIUARTTransport_h
-#define SCPIUARTTransport_h
+#ifndef NanoVNA_h
+#define NanoVNA_h
 
-#include "../xptools/UART.h"
+class EdgeTrigger;
 
 /**
-	@brief Abstraction of a transport layer for moving SCPI data between endpoints
-	@ingroup transports
+	@brief NanoVNA - driver for talking to a NanoVNA using the NanoVNA 5 software
+	@ingroup vnadrivers
  */
-class SCPIUARTTransport : public SCPITransport
+class NanoVNA : public virtual SCPIVNA, public virtual CommandLineDriver
 {
 public:
-	SCPIUARTTransport(const std::string& args);
-	virtual ~SCPIUARTTransport();
+	NanoVNA(SCPITransport* transport);
+	virtual ~NanoVNA();
 
-	virtual std::string GetConnectionString() override;
-	static std::string GetTransportName();
+	//not copyable or assignable
+	NanoVNA(const NanoVNA& rhs) =delete;
+	NanoVNA& operator=(const NanoVNA& rhs) =delete;
 
-	virtual bool SendCommand(const std::string& cmd) override;
-	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
-	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
-	virtual void SendRawData(size_t len, const unsigned char* buf) override;
+public:
 
-	virtual bool IsCommandBatchingSupported() override;
-	virtual bool IsConnected() override;
+	//Channel configuration
 
-	TRANSPORT_INITPROC(SCPIUARTTransport)
+	//Triggering
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+	virtual void ForceTrigger() override;
+	virtual bool IsTriggerArmed() override;
+	virtual void PushTrigger() override;
+	virtual void PullTrigger() override;
+
+	//Timebase
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
+	virtual uint64_t GetSampleDepth() override;
+	virtual void SetSampleDepth(uint64_t depth) override;
+	// Sweep configuration
+	virtual void SetSpan(int64_t span) override;
+	virtual int64_t GetSpan() override;
+	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
+	virtual int64_t GetCenterFrequency(size_t channel) override;
+	// Rbw
+	virtual int64_t GetResolutionBandwidth() override;
+	virtual void SetResolutionBandwidth(int64_t rbw) override;
 
 protected:
-	UART m_uart;
+	// Device communication methods and members
+	enum Model {
+		MODEL_UNKNOWN,
+		MODEL_NANOVNA,
+		MODEL_NANOVNA_D,
+		MODEL_NANOVNA_F_DEEPELEC,
+		MODEL_NANOVNA_F,
+		MODEL_NANOVNA_H,
+		MODEL_NANOVNA_H4,
+		MODEL_NANOVNA_F_V2,
+		MODEL_NANOVNA_V2
+	};
 
-	std::string m_devfile;
-	unsigned int m_baudrate;
-	bool m_dtrEnable;
+	void SendBandwidthValue(int64_t bandwidth);
+
+	std::string GetChannelColor(size_t i);
+
+	bool m_triggerArmed = false;
+	bool m_triggerOneShot = false;
+
+	int64_t m_sampleDepth = 0;
+	size_t m_maxDeviceSampleDepth = 0;
+	int64_t m_rbw = 0;
+	std::map<int64_t,int64_t> m_rbwValues;
+
+	Model m_nanoVNAModel = MODEL_UNKNOWN;
+
+	// Span control
+	int64_t m_sweepStart;
+	int64_t m_sweepStop;
+
+	int64_t m_freqMax;
+	int64_t m_freqMin;
+
+public:
+	static std::string GetDriverNameInternal();
+	VNA_INITPROC(NanoVNA)
 };
 
 #endif

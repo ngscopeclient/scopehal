@@ -85,6 +85,7 @@
 #include "UHDBridgeSDR.h"
 
 #include "CopperMountainVNA.h"
+#include "NanoVNA.h"
 #include "PicoVNA.h"
 
 #include "SiglentVectorSignalGenerator.h"
@@ -273,6 +274,7 @@ void DriverStaticInit()
 	AddSDRDriverClass(UHDBridgeSDR);
 
 	AddVNADriverClass(CopperMountainVNA);
+	AddVNADriverClass(NanoVNA);
 	AddVNADriverClass(PicoVNA);
 
 	AddTriggerClass(CDR8B10BTrigger);

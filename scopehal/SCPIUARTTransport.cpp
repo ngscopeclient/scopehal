@@ -44,22 +44,30 @@ using namespace std;
 SCPIUARTTransport::SCPIUARTTransport(const string& args)
 {
 	char devfile[128];
+	char flags[128];
 	unsigned int baudrate = 0;
-	if(2 != sscanf(args.c_str(), "%127[^:]:%u", devfile, &baudrate))
+	m_dtrEnable = false;
+	if(3 == sscanf(args.c_str(), "%127[^:]:%u:%127s", devfile, &baudrate, flags))
+	{
+		m_devfile = devfile;
+		m_baudrate = baudrate;
+		m_dtrEnable = (strcmp(flags,"DTR") == 0);
+	}
+	else if(2 == sscanf(args.c_str(), "%127[^:]:%u", devfile, &baudrate))
+	{
+		m_devfile = devfile;
+		m_baudrate = baudrate;
+	}
+	else
 	{
 		//default if port not specified
 		m_devfile = args;
 		m_baudrate = 115200;
 	}
-	else
-	{
-		m_devfile = devfile;
-		m_baudrate = baudrate;
-	}
 
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_devfile.c_str(), m_baudrate);
+	LogDebug("Connecting to SCPI oscilloscope at %s:%d with dtrEnable=%s\n", m_devfile.c_str(), m_baudrate, m_dtrEnable ? "true" : "false");
 
-	if(!m_uart.Connect(m_devfile, m_baudrate))
+	if(!m_uart.Connect(m_devfile, m_baudrate, m_dtrEnable))
 	{
 		m_uart.Close();
 		LogError("Couldn't connect to UART\n");
@@ -87,7 +95,10 @@ string SCPIUARTTransport::GetTransportName()
 string SCPIUARTTransport::GetConnectionString()
 {
 	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%s:%u", m_devfile.c_str(), m_baudrate);
+	if(m_dtrEnable)
+		snprintf(tmp, sizeof(tmp), "%s:%u:DTR", m_devfile.c_str(), m_baudrate);
+	else
+		snprintf(tmp, sizeof(tmp), "%s:%u", m_devfile.c_str(), m_baudrate);
 	return string(tmp);
 }
 
