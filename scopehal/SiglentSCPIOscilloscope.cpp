@@ -732,7 +732,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 			// --------------------------------------------------
 			case PROTOCOL_SPO:
 			case PROTOCOL_ESERIES:
-				reply = converse("C%d:TRACE?", i + 1);
+				reply = converse("C%zu:TRACE?", i + 1);
 
 				{
 					lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -741,7 +741,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 				break;
 			// --------------------------------------------------
 			case PROTOCOL_E11:
-				reply = converse(":CHANNEL%d:SWITCH?", i + 1);
+				reply = converse(":CHANNEL%zu:SWITCH?", i + 1);
 				{
 					lock_guard<recursive_mutex> lock2(m_cacheMutex);
 					m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
@@ -760,7 +760,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 
 		//See if the channel is on (digital channel numbers are 0 based)
 		size_t nchan = i - m_analogChannelCount;
-		string str = converse(":DIGITAL:D%d?", nchan);
+		string str = converse(":DIGITAL:D%zu?", nchan);
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		// OFF can bee "SUPPORT_OFF" if all digital channels are off
@@ -785,11 +785,11 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 			// --------------------------------------------------
 			case PROTOCOL_SPO:
 			case PROTOCOL_ESERIES:
-				sendOnly(":C%d:TRACE ON", i + 1);
+				sendOnly(":C%zu:TRACE ON", i + 1);
 				break;
 			// --------------------------------------------------
 			case PROTOCOL_E11:
-				sendOnly(":CHANNEL%d:SWITCH ON", i + 1);
+				sendOnly(":CHANNEL%zu:SWITCH ON", i + 1);
 				break;
 			// --------------------------------------------------
 			default:
@@ -841,13 +841,13 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 			// --------------------------------------------------
 			case PROTOCOL_SPO:
 			case PROTOCOL_ESERIES:
-				sendOnly("C%d:TRACE OFF", i + 1);
+				sendOnly("C%zu:TRACE OFF", i + 1);
 				break;
 			// -------------------------------------------------
 			case PROTOCOL_E11:
 				//If this is an analog channel, just toggle it
 				if(i < m_analogChannelCount)
-					sendOnly(":CHANNEL%d:SWITCH OFF", i + 1);
+					sendOnly(":CHANNEL%zu:SWITCH OFF", i + 1);
 				break;
 			// --------------------------------------------------
 			default:
@@ -861,7 +861,7 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 		//Digital channel
 
 		//Disable this channel (digital channel numbers are 0 based)
-		sendOnly(":DIGITAL:D%d OFF", i - m_analogChannelCount);
+		sendOnly(":DIGITAL:D%zu OFF", i - m_analogChannelCount);
 
 		//If we have NO digital channels enabled, disable the appropriate digital bus
 
@@ -1055,25 +1055,25 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_AC_50:
-					sendOnly("C%d:COUPLING %s", i + 1, "A50");
+					sendOnly("C%zu:COUPLING %s", i + 1, "A50");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_50:
-					sendOnly("C%d:COUPLING %s", i + 1, "D50");
+					sendOnly("C%zu:COUPLING %s", i + 1, "D50");
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_1M:
-					sendOnly("C%d:COUPLING %s", i + 1, "A1M");
+					sendOnly("C%zu:COUPLING %s", i + 1, "A1M");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
-					sendOnly("C%d:COUPLING %s", i + 1, "D1M");
+					sendOnly("C%zu:COUPLING %s", i + 1, "D1M");
 					break;
 
 				//treat unrecognized as ground
 				case OscilloscopeChannel::COUPLE_GND:
 				default:
-					sendOnly("C%d:COUPLING %s", i + 1, "GND");
+					sendOnly("C%zu:COUPLING %s", i + 1, "GND");
 					break;
 			}
 			break;
@@ -1082,29 +1082,29 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_AC_1M:
-					sendOnly(":CHANNEL%d:COUPLING AC", i + 1);
-					sendOnly(":CHANNEL%d:IMPEDANCE ONEMEG", i + 1);
+					sendOnly(":CHANNEL%zu:COUPLING AC", i + 1);
+					sendOnly(":CHANNEL%zu:IMPEDANCE ONEMEG", i + 1);
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
-					sendOnly(":CHANNEL%d:COUPLING DC", i + 1);
-					sendOnly(":CHANNEL%d:IMPEDANCE ONEMEG", i + 1);
+					sendOnly(":CHANNEL%zu:COUPLING DC", i + 1);
+					sendOnly(":CHANNEL%zu:IMPEDANCE ONEMEG", i + 1);
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_50:
-					sendOnly(":CHANNEL%d:COUPLING DC", i + 1);
-					sendOnly(":CHANNEL%d:IMPEDANCE FIFTY", i + 1);
+					sendOnly(":CHANNEL%zu:COUPLING DC", i + 1);
+					sendOnly(":CHANNEL%zu:IMPEDANCE FIFTY", i + 1);
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_50:
-					sendOnly(":CHANNEL%d:COUPLING AC", i + 1);
-					sendOnly(":CHANNEL%d:IMPEDANCE FIFTY", i + 1);
+					sendOnly(":CHANNEL%zu:COUPLING AC", i + 1);
+					sendOnly(":CHANNEL%zu:IMPEDANCE FIFTY", i + 1);
 					break;
 
 				//treat unrecognized as ground
 				case OscilloscopeChannel::COUPLE_GND:
 				default:
-					sendOnly(":CHANNEL%d:COUPLING GND", i + 1);
+					sendOnly(":CHANNEL%zu:COUPLING GND", i + 1);
 					break;
 			}
 			break;
@@ -1132,11 +1132,11 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 		// --------------------------------------------------
 		case PROTOCOL_SPO:
 		case PROTOCOL_ESERIES:
-			reply = converse("C%d:ATTENUATION?", i + 1);
+			reply = converse("C%zu:ATTENUATION?", i + 1);
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			reply = converse(":CHANNEL%d:PROBE?", i + 1);
+			reply = converse(":CHANNEL%zu:PROBE?", i + 1);
 			break;
 		// --------------------------------------------------
 		default:
@@ -1175,17 +1175,17 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			// should be sent as floating point numbers with one decimal.
 			if(atten >= 1)
 			{
-				sendOnly("C%d:ATTENUATION %d", i + 1, (int)atten);
+				sendOnly("C%zu:ATTENUATION %d", i + 1, (int)atten);
 			}
 			else
 			{
-				sendOnly("C%d:ATTENUATION %.1lf", i + 1, atten);
+				sendOnly("C%zu:ATTENUATION %.1lf", i + 1, atten);
 			}
 			break;
 
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			sendOnly(":CHANNEL%d:PROBE VALUE,%lf", i + 1, atten);
+			sendOnly(":CHANNEL%zu:PROBE VALUE,%lf", i + 1, atten);
 			break;
 
 		// --------------------------------------------------
@@ -1254,7 +1254,7 @@ unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 		// --------------------------------------------------
 		case PROTOCOL_SPO:
 		case PROTOCOL_ESERIES:
-			reply = converse("C%d:BANDWIDTH_LIMIT?", i + 1);
+			reply = converse("C%zu:BANDWIDTH_LIMIT?", i + 1);
 			if(reply == "OFF")
 				return 0;
 			else if(reply == "ON")
@@ -1262,7 +1262,7 @@ unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			reply = converse(":CHANNEL%d:BWLIMIT?", i + 1);
+			reply = converse(":CHANNEL%zu:BWLIMIT?", i + 1);
 			if(reply == "FULL")
 				return 0;
 			else if(reply == "20M")
@@ -1291,11 +1291,11 @@ void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int li
 			switch(limit_mhz)
 			{
 				case 0:
-					sendOnly("BANDWIDTH_LIMIT C%d,OFF", i + 1);
+					sendOnly("BANDWIDTH_LIMIT C%zu,OFF", i + 1);
 					break;
 
 				case 20:
-					sendOnly("BANDWIDTH_LIMIT C%d,ON", i + 1);
+					sendOnly("BANDWIDTH_LIMIT C%zu,ON", i + 1);
 					break;
 
 				default:
@@ -1307,15 +1307,15 @@ void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int li
 			switch(limit_mhz)
 			{
 				case 0:
-					sendOnly(":CHANNEL%d:BWLIMIT FULL", i + 1);
+					sendOnly(":CHANNEL%zu:BWLIMIT FULL", i + 1);
 					break;
 
 				case 20:
-					sendOnly(":CHANNEL%d:BWLIMIT 20M", i + 1);
+					sendOnly(":CHANNEL%zu:BWLIMIT 20M", i + 1);
 					break;
 
 				case 200:
-					sendOnly(":CHANNEL%d:BWLIMIT 200M", i + 1);
+					sendOnly(":CHANNEL%zu:BWLIMIT 200M", i + 1);
 					break;
 
 				default:
@@ -1346,11 +1346,11 @@ void SiglentSCPIOscilloscope::Invert(size_t i, bool invert)
 		// --------------------------------------------------
 		case PROTOCOL_SPO:
 		case PROTOCOL_ESERIES:
-			sendOnly("C%d:INVERTSET %s", i + 1, invert ? "ON" : "OFF");
+			sendOnly("C%zu:INVERTSET %s", i + 1, invert ? "ON" : "OFF");
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			sendOnly(":CHANNEL%d:INVERT %s", i + 1, invert ? "ON" : "OFF");
+			sendOnly(":CHANNEL%zu:INVERT %s", i + 1, invert ? "ON" : "OFF");
 			break;
 		// --------------------------------------------------
 		default:
@@ -1372,11 +1372,11 @@ bool SiglentSCPIOscilloscope::IsInverted(size_t i)
 		// --------------------------------------------------
 		case PROTOCOL_SPO:
 		case PROTOCOL_ESERIES:
-			reply = Trim(converse("C%d:INVERTSET?", i + 1));
+			reply = Trim(converse("C%zu:INVERTSET?", i + 1));
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			reply = Trim(converse(":CHANNEL%d:INVERT?", i + 1));
+			reply = Trim(converse(":CHANNEL%zu:INVERT?", i + 1));
 			break;
 		// --------------------------------------------------
 		default:
@@ -1452,14 +1452,14 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 		case PROTOCOL_E11:
 			if(i < m_analogChannelCount)
 			{
-				name = converse(":CHANNEL%d:LABEL:TEXT?", i + 1);
+				name = converse(":CHANNEL%zu:LABEL:TEXT?", i + 1);
 				// Remove "'s around the name
 				if(name.length() > 2)
 					name = name.substr(1, name.length() - 2);
 			}
 			else
 			{
-				name = converse(":DIGITAL:LABEL%d?", i - m_analogChannelCount);
+				name = converse(":DIGITAL:LABEL%zu?", i - m_analogChannelCount);
 				// Remove "'s around the name
 				if(name.length() > 2)
 					name = name.substr(1, name.length() - 2);
