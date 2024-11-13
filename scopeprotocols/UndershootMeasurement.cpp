@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,9 @@ using namespace std;
 UndershootMeasurement::UndershootMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "min", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("din");
 }
 
@@ -96,6 +98,8 @@ void UndershootMeasurement::Refresh()
 	float		vmin = FLT_MAX;
 
 	//For each cycle, find how far we got below the base
+	double sum = 0;
+	float global_min = 0;
 	for(size_t i=0; i < len; i++)
 	{
 		//If we're above the midpoint, reset everything and add a new sample
@@ -114,6 +118,9 @@ void UndershootMeasurement::Refresh()
 				cap->m_offsets.push_back(tmin);
 				cap->m_durations.push_back(0);
 				cap->m_samples.push_back(base - vmin);
+
+				global_min = min(global_min, vmin);
+				sum += vmin;
 			}
 
 			//Reset
@@ -135,4 +142,7 @@ void UndershootMeasurement::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+
+	m_streams[1].m_value = sum / cap->m_samples.size();
+	m_streams[2].m_value = global_min;
 }
