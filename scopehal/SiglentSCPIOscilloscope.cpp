@@ -996,7 +996,7 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 		// --------------------------------------------------
 		case PROTOCOL_SPO:
 		case PROTOCOL_ESERIES:
-			replyType = Trim(converse("C%d:COUPLING?", i + 1));
+			replyType = Trim(converse("C%zu:COUPLING?", i + 1));
 			if(replyType == "A50")
 				return OscilloscopeChannel::COUPLE_AC_50;
 			else if(replyType == "D50")
@@ -1010,8 +1010,8 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			replyType = Trim(converse(":CHANNEL%d:COUPLING?", i + 1).substr(0, 2));
-			replyImp = Trim(converse(":CHANNEL%d:IMPEDANCE?", i + 1).substr(0, 3));
+			replyType = Trim(converse(":CHANNEL%zu:COUPLING?", i + 1).substr(0, 2));
+			replyImp = Trim(converse(":CHANNEL%zu:IMPEDANCE?", i + 1).substr(0, 3));
 
 			if(replyType == "AC")
 				return (replyImp.find("FIF") == 0) ? OscilloscopeChannel::COUPLE_AC_50 : OscilloscopeChannel::COUPLE_AC_1M;
@@ -2540,11 +2540,11 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 		// --------------------------------------------------
 		case PROTOCOL_SPO:
 		case PROTOCOL_ESERIES:
-			reply = converse("C%d:VOLT_DIV?", i + 1);
+			reply = converse("C%zu:VOLT_DIV?", i + 1);
 			break;
 		// --------------------------------------------------
 		case PROTOCOL_E11:
-			reply = converse(":CHANNEL%d:SCALE?", i + 1);
+			reply = converse(":CHANNEL%zu:SCALE?", i + 1);
 			break;
 		// --------------------------------------------------
 		default:
@@ -3778,12 +3778,12 @@ void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 		i++;
 
 	if(c_sds2000xp_threshold_table[i].name)
-		sendOnly(":DIGITAL:THRESHOLD%d %s", (channel / 8) + 1, (c_sds2000xp_threshold_table[i].name));
+		sendOnly(":DIGITAL:THRESHOLD%zu %s", (channel / 8) + 1, (c_sds2000xp_threshold_table[i].name));
 	else
 	{
 		do
 		{
-			sendOnly(":DIGITAL:THRESHOLD%d CUSTOM,%1.2E", (channel / 8) + 1, level);
+			sendOnly(":DIGITAL:THRESHOLD%zu CUSTOM,%1.2E", (channel / 8) + 1, level);
 
 		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount) - level)) > 0.1f);
 	}

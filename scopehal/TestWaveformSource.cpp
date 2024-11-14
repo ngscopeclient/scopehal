@@ -488,7 +488,7 @@ void TestWaveformSource::DegradeSerialData(
 		//Rescale the FFT output and copy to the output, then add noise
 		float fftscale = 1.0f / npoints;
 		for(size_t i=0; i<finalLen; i++)
-			cap->m_samples[i] = m_reverseOutBuf[i + istart] * fftscale + noise(m_rng);
+			cap->m_samples[i] = m_reverseOutBuf[i + istart] * fftscale + (float)noise(m_rng);
 
 		//Resize the waveform to truncate garbage at the end
 		cap->Resize(finalLen);
