@@ -46,6 +46,8 @@
 
 #endif
 
+#define UNIT_OVERLOAD_LABEL "Overload"
+
 /**
 	@brief A unit of measurement, plus conversion to pretty-printed output
 

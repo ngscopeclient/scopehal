@@ -86,6 +86,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_interleavingValid(false)
 	, m_meterMode(Multimeter::DC_VOLTAGE)
 	, m_meterModeValid(false)
+	, m_dmmAutorangeValid(false)
 	, m_highDefinition(false)
 {
 	//standard initialization
@@ -1071,6 +1072,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_triggerOffsetValid = false;
 	m_interleavingValid = false;
 	m_meterModeValid = false;
+	m_dmmAutorangeValid = false;
 
 	//Clear cached display name of all channels
 	for(auto c : m_channels)
@@ -1891,14 +1893,23 @@ int LeCroyOscilloscope::GetMeterDigits()
 
 bool LeCroyOscilloscope::GetMeterAutoRange()
 {
+	if(m_dmmAutorangeValid)
+		return m_dmmAutorange;
+
 	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.AutoRange'");
 	int ret;
 	sscanf(str.c_str(), "%d", &ret);
-	return ret ? true : false;
+	m_dmmAutorange = (ret ? true : false);
+
+	m_dmmAutorangeValid = true;
+	return m_dmmAutorange;
 }
 
 void LeCroyOscilloscope::SetMeterAutoRange(bool enable)
 {
+	m_dmmAutorange = enable;
+	m_dmmAutorangeValid = true;
+
 	if(enable)
 		m_transport->SendCommandQueued("VBS 'app.acquisition.DVM.AutoRange = 1'");
 	else

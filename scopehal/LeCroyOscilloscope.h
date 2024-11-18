@@ -375,6 +375,8 @@ protected:
 	bool m_interleavingValid;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
+	bool m_dmmAutorangeValid;
+	bool m_dmmAutorange;
 	std::map<size_t, bool> m_probeIsActive;
 
 	//True if we have >8 bit capture depth

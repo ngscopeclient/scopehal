@@ -46,6 +46,7 @@ OwonXDMMultimeter::OwonXDMMultimeter(SCPITransport* transport)
 	, SCPIInstrument(transport)
 	, m_modeValid(false)
 	, m_secmodeValid(false)
+	, m_dmmAutorangeValid(false)
 {
 	//prefetch operating mode
 	GetMeterMode();
@@ -55,6 +56,9 @@ OwonXDMMultimeter::OwonXDMMultimeter(SCPITransport* transport)
 
 	// Set speed to high
 	m_transport->SendCommandQueued("RATE F");
+
+	// Rate limit to 65 Hz (which is the highest measurement supported by the metter)
+	m_transport->EnableRateLimiting(chrono::milliseconds(1000/65));
 }
 
 OwonXDMMultimeter::~OwonXDMMultimeter()
@@ -108,17 +112,26 @@ int OwonXDMMultimeter::GetMeterDigits()
 
 bool OwonXDMMultimeter::GetMeterAutoRange()
 {
+	if(m_dmmAutorangeValid)
+		return m_dmmAutorange;
+
 	string reply = m_transport->SendCommandQueuedWithReply("AUTO?");
-	return (Trim(reply) == "1");
+	m_dmmAutorange = (Trim(reply) == "1");
+
+	m_dmmAutorangeValid = true;
+	return m_dmmAutorange;
 }
 
 void OwonXDMMultimeter::SetMeterAutoRange(bool enable)
 {
+	m_dmmAutorange = enable;
+	m_dmmAutorangeValid = true;
+
 	if(enable)
-		m_transport->SendCommandQueued("AUTO");
+		m_transport->SendCommandImmediate("AUTO");
 	else
 	{
-		m_transport->SendCommandQueued("RANGE 1");
+		m_transport->SendCommandImmediate("RANGE 1");
 	}
 }
 
@@ -143,6 +156,8 @@ double OwonXDMMultimeter::GetMeterValue()
 			LogWarning("Failed to read value: got '%s'\n",value.c_str());
 			continue;
 		}
+		else if(value == "1E+9") // Overload
+			return std::numeric_limits<double>::max();
 		istringstream os(value);
     	double result;
     	os >> result;
@@ -165,7 +180,9 @@ double OwonXDMMultimeter::GetSecondaryMeterValue()
 			// No secondary reading at this point
 			return 0;
 		}
-		if(value.empty()||(value.find("NON")!=std::string::npos))
+		else if(value == "1E+9")
+			return std::numeric_limits<double>::max(); // Overload
+		if(value.empty())
 		{
 			LogWarning("Failed to read value: got '%s'\n",value.c_str());
 			continue;
@@ -259,43 +276,43 @@ void OwonXDMMultimeter::SetMeterMode(Multimeter::MeasurementTypes type)
 	switch(type)
 	{
 		case DC_VOLTAGE:
-			m_transport->SendCommandQueued("CONF:VOLT:DC");
+			m_transport->SendCommandImmediate("CONF:VOLT:DC");
 			break;
 
 		case AC_RMS_AMPLITUDE:
-			m_transport->SendCommandQueued("CONF:VOLT:AC");
+			m_transport->SendCommandImmediate("CONF:VOLT:AC");
 			break;
 
 		case DC_CURRENT:
-			m_transport->SendCommandQueued("CONF:CURR:DC");
+			m_transport->SendCommandImmediate("CONF:CURR:DC");
 			break;
 
 		case AC_CURRENT:
-			m_transport->SendCommandQueued("CONF:CURR:AC");
+			m_transport->SendCommandImmediate("CONF:CURR:AC");
 			break;
 
 		case RESISTANCE:
-			m_transport->SendCommandQueued("CONF:RES");
+			m_transport->SendCommandImmediate("CONF:RES");
 			break;
 
 		case CAPACITANCE:
-			m_transport->SendCommandQueued("CONF:CAP");
+			m_transport->SendCommandImmediate("CONF:CAP");
 			break;
 
 		case FREQUENCY:
-			m_transport->SendCommandQueued("CONF:FREQ");
+			m_transport->SendCommandImmediate("CONF:FREQ");
 			break;
 
 		case DIODE:
-			m_transport->SendCommandQueued("CONF:DIOD");
+			m_transport->SendCommandImmediate("CONF:DIOD");
 			break;
 
 		case CONTINUITY:
-			m_transport->SendCommandQueued("CONF:CONT");
+			m_transport->SendCommandImmediate("CONF:CONT");
 			break;
 
 		case TEMPERATURE:
-			m_transport->SendCommandQueued("CONF:TEMP");
+			m_transport->SendCommandImmediate("CONF:TEMP");
 			break;
 
 		//whatever it is, not supported
@@ -313,11 +330,11 @@ void OwonXDMMultimeter::SetSecondaryMeterMode(Multimeter::MeasurementTypes type)
 	switch(type)
 	{
 		case FREQUENCY:
-			m_transport->SendCommandQueued("FUNC2 \"FREQ\"");
+			m_transport->SendCommandImmediate("FUNC2 \"FREQ\"");
 			break;
 
 		case NONE:
-			m_transport->SendCommandQueued("FUNC2 \"NONe\"");
+			m_transport->SendCommandImmediate("FUNC2 \"NONe\"");
 			break;
 
 		//not supported
