@@ -144,6 +144,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	QSPIDecoder.cpp
 	QuadratureDecoder.cpp
 	ReferencePlaneExtensionFilter.cpp
+	RGBLEDDecoder.cpp
 	RISFilter.cpp
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp

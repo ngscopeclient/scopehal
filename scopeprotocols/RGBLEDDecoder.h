@@ -1,4 +1,5 @@
-/************************************************************************************************************************                                                                                                                      *
+/***********************************************************************************************************************
+*                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
@@ -26,114 +27,64 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "OvershootMeasurement.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of RGBLEDDecoder
+ */
 
-using namespace std;
+#ifndef RGBLEDDecoder_h
+#define RGBLEDDecoder_h
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-OvershootMeasurement::OvershootMeasurement(const string& color)
-	: Filter(color, CAT_MEASUREMENT)
+class RGBLEDSymbol
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+public:
 
-	CreateInput("din");
-}
+	RGBLEDSymbol() {}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+	RGBLEDSymbol(uint32_t d) : m_data(d) {}
 
-bool OvershootMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+	uint32_t m_data;
+
+	bool operator==(const RGBLEDSymbol& s) const { return (m_data == s.m_data); }
+};
+
+class RGBLEDWaveform : public SparseWaveform<RGBLEDSymbol>
 {
-	if(stream.m_channel == NULL)
-		return false;
+public:
+	RGBLEDWaveform () : SparseWaveform<RGBLEDSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string OvershootMeasurement::GetProtocolName()
+class RGBLEDDecoder : public Filter
 {
-	return "Overshoot";
-}
+public:
+	RGBLEDDecoder(const std::string& color);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
-void OvershootMeasurement::Refresh()
-{
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	static std::string GetProtocolName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	PROTOCOL_DECODER_INITPROC(RGBLEDDecoder)
+
+protected:
+	enum pwidth_t
 	{
-		SetData(NULL, 0);
-		return;
-	}
+		SHORT,
+		LONG,
+		AMBIGUOUS
+	};
 
-	//Get the input data
-	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
-	size_t len = din->size();
-
-	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
-
-	//Figure out the nominal top of the waveform
-	float top = GetTopVoltage(sdin, udin);
-	float base = GetBaseVoltage(sdin, udin);
-	float midpoint = (top+base)/2;
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
-	cap->PrepareForCpuAccess();
-
-	int64_t		tmax = 0;
-	float		vmax = 0;
-
-	//For each cycle, find how far we got above the top
-	for(size_t i=0; i < len; i++)
+	enum type_t
 	{
-		//If we're below the midpoint, reset everything and add a new sample
-		float v = GetValue(sdin, udin, i);
-		if(v < midpoint)
-		{
-			//Add a sample for the current value (if any)
-			if(tmax > 0)
-			{
-				//Update duration of the previous sample
-				size_t off = cap->size();
-				if(off > 0)
-					cap->m_durations[off-1] = tmax - cap->m_offsets[off-1];
+		TYPE_19_C47,	//Everlight 19-C47/RSGHBC-5V01/2T and similar
+		TYPE_WS2812
+	};
 
-				//Add the new sample
-				cap->m_offsets.push_back(tmax);
-				cap->m_durations.push_back(0);
-				cap->m_samples.push_back(vmax - top);
-			}
+	FilterParameter& m_type;
+};
 
-			//Reset
-			tmax = 0;
-			vmax = -FLT_MAX;
-		}
-
-		//Accumulate the highest peak of this cycle
-		else
-		{
-			if(v > vmax)
-			{
-				tmax = ::GetOffset(sdin, udin, i);
-				vmax = v;
-			}
-		}
-	}
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-}
+#endif

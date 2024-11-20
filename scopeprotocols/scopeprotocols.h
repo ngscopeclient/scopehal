@@ -180,6 +180,7 @@
 #include "PRBSGeneratorFilter.h"
 #include "PulseWidthMeasurement.h"
 #include "ReferencePlaneExtensionFilter.h"
+#include "RGBLEDDecoder.h"
 #include "RjBUjFilter.h"
 #include "RMSMeasurement.h"
 #include "QSGMIIDecoder.h"
