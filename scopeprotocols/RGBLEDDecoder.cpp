@@ -44,6 +44,7 @@ using namespace std;
 
 RGBLEDDecoder::RGBLEDDecoder(const string& color) : Filter(color, CAT_BUS)
 	, m_type(m_parameters["LED Type"])
+	, m_displayscale(m_parameters["Brightness Scale"])
 {
 	AddProtocolStream("data");
 	CreateInput("din");
@@ -52,6 +53,9 @@ RGBLEDDecoder::RGBLEDDecoder(const string& color) : Filter(color, CAT_BUS)
 	m_type.AddEnumValue("Everlight 19-C47", TYPE_19_C47);
 	m_type.AddEnumValue("Worldsemi WS2812", TYPE_WS2812);
 	m_type.SetIntVal(TYPE_WS2812);
+
+	m_displayscale = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_displayscale.SetFloatVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +108,7 @@ void RGBLEDDecoder::Refresh(
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_scale = m_displayscale.GetFloatVal();
 	SetData(cap, 0);
 
 	//Measure widths of all edges in the incoming signal
@@ -276,7 +281,15 @@ string RGBLEDWaveform::GetColor(size_t i)
 	else*/
 	{
 		char tmp[32];
-		snprintf(tmp, sizeof(tmp), "#%06x", s.m_data & 0xffffff);
+
+		uint32_t r = (s.m_data >> 16) & 0xff;
+		uint32_t g = (s.m_data >> 8) & 0xff;
+		uint32_t b = (s.m_data >> 0) & 0xff;
+		r = min(r * m_scale, 255.0f);
+		g = min(g * m_scale, 255.0f);
+		b = min(b * m_scale, 255.0f);
+
+		snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", r, g, b);
 		return string(tmp);
 	}
 }

@@ -52,9 +52,14 @@ public:
 class RGBLEDWaveform : public SparseWaveform<RGBLEDSymbol>
 {
 public:
-	RGBLEDWaveform () : SparseWaveform<RGBLEDSymbol>() {};
+	RGBLEDWaveform ()
+		: SparseWaveform<RGBLEDSymbol>()
+		, m_scale(1)
+	{};
 	virtual std::string GetText(size_t) override;
 	virtual std::string GetColor(size_t) override;
+
+	float m_scale;
 };
 
 class RGBLEDDecoder : public Filter
@@ -85,6 +90,8 @@ protected:
 	};
 
 	FilterParameter& m_type;
+
+	FilterParameter& m_displayscale;
 };
 
 #endif
