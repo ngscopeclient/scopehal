@@ -34,6 +34,7 @@
  */
 
 #include "../scopehal/scopehal.h"
+#include "DVIDecoder.h"
 #include "RGBLEDDecoder.h"
 #include <algorithm>
 
@@ -42,7 +43,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-RGBLEDDecoder::RGBLEDDecoder(const string& color) : Filter(color, CAT_BUS)
+RGBLEDDecoder::RGBLEDDecoder(const string& color) : PacketDecoder(color, CAT_SERIAL)
 	, m_type(m_parameters["LED Type"])
 	, m_displayscale(m_parameters["Brightness Scale"])
 {
@@ -63,7 +64,7 @@ RGBLEDDecoder::RGBLEDDecoder(const string& color) : Filter(color, CAT_BUS)
 
 bool RGBLEDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if((i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -86,13 +87,15 @@ void RGBLEDDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	ClearPackets();
+
 	LogTrace("Refresh\n");
 	LogIndenter li;
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -110,6 +113,8 @@ void RGBLEDDecoder::Refresh(
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_scale = m_displayscale.GetFloatVal();
 	SetData(cap, 0);
+
+	VideoScanlinePacket* pack = nullptr;
 
 	//Measure widths of all edges in the incoming signal
 	//Add a dummy edge at beginning and end
@@ -177,6 +182,7 @@ void RGBLEDDecoder::Refresh(
 			phase = 0;
 			value = 0;
 			error = false;
+			pack = nullptr;
 			continue;
 		}
 
@@ -189,6 +195,7 @@ void RGBLEDDecoder::Refresh(
 			phase = 0;
 			value = 0;
 			error = false;
+			pack = nullptr;
 			continue;
 		}
 
@@ -223,7 +230,17 @@ void RGBLEDDecoder::Refresh(
 		{
 			//If this is the start of a symbol, save the timestamp
 			if(bcount == 0)
+			{
 				tstart = edges[i-1];
+
+				//and if start of a packet, make one
+				if(!pack)
+				{
+					pack = new VideoScanlinePacket;
+					pack->m_offset = tstart;
+					m_packets.push_back(pack);
+				}
+			}
 
 			value <<= 1;
 			if(pulsewidth == LONG)
@@ -255,8 +272,15 @@ void RGBLEDDecoder::Refresh(
 		//End of a symbol?
 		if( (bcount == 23) && (phase == 1) )
 		{
-			LogTrace("Decoded value (started at %s): error=%d, value=#%06x\n",
-				fs.PrettyPrint(tstart).c_str(), error, value);
+			//LogTrace("Decoded value (started at %s): error=%d, value=#%06x\n",
+			//	fs.PrettyPrint(tstart).c_str(), error, value);
+
+			pack->m_data.push_back(value >> 16);
+			pack->m_data.push_back((value >> 8) & 0xff);
+			pack->m_data.push_back(value & 0xff);
+
+			//Update durations
+			pack->m_len = edges[i] - pack->m_offset;
 
 			//Add the symbol
 			cap->m_offsets.push_back(tstart);
@@ -271,6 +295,20 @@ void RGBLEDDecoder::Refresh(
 	//Done
 	cap->MarkModifiedFromCpu();
 }
+
+vector<string> RGBLEDDecoder::GetHeaders()
+{
+	vector<string> ret;
+	return ret;
+}
+
+bool RGBLEDDecoder::GetShowImageColumn()
+{
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RGBLEDWaveform
 
 string RGBLEDWaveform::GetColor(size_t i)
 {

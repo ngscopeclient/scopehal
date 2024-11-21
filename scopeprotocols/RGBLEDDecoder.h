@@ -36,6 +36,8 @@
 #ifndef RGBLEDDecoder_h
 #define RGBLEDDecoder_h
 
+#include "PacketDecoder.h"
+
 class RGBLEDSymbol
 {
 public:
@@ -62,7 +64,7 @@ public:
 	float m_scale;
 };
 
-class RGBLEDDecoder : public Filter
+class RGBLEDDecoder : public PacketDecoder
 {
 public:
 	RGBLEDDecoder(const std::string& color);
@@ -70,6 +72,9 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
+
+	virtual bool GetShowImageColumn() override;
+	virtual std::vector<std::string> GetHeaders() override;
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
