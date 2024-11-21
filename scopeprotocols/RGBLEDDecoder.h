@@ -80,6 +80,9 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(RGBLEDDecoder)
 
+	float GetScale()
+	{ return m_displayscale.GetFloatVal(); }
+
 protected:
 	enum pwidth_t
 	{
