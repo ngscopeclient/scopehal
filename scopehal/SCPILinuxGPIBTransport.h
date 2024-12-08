@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,7 +55,7 @@ public:
 
 	void FlushRXBuffer(void) override;
 	bool SendCommand(const std::string& cmd) override;
-	std::string ReadReply(bool endOnSemicolon = true) override;
+	std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
 	size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
 	void SendRawData(size_t len, const unsigned char* buf) override;
 
