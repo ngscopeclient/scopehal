@@ -69,6 +69,7 @@
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
 #include "OwonXDGFunctionGenerator.h"
+#include "SiglentFunctionGenerator.h"
 #include "RigolFunctionGenerator.h"
 
 #include "GWInstekGPDX303SPowerSupply.h"
@@ -249,6 +250,7 @@ void DriverStaticInit()
 
 	AddFunctionGeneratorDriverClass(OwonXDGFunctionGenerator);
 	AddFunctionGeneratorDriverClass(RigolFunctionGenerator);
+	AddFunctionGeneratorDriverClass(SiglentFunctionGenerator);
 
 	AddLoadDriverClass(SiglentLoad);
 
