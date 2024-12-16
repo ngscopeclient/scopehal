@@ -586,6 +586,8 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
  */
 string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 {
+	if(value >= std::numeric_limits<double>::max())
+		return UNIT_OVERLOAD_LABEL;
 	if(useDisplayLocale)
 		SetPrintingLocale();
 
@@ -961,6 +963,9 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
  */
 double Unit::ParseString(const string& str, bool useDisplayLocale)
 {
+	if(str == UNIT_OVERLOAD_LABEL)
+		return std::numeric_limits<double>::max();
+
 	if(useDisplayLocale)
 		SetPrintingLocale();
 
