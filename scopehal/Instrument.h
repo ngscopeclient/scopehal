@@ -31,6 +31,7 @@
 	@file
 	@author Andrew D. Zonenberg
 	@brief Declaration of Instrument
+	@ingroup core
  */
 
 #ifndef Instrument_h
@@ -52,6 +53,8 @@
 	which are not possible to implement clientside.
 
 	All channels regardless of type occupy a single zero-based namespace.
+
+	@ingroup core
  */
 class Instrument
 	: public std::enable_shared_from_this<Instrument>
@@ -207,6 +210,21 @@ public:
 		@return True if waveform was acquired, false if connection lost or other serious error
 	 */
 	virtual bool AcquireData() =0;
+
+	/**
+		@brief Instruments are allowed to cache configuration settings to reduce round trip queries to the device.
+
+		In order to see updates made by the user at the front panel, the cache must be flushed.
+
+		Cache flushing is recommended to be manually triggered during interactive operation if there is no way to
+		push updates from the scope to the driver.
+
+		In scripted/ATE environments where nobody should be touching the instrument, flushing is typically not needed.
+
+		The default implementation of this function does nothing since the base class provides no caching.
+		If a derived class caches configuration, it should override this function to clear any cached data.
+	 */
+	virtual void FlushConfigCache();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Serialization

@@ -104,11 +104,6 @@ shared_ptr<Oscilloscope> Oscilloscope::CreateOscilloscope(string driver, SCPITra
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device properties
 
-void Oscilloscope::FlushConfigCache()
-{
-	//nothing to do, base class has no caching
-}
-
 bool Oscilloscope::IsOffline()
 {
 	return false;

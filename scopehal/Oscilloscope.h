@@ -64,21 +64,6 @@ public:
 	virtual std::string IDPing() =0;
 
 	/**
-		@brief Instruments are allowed to cache configuration settings to reduce round trip queries to the device.
-
-		In order to see updates made by the user at the front panel, the cache must be flushed.
-
-		Cache flushing is recommended to be manually triggered during interactive operation if there is no way to
-		push updates from the scope to the driver.
-
-		In scripted/ATE environments where nobody should be touching the instrument, flushing is typically not needed.
-
-		The default implementation of this function does nothing since the base class provides no caching.
-		If a derived class caches configuration, it should override this function to clear any cached data.
-	 */
-	virtual void FlushConfigCache();
-
-	/**
 		@brief Checks if the instrument is currently online.
 
 		@return True if the Oscilloscope object is actively connected to a physical scope.
@@ -391,7 +376,7 @@ protected:
 
 	/**
 	 	@brief Helper method called by drivers to set one channel's download status and update its download progress.
-		Be aware that there is a measurement on ngscopeclient UI of the time spent between the download start and 
+		Be aware that there is a measurement on ngscopeclient UI of the time spent between the download start and
 		the progress of the last enabled channel. This measurement is used to decide whether to display a progress bar or not.
 		This download speed evaluation method only works if enabled channels are download sequencially in increasing numeric order
 		or if all channels are downloaded at the same speed.
