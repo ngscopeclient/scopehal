@@ -282,7 +282,7 @@ void PicoOscilloscope::IdentifyHardware()
 	else if(m_model[0] == '3')
 	{
 		m_series = SERIES_3x0xD;
-		if(m_model.find("MSO") > 0)
+		if(m_model.find("MSO") != string::npos)
 		{
 			// PicoScope3000 support 16 Digital Channels for MSO (or nothing)
 			m_digitalChannelCount = 16;
