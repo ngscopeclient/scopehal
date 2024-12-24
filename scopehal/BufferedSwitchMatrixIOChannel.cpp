@@ -75,6 +75,11 @@ bool BufferedSwitchMatrixIOChannel::ValidateChannel(size_t i, StreamDescriptor s
 	if(din && (din->GetInstrument() == m_instrument) )
 		return true;
 
+	//Digital I/O of same instrument? It's good
+	auto dio = dynamic_cast<DigitalIOChannel*>(stream.m_channel);
+	if(dio && (dio->GetInstrument() == m_instrument) )
+		return true;
+
 	//Nope, doesn't work
 	return false;
 }
@@ -87,8 +92,11 @@ void BufferedSwitchMatrixIOChannel::OnInputChanged(size_t i)
 
 	//get the input channel and set the path appropriately
 	auto din = dynamic_cast<DigitalInputChannel*>(GetInput(i).m_channel);
-	if(!din)
-		parent->SetMuxPathOpen(GetIndex());
-	else
+	auto dio = dynamic_cast<DigitalIOChannel*>(GetInput(i).m_channel);
+	if(dio)
+		parent->SetMuxPath(GetIndex(), dio->GetIndex());
+	else if(din)
 		parent->SetMuxPath(GetIndex(), din->GetIndex());
+	else
+		parent->SetMuxPathOpen(GetIndex());
 }
