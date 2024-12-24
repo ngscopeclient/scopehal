@@ -101,6 +101,12 @@ void SiglentFunctionGenerator::FlushConfigCache()
 
 		m_cachedFrequency[i] = 0;
 		m_cachedFrequencyValid[i] = false;
+
+		m_cachedAmplitude[i] = 0;
+		m_cachedAmplitudeValid[i] = false;
+
+		m_cachedOffset[i] = 0;
+		m_cachedOffsetValid[i] = false;
 	}
 }
 
@@ -110,6 +116,9 @@ string SiglentFunctionGenerator::RemoveHeader(const string& str)
 	return Trim(str.substr(pos + 1));
 }
 
+/**
+	@brief Parse the response to an OUTP? query
+ */
 void SiglentFunctionGenerator::ParseOutputState(const string& str, size_t i)
 {
 	auto fields = explode(str, ',');
@@ -124,6 +133,55 @@ void SiglentFunctionGenerator::ParseOutputState(const string& str, size_t i)
 	//TODO: output invert
 
 	//TODO: output impedance
+}
+
+/**
+	@brief Parse the response to a BSWV? query
+ */
+void SiglentFunctionGenerator::ParseBasicWaveform(const string& str, size_t i)
+{
+	auto fields = explode(str, ',');
+	LogDebug("ParseBasicWaveform\n");
+	LogIndenter li;
+
+	//Fields are paired as name,value consecutively
+	map<string, string> fieldmap;
+	for(size_t j=0; j<fields.size(); j += 2)
+	{
+		if(j+1 >= fields.size())
+			break;
+		fieldmap[fields[j]] = fields[j+1];
+	}
+
+	//Default all waveform cache stuff to invalid
+	m_cachedAmplitudeValid[i] = false;
+	m_cachedOffsetValid[i] = false;
+	m_cachedFrequencyValid[i] = false;
+
+	Unit volts(Unit::UNIT_VOLTS);
+	Unit hz(Unit::UNIT_HZ);
+	for(auto it : fieldmap)
+	{
+		if(it.first == "AMP")
+		{
+			m_cachedAmplitude[i] = volts.ParseString(it.second);
+			m_cachedAmplitudeValid[i] = true;
+		}
+
+		if(it.first == "OFST")
+		{
+			m_cachedOffset[i] = volts.ParseString(it.second);
+			m_cachedOffsetValid[i] = true;
+		}
+
+		if(it.first == "FRQ")
+		{
+			m_cachedFrequency[i] = hz.ParseString(it.second);
+			m_cachedFrequencyValid[i] = true;
+		}
+
+		//LogDebug("%10s -> %10s\n", it.first.c_str(), it.second.c_str());
+	}
 }
 
 vector<FunctionGenerator::WaveShape> SiglentFunctionGenerator::GetAvailableWaveformShapes(int /*chan*/)
@@ -176,58 +234,70 @@ bool SiglentFunctionGenerator::GetFunctionChannelActive(int chan)
 
 void SiglentFunctionGenerator::SetFunctionChannelActive(int chan, bool on)
 {
-	/*
 	if(on)
-		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":STAT ON");
+		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP ON");
 	else
-		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":STAT OFF");
-	*/
+		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP OFF");
+
+	m_cachedOutputEnable[chan] = on;
+	m_cachedEnableStateValid[chan] = true;
 }
 
 float SiglentFunctionGenerator::GetFunctionChannelAmplitude(int chan)
 {
-	/*auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":VOLT?"));
-	return stof(reply);*/
-	return 0;
+	if(m_cachedAmplitudeValid[chan])
+		return m_cachedAmplitude[chan];
+
+	auto reply = RemoveHeader(m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":BSWV?"));
+	ParseBasicWaveform(reply, chan);
+
+	return m_cachedAmplitude[chan];
 }
 
 void SiglentFunctionGenerator::SetFunctionChannelAmplitude(int chan, float amplitude)
 {
-	//m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":VOLT " + to_string(amplitude));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV AMP," + to_string(amplitude));
+
+	m_cachedAmplitude[chan] = amplitude;
+	m_cachedAmplitudeValid[chan] = true;
 }
 
 float SiglentFunctionGenerator::GetFunctionChannelOffset(int chan)
 {
-	/*auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":VOLT:OFFS?"));
-	return stof(reply);*/
-	return 0;
+	if(m_cachedOffsetValid[chan])
+		return m_cachedOffset[chan];
+
+	auto reply = RemoveHeader(m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":BSWV?"));
+	ParseBasicWaveform(reply, chan);
+
+	return m_cachedOffset[chan];
 }
 
 void SiglentFunctionGenerator::SetFunctionChannelOffset(int chan, float offset)
 {
-	//m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":VOLT:OFFS " + to_string(offset));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV OFST," + to_string(offset));
+
+	m_cachedOffset[chan] = offset;
+	m_cachedOffsetValid[chan] = true;
 }
 
 float SiglentFunctionGenerator::GetFunctionChannelFrequency(int chan)
 {
-	/*
 	if(m_cachedFrequencyValid[chan])
 		return m_cachedFrequency[chan];
 
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":FREQ?"));
-	m_cachedFrequency[chan] = stof(reply);*/
-	m_cachedFrequencyValid[chan] = true;
+	auto reply = RemoveHeader(m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":BSWV?"));
+	ParseBasicWaveform(reply, chan);
+
 	return m_cachedFrequency[chan];
 }
 
 void SiglentFunctionGenerator::SetFunctionChannelFrequency(int chan, float hz)
 {
-	/*
-	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FREQ " + to_string(hz));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz));
 
 	m_cachedFrequency[chan] = hz;
 	m_cachedFrequencyValid[chan] = true;
-	*/
 }
 
 FunctionGenerator::WaveShape SiglentFunctionGenerator::GetFunctionChannelShape(int chan)

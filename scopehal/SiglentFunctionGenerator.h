@@ -85,15 +85,21 @@ public:
 	GENERATOR_INITPROC(SiglentFunctionGenerator)
 
 protected:
+
+	//Config cache
 	bool m_cachedFrequencyValid[2];
 	int64_t m_cachedFrequency[2];
-
 	bool m_cachedEnableStateValid[2];
 	bool m_cachedOutputEnable[2];
+	bool m_cachedAmplitudeValid[2];
+	float m_cachedAmplitude[2];
+	bool m_cachedOffsetValid[2];
+	float m_cachedOffset[2];
 
 	std::string RemoveHeader(const std::string& str);
 
 	void ParseOutputState(const std::string& str, size_t i);
+	void ParseBasicWaveform(const std::string& str, size_t i);
 };
 
 #endif
