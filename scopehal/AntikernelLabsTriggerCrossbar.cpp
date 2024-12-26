@@ -1454,13 +1454,21 @@ void AntikernelLabsTriggerCrossbar::PullTrigger()
 	//for now, set a default edge trigger
 	//(this is fake, but it'll do for starting out to enable control of trigger position)
 	auto trig = new EdgeTrigger(this);
-	trig->SetInput(0, GetOscilloscopeChannel(m_rxChannelBase));
+
+	auto source = Trim(m_transport->SendCommandQueuedWithReply("TRIGMUX?"));
+	auto chan = GetChannel(atoi(source.c_str()));
+	chan->m_visibilityMode = InstrumentChannel::VIS_SHOW;
+
+	trig->SetInput(0, chan);
 	m_trigger = trig;
 }
 
 void AntikernelLabsTriggerCrossbar::PushTrigger()
 {
-	//no-op for now
+	//Push mux selector
+	auto chan = m_trigger->GetInput(0);
+	if(chan)
+		m_transport->SendCommandQueued(string("TRIGMUX " ) + to_string(chan.m_channel->GetIndex()));
 }
 
 void AntikernelLabsTriggerCrossbar::Start()

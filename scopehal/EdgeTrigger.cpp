@@ -87,13 +87,19 @@ bool EdgeTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(i > 0)
 		return false;
 
-	//There has to be a signal to trigger on
+	//Has to be non null
+	if(!stream.m_channel)
+		return false;
+
+	//Has to be a scope or digital input / IO channel
 	auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
-	if(!schan)
+	auto di = dynamic_cast<DigitalInputChannel*>(stream.m_channel);
+	auto dio = dynamic_cast<DigitalIOChannel*>(stream.m_channel);
+	if(!schan && !di && !dio)
 		return false;
 
 	//It has to be from the same instrument we're trying to trigger on
-	if(schan->GetScope() != m_scope)
+	if(stream.m_channel->GetInstrument() != m_scope)
 		return false;
 
 	return true;
