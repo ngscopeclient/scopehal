@@ -427,6 +427,11 @@ int64_t DemoOscilloscope::GetTriggerOffset()
 	return 0;
 }
 
+bool DemoOscilloscope::CanInterleave()
+{
+	return false;
+}
+
 bool DemoOscilloscope::IsInterleaving()
 {
 	return false;

@@ -107,6 +107,7 @@ public:
 	virtual int64_t GetTriggerOffset() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
+	virtual bool CanInterleave() override;
 
 	virtual bool IsADCModeConfigurable() override;
 	virtual std::vector<std::string> GetADCModeNames(size_t channel) override;
