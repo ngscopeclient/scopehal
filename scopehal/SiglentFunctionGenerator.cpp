@@ -107,6 +107,12 @@ void SiglentFunctionGenerator::FlushConfigCache()
 
 		m_cachedOffset[i] = 0;
 		m_cachedOffsetValid[i] = false;
+
+		m_cachedImpedance[i] = IMPEDANCE_HIGH_Z;
+		m_cachedImpedanceValid[i] = 0;
+
+		m_cachedWaveShape[i] = SHAPE_SINE;
+		m_cachedWaveShapeValid[i] = false;
 	}
 }
 
@@ -130,9 +136,15 @@ void SiglentFunctionGenerator::ParseOutputState(const string& str, size_t i)
 		m_cachedOutputEnable[i] = false;
 	m_cachedEnableStateValid[i] = true;
 
-	//TODO: output invert
+	//field 1 is always LOAD
+	//field 2 is impedance
+	if(fields[2] == "HZ")
+		m_cachedImpedance[i] = IMPEDANCE_HIGH_Z;
+	else
+		m_cachedImpedance[i] = IMPEDANCE_50_OHM;
+	m_cachedImpedanceValid[i] = true;
 
-	//TODO: output impedance
+	//TODO: output invert
 }
 
 /**
@@ -180,6 +192,40 @@ void SiglentFunctionGenerator::ParseBasicWaveform(const string& str, size_t i)
 			m_cachedFrequencyValid[i] = true;
 		}
 
+		if(it.first == "WVTP")
+		{
+			if(it.second == "SINE")
+			{
+				m_cachedWaveShape[i] = SHAPE_SINE;
+				m_cachedWaveShapeValid[i] = true;
+			}
+			else if(it.second == "SQUARE")
+			{
+				m_cachedWaveShape[i] = SHAPE_SQUARE;
+				m_cachedWaveShapeValid[i] = true;
+			}
+			else if(it.second == "PULSE")
+			{
+				m_cachedWaveShape[i] = SHAPE_PULSE;
+				m_cachedWaveShapeValid[i] = true;
+			}
+			else if(it.second == "NOISE")
+			{
+				m_cachedWaveShape[i] = SHAPE_NOISE;
+				m_cachedWaveShapeValid[i] = true;
+			}
+			else if(it.second == "DC")
+			{
+				m_cachedWaveShape[i] = SHAPE_DC;
+				m_cachedWaveShapeValid[i] = true;
+			}
+			else
+			{
+				LogWarning("Don't know what to do with wave shape %s\n", it.second.c_str());
+				m_cachedWaveShapeValid[i] = false;
+			}
+		}
+
 		//LogDebug("%10s -> %10s\n", it.first.c_str(), it.second.c_str());
 	}
 }
@@ -189,11 +235,11 @@ vector<FunctionGenerator::WaveShape> SiglentFunctionGenerator::GetAvailableWavef
 	vector<WaveShape> ret;
 	ret.push_back(SHAPE_SINE);
 	ret.push_back(SHAPE_SQUARE);
-	ret.push_back(SHAPE_SAWTOOTH_UP);
+	//ret.push_back(SHAPE_SAWTOOTH_UP);
 	ret.push_back(SHAPE_PULSE);
 	ret.push_back(SHAPE_NOISE);
 	ret.push_back(SHAPE_DC);
-	ret.push_back(SHAPE_HALF_SINE);
+	/*ret.push_back(SHAPE_HALF_SINE);
 	ret.push_back(SHAPE_GAUSSIAN_PULSE);
 	ret.push_back(SHAPE_SAWTOOTH_DOWN);
 	ret.push_back(SHAPE_NEGATIVE_PULSE);
@@ -217,7 +263,8 @@ vector<FunctionGenerator::WaveShape> SiglentFunctionGenerator::GetAvailableWavef
 	ret.push_back(SHAPE_BARTLETT);
 	ret.push_back(SHAPE_HAMMING);
 	ret.push_back(SHAPE_HANNING);
-	ret.push_back(SHAPE_TRIANGLE);
+	ret.push_back(SHAPE_TRIANGLE);*/
+	//TODO: PRBS? only in some models
 	return ret;
 }
 
@@ -302,171 +349,53 @@ void SiglentFunctionGenerator::SetFunctionChannelFrequency(int chan, float hz)
 
 FunctionGenerator::WaveShape SiglentFunctionGenerator::GetFunctionChannelShape(int chan)
 {
-	/*
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP?"));
-	if(reply == "SIN")
-		return SHAPE_SINE;
-	else if(reply == "SQU")
-		return SHAPE_SQUARE;
-	else if(reply == "RAMP")
-		return SHAPE_SAWTOOTH_UP;
-	else if(reply == "PULS")
-		return SHAPE_PULSE;
-	else if(reply == "NOIS")
-		return SHAPE_NOISE;
-	//USER
-	//HARMonic
-	//CUSTom
-	else if(reply == "DC")
-		return SHAPE_DC;
-	else if(reply == "ABSSINE")
-		return SHAPE_HALF_SINE;
-	//ABSSINEHALF
-	//AMPALT
-	//ATTALT
-	else if(reply == "GAUSSPULSE")
-		return SHAPE_GAUSSIAN_PULSE;
-	else if(reply == "NEGRAMP")
-		return SHAPE_SAWTOOTH_DOWN;
-	else if(reply == "NPULSE")
-		return SHAPE_NEGATIVE_PULSE;
-	//PPULSE
-	//SINETRA
-	//SINEVER
-	else if(reply == "STAIRDN")
-		return SHAPE_STAIRCASE_DOWN;
-	else if(reply == "STAIRUD")
-		return SHAPE_STAIRCASE_UP_DOWN;
-	else if(reply == "STAIRUP")
-		return SHAPE_STAIRCASE_UP;
-	//TRAPEZIA
-	//BANDLIMITED
-	//BUTTERWORTH
-	//CHEBYSHEV1
-	//CHEBYSHEV2
-	//COMBIN
-	//CPULSE
-	//CWPULSE
-	//DAMPEDOSC
-	//DUALTONE
-	//GAMA
-	//GATEVIBR
-	//LFMPULSE
-	//MCNOSIE
-	//NIMHDISCHARGE
-	//PAHCUR
-	//QUAKE
-	//RADAR
-	//RIPPLE
-	//ROUDHALF
-	//ROUNDPM
-	//STEPRESP
-	//SWINGOSC
-	//TV
-	//VOICE
-	//THREEAM
-	//THREEFM
-	//THREEPM
-	//THREEPWM
-	//THREEPFM
-	else if(reply == "CARDIAC")
-		return SHAPE_CARDIAC;
-	//EOG
-	//EEG
-	//EMG
-	//PULSILOGRAM
-	//RESSPEED
-	//LFPULSE
-	//TENS1
-	//TENS2
-	//TENS3
-	//IGNITION
-	//ISO167502SP|ISO167502VR|ISO76372TP1|ISO76372TP2A|ISO76372TP2B|ISO76372TP3A|ISO76372TP3B|ISO76372TP4|ISO76372TP5A|ISO76372TP5B|
-	//SCR
-	//SURGE
-	//AIRY
-	//BESSELJ
-	//BESSELY
-	//CAUCHY
-	else if(reply == "CUBIC")
-		return SHAPE_CUBIC;
-	//DIRICHLET|ERF|ERFC|ERFCINV|ERFINV|
-	else if(reply == "EXPFALL")
-		return SHAPE_EXPONENTIAL_DECAY;
-	else if(reply == "EXPRISE")
-		return SHAPE_EXPONENTIAL_RISE;
-	else if(reply == "GAUSS")
-		return SHAPE_GAUSSIAN;
-	else if(reply == "HAVERSINE")
-		return SHAPE_HAVERSINE;
-	//LAGUERRE|LAPLACE|LEGEND|
-	else if(reply == "LOG")
-		return SHAPE_LOG_RISE;
-	//LOGNORMAL
-	//LORENTZ|MAXWELL|RAYLEIGH|VERSIERA|WEIBULL|X2DATA|COSH|COSINT
-	else if(reply == "COT")
-		return SHAPE_COT;
-	//COTHCON|COTHPRO|CSCCON|CSCPRO|CSCHCON|CSCHPRO|RECIPCON|RECIPPRO|SECCON|SECPRO|SECH|
-	else if(reply == "SINC")
-		return SHAPE_SINC;
-	//SINH|SININT
-	else if(reply == "SQRT")
-		return SHAPE_SQUARE_ROOT;
-	else if(reply == "TAN")
-		return SHAPE_TAN;
-	//TANH
-	else if(reply == "ACOS")
-		return SHAPE_ACOS;
-	//COSH|ACOTCON|ACOTPRO|ACOTHCON|ACOTHPRO|ACSCCON|ACSCPRO|ACSCHCON|ACSCHPRO|ASECCON|ASECPRO|ASECH|
-	else if(reply == "ASIN")
-		return SHAPE_ASIN;
-	//ASINH
-	else if(reply == "ATAN")
-		return SHAPE_ATAN;
-	//ATANH
-	else if(reply == "BARTLETT")
-		return SHAPE_BARTLETT;
-	//BARTHANN|BLACKMAN|BLACKMANH|BOHMANWIN|BOXCAR|CHEBWIN|FLATTOPWIN|
-	else if(reply == "HAMMING")
-		return SHAPE_HAMMING;
-	else if(reply == "HANNING")
-		return SHAPE_HANNING;
-	//KAISER|NUTTALLWIN|PARZENWIN|TAYLORWIN|TUKEYWIN
-	else if(reply == "TRIANG")
-		return SHAPE_TRIANGLE;
-	*/
-	return SHAPE_SINE;
+	if(m_cachedWaveShapeValid[chan])
+		return m_cachedWaveShape[chan];
+
+	auto reply = RemoveHeader(m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":BSWV?"));
+	ParseBasicWaveform(reply, chan);
+
+	//TODO: handle arb etc
+
+	return m_cachedWaveShape[chan];
 }
 
 void SiglentFunctionGenerator::SetFunctionChannelShape(int chan, WaveShape shape)
 {
-	/*
+	m_cachedWaveShapeValid[chan] = true;
+	m_cachedWaveShape[chan] = shape;
+
 	switch(shape)
 	{
 		case SHAPE_SINE:
-			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP SIN");
+			m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP,SINE");
 			break;
 
 		case SHAPE_SQUARE:
-			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP SQU");
+			m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP,SQUARE");
 			break;
 
+		//TODO: RAMP is sawtooth but you have to change symmetry
+		/*
 		case SHAPE_SAWTOOTH_UP:
-			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP RAMP");
+			m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP,RAMP");
 			break;
+			*/
 
 		case SHAPE_PULSE:
-			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP PULS");
+			m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP,PULSE");
 			break;
 
 		case SHAPE_NOISE:
-			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP NOIS");
+			m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP,NOISE");
 			break;
 
 		case SHAPE_DC:
-			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP DC");
+			m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP,DC");
 			break;
 
+		//for anything else, it's an ARB
+	/*
 		case SHAPE_HALF_SINE:
 			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP ABSSINE");
 			break;
@@ -566,12 +495,13 @@ void SiglentFunctionGenerator::SetFunctionChannelShape(int chan, WaveShape shape
 		case SHAPE_TRIANGLE:
 			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP TRIANG");
 			break;
-
+		*/
 		default:
 			LogWarning("[SiglentFunctionGenerator::SetFunctionChannelShape] unrecognized shape %d", shape);
+
+			m_cachedWaveShapeValid[chan] = false;
 			break;
 	}
-	*/
 }
 
 float SiglentFunctionGenerator::GetFunctionChannelDutyCycle(int chan)
@@ -602,20 +532,22 @@ bool SiglentFunctionGenerator::HasFunctionRiseFallTimeControls(int /*chan*/)
 
 FunctionGenerator::OutputImpedance SiglentFunctionGenerator::GetFunctionChannelOutputImpedance(int chan)
 {
-	/*
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("OUTP") + to_string(chan+1) + ":IMP?"));
-	if(reply == "50")
-		return IMPEDANCE_50_OHM;
-	*/
-	return IMPEDANCE_HIGH_Z;
+	if(m_cachedImpedanceValid[chan])
+		return m_cachedImpedance[chan];
+
+	auto reply = RemoveHeader(m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":OUTP?"));
+	ParseOutputState(reply, chan);
+
+	return m_cachedImpedance[chan];
 }
 
 void SiglentFunctionGenerator::SetFunctionChannelOutputImpedance(int chan, FunctionGenerator::OutputImpedance z)
 {
-	/*
 	if(z == IMPEDANCE_HIGH_Z)
-		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":IMP INF");
+		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP LOAD,HZ");
 	else
-		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":IMP 50");
-		*/
+		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP LOAD,50");
+
+	m_cachedImpedance[chan] = z;
+	m_cachedImpedanceValid[chan] = true;
 }

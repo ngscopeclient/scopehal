@@ -95,6 +95,11 @@ protected:
 	float m_cachedAmplitude[2];
 	bool m_cachedOffsetValid[2];
 	float m_cachedOffset[2];
+	OutputImpedance m_cachedImpedance[2];
+	bool m_cachedImpedanceValid[2];
+
+	WaveShape m_cachedWaveShape[2];
+	bool m_cachedWaveShapeValid[2];
 
 	std::string RemoveHeader(const std::string& str);
 
