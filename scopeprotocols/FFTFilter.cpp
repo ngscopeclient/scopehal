@@ -276,7 +276,10 @@ void FFTFilter::DoRefresh(
 	}
 	wpipe->BindBufferNonblocking(0, data, cmdBuf);
 	wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
-	wpipe->Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	wpipe->Dispatch(cmdBuf, args,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 	wpipe->AddComputeMemoryBarrier(cmdBuf);
 	m_rdinbuf.MarkModifiedFromGpu();
 
@@ -298,7 +301,9 @@ void FFTFilter::DoRefresh(
 	pipe.BindBuffer(0, m_rdoutbuf);
 	pipe.BindBuffer(1, cap->m_samples);
 	pipe.AddComputeMemoryBarrier(cmdBuf);
-	pipe.Dispatch(cmdBuf, cargs, GetComputeBlockCount(nouts, 64));
+	pipe.Dispatch(cmdBuf, cargs,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 
 	//Done, block until the compute operations finish
 	cmdBuf.end();
