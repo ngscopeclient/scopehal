@@ -235,7 +235,10 @@ void FIRFilter::DoFilterKernel(
 		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
 		m_computePipeline.BindBufferNonblocking(1, m_coefficients, cmdBuf);
 		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
-		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(args.end, 64));
+		const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
+		m_computePipeline.Dispatch(cmdBuf, args,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
