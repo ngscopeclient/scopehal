@@ -56,8 +56,9 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	if(gl_GlobalInvocationID.x >= size)
+	uint i = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
+	if(i >= size)
 		return;
 
-	dout[gl_GlobalInvocationID.x] = inP[gl_GlobalInvocationID.x + offsetP] - inN[gl_GlobalInvocationID.x + offsetN];
+	dout[i] = inP[i + offsetP] - inN[i + offsetN];
 }

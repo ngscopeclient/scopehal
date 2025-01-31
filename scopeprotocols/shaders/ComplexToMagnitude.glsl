@@ -50,12 +50,14 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
+	uint i = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
+
 	//If off end of array, stop
-	if(gl_GlobalInvocationID.x >= npoints)
+	if(i >= npoints)
 		return;
 
-	float real = din[gl_GlobalInvocationID.x*2];
-	float imag = din[gl_GlobalInvocationID.x*2 + 1];
+	float real = din[i*2];
+	float imag = din[i*2 + 1];
 
-	dout[gl_GlobalInvocationID.x] = sqrt(real*real + imag*imag) * scale;
+	dout[i] = sqrt(real*real + imag*imag) * scale;
 }
