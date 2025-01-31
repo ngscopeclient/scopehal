@@ -56,22 +56,24 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	if(gl_GlobalInvocationID.x >= imax)				//i
+	uint i = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
+
+	if(i >= imax)
 		return;
-	if(gl_GlobalInvocationID.y >= upsample_factor)	//j
+	if(gl_GlobalInvocationID.z >= upsample_factor)
 		return;
 
 	uint start = 0;
 	uint sstart = 0;
-	if(gl_GlobalInvocationID.y > 0)
+	if(gl_GlobalInvocationID.z > 0)
 	{
 		sstart = 1;
-		start = upsample_factor - gl_GlobalInvocationID.y;
+		start = upsample_factor - gl_GlobalInvocationID.z;
 	}
 
 	float f = 0;
 	for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
 		f += fkernel[k] * din[gl_GlobalInvocationID.x + sstart];
 
-	dout[gl_GlobalInvocationID.x*upsample_factor + gl_GlobalInvocationID.y] = f;
+	dout[i*upsample_factor + gl_GlobalInvocationID.z] = f;
 }

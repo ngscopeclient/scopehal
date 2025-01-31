@@ -159,7 +159,11 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		args.upsample_factor = upsample_factor;
 		args.kernel = kernel;
 
-		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(imax, 64), GetComputeBlockCount(upsample_factor, 1));
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+		m_computePipeline.Dispatch(cmdBuf, args,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1,
+			GetComputeBlockCount(upsample_factor, 1));
 
 		//Done, submit to the queue and wait
 		cmdBuf.end();
