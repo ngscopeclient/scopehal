@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -652,33 +652,65 @@ protected:
 					//auto type = m_gpuMemoryType;
 					auto bOld = std::move(m_gpuBuffer);
 
-					AllocateGpuBuffer(size);
+					//Allocation successful!
+					if(AllocateGpuBuffer(size))
+					{
+						std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
-					std::lock_guard<std::mutex> lock(g_vkTransferMutex);
+						//Make the transfer request
+						g_vkTransferCommandBuffer->begin({});
+						vk::BufferCopy region(0, 0, m_size * sizeof(T));
+						g_vkTransferCommandBuffer->copyBuffer(**bOld, **m_gpuBuffer, {region});
+						g_vkTransferCommandBuffer->end();
 
-					//Make the transfer request
-					g_vkTransferCommandBuffer->begin({});
-					vk::BufferCopy region(0, 0, m_size * sizeof(T));
-					g_vkTransferCommandBuffer->copyBuffer(**bOld, **m_gpuBuffer, {region});
-					g_vkTransferCommandBuffer->end();
+						//Submit the request and block until it completes
+						g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 
-					//Submit the request and block until it completes
-					g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
+						//make sure buffer is freed before underlying physical memory (pOld) goes out of scope
+						bOld = nullptr;
+					}
 
-					//make sure buffer is freed before underlying physical memory (pOld) goes out of scope
-					bOld = nullptr;
+					//Allocation failed!
+					else
+					{
+						//Revert to the old buffer. We're now in a consistent state again
+						m_gpuPhysMem = std::move(pOld);
+						m_gpuBuffer = std::move(bOld);
+
+						//Make sure we have a CPU side buffer that's DMA capable
+						if(m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE)
+						{
+							SetCpuAccessHint(HINT_LIKELY);
+							SetGpuAccessHint(HINT_LIKELY);
+							AllocateCpuBuffer(size);
+						}
+
+						//Free the GPU buffer, moving its contents to the CPU
+						FreeGpuBuffer();
+					}
 				}
 
 				//Nope, just allocate a new buffer
 				else
 				{
-					AllocateGpuBuffer(size);
+					//Allocation successful? We now have the buffer
+					if(AllocateGpuBuffer(size))
+					{
+						//If we already had CPU-side memory containing data, then the new GPU-side buffer is stale
+						//until we copy stuff over to it.
+						//Special case: if m_size is 0 (newly allocated buffer) we're not stale yet
+						if( (m_cpuPhysMem != nullptr) && (m_size != 0) )
+							m_gpuPhysMemIsStale = true;
+					}
 
-					//If we already had CPU-side memory containing data, then the new GPU-side buffer is stale
-					//until we copy stuff over to it.
-					//Special case: if m_size is 0 (newly allocated buffer) we're not stale yet
-					if( (m_cpuPhysMem != nullptr) && (m_size != 0) )
-						m_gpuPhysMemIsStale = true;
+					//Allocation failed? No change, we already had the CPU buffer and don't have to touch anything
+					//But did the CPU buffer exist? if not, allocate *something*
+					else if(m_cpuPhysMem == nullptr)
+					{
+						SetCpuAccessHint(HINT_LIKELY);
+						SetGpuAccessHint(HINT_LIKELY);
+						AllocateCpuBuffer(size);
+					}
 				}
 			}
 		}
@@ -908,7 +940,10 @@ public:
 
 		//If we don't have a buffer, allocate one unless our CPU buffer is pinned and GPU-readable
 		if(!HasGpuBuffer() && (m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE) )
-			AllocateGpuBuffer(m_capacity);
+		{
+			if(!AllocateGpuBuffer(m_capacity))
+				return;
+		}
 
 		//Make sure the GPU-side buffer is up to date
 		if(m_gpuPhysMemIsStale && !outputOnly)
@@ -935,7 +970,10 @@ public:
 
 		//If we don't have a buffer, allocate one unless our CPU buffer is pinned and GPU-readable
 		if(!HasGpuBuffer() && (m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE) )
-			AllocateGpuBuffer(m_capacity);
+		{
+			if(!AllocateGpuBuffer(m_capacity))
+				return;
+		}
 
 		//Make sure the GPU-side buffer is up to date
 		if(m_gpuPhysMemIsStale && !outputOnly)
@@ -1286,9 +1324,11 @@ protected:
 
 	/**
 		@brief Allocates physical memory for GPU access
+
+		@return true on success, false on failure
 	 */
 	__attribute__((noinline))
-	void AllocateGpuBuffer(size_t size)
+	bool AllocateGpuBuffer(size_t size)
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
@@ -1353,15 +1393,16 @@ protected:
 			}
 
 			//If we get here, we couldn't allocate no matter what
-			//TODO: Fall back to a CPU-side allocation
+			//Fall back to a CPU-side allocation
 			if(!ok)
 			{
 				LogError(
-					"Failed to allocate %s of GPU memory despite our best efforts to reclaim space\n"
-					"This is unrecoverable (for now).\n",
+					"Failed to allocate %s of GPU memory despite our best efforts to reclaim space, falling back to CPU-side pinned allocation\n",
 					Unit(Unit::UNIT_BYTES).PrettyPrint(req.size, 4).c_str());
-
-				std::abort();
+				m_gpuMemoryType = MEM_TYPE_NULL;
+				m_gpuPhysMem = nullptr;
+				m_gpuBuffer = nullptr;
+				return false;
 			}
 		}
 		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
@@ -1370,6 +1411,8 @@ protected:
 
 		if(g_hasDebugUtils)
 			UpdateGpuNames();
+
+		return true;
 	}
 
 protected:

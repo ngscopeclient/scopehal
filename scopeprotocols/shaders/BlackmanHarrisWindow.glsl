@@ -57,13 +57,15 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
+	uint i = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
+
 	//If off end of array, stop
-	if(gl_GlobalInvocationID.x >= npoints)
+	if(i >= npoints)
 		return;
 
 	//If off end of input, zero fill
-	else if(gl_GlobalInvocationID.x >= numActualSamples)
-		dout[gl_GlobalInvocationID.x + offsetOut] = 0;
+	else if(i >= numActualSamples)
+		dout[i + offsetOut] = 0;
 
 	//Normal Blackman-Harris window function
 	else
@@ -73,13 +75,13 @@ void main()
 		const float alpha2 = 0.14128;
 		const float alpha3 = 0.01168;
 
-		float num = gl_GlobalInvocationID.x * scale;
+		float num = i * scale;
 		float w =
 			alpha0 -
 			alpha1 * cos(num) +
 			alpha2 * cos(2*num) -
 			alpha3 * cos(6*num);
 
-		dout[gl_GlobalInvocationID.x + offsetOut] = w * din[gl_GlobalInvocationID.x + offsetIn];
+		dout[i + offsetOut] = w * din[i + offsetIn];
 	}
 }

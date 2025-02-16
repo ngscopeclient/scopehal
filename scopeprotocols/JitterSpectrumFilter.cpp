@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,6 +44,9 @@ JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 	m_category = CAT_ANALYSIS;
+
+	SetVoltageRange(250, 0);
+	SetOffset(-125, 0);
 }
 
 JitterSpectrumFilter::~JitterSpectrumFilter()
@@ -172,7 +175,7 @@ void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndSparseAnalog())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInput(0).GetData());

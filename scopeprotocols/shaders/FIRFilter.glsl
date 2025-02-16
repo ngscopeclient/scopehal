@@ -55,12 +55,13 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
+	uint idx = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
 	//If off end of array, stop
-	if(gl_GlobalInvocationID.x >= end)
+	if(idx >= end)
 		return;
 
 	float temp = 0;
 	for(uint i=0; i<filterlen; i++)
-		temp += din[gl_GlobalInvocationID.x + i] * taps[i];
-	dout[gl_GlobalInvocationID.x] = temp;
+		temp += din[idx + i] * taps[i];
+	dout[idx] = temp;
 }

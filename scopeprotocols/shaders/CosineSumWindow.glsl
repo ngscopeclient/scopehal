@@ -56,18 +56,20 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
+	uint i = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
+
 	//If off end of array, stop
-	if(gl_GlobalInvocationID.x >= npoints)
+	if(i >= npoints)
 		return;
 
 	//If off end of input, zero fill
-	else if(gl_GlobalInvocationID.x >= numActualSamples)
-		dout[gl_GlobalInvocationID.x + offsetOut] = 0;
+	else if(i >= numActualSamples)
+		dout[i + offsetOut] = 0;
 
 	//Nope, copy it
 	else
 	{
-		float w = (alpha0 - alpha1*cos(gl_GlobalInvocationID.x*scale));
-		dout[gl_GlobalInvocationID.x + offsetOut] = w * din[gl_GlobalInvocationID.x + offsetIn];
+		float w = (alpha0 - alpha1*cos(i*scale));
+		dout[i + offsetOut] = w * din[i + offsetIn];
 	}
 }
