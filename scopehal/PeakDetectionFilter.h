@@ -67,16 +67,14 @@ public:
 		T* cap,
 		int64_t max_peaks,
 		float search_hz,
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue)
+		bool yUnitIsDB,
+		[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+		[[maybe_unused]] std::shared_ptr<QueueHandle> queue)
 	{
 		//input must be analog
 		AssertTypeIsAnalogWaveform(cap);
 
-		//TODO: figure this out
-		bool yUnitIsDB = true;
-
-		double start = GetTime();
+		//double start = GetTime();
 
 		size_t nouts = cap->size();
 		if( (max_peaks == 0) || (nouts < 2) )
@@ -184,14 +182,13 @@ public:
 			m_peaks.clear();
 			for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
 			{
-				//Find FWHM of only the target peaks
-
+				//TODO: Find FWHM of only the target peaks
 				m_peaks.push_back(peaks[i]);
 			}
 		}
 
-		double dt = GetTime() - start;
-		LogDebug("delta = %.3f ms\n", dt * 1000);
+		//double dt = GetTime() - start;
+		//LogDebug("delta = %.3f ms\n", dt * 1000);
 	}
 
 protected:
@@ -223,6 +220,7 @@ protected:
 			cap,
 			m_parameters[m_numpeaksname].GetIntVal(),
 			m_parameters[m_peakwindowname].GetFloatVal(),
+			GetYAxisUnits(0).IsLogarithmic(),
 			cmdBuf,
 			queue);
 	}

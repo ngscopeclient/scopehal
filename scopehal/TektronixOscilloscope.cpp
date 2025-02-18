@@ -1,3 +1,4 @@
+
 /***********************************************************************************************************************
 *                                                                                                                      *
 * libscopehal                                                                                                          *
@@ -1933,7 +1934,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//If channel is enabled but was just turned on/off, skip this channel
 		if(IsEnableStateDirty(i))
 		{
-			pending_waveforms[nchan].push_back(NULL);
+			pending_waveforms[nchan].push_back(nullptr);
 			continue;
 		}
 
@@ -1967,7 +1968,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			//Read the data block
 			size_t msglen;
 			double* samples = (double*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
-			if(samples == NULL)
+			if(samples == nullptr)
 			{
 				LogWarning("Didn't get any samples (timeout?)\n");
 
@@ -1994,7 +1995,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			auto cap = new UniformAnalogWaveform;
 			cap->m_timescale = preamble.hzbase;
 			cap->m_triggerPhase = 0;
-			cap->m_startTimestamp = time(NULL);
+			cap->m_startTimestamp = time(nullptr);
 			double t = GetTime();
 			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 			cap->Resize(nsamples);
@@ -2018,7 +2019,13 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 			//Look for peaks
 			//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
-			dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(cap, 10, 1000000, *m_cmdBuf, m_queue);
+			dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(
+				cap,
+				10,
+				1000000,
+				true,
+				*m_cmdBuf,
+				m_queue);
 
 			succeeded = true;
 			break;

@@ -355,7 +355,13 @@ bool TinySA::AcquireData()
 
 	//Look for peaks
 	//TODO: make this configurable, for now 500 kHz spacing and up to 10 peaks
-	dynamic_cast<SpectrumChannel*>(m_channels[0])->FindPeaks(cap, 10, 500000, *m_cmdBuf, m_queue);
+	dynamic_cast<SpectrumChannel*>(m_channels[0])->FindPeaks(
+		cap,
+		10,
+		500000,
+		true,
+		*m_cmdBuf,
+		m_queue);
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();

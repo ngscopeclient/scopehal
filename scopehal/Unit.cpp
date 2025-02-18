@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -116,6 +116,21 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_FARADS;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
+}
+
+bool Unit::IsLogarithmic()
+{
+	switch(m_type)
+	{
+		case UNIT_DB:
+		case UNIT_DBM:
+		case UNIT_LOG_BER:
+		case UNIT_COUNTS_SCI:
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 /**
