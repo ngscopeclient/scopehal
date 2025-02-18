@@ -73,6 +73,9 @@ public:
 		//input must be analog
 		AssertTypeIsAnalogWaveform(cap);
 
+		//TODO: figure this out
+		bool yUnitIsDB = true;
+
 		double start = GetTime();
 
 		size_t nouts = cap->size();
@@ -84,45 +87,6 @@ public:
 			cap->PrepareForCpuAccess();
 
 			std::vector<Peak> peaks;
-	/*
-			//Figure out filter coefficients
-			int64_t hz_per_sample = cap->m_timescale;
-			//int64_t cutoff_bins = search_hz / hz_per_sample;
-			int64_t cutoff_bins = 20;
-			const float atten = 30;
-			size_t filterlen = (atten / 22) * cutoff_bins;
-			filterlen |= 1;	//force length to be odd
-
-			//Make a temporary buffer for the filtered peaks and calculate the coefficients
-			m_filteredInput.resize(cap->size());
-			m_peakCoefficients.resize(filterlen);
-			Filter::CalculateFIRCoefficients(0, cutoff_bins, atten, Filter::FILTER_TYPE_LOWPASS, m_peakCoefficients);
-			LogDebug("cutoff bins %zu, filterlen %zu\n", (size_t)cutoff_bins, filterlen);
-
-			//Apply the convolution to make the filtered spectrum
-			cmdBuf.begin({});
-			FIRFilterArgs args;
-			args.end = cap->size() - m_peakCoefficients.size();
-			args.filterlen = m_peakCoefficients.size();
-			m_peakFirComputePipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
-			m_peakFirComputePipeline.BindBufferNonblocking(1, m_peakCoefficients, cmdBuf);
-			m_peakFirComputePipeline.BindBufferNonblocking(2, m_filteredInput, cmdBuf, true);
-			const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
-			m_peakFirComputePipeline.Dispatch(cmdBuf, args,
-				std::min(compute_block_count, 32768u),
-				compute_block_count / 32768 + 1);
-			cmdBuf.end();
-			queue->SubmitAndBlock(cmdBuf);
-			m_filteredInput.MarkModifiedFromGpu();
-
-			//DEBUG: dump the filtered spectrum
-			m_filteredInput.PrepareForCpuAccess();
-			auto filtered = m_filteredInput.GetCpuPointer();
-			FILE* fp = fopen("/tmp/foo.csv", "w");
-			for(size_t i=0; i<cap->size(); i++)
-				fprintf(fp, "%zu,%f\n", i*hz_per_sample + cap->m_triggerPhase, filtered[i]);
-			fclose(fp);
-			*/
 
 			//Get peak search width in bins
 			//(assume bins are equal size, this should get us close)
@@ -180,7 +144,12 @@ public:
 				//LogDebug("Moved peak from %zu to %zd\n", (size_t)cap->m_offsets[i], peak_location);
 
 				//Move left and right from the peak until we get half magnitude
-				float hmtarget = (target - baseline)/2 + baseline;
+				//If Y axis is dB, we want to be half *magnitude* not half dB
+				float hmtarget;
+				if(yUnitIsDB)
+					hmtarget = target - 3;
+				else
+					hmtarget = (target - baseline)/2 + baseline;
 				ssize_t hmleft = target;
 				ssize_t hmright = target;
 				for(ssize_t j=i; j >= 0; j--)
@@ -214,7 +183,11 @@ public:
 			std::sort(peaks.rbegin(), peaks.rend(), std::less<Peak>());
 			m_peaks.clear();
 			for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
+			{
+				//Find FWHM of only the target peaks
+
 				m_peaks.push_back(peaks[i]);
+			}
 		}
 
 		double dt = GetTime() - start;
