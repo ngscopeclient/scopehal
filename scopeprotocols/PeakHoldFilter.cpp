@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -74,7 +74,7 @@ void PeakHoldFilter::ClearSweeps()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PeakHoldFilter::Refresh()
+void PeakHoldFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -136,7 +136,7 @@ void PeakHoldFilter::Refresh()
 				cap->m_samples[i] = max((float)cap->m_samples[i], (float)sdin->m_samples[i]);
 		}
 
-		FindPeaks(cap);
+		FindPeaks(cap, cmdBuf, queue);
 	}
 	else
 	{
@@ -175,6 +175,6 @@ void PeakHoldFilter::Refresh()
 				cap->m_samples[i] = max((float)cap->m_samples[i], (float)udin->m_samples[i]);
 		}
 
-		FindPeaks(cap);
+		FindPeaks(cap, cmdBuf, queue);
 	}
 }

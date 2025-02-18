@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -71,7 +71,7 @@ string PeaksFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PeaksFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void PeaksFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Output units track the input
 	if(GetInput(0))
@@ -98,7 +98,7 @@ void PeaksFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueH
 
 	if(sdin)
 	{
-		FindPeaks(sdin);
+		FindPeaks(sdin, cmdBuf, queue);
 
 		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
 		cap->m_offsets.CopyFrom(sdin->m_offsets);
@@ -107,7 +107,7 @@ void PeaksFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueH
 	}
 	else if(udin)
 	{
-		FindPeaks(udin);
+		FindPeaks(udin, cmdBuf, queue);
 
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
 		cap->m_samples.CopyFrom(udin->m_samples);

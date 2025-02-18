@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,18 +63,66 @@ public:
 
 	template<class T>
 	__attribute__((noinline))
-	void FindPeaks(T* cap, int64_t max_peaks, float search_hz)
+	void FindPeaks(
+		T* cap,
+		int64_t max_peaks,
+		float search_hz,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue)
 	{
 		//input must be analog
 		AssertTypeIsAnalogWaveform(cap);
+
+		double start = GetTime();
 
 		size_t nouts = cap->size();
 		if( (max_peaks == 0) || (nouts < 2) )
 			m_peaks.clear();
 		else
 		{
-			//We're looking for peaks on the CPU
+			//TODO: use the GPU
 			cap->PrepareForCpuAccess();
+
+			std::vector<Peak> peaks;
+	/*
+			//Figure out filter coefficients
+			int64_t hz_per_sample = cap->m_timescale;
+			//int64_t cutoff_bins = search_hz / hz_per_sample;
+			int64_t cutoff_bins = 20;
+			const float atten = 30;
+			size_t filterlen = (atten / 22) * cutoff_bins;
+			filterlen |= 1;	//force length to be odd
+
+			//Make a temporary buffer for the filtered peaks and calculate the coefficients
+			m_filteredInput.resize(cap->size());
+			m_peakCoefficients.resize(filterlen);
+			Filter::CalculateFIRCoefficients(0, cutoff_bins, atten, Filter::FILTER_TYPE_LOWPASS, m_peakCoefficients);
+			LogDebug("cutoff bins %zu, filterlen %zu\n", (size_t)cutoff_bins, filterlen);
+
+			//Apply the convolution to make the filtered spectrum
+			cmdBuf.begin({});
+			FIRFilterArgs args;
+			args.end = cap->size() - m_peakCoefficients.size();
+			args.filterlen = m_peakCoefficients.size();
+			m_peakFirComputePipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+			m_peakFirComputePipeline.BindBufferNonblocking(1, m_peakCoefficients, cmdBuf);
+			m_peakFirComputePipeline.BindBufferNonblocking(2, m_filteredInput, cmdBuf, true);
+			const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
+			m_peakFirComputePipeline.Dispatch(cmdBuf, args,
+				std::min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+			cmdBuf.end();
+			queue->SubmitAndBlock(cmdBuf);
+			m_filteredInput.MarkModifiedFromGpu();
+
+			//DEBUG: dump the filtered spectrum
+			m_filteredInput.PrepareForCpuAccess();
+			auto filtered = m_filteredInput.GetCpuPointer();
+			FILE* fp = fopen("/tmp/foo.csv", "w");
+			for(size_t i=0; i<cap->size(); i++)
+				fprintf(fp, "%zu,%f\n", i*hz_per_sample + cap->m_triggerPhase, filtered[i]);
+			fclose(fp);
+			*/
 
 			//Get peak search width in bins
 			//(assume bins are equal size, this should get us close)
@@ -86,7 +134,6 @@ public:
 			float baseline = Filter::GetMinVoltage(cap);
 
 			//Find peaks (TODO: can we vectorize/multithread this?)
-			std::vector<Peak> peaks;
 			ssize_t nend = nouts-1;
 			size_t minpeak = 10;		//Skip this many bins at left to avoid false positives on the DC peak
 										//(TODO: this only makes sense for FFT)
@@ -169,10 +216,18 @@ public:
 			for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
 				m_peaks.push_back(peaks[i]);
 		}
+
+		double dt = GetTime() - start;
+		LogDebug("delta = %.3f ms\n", dt * 1000);
 	}
 
 protected:
 	std::vector<Peak> m_peaks;
+
+	AcceleratorBuffer<float> m_filteredInput;
+	AcceleratorBuffer<float> m_peakCoefficients;
+
+	ComputePipeline m_peakFirComputePipeline;
 };
 
 /**
@@ -189,12 +244,14 @@ public:
 protected:
 
 	template<class T>
-	void FindPeaks(T* cap)
+	void FindPeaks(T* cap, vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 	{
 		PeakDetector::FindPeaks(
 			cap,
 			m_parameters[m_numpeaksname].GetIntVal(),
-			m_parameters[m_peakwindowname].GetFloatVal());
+			m_parameters[m_peakwindowname].GetFloatVal(),
+			cmdBuf,
+			queue);
 	}
 
 	std::string m_numpeaksname;

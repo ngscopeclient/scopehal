@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -1360,6 +1360,84 @@ void Filter::AdvanceToTimestampScaled(UniformWaveformBase* wfm, size_t& i, size_
 
 	while( ((i+1) < len) && ( ( static_cast<int64_t>(i+1) * wfm->m_timescale) <= timestamp) )
 		i ++;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Common DSP helpers
+
+/**
+	@brief Calculates FIR coefficients
+
+	Based on public domain code at https://www.arc.id.au/FilterDesign.html
+
+	Cutoff frequencies are specified in fractions of the Nyquist limit (Fsample/2).
+
+	@param fa				Left side passband (0 for LPF)
+	@param fb				Right side passband (1 for HPF)
+	@param stopbandAtten	Stop-band attenuation, in dB
+	@param type				Type of filter
+	@param coefficients		Output coefficients
+ */
+void Filter::CalculateFIRCoefficients(
+		float fa,
+		float fb,
+		float stopbandAtten,
+		FIRFilterType type,
+		AcceleratorBuffer<float>& coefficients)
+{
+	coefficients.PrepareForCpuAccess();
+
+	//Calculate the impulse response of the filter
+	size_t len = coefficients.size();
+	size_t np = (len - 1) / 2;
+	vector<float> impulse;
+	impulse.push_back(fb-fa);
+	for(size_t j=1; j<=np; j++)
+		impulse.push_back( (sin(j*M_PI*fb) - sin(j*M_PI*fa)) /(j*M_PI) );
+
+	//Calculate window scaling factor for stopband attenuation
+	float alpha = 0;
+	if(stopbandAtten < 21)
+		alpha = 0;
+	else if(stopbandAtten > 50)
+		alpha = 0.1102 * (stopbandAtten - 8.7);
+	else
+		alpha = 0.5842 * pow(stopbandAtten-21, 0.4) + 0.07886*(stopbandAtten-21);
+
+	//Final windowing (Kaiser-Bessel)
+	float ia = Bessel(alpha);
+	if(type == FILTER_TYPE_NOTCH)
+	{
+		for(size_t j=0; j<=np; j++)
+			coefficients[np+j] = -impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
+		coefficients[np] += 1;
+	}
+	else
+	{
+		for(size_t j=0; j<=np; j++)
+			coefficients[np+j] = impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
+	}
+	for(size_t j=0; j<=np; j++)
+		coefficients[j] = coefficients[len-1-j];
+
+	coefficients.MarkModifiedFromCpu();
+}
+
+/**
+	@brief 0th order Bessel function
+ */
+float Filter::Bessel(float x)
+{
+	float d = 0;
+	float ds = 1;
+	float s = 1;
+	while(ds > s*1e-6)
+	{
+		d += 2;
+		ds *= (x*x)/(d*d);
+		s += ds;
+	}
+	return s;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

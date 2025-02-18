@@ -93,7 +93,7 @@ bool FIRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 void FIRFilter::SetDefaultName()
 {
 	char hwname[256];
-	auto type = static_cast<FilterType>(m_parameters[m_filterTypeName].GetIntVal());
+	auto type = static_cast<FIRFilterType>(m_parameters[m_filterTypeName].GetIntVal());
 	switch(type)
 	{
 		case FILTER_TYPE_LOWPASS:
@@ -161,7 +161,7 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	float nyquist = sample_hz / 2;
 	float flo = m_parameters[m_freqLowName].GetFloatVal();
 	float fhi = m_parameters[m_freqHighName].GetFloatVal();
-	auto type = static_cast<FilterType>(m_parameters[m_filterTypeName].GetIntVal());
+	auto type = static_cast<FIRFilterType>(m_parameters[m_filterTypeName].GetIntVal());
 	if(type == FILTER_TYPE_LOWPASS)
 		flo = 0;
 	else if(type == FILTER_TYPE_HIGHPASS)
@@ -278,75 +278,4 @@ void FIRFilter::DoFilterKernelGeneric(
 
 		cap->m_samples[i]	= v;
 	}
-}
-
-/**
-	@brief Calculates FIR coefficients
-
-	Based on public domain code at https://www.arc.id.au/FilterDesign.html
-
-	Cutoff frequencies are specified in fractions of the Nyquist limit (Fsample/2).
-
-	@param fa				Left side passband (0 for LPF)
-	@param fb				Right side passband (1 for HPF)
-	@param stopbandAtten	Stop-band attenuation, in dB
-	@param type				Type of filter
- */
-void FIRFilter::CalculateFilterCoefficients(
-	float fa,
-	float fb,
-	float stopbandAtten,
-	FilterType type)
-{
-	//Calculate the impulse response of the filter
-	size_t len = m_coefficients.size();
-	size_t np = (len - 1) / 2;
-	vector<float> impulse;
-	impulse.push_back(fb-fa);
-	for(size_t j=1; j<=np; j++)
-		impulse.push_back( (sin(j*M_PI*fb) - sin(j*M_PI*fa)) /(j*M_PI) );
-
-	//Calculate window scaling factor for stopband attenuation
-	float alpha = 0;
-	if(stopbandAtten < 21)
-		alpha = 0;
-	else if(stopbandAtten > 50)
-		alpha = 0.1102 * (stopbandAtten - 8.7);
-	else
-		alpha = 0.5842 * pow(stopbandAtten-21, 0.4) + 0.07886*(stopbandAtten-21);
-
-	//Final windowing (Kaiser-Bessel)
-	float ia = Bessel(alpha);
-	if(type == FILTER_TYPE_NOTCH)
-	{
-		for(size_t j=0; j<=np; j++)
-			m_coefficients[np+j] = -impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
-		m_coefficients[np] += 1;
-	}
-	else
-	{
-		for(size_t j=0; j<=np; j++)
-			m_coefficients[np+j] = impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
-	}
-	for(size_t j=0; j<=np; j++)
-		m_coefficients[j] = m_coefficients[len-1-j];
-
-	m_coefficients.MarkModifiedFromCpu();
-}
-
-/**
-	@brief 0th order Bessel function
- */
-float FIRFilter::Bessel(float x)
-{
-	float d = 0;
-	float ds = 1;
-	float s = 1;
-	while(ds > s*1e-6)
-	{
-		d += 2;
-		ds *= (x*x)/(d*d);
-		s += ds;
-	}
-	return s;
 }

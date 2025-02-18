@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -500,6 +500,11 @@ protected:
 
 	///@brief Impedance selected for the AFG output
 	FunctionGenerator::OutputImpedance m_afgImpedance;
+
+	//Vulkan peak detection
+	std::shared_ptr<QueueHandle> m_queue;
+	std::unique_ptr<vk::raii::CommandPool> m_pool;
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 
 public:
 	static std::string GetDriverNameInternal();

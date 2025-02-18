@@ -35,12 +35,6 @@
 #ifndef FIRFilter_h
 #define FIRFilter_h
 
-struct FIRFilterArgs
-{
-	uint32_t end;
-	uint32_t filterlen;
-};
-
 /**
 	@brief Performs an arbitrary FIR filter with tap delay equal to the sample rate
  */
@@ -65,18 +59,10 @@ public:
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
 
-	enum FilterType
-	{
-		FILTER_TYPE_LOWPASS,
-		FILTER_TYPE_HIGHPASS,
-		FILTER_TYPE_BANDPASS,
-		FILTER_TYPE_NOTCH
-	};
+	FIRFilterType GetFilterType()
+	{ return static_cast<FIRFilterType>(m_parameters[m_filterTypeName].GetIntVal()); }
 
-	FilterType GetFilterType()
-	{ return static_cast<FilterType>(m_parameters[m_filterTypeName].GetIntVal()); }
-
-	void SetFilterType(FilterType type)
+	void SetFilterType(FIRFilterType type)
 	{ m_parameters[m_filterTypeName].SetIntVal(type); }
 
 	void SetFreqLow(float freq)
@@ -87,9 +73,8 @@ public:
 
 protected:
 
-	void CalculateFilterCoefficients(float fa, float fb, float stopbandAtten, FilterType type);
-
-	static float Bessel(float x);
+	void CalculateFilterCoefficients(float fa, float fb, float stopbandAtten, FIRFilterType type)
+	{ CalculateFIRCoefficients(fa, fb, stopbandAtten, type, m_coefficients); }
 
 	void DoFilterKernelGeneric(
 		UniformAnalogWaveform* din,

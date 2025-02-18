@@ -312,5 +312,5 @@ void FFTFilter::DoRefresh(
 	cap->MarkModifiedFromGpu();
 
 	//Peak search (for now this runs on the CPU)
-	FindPeaks(cap);
+	FindPeaks(cap, cmdBuf, queue);
 }

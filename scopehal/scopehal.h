@@ -95,6 +95,14 @@ extern bool g_hasPushDescriptor;
 
 extern size_t g_maxComputeGroupCount[3];
 
+struct FIRFilterArgs
+{
+	uint32_t end;
+	uint32_t filterlen;
+};
+
+uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
+
 #include "Unit.h"
 #include "Bijection.h"
 #include "IDTable.h"
@@ -256,8 +264,6 @@ extern bool g_vulkanDeviceIsMoltenVK;
 extern uint32_t g_vkPinnedMemoryHeap;
 extern uint32_t g_vkLocalMemoryHeap;
 extern bool g_vulkanDeviceHasUnifiedMemory;
-
-uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 
 //Validation helper for templates
 //Throws compile-time error if specialized for false since there's no implementation

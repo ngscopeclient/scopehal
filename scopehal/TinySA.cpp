@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -113,6 +113,35 @@ TinySA::TinySA(SCPITransport* transport)
 	// Init channel range and offet
 	SetChannelVoltageRange(0,0,130);
 	SetChannelOffset(0,0,50);
+
+	//Create Vulkan objects for peak detection
+	m_queue = g_vkQueueManager->GetComputeQueue("TinySA.queue");
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		m_queue->m_family );
+	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
+	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
+		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+
+	if(g_hasDebugUtils)
+	{
+		string poolname = "TinySA.pool";
+		string bufname = "TinySA.cmdbuf";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandPool,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
+				poolname.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
+				bufname.c_str()));
+	}
 }
 
 TinySA::~TinySA()
@@ -200,7 +229,7 @@ size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8
 			{
 				// Sweep with low rbw can take several minutes => reset timeout as long as we receive data from the device
 				lastActivity = GetTime();
-				dataRead+=newBytes; 
+				dataRead+=newBytes;
 			}
 			if(dataRead >= length)
 				inFooter = true;
@@ -326,7 +355,7 @@ bool TinySA::AcquireData()
 
 	//Look for peaks
 	//TODO: make this configurable, for now 500 kHz spacing and up to 10 peaks
-	dynamic_cast<SpectrumChannel*>(m_channels[0])->FindPeaks(cap, 10, 500000);
+	dynamic_cast<SpectrumChannel*>(m_channels[0])->FindPeaks(cap, 10, 500000, *m_cmdBuf, m_queue);
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
