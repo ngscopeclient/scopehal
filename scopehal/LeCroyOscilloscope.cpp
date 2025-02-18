@@ -3066,6 +3066,10 @@ float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 	float offset;
 	sscanf(reply.c_str(), "%f", &offset);
 
+	//Correct for frontend inversion
+	if(IsInverted(i))
+		offset = -offset;
+
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
@@ -3078,7 +3082,10 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float off
 		return;
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), offset);
+	if(IsInverted(i))
+		snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), -offset);
+	else
+		snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), offset);
 	m_transport->SendCommandQueued(tmp);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
