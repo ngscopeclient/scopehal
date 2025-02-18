@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -376,6 +376,8 @@ protected:
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
 	std::map<size_t, bool> m_probeIsActive;
+	std::map<size_t, bool> m_channelIsInverted;
+	float GetTriggerLevelWithInversion(Trigger* trig);
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;

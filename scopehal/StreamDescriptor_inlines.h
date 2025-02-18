@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -107,6 +107,14 @@ inline void StreamDescriptor::SetVoltageRange(float v)
 	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
 	if(schan)
 		schan->SetVoltageRange(v, m_stream);
+}
+
+inline bool StreamDescriptor::IsInverted()
+{
+	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
+	if(schan)
+		return schan->IsInverted(m_stream);
+	return false;
 }
 
 inline void StreamDescriptor::SetOffset(float v)

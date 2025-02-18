@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -196,6 +196,14 @@ void OscilloscopeChannel::SetBandwidthLimit(int mhz)
 {
 	if(m_instrument)
 		GetScope()->SetChannelBandwidthLimit(m_index, mhz);
+}
+
+bool OscilloscopeChannel::IsInverted([[maybe_unused]] size_t stream)
+{
+	if(m_instrument)
+		return GetScope()->IsInverted(m_index);
+	else
+		return false;
 }
 
 float OscilloscopeChannel::GetVoltageRange(size_t stream)
