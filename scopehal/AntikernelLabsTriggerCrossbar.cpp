@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -435,7 +435,7 @@ void AntikernelLabsTriggerCrossbar::SetMuxOutputDrive(size_t dstchan, float v)
 	m_transport->SendCommandQueued(m_channels[dstchan]->GetHwname() + ":LEV " + to_string(mv));
 }
 
-bool AntikernelLabsTriggerCrossbar::MuxHasConfigurableThreshold(size_t dstchan)
+bool AntikernelLabsTriggerCrossbar::MuxHasConfigurableThreshold([[maybe_unused]] size_t dstchan)
 {
 	return true;
 }
