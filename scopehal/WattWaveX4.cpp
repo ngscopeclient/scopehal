@@ -66,25 +66,28 @@ WattWaveX4::WattWaveX4(SCPITransport* transport)
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		//Hardware name of the channel
-		string chname = string("C") + to_string(i+1);
+		//string chname = "";
+		string chname = string("Channel: ") + to_string(i+1);
 
 		//Create the channel
-		auto chan = new OscilloscopeChannel(
+		auto chan = new PowerMeterChannel(//OscilloscopeChannel(
 			this,
 			chname,
 			GetChannelColor(i),
-			Unit(Unit::UNIT_FS),
-			Unit(Unit::UNIT_AMPS),
-			Stream::STREAM_TYPE_ANALOG,
+			//Unit(Unit::UNIT_FS),
+			//Unit(ch_unit),
+			//Stream::STREAM_TYPE_ANALOG,
 			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
 		//Set initial configuration so we have a well-defined instrument state
 		m_channelAttenuations[i] = 1;
-		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_DC_1M);
+		//SetChannelCoupling(i, OscilloscopeChannel::COUPLE_DC_1M);
 		SetChannelOffset(i, 0,  0);
 		SetChannelVoltageRange(i, 0, 5);
+		SetChannelOffset(i, 1,  0);  //stream 1
+		SetChannelVoltageRange(i, 1, 1); //stream 1
 	}
 
 
@@ -95,22 +98,22 @@ WattWaveX4::WattWaveX4(SCPITransport* transport)
 	auto depths = GetSampleDepthsNonInterleaved();
 	SetSampleDepth(depths[0]);
 
-	/*
+	
 	//Add the external trigger input
-	m_extTrigChannel =
+	/*m_extTrigChannel =
 		new OscilloscopeChannel(this, "EX", Stream::STREAM_TYPE_TRIGGER, "", m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
-	m_extTrigChannel->SetDefaultDisplayName();
-	*/
+	m_extTrigChannel->SetDefaultDisplayName();*/
+	
 
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
-//	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
-//	SetTrigger(trig);
-//	PushTrigger();
-//	SetTriggerOffset(0);
+	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
+	SetTrigger(trig);
+	PushTrigger();
+	SetTriggerOffset(17);
 }
 
 /**
@@ -246,7 +249,7 @@ bool WattWaveX4::AcquireData()
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->FlushRXBuffer(); // flush buffer
 	m_transport->SendCommand("ACQUIRE:DATA_OUT 1"); // start datastream out of device
-	SequenceSet s;
+	
     std::vector<meas_data_set> datasets;
 	auto BUFFER_SIZE = (GetSampleDepth()+2) * sizeof(meas_data_set);
 	std::vector<uint8_t> buffer(BUFFER_SIZE);
@@ -263,8 +266,10 @@ bool WattWaveX4::AcquireData()
 			LogWarning("WattWave X4 Error: Serial read failed or timed out!\n");
             //break;  counter to give error
 			}
+			
 		this->ChannelsDownloadStatusUpdate(0, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.5);
-        bufferLen += bytesRead;
+		
+        bufferLen /*+*/= bytesRead;
         // Process buffer while it contains full dataset(s)
         size_t i = 0;
         while (i + DATASET_SIZE <= bufferLen) {
@@ -314,21 +319,25 @@ bool WattWaveX4::AcquireData()
 			break;
 			}
     }
-	m_transport->SendCommand("ACQUIRE:DATA_OUT 0"); // start datastream out of device
-	//ssize_t bytesRead = m_transport->ReadRawData(BUFFER_SIZE, (uint8_t*)&buffer); // flush buffer
+	m_transport->SendCommand("ACQUIRE:DATA_OUT 0"); // stop datastream out of device
 	m_transport->FlushRXBuffer(); // flush buffer
 	
-	for(int i=0; i<4; i++)
+	
+	SequenceSet s;
+
+	for(int i=0; i<static_cast<int>(m_analogChannelCount); i++)
 	{
 		if(!m_channelsEnabled[i])
 			continue;
-	
-	
-	double t = GetTime();
+			
+			
+	double t = GetTime();  // need to be alingned??
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 		//Create our waveform
+		
+		
 	auto cap = new UniformAnalogWaveform;
-	cap->m_timescale = 1000000000;//fs_per_sample;
+	cap->m_timescale = 100e9;// 100us fs_per_sample;
 	cap->m_triggerPhase = 1;//trigphase;
 	cap->m_startTimestamp = time(NULL);
 	cap->m_startFemtoseconds = 1;//fs;
@@ -338,15 +347,33 @@ bool WattWaveX4::AcquireData()
 		{
 		cap->m_samples[j] = datasets[j].meas_current[i];
 		}
+		
+	auto cap_v = new UniformAnalogWaveform;
+	cap_v->m_timescale = 100e9;// 100us fs_per_sample;
+	cap_v->m_triggerPhase = 1;//trigphase;
+	cap_v->m_startTimestamp = time(NULL);
+	cap_v->m_startFemtoseconds = 1;//fs;
+	cap_v->Resize(datasets.size());
+	cap_v->PrepareForCpuAccess();
+	for(size_t j=0; j<datasets.size(); j++)
+		{
+		cap_v->m_samples[j] = datasets[j].meas_voltage[i];
+		}		
+
+	cap_v->MarkSamplesModifiedFromCpu();	
 	cap->MarkSamplesModifiedFromCpu();
-	s[GetOscilloscopeChannel(i)] = cap;
+	
+	auto chan = GetChannel(i);
+	s[StreamDescriptor(chan, 0)] = cap_v;
+	s[StreamDescriptor(chan, 1)] = cap;
 	}
 	
-	
-	//Save the waveforms to our queue
+		//Save the waveforms to our queue
 	m_pendingWaveformsMutex.lock();
 	m_pendingWaveforms.push_back(s);
 	m_pendingWaveformsMutex.unlock();
+
+
 
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)
@@ -613,7 +640,7 @@ bool WattWaveX4::CanEnableChannel([[maybe_unused]] size_t channel)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Logic analyzer configuration
-
+/*
 vector<Oscilloscope::DigitalBank> WattWaveX4::GetDigitalBanks()
 {
 	vector<DigitalBank> banks;
@@ -654,4 +681,66 @@ void WattWaveX4::SetDigitalHysteresis([[maybe_unused]] size_t channel, [[maybe_u
 void WattWaveX4::SetDigitalThreshold([[maybe_unused]] size_t channel, [[maybe_unused]] float level)
 {
 
+}*/
+
+bool WattWaveX4::CanAverage(size_t /*i*/)
+{
+	return true;
 }
+
+size_t WattWaveX4::GetNumAverages(size_t /*i*/)
+{
+	return 1;
+}
+
+void WattWaveX4::SetNumAverages(size_t /*i*/, size_t /*navg*/)
+{
+
+}
+
+bool WattWaveX4::CanInterleave()
+{
+	return false;
+}
+
+
+float WattWaveX4::GetChannelVoltageRange(size_t i, size_t stream)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return local_channelVoltageRanges[i][stream];
+}
+
+void WattWaveX4::SetChannelVoltageRange(size_t i, size_t stream, float range)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		local_channelVoltageRanges[i][stream] = range;
+		LogWarning("CH: %zu - stream: %zu\n",i,stream);
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range / GetChannelAttenuation(i));
+	m_transport->SendCommand(buf);
+}
+
+float WattWaveX4::GetChannelOffset(size_t i, size_t stream)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return local_channelOffsets[i][stream];
+}
+
+void WattWaveX4::SetChannelOffset(size_t i, size_t stream, float offset)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		local_channelOffsets[i][stream] = offset;
+		LogDebug("ch:%zu - stream%zu \n", i,stream);
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset / GetChannelAttenuation(i));
+	m_transport->SendCommand(buf);
+}
+

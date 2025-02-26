@@ -105,14 +105,24 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 
-	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+	/*virtual std::vector<DigitalBank> GetDigitalBanks() override;
 	virtual DigitalBank GetDigitalBank(size_t channel) override;
 	virtual bool IsDigitalHysteresisConfigurable() override;
 	virtual bool IsDigitalThresholdConfigurable() override;
 	virtual float GetDigitalHysteresis(size_t channel) override;
 	virtual float GetDigitalThreshold(size_t channel) override;
 	virtual void SetDigitalHysteresis(size_t channel, float level) override;
-	virtual void SetDigitalThreshold(size_t channel, float level) override;
+	virtual void SetDigitalThreshold(size_t channel, float level) override;*/
+
+	virtual bool CanAverage(size_t i) override;
+	virtual size_t GetNumAverages(size_t i) override;
+	virtual void SetNumAverages(size_t i, size_t navg) override;
+	virtual bool CanInterleave() override;
+	
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
 
 	enum Series
 	{
@@ -135,6 +145,8 @@ protected:
 	// Most SCPI API calls are write-only, so we have to maintain all state client-side.
 	// This isn't strictly a cache anymore since it's never flushed!
 	std::map<size_t, double> m_channelAttenuations;
+	std::map<size_t, std::map<size_t, float>> local_channelVoltageRanges;
+	std::map<size_t, std::map<size_t, float>> local_channelOffsets;
 	
 	Series m_series;
 	
@@ -158,6 +170,7 @@ struct meas_data_set {
     uint16_t counter;          // 2 bytes (Counter)
     uint8_t channel1;         // 4 bytes (Assumed as uint32_t for INA229::Register)
     float meas_current[4];     // 16 bytes (4x4 bytes float)
+	float meas_voltage[4];     // 16 bytes (4x4 bytes float)
 } __attribute__((packed));      // Ensure no compiler padding
 #define STX 0x55                    // Start-of-text character
 //#define BUFFER_SIZE 1024             // Buffer size for reading multiple datasets
@@ -166,5 +179,31 @@ struct meas_data_set {
 	
 	
 };
+
+
+
+class PowerMeterChannel : public OscilloscopeChannel
+{
+public:
+
+	/**
+		@brief Initialize the channel
+
+		@param scope	Parent instrument
+		@param hwname	Hardware name of the channel
+		@param color	Display color for the channel
+		@param index	Index of the channel within the instrument
+	 */
+	PowerMeterChannel(Oscilloscope* scope,
+		const std::string& hwname,
+		const std::string& color,
+		size_t index)
+		: OscilloscopeChannel(scope, hwname, color, Unit(Unit::UNIT_FS), index)
+	{
+		AddStream(Unit(Unit::UNIT_VOLTS), "volt", Stream::STREAM_TYPE_ANALOG);
+		AddStream(Unit(Unit::UNIT_AMPS), "amp", Stream::STREAM_TYPE_ANALOG);
+	}
+};
+
 
 #endif // WATTWAVEX4_H
