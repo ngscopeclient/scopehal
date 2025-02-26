@@ -53,6 +53,7 @@ Trigger::Trigger(Oscilloscope* scope)
 	, m_level(m_parameters["Lower Level"])
 {
 	m_level = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level.MarkHidden();
 }
 
 Trigger::~Trigger()

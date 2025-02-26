@@ -198,6 +198,7 @@ set(SCOPEHAL_SOURCES
 	RohdeSchwarzHMC804xPowerSupply.cpp
 	RidenPowerSupply.cpp
 	KuaiquPowerSupply.cpp
+    WattWaveX4.cpp
 
 	StandardColors.cpp
 	Filter.cpp

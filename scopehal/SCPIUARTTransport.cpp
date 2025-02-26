@@ -171,3 +171,14 @@ bool SCPIUARTTransport::IsCommandBatchingSupported()
 {
 	return false;
 }
+
+void SCPIUARTTransport::FlushRXBuffer()
+{
+	if (!IsConnected())
+		return;
+	unsigned char buf[1024];
+	//ibclr(m_handle);
+	while (ReadRawData(1024, buf) != 0) {}
+	//do nothing
+	return;
+}
