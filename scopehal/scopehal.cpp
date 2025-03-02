@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -130,11 +130,12 @@ bool g_hasFMA = false;
 #include <mach-o/dyld.h>
 #endif
 
-///@brief True if filters can use GPU acceleration
-bool g_gpuFilterEnabled = false;
+/**
+	@brief True if filters can use GPU acceleration
 
-///@brief True if scope drivers can use GPU acceleration
-bool g_gpuScopeDriverEnabled = false;
+	Will be deprecated soon since Vulkan is now a mandatory core part of the application
+ */
+bool g_gpuFilterEnabled = false;
 
 vector<string> g_searchPaths;
 
@@ -142,6 +143,13 @@ void VulkanCleanup();
 
 ///@brief List of handlers for low memory registered by various subsystems
 set<MemoryPressureHandler> g_memoryPressureHandlers;
+
+/**
+	@brief Mutex for controlling access to background Vulkan activity
+
+	Arbitrarily many threads can own this mutex at once, but it must be held when calling vkDeviceWaitIdle.
+ */
+shared_mutex g_vulkanActivityMutex;
 
 /**
 	@brief Static initialization for SCPI transports

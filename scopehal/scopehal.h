@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,6 +55,7 @@
 #include <cinttypes>
 #include <set>
 #include <float.h>
+#include <shared_mutex>
 
 #include <sigc++/sigc++.h>
 
@@ -83,7 +84,6 @@ extern bool g_hasAvx2;
 
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
-extern bool g_gpuScopeDriverEnabled;
 extern bool g_hasShaderFloat64;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderInt16;
@@ -264,6 +264,7 @@ extern bool g_vulkanDeviceIsMoltenVK;
 extern uint32_t g_vkPinnedMemoryHeap;
 extern uint32_t g_vkLocalMemoryHeap;
 extern bool g_vulkanDeviceHasUnifiedMemory;
+extern std::shared_mutex g_vulkanActivityMutex;;
 
 //Validation helper for templates
 //Throws compile-time error if specialized for false since there's no implementation

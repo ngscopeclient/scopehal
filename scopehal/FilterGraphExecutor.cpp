@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,6 +35,7 @@
  */
 
 #include "scopehal.h"
+#include <shared_mutex>
 
 using namespace std;
 
@@ -258,6 +259,8 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		FlowGraphNode* f;
 		while( (f = GetNextRunnableNode()) != nullptr)
 		{
+			lock_guard<shared_mutex> lock(g_vulkanActivityMutex);
+
 			//Make sure the filter's inputs are where we need them
 			auto loc = f->GetInputLocation();
 			if(loc != Filter::LOC_DONTCARE)

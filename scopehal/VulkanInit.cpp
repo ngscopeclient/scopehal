@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -984,7 +984,6 @@ bool VulkanInit(bool skipGLFW)
 
 	//If we get here, everything is good
 	g_gpuFilterEnabled = true;
-	g_gpuScopeDriverEnabled = true;
 
 	//Initialize the glsl compiler since vkFFT does JIT generation of kernels
 	if(1 != glslang_initialize_process())

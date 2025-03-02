@@ -389,11 +389,18 @@ bool UHDBridgeSDR::AcquireData()
 
 		//TODO: stream timestamp from the server
 
-		if(!m_transport->ReadRawData(depth * sizeof(float) * 2, (uint8_t*)buf))
+		size_t readlen = depth * sizeof(float) * 2;
+		if(!m_transport->ReadRawData(readlen, (uint8_t*)buf))
 		{
-			LogDebug("fail to read data\n");
+			Unit hz(Unit::UNIT_HZ);
+			LogDebug("fail to read data (readlen = %zu, sample_hz = %s, depth = %" PRIu64 ")\n",
+				readlen,
+				hz.PrettyPrint(sample_hz).c_str(),
+				depth);
 			return false;
 		}
+		else
+			LogDebug("got %" PRIu64 " samples\n", depth);
 
 		//Create our waveforms
 		auto icap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname() + ".i");
