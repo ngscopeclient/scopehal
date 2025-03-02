@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,6 +43,8 @@
 	This is a helper class intended for instruments producing I/Q outputs which creates two analog waveform streams,
 	called I and Q, as outputs.
 
+	An additional scalar output "center" specifies the center frequency.
+
 	@ingroup core
  */
 class ComplexChannel : public OscilloscopeChannel
@@ -60,7 +62,11 @@ public:
 	{
 		AddStream(yunit, "I", Stream::STREAM_TYPE_ANALOG);
 		AddStream(yunit, "Q", Stream::STREAM_TYPE_ANALOG);
+		AddStream(Unit(Unit::UNIT_HZ), "center", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	}
+
+	void UpdateCenterFrequency(float freq)
+	{ m_streams[2].m_value = freq; }
 
 	//assume this is a SDR with I/Q input for now
 	virtual PhysicalConnector GetPhysicalConnector() override

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -390,7 +390,10 @@ bool UHDBridgeSDR::AcquireData()
 		//TODO: stream timestamp from the server
 
 		if(!m_transport->ReadRawData(depth * sizeof(float) * 2, (uint8_t*)buf))
+		{
+			LogDebug("fail to read data\n");
 			return false;
+		}
 
 		//Create our waveforms
 		auto icap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname() + ".i");
@@ -424,6 +427,9 @@ bool UHDBridgeSDR::AcquireData()
 
 		//Clean up
 		delete[] buf;
+
+		//Update center frequency
+		dynamic_cast<ComplexChannel*>(GetChannel(i))->UpdateCenterFrequency(GetCenterFrequency(i));
 	}
 
 	//Save the waveforms to our queue
