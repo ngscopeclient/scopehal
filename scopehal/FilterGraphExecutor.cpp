@@ -259,7 +259,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		FlowGraphNode* f;
 		while( (f = GetNextRunnableNode()) != nullptr)
 		{
-			lock_guard<shared_mutex> lock(g_vulkanActivityMutex);
+			shared_lock<shared_mutex> lock(g_vulkanActivityMutex);
 
 			//Make sure the filter's inputs are where we need them
 			auto loc = f->GetInputLocation();
