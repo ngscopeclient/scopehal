@@ -2837,6 +2837,12 @@ bool LeCroyOscilloscope::AcquireData()
 			}
 		}
 
+		//If we are using a CDR trigger, for some reason timestamps don't work
+		//https://github.com/ngscopeclient/scopehal/issues/959
+		//Unless LeCroy gets us a better workaround (TLC#00367891), just use clientside clock
+		if(dynamic_cast<CDRTrigger*>(GetTrigger()) != nullptr)
+			useClientsideTimestamp = true;
+
 		//See if any digital channels are enabled
 		if(m_digitalChannelCount > 0)
 		{
