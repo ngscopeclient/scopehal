@@ -137,6 +137,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PhaseMeasurement.cpp
 	PhaseNonlinearityFilter.cpp
 	PkPkMeasurement.cpp
+	PointSampleFilter.cpp
 	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
 	PulseWidthMeasurement.cpp

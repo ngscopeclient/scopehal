@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -176,6 +176,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PhaseMeasurement);
 	AddDecoderClass(PhaseNonlinearityFilter);
 	AddDecoderClass(PkPkMeasurement);
+	AddDecoderClass(PointSampleFilter);
 	AddDecoderClass(PRBSCheckerFilter);
 	AddDecoderClass(PRBSGeneratorFilter);
 	AddDecoderClass(PulseWidthMeasurement);
