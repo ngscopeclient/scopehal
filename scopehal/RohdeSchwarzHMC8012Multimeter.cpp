@@ -41,6 +41,7 @@ RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* tran
 	, SCPIInstrument(transport)
 	, m_modeValid(false)
 	, m_secmodeValid(false)
+	, m_dmmAutorangeValid(false)
 {
 	//prefetch operating mode
 	GetMeterMode();
@@ -100,6 +101,9 @@ int RohdeSchwarzHMC8012Multimeter::GetMeterDigits()
 
 bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 {
+	if(m_dmmAutorangeValid)
+		return m_dmmAutorange;
+
 	string reply;
 
 	switch(m_mode)
@@ -122,19 +126,28 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 
 		//no autoranging in temperature mode
 		case TEMPERATURE:
+			m_dmmAutorangeValid = true;
+			m_dmmAutorange = false;
 			return false;
 
 		//TODO
 		default:
 			LogError("GetMeterAutoRange not implemented yet for modes other than DC_CURRENT\n");
+			m_dmmAutorangeValid = true;
+			m_dmmAutorange = false;
 			return false;
 	}
 
-	return (reply == "1");
+	m_dmmAutorange = (reply == "1");
+	m_dmmAutorangeValid = true;
+	return m_dmmAutorange;
 }
 
 void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
 {
+	m_dmmAutorange = enable;
+	m_dmmAutorangeValid = true;
+
 	switch(m_mode)
 	{
 		case AC_RMS_AMPLITUDE:
