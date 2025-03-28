@@ -1290,6 +1290,11 @@ void Oscilloscope::Convert16BitSamples(float* pout, const int16_t* pin, float ga
 	else
 	{
 		#ifdef __x86_64__
+		if(g_hasAvx512F)
+		{
+			Convert16BitSamplesAVX512F(pout + off, pin + off, gain, offset, nsamp);
+		}
+
 		if(g_hasAvx2)
 		{
 			if(g_hasFMA)
