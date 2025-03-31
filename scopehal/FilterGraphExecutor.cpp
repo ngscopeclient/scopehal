@@ -202,6 +202,12 @@ void FilterGraphExecutor::ExecutorThread(FilterGraphExecutor* pThis, size_t i)
 	pthread_setname_np(pthread_self(), "FilterGraph");
 	#endif
 
+	//Make locale handling thread safe on Windows
+	#ifdef _WIN32
+	_configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
+	Unit::SetDefaultLocale();
+	#endif
+
 	pThis->DoExecutorThread(i);
 }
 

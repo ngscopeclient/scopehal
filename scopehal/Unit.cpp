@@ -46,6 +46,7 @@ string Unit::m_slocale;
 locale_t Unit::m_locale;
 locale_t Unit::m_defaultLocale;
 #endif
+char Unit::m_decimalSeparator = '.';
 
 /**
 	@brief Constructs a new unit from a string
@@ -753,7 +754,11 @@ string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLoc
 					value1 /= 10000;
 				}
 
-				snprintf(tmp, sizeof(tmp), "%" PRId64 ".%04" PRId64, value1, value2);
+				//Use correct decimal separator for user's locale if needed
+				if(useDisplayLocale)
+					snprintf(tmp, sizeof(tmp), "%" PRId64 "%c%04" PRId64, value1, m_decimalSeparator, value2);
+				else
+					snprintf(tmp, sizeof(tmp), "%" PRId64 ".%04" PRId64, value1, value2);
 
 				//Trim zeroes at right
 				ssize_t n = strlen(tmp) - 1;
@@ -1120,14 +1125,33 @@ int64_t Unit::ParseStringInt64(const string& str, bool useDisplayLocale)
 		}
 
 
-		//Find the first non-numeric character in the strnig
+		//Remove decimal separators  and find suffixes
+		string sbase;
+		bool foundDecimal = false;
 		for(size_t i=0; i<str.size(); i++)
 		{
 			char c = str[i];
-			if(isspace(c) || isdigit(c) || (c == '.') || (c == ',') || (c == '-') )
-				continue;
 
-			if(c == 'T')
+			if(isspace(c))
+				continue;
+			else if(isdigit(c))
+			{
+				sbase += c;
+				if(foundDecimal)
+					divscale *= 10;
+				continue;
+			}
+			else if(c == '-')
+			{
+				sbase += c;
+				continue;
+			}
+			else if( (c == '.') || (c == ',') )
+			{
+				foundDecimal = true;
+				continue;
+			}
+			else if(c == 'T')
 			{
 				if(m_type == UNIT_BYTES)
 					mulscale *= 1024 * 1024 * 1024 * 1024LL;
@@ -1170,7 +1194,7 @@ int64_t Unit::ParseStringInt64(const string& str, bool useDisplayLocale)
 		}
 
 		//Parse the base value
-		sscanf(str.c_str(), "%" SCNd64, &ret);
+		sscanf(sbase.c_str(), "%" SCNd64, &ret);
 		ret *= mulscale;
 		ret /= divscale;
 	}
@@ -1226,15 +1250,32 @@ Unit Unit::operator/(const Unit& rhs)
 	return Unit(m_type);
 }
 
-void Unit::SetLocale(const char* locale)
+/**
+	@brief Initialize the locales for pretty-printing and file interchange
+ */
+void Unit::InitializeLocales()
 {
-#ifdef _WIN32
-	m_slocale = locale;
-#else
-	m_locale = newlocale(LC_ALL, locale, 0);
+	LogDebug("Initializing locales\n");
+	LogIndenter li;
 
-	m_defaultLocale = newlocale(LC_ALL, "C", 0);
-#endif
+	#ifdef _WIN32
+
+	#else
+		m_locale = newlocale(LC_NUMERIC_MASK, "", 0);
+		if(!m_locale)
+			LogError("Failed to create UI locale\n");
+		m_defaultLocale = newlocale(LC_NUMERIC_MASK, "C", 0);
+		if(!m_defaultLocale)
+			LogError("Failed to create default locale\n");
+	#endif
+
+	//Figure out the decimal separator in use
+	SetPrintingLocale();
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "%3.1f", 0.0);
+	m_decimalSeparator = tmp[1];
+	LogDebug("Decimal separator is %c\n", m_decimalSeparator);
+	SetDefaultLocale();
 }
 
 /**

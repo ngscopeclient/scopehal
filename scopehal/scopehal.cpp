@@ -230,6 +230,7 @@ void DriverStaticInit()
 {
 	InitializeSearchPaths();
 	DetectCPUFeatures();
+	Unit::InitializeLocales();
 
 	AddBERTDriverClass(AntikernelLabsTriggerCrossbar);
 	AddBERTDriverClass(MultiLaneBERT);

@@ -137,9 +137,9 @@ public:
 	Unit operator*(const Unit& rhs);
 	Unit operator/(const Unit& rhs);
 
-	static void SetLocale(const char* locale);
-
 	bool IsLogarithmic();
+
+	static void InitializeLocales();
 
 protected:
 	UnitType m_type;
@@ -164,6 +164,9 @@ protected:
 	 */
 	static locale_t m_defaultLocale;
 #endif
+
+	///@brief The decimal separator for pretty-printing in the user's selected locale
+	static char m_decimalSeparator;
 
 	static void SetPrintingLocale();
 	static void SetDefaultLocale();
