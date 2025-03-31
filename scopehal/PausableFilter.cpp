@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -112,4 +112,12 @@ bool PausableFilter::ShouldRefresh()
 
 	//otherwise don't do anything
 	return false;
+}
+
+void PausableFilter::LoadParameters(const YAML::Node& node, IDTable& table)
+{
+	Filter::LoadParameters(node, table);
+
+	//Stop refreshing the filter when we load a session from a file
+	Stop();
 }

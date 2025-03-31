@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,6 +53,8 @@ public:
 
 	virtual std::vector<std::string> EnumActions() override;
 	virtual bool PerformAction(const std::string& id) override;
+
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table) override;
 
 	bool ShouldRefresh();
 
