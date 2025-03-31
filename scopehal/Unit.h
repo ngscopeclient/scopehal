@@ -168,6 +168,8 @@ protected:
 	///@brief The decimal separator for pretty-printing in the user's selected locale
 	static char m_decimalSeparator;
 
+	//public so threads can properly set default locale on initialization, but should not be called by general user code
+public:
 	static void SetPrintingLocale();
 	static void SetDefaultLocale();
 };
