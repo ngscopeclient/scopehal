@@ -1259,7 +1259,8 @@ void Unit::InitializeLocales()
 	LogIndenter li;
 
 	#ifdef _WIN32
-
+		setlocale(LC_NUMERIC, "");
+		m_slocale = setlocale(LC_NUMERIC, nullptr);
 	#else
 		m_locale = newlocale(LC_NUMERIC_MASK, "", 0);
 		if(!m_locale)
