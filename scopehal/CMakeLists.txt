@@ -246,7 +246,6 @@ target_link_libraries(scopehal
 	Vulkan::Loader
 	Vulkan::Headers
 	glslang::glslang
-	glslang::SPIRV
 	glfw
 	${WIN_LIBS}
 	)
