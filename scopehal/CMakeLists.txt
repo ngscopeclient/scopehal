@@ -250,6 +250,12 @@ target_link_libraries(scopehal
 	${WIN_LIBS}
 	)
 
+if(TARGET glslang::SPIRV)
+	target_link_libraries(scopehal
+		glslang::SPIRV
+	)
+endif()
+
 if(LXI_FOUND)
 	target_link_libraries(scopehal
 		PkgConfig::LXI
