@@ -52,17 +52,77 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_liveMode(false)
 	, m_highDefinition(false)
 {
+	memset(&m_opts, 0, sizeof(m_opts));
+	// Use the string in m_model (which has already been filled by SCPIDevice's constructor) to determine first 'scope family, and then possibly some of the feature set.
 	//Last digit of the model number is the number of channels
-	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
+	if (strstr(m_model.c_str(), "DS1"))
 	{
-		if(m_model.size() >= 7 && (m_model[6] == 'D' || m_model[6] == 'E'))
-			m_protocol = DS_OLD;
+		if (1 != sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
+		{
+			LogError("Bad model number\n");
+			return;
+		}
+		// two different series of 'scope were called DS1xxx: DS1xxxB/D/E and DS1xxxZ
+		// they use different protocols, so differentiate here.
+		if (m_model.size() >= 7 && (m_model[6] == 'D' || m_model[6] == 'E'))
+		{
+			m_family = DS1x_OLD;
+		}
 		else
-			m_protocol = DS;
+		{
+			m_family = DS1x;
+		}
 	}
-	else if(1 == sscanf(m_model.c_str(), "MSO%d", &m_modelNumber))
+	else if (strstr(m_model.c_str(), "DS2"))
 	{
-		m_protocol = MSO5;
+		m_family = MSO2x_DS2x;
+		sscanf(m_model.c_str(), "DS%d", &m_modelNumber);
+	}
+	else if (strstr(m_model.c_str(), "MSO2"))
+	{
+		m_family = MSO2x_DS2x;
+		sscanf(m_model.c_str(), "MSO%d", &m_modelNumber);
+	}
+	else if (strstr(m_model.c_str(), "MSO5"))
+	{
+		m_family = MSO5;
+		sscanf(m_model.c_str(), "MSO%d", &m_modelNumber);
+	}
+	else if (strstr(m_model.c_str(), "DHO"))
+	{
+		m_family = DHO;
+		sscanf(m_model.c_str(), "DHO%d", &m_modelNumber);
+		if (m_modelNumber >= 5000)
+		{
+			LogError("Bad model number\n");
+			return;
+		}
+	}
+	else
+	{
+		LogError("Bad model number\n");
+		return;
+	}
+	
+	// Maybe fix this in a similar manner to bandwidth
+	int nchans = m_modelNumber % 10;
+	
+	// figure out bandwidth etc.
+	switch (m_family)
+	{
+	case DS1x_OLD:
+	case DS1x:
+		m_bandwidth = m_modelNumber % 1000 - nchans;
+		break;
+		
+	case MSO2x_DS2x:
+		m_bandwidth = m_modelNumber % 1000 - nchans;
+		// TODO get the opts
+		
+		break;
+		
+	case MSO5:
+	{
 		// Hacky workaround since :SYST:OPT:STAT doesn't work properly on some scopes
 		// Only enable chan 1
 		m_transport->SendCommandQueued("CHAN1:DISP 1\n");
@@ -74,21 +134,21 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		}
 		// Set in run mode to be able to set memory depth
 		m_transport->SendCommandQueued("RUN\n");
-
+		
 		m_transport->SendCommandQueued("ACQ:MDEP 200M\n");
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply("ACQ:MDEP?\n"));
-		m_opt200M = reply == "2.0000E+08" ?
+		m_opts.mso5.bw200M = reply == "2.0000E+08" ?
 						true :
 						false;	  // Yes, it actually returns a stringified float, manual says "scientific notation"
-
+		
 		// Reset memory depth
 		m_transport->SendCommandQueued("ACQ:MDEP 1M\n");
 		string originalBandwidthLimit = m_transport->SendCommandQueuedWithReply("CHAN1:BWL?");
-
+		
 		// Figure out its actual bandwidth since :SYST:OPT:STAT is practically useless
 		m_transport->SendCommandQueued("CHAN1:BWL 200M\n");
 		reply = Trim(m_transport->SendCommandQueuedWithReply("CHAN1:BWL?\n"));
-
+		
 		// A bit of a tree, maybe write more beautiful code
 		if(reply == "200M")
 			m_bandwidth = 350;
@@ -106,16 +166,17 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 					m_bandwidth = 70;
 			}
 		}
-
+		
 		m_transport->SendCommandQueued("CHAN1:BWL " + originalBandwidthLimit);
+		break;
 	}
-	else if(1 == sscanf(m_model.c_str(), "DHO%d", &m_modelNumber) && (m_modelNumber < 5000))
-	{	// Model numbers are :
+	case DHO:
+	{
+		// Model numbers are :
 		// - DHO802 (70MHz), DHO804 (70Mhz), DHO812 (100MHz),DHO814 (100MHz)
 	    // - DHO914/DHO914S (125MHz), DHO924/DHO924S (250MHz)
 		// - DHO1072 (70MHz), DHO1074 (70MHz), DHO1102 (100MHz), DHO1104 (100MHz), DHO1202 (200MHz), DHO1204 (200MHz)
 		// - DHO4204 (200MHz), DHO4404 (400 MHz), DHO4804 (800MHz)
-		m_protocol = DHO;
 		// Those are 12 bits (HD) models => default to high definition mode
 		// This can be overriden by driver 8bits setting
 		m_highDefinition = true;
@@ -134,7 +195,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		m_bandwidth = m_modelNumber % model_modulo / 10 * model_multiplicator;
 		if(m_bandwidth == 0) m_bandwidth = 70; // Fallback for DHO80x models
 
-		m_opt200M = false;	  // does not exist in 800/900 series
+		m_opts.mso5.bw200M = false;	  // does not exist in 800/900 series
 		m_lowSrate = false;
 
 		if (m_modelNumber > 4000 && m_modelNumber < 5000) {
@@ -183,19 +244,10 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			m_maxSrate  = 1.25*1000*1000*1000;
 			m_lowSrate = true;
 		}
+		break;
 	}
-	else
-	{
-		LogError("Bad model number\n");
-		return;
 	}
-
-	// Maybe fix this in a similar manner to bandwidth
-	int nchans = m_modelNumber % 10;
-
-	if((m_protocol != MSO5) && (m_protocol != DHO))
-		m_bandwidth = m_modelNumber % 1000 - nchans;
-
+	
 	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
@@ -237,13 +289,19 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	m_extTrigChannel->SetDefaultDisplayName();
 
 	//Configure acquisition modes
-	if(m_protocol == DS_OLD)
-		m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
-	else
+	switch (m_family)
 	{
+	case DS1x_OLD:
+		m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
+		break;
+		
+	default:
 		m_transport->SendCommandQueued(string(":WAV:FORM ") + (m_highDefinition ? "WORD" : "BYTE"));
 		m_transport->SendCommandQueued(":WAV:MODE RAW");
+		break;
 	}
+	// what's with all the VERN? it's a pain in the dick!
+	/*
 	if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
 	{
 		for(size_t i = 0; i < m_analogChannelCount; i++)
@@ -251,6 +309,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	}
 	if(m_protocol == MSO5 || m_protocol == DS || m_protocol == DHO)
 		m_transport->SendCommandQueued(":TIM:VERN ON");
+	*/
 	FlushConfigCache();
 
 	//make sure all setup commands finish before we proceed
@@ -527,30 +586,34 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
 {
 	vector<unsigned int> ret;
-
-	if(m_protocol == MSO5)
+	
+	switch (m_family)
 	{
+	case MSO2x_DS2x:
+	case MSO5:
 		switch(m_bandwidth)
 		{
-			case 70:
-			case 100:
-				ret = {20, 0};
-				break;
-			case 200:
-				ret = {20, 100, 0};
-				break;
-			case 350:
-				ret = {20, 100, 200, 0};
-				break;
-			default:
-				LogError("Invalid model bandwidth\n");
+		case 70:
+		case 100:
+			ret = {20, 0};
+			break;
+		case 200:
+		case 250:
+		case 300:
+			ret = {20, 100, 0};
+			break;
+		case 350:
+			ret = {20, 100, 200, 0};
+			break;
+		default:
+			LogError("Invalid model bandwidth\n");
 		}
-	}
-
-	//For now, all known DS series models only support 20 MHz or off
-	else if(m_protocol == DS || m_protocol == DHO)
-	{
+		break;
+		
+	default:
+		// For now, all known DS series models only support 20 MHz or off
 		ret = {20, 0};
+		break;
 	}
 	return ret;
 }
@@ -581,53 +644,61 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 {
 	bool valid = true;
 
-	if(m_protocol == MSO5 || m_protocol == DHO)
+	switch (m_family)
 	{
+	case MSO2x_DS2x:
+	case MSO5:
 		switch(m_bandwidth)
 		{
-			case 70:
-			case 100:
-			case 125:
-				if((limit_mhz <= 20) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-				else
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-				break;
-			case 200:
-			case 250:
-				if((limit_mhz <= 20) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-				else if((limit_mhz <= 100) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 100M");
-				else
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-				break;
-			case 350:
-			case 400:
-			case 800:
-				if((limit_mhz <= 20) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-				else if((limit_mhz <= 100) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 100M");
-				else if((limit_mhz <= 200) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 200M");
-				else
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-				break;
-			default:
-				LogError("Invalid model number\n");
-				valid = false;
+		case 70:
+		case 100:
+		case 125:
+			if((limit_mhz <= 20) & (limit_mhz != 0))
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
+			else
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
+			break;
+		case 200:
+		case 250:
+		case 300:
+			if((limit_mhz <= 20) & (limit_mhz != 0))
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
+			else if((limit_mhz <= 100) & (limit_mhz != 0))
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 100M");
+			else
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
+			break;
+		case 350:
+		case 400:
+		case 800:
+			if((limit_mhz <= 20) & (limit_mhz != 0))
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
+			else if((limit_mhz <= 100) & (limit_mhz != 0))
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 100M");
+			else if((limit_mhz <= 200) & (limit_mhz != 0))
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 200M");
+			else
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
+			break;
+		default:
+			LogError("Invalid model number\n");
+			valid = false;
 		}
-	}
-	else if(m_protocol == DS)
-	{
+		break;
+		
+	case DS1x:
+	case DS1x_OLD:
 		if((limit_mhz <= 20) & (limit_mhz != 0))
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
 		else
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-	}
-	else
+		break;
+		
+	default:
 		LogError("unimplemented SetChannelBandwidth for this model\n");
+		valid = false;
+		break;
+	}
 
 	if(valid)
 	{
@@ -656,18 +727,15 @@ float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 	}
 
 	string reply;
-	if(m_protocol == DS)
-		reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":RANGE?"));
-	else if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
-		reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":SCALE?"));
-
+	// n.b. DS1x does actually have a "RANGE" command, but since it's directly related to SCALE in the same way as the others, we just use SCALE for everyone.
+	// reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":RANGE?"));
+	reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":SCALE?"));
+	
 	float range;
 	sscanf(reply.c_str(), "%f", &range);
+	// everybody has 8 vertical divisions
+	range = 8 * range;
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	if(m_protocol == MSO5 || m_protocol == DHO)
-		range = 8 * range;
-	if(m_protocol == DS_OLD)
-		range = 10 * range;
 	m_channelVoltageRanges[i] = range;
 
 	return range;
@@ -675,15 +743,11 @@ float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 void RigolOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
-	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_channelVoltageRanges[i] = range;
-	}
-
-	if(m_protocol == DS)
-		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":RANGE " + to_string(range));
-	else if(m_protocol == MSO5 || m_protocol == DS_OLD || m_protocol == DHO)
-		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":SCALE " + to_string(range / 8));
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelVoltageRanges[i] = range;
+	
+	// everybody has 8 vertical divisions
+	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":SCALE " + to_string(range / 8));
 }
 
 OscilloscopeChannel* RigolOscilloscope::GetExternalTrigger()
@@ -742,7 +806,7 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 		//The "TD" state is not sticky on Rigol scopes, unlike the equivalent LeCroy status register bit.
 		//The scope will go from "run" to "stop" state on trigger with only a momentary pass through "TD".
 		//If we armed the trigger recently and we're now stopped, this means we must have triggered.
-		if(m_triggerArmed && (m_protocol != DS_OLD || m_triggerWasLive))
+		if(m_triggerArmed && (m_family != DS1x_OLD || m_triggerWasLive))
 		{
 			m_triggerArmed = false;
 			m_triggerWasLive = false;
@@ -779,12 +843,19 @@ bool RigolOscilloscope::AcquireData()
 	double yorigin;
 	double yreference;
 	size_t maxpoints = 250 * 1000;
-	if(m_protocol == DS)
-		maxpoints = 250 * 1000;
-	else if(m_protocol == DS_OLD)
+	switch (m_family)
+	{
+	case DS1x_OLD:
 		maxpoints = 8192;	 // FIXME
-	else if(m_protocol == MSO5)
+		break;
+		
+	case MSO5:
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
+		break;
+		
+	default:
+		break;
+	}
 
 	unsigned char* temp_buf = new unsigned char[(m_highDefinition ? (maxpoints * 2) : maxpoints) + 1];
 	map<int, vector<UniformAnalogWaveform*>> pending_waveforms;
@@ -797,7 +868,7 @@ bool RigolOscilloscope::AcquireData()
 
 		int64_t fs_per_sample = 0;
 
-		if(m_protocol == DS_OLD)
+		if (m_family == DS1x_OLD)
 		{
 			yreference = 0;
 			npoints = maxpoints;
@@ -819,7 +890,7 @@ bool RigolOscilloscope::AcquireData()
 
 			//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
 			auto reply = Trim(m_transport->SendCommandQueuedWithReply("WAV:PRE?"));
-			//LogDebug("Preamble = %s\n", reply.c_str());
+			LogDebug("Preamble = %s\n", reply.c_str());
 			sscanf(reply.c_str(),
 				"%d,%d,%zu,%d,%lf,%lf,%lf,%lf,%lf,%lf",
 				&unused1,
@@ -838,12 +909,12 @@ bool RigolOscilloscope::AcquireData()
 				continue;
 			}
 			fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
-			if(m_protocol == DHO)
+			if (m_family == DHO)
 			{	// DHO models return page size instead of memory depth when paginating
 				npoints = GetSampleDepth();
 			}
-			//LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", (int) npoints, xorigin, xreference, (long int) fs_per_sample);
-			//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
+			LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", (int) npoints, xorigin, xreference, (long int) fs_per_sample);
+			LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 		}
 
 		//If we have zero points in the reply, skip reading data from this channel
@@ -861,29 +932,32 @@ bool RigolOscilloscope::AcquireData()
 		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
-		for(size_t npoint = 0; npoint < npoints;)
+		for (size_t npoint = 0; npoint < npoints;)
 		{
-			if(m_protocol == MSO5)
+			switch (m_family)
 			{
+			case MSO5:
 				//Ask for the data block
 				m_transport->SendCommandQueued("*WAI");
 				m_transport->SendCommandQueued("WAV:DATA?");
-			}
-			else if(m_protocol == DS_OLD)
-			{
+				break;
+			
+			case DS1x_OLD:
 				m_transport->SendCommandQueued(string(":WAV:DATA? ") + m_channels[i]->GetHwname());
-			}
-			else
-			{
+				break;
+				
+			default:
 				//Ask for the data
 				m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint + 1));	//ONE based indexing WTF
 				size_t end = npoint + maxpoints;
-				if(end > npoints)
+				if (end > npoints)
+				{
 					end = npoints;
-				m_transport->SendCommandQueued(
-					string("WAV:STOP ") + to_string(end));	  //Here it is zero based, so it gets from 1-1000
-
+				}
+				m_transport->SendCommandQueued(string("WAV:STOP ") + to_string(end));	  //Here it is zero based, so it gets from 1-1000
+				
 				//Ask for the data block
+				LogDebug("Asking for points %zu to %zu\n", npoint, end);
 				m_transport->SendCommandQueued("WAV:DATA?");
 			}
 			m_transport->FlushCommandQueue();
@@ -911,7 +985,7 @@ bool RigolOscilloscope::AcquireData()
 			size_t header_blocksize;
 			size_t header_blocksize_bytes;
 			sscanf((char*)header, "%zu", &header_blocksize);
-			//LogDebug("Header block size = %zu\n", header_blocksize);
+			LogDebug("Header block size = %zu\n", header_blocksize);
 
 			if(header_blocksize == 0)
 			{
@@ -966,8 +1040,10 @@ bool RigolOscilloscope::AcquireData()
  					v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;	
 					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
 				}
-				if(m_protocol == DS_OLD)
+				if (m_family == DS1x_OLD)
+				{
 					v = (128 - static_cast<float>(temp_buf[j])) * yincrement - ydelta;
+				}
 				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
 				cap->m_samples[npoint + j] = v;
 			}
@@ -1009,7 +1085,7 @@ bool RigolOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		if(m_protocol == DS_OLD)
+		if (m_family == DS1x_OLD)
 		{
 			m_transport->SendCommandQueued(":STOP");
 			m_transport->SendCommandQueued(":TRIG:EDGE:SWE SING");
@@ -1033,7 +1109,7 @@ bool RigolOscilloscope::AcquireData()
 
 void RigolOscilloscope::PrepareStart()
 {
-	if(m_protocol == DHO)
+	if (m_family == DHO)
 	{
 		// DHO models need to set raw mode off and on again or vice versa to reset the number of points according to the current memory depth
 		if(m_liveMode)
@@ -1052,13 +1128,15 @@ void RigolOscilloscope::PrepareStart()
 void RigolOscilloscope::Start()
 {
 	//LogDebug("Start single trigger\n");
-	if(m_protocol == DS_OLD)
+	switch (m_family)
 	{
+	case DS1x_OLD:
 		m_transport->SendCommandQueued(":TRIG:EDGE:SWE SING");
 		m_transport->SendCommandQueued(":RUN");
-	}
-	else if(m_protocol == DHO)
-	{	// Check for memory depth : if it is 1k, switch to live mode for better performance
+		break;
+		
+	case DHO:
+		// Check for memory depth : if it is 1k, switch to live mode for better performance
 		// Limit live mode to one channel setup to prevent grabbing waveforms from to different triggers on seperate channels
 		if(GetEnabledChannelCount()==1)
 		{
@@ -1073,11 +1151,12 @@ void RigolOscilloscope::Start()
 		PrepareStart();
 		m_transport->SendCommandQueued(m_liveMode ? ":RUN" : ":SING");
 		m_transport->SendCommandQueued("*WAI");
-	}
-	else
-	{
+		break;
+		
+	default:
 		m_transport->SendCommandQueued(":SING");
 		m_transport->SendCommandQueued("*WAI");
+		break;
 	}
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
@@ -1088,7 +1167,7 @@ void RigolOscilloscope::StartSingleTrigger()
 	m_liveMode = false;
 	m_mdepthValid = false; // Memory depth might have been changed on scope
 	PrepareStart();
-	if(m_protocol == DS_OLD)
+	if (m_family == DS1x_OLD)
 	{
 		m_transport->SendCommandQueued(":TRIG:EDGE:SWE SING");
 		m_transport->SendCommandQueued(":RUN");
@@ -1115,10 +1194,18 @@ void RigolOscilloscope::ForceTrigger()
 	m_liveMode = false;
 	m_mdepthValid = false; // Memory depth might have been changed on scope
 	PrepareStart();
-	if(m_protocol == DS || m_protocol == DHO)
+	switch (m_family)
+	{
+	case DS1x:
+	case DHO:
+	case MSO2x_DS2x:
 		m_transport->SendCommandQueued(":TFOR");
-	else
+		break;
+		
+	default:
 		LogError("RigolOscilloscope::ForceTrigger not implemented for this model\n");
+		break;
+	}
 }
 
 bool RigolOscilloscope::IsTriggerArmed()
@@ -1186,8 +1273,11 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
-	if(m_protocol == MSO5)
+	switch (m_family)
 	{
+	//case DS1x:
+	case MSO2x_DS2x:
+	case MSO5:
 		ret = {
 			100,
 			200,
@@ -1213,9 +1303,11 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 			1 * 1000 * 1000 * 1000,
 			2 * 1000 * 1000 * 1000,
 		};
-	}
-	else if(m_protocol == DHO)
-	{	// For DHO model, srates depend on high/low sample rate models, max srate and number of enabled channels
+		break;
+		
+	case DHO:
+	{
+		// For DHO model, srates depend on high/low sample rate models, max srate and number of enabled channels
 		uint64_t maxSrate = m_maxSrate / GetEnabledChannelCount();
 		uint64_t curSrate;
 		for (auto curSrateItem : (m_lowSrate ? dhoLowSampleRates : dhoHighSampleRates))
@@ -1227,9 +1319,12 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 			}
 			else break;
 		}
+		break;
 	}
-	else
+	default:
 		LogError("RigolOscilloscope::GetSampleRatesNonInterleaved not implemented for this model\n");
+		break;
+	}
 	return ret;
 }
 
@@ -1243,66 +1338,108 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesInterleaved()
 
 set<Oscilloscope::InterleaveConflict> RigolOscilloscope::GetInterleaveConflicts()
 {
-	if(m_protocol == DHO)
+	if (m_family == DHO)
 	{	// No interleave conflicts possible on DHO models
 		return {};
 	}
 	//FIXME
 	set<Oscilloscope::InterleaveConflict> ret;
-	LogError("RigolOscilloscope::GetInterleaveConflicts not implemented for this model\n");
+	//LogError("RigolOscilloscope::GetInterleaveConflicts not implemented for this model\n");
 	return ret;
 }
 
-static std::vector<uint64_t> dhoSampleDepths {
-	{ 	// Available sample depths for DHO models, regardless of model type and activated channels
-		1000,
-		10*1000,
-		100*1000,
-		1*1000*1000,
-		10*1000*1000,
-		25*1000*1000,
-		50*1000*1000,
-		100*1000*1000,
-		250*1000*1000,
-		500*1000*1000,
+static std::vector<uint64_t> SampleDepths_DHO
+{
+	{
+		// Available sample depths for DHO models, regardless of model type and activated channels
+		             1000,
+		        10 * 1000,
+		       100 * 1000,
+		  1 * 1000 * 1000,
+		 10 * 1000 * 1000,
+		 25 * 1000 * 1000,
+		 50 * 1000 * 1000,
+		100 * 1000 * 1000,
+		250 * 1000 * 1000,
+		500 * 1000 * 1000,
 	}
+};
+
+static std::vector<uint64_t> SampleDepths_MSO2x_DS2x
+{
+	               0, // for "Auto"
+	       14 * 1000,
+	      140 * 1000,
+	     1400 * 1000,
+	14 * 1000 * 1000,
+};
+
+static std::vector<uint64_t> SampleDepths_MSO2x_DS2x_deep
+{
+	               0, // for "Auto"
+	       14 * 1000,
+	      140 * 1000,
+	     1400 * 1000,
+	14 * 1000 * 1000,
+	56 * 1000 * 1000,
+};
+
+static std::vector<uint64_t> SampleDepths_MSO5
+{
+	            1000,
+	       10 * 1000,
+	      100 * 1000,
+	     1000 * 1000,
+	10 * 1000 * 1000,
+	25 * 1000 * 1000,
 };
 
 vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
-	if(m_protocol == MSO5)
+	switch (m_family)
 	{
-		ret = {
-			1000,
-			10 * 1000,
-			100 * 1000,
-			1000 * 1000,
-			10 * 1000 * 1000,
-			25 * 1000 * 1000,
-		};
-	}
-	else if(m_protocol == DHO)
-	{	// Mdepth depends on model (maxMemDepth) and number of enabled channels
-		uint64_t maxMemDepth = m_maxMdepth / GetEnabledChannelCount();
-		for (auto curMemDepth : dhoSampleDepths)
+	case MSO2x_DS2x:
+		if (m_opts.mso2.deep_memory == true)
 		{
-			if(curMemDepth<=maxMemDepth)
+			ret = SampleDepths_MSO2x_DS2x_deep;
+		}
+		else
+		{
+			ret = SampleDepths_MSO2x_DS2x;
+		}
+		break;
+		
+	case MSO5:
+		ret = SampleDepths_MSO5;
+		break;
+		
+	case DHO:
+	{
+		// Mdepth depends on model (maxMemDepth) and number of enabled channels
+		uint64_t maxMemDepth = m_maxMdepth / GetEnabledChannelCount();
+		for (auto curMemDepth : SampleDepths_DHO)
+		{
+			if (curMemDepth <= maxMemDepth)
 			{
 				ret.push_back(curMemDepth);
 			}
 			else break;
 		}
+		break;
 	}
-	else
+	default:
 		LogError("RigolOscilloscope::GetSampleDepthsNonInterleaved not implemented for this model\n");
+		break;
+	}
+	
 	return ret;
 }
 
 vector<uint64_t> RigolOscilloscope::GetSampleDepthsInterleaved()
 {
-	if(m_protocol == DHO)
+	if (m_family == DHO)
 	{	// Sample Depths are dynamical (depending on the number of active channels) in DHO models
 		return GetSampleDepthsNonInterleaved();
 	}
@@ -1335,7 +1472,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 		return m_mdepth;
 
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?"));
-
+	//LogWarning("GetSampleDepth, instrument returned %s\n", ret.c_str());
 	double depth;
 	sscanf(ret.c_str(), "%lf", &depth);
 	m_mdepth = (uint64_t)depth;
@@ -1345,7 +1482,42 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	if(m_protocol == MSO5)
+	switch (m_family)
+	{
+	case MSO2x_DS2x:
+		switch(depth)
+		{
+		case 0:
+			m_transport->SendCommandQueued("ACQ:MDEP AUTO");
+			break;
+		case 14000:
+			m_transport->SendCommandQueued("ACQ:MDEP 14000");
+			break;
+		case 140000:
+			m_transport->SendCommandQueued("ACQ:MDEP 140000");
+			break;
+		case 1400000:
+			m_transport->SendCommandQueued("ACQ:MDEP 1400000");
+			break;
+		case 14000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 14000000");
+			break;
+		case 56000000:
+			if (m_opts.mso2.deep_memory == true)
+			{
+				m_transport->SendCommandQueued("ACQ:MDEP 56000000");
+			}
+			else
+			{
+				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+			}
+			break;
+		default:
+			LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+		}
+		break;
+		
+	case MSO5:
 	{
 		// The MSO5 series will only process a sample depth setting if the oscilloscope is in auto or normal mode.
 		// It's frustrating, but to accommodate, we'll grab the current mode and status for restoration later, then stick the
@@ -1356,87 +1528,89 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 		m_transport->SendCommandQueued(":RUN");
 		switch(depth)
 		{
-			case 1000:
-				m_transport->SendCommandQueued("ACQ:MDEP 1k");
-				break;
-			case 10000:
-				m_transport->SendCommandQueued("ACQ:MDEP 10k");
-				break;
-			case 100000:
-				m_transport->SendCommandQueued("ACQ:MDEP 100k");
-				break;
-			case 1000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 1M");
-				break;
-			case 10000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 10M");
-				break;
-			case 25000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 25M");
-				break;
-			case 50000000:
-				if(m_opt200M)
-					m_transport->SendCommandQueued("ACQ:MDEP 50M");
-				else
-					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
-				break;
-			case 100000000:
-				//m_transport->SendCommandQueued("ACQ:MDEP 100M");
+		case 1000:
+			m_transport->SendCommandQueued("ACQ:MDEP 1k");
+			break;
+		case 10000:
+			m_transport->SendCommandQueued("ACQ:MDEP 10k");
+			break;
+		case 100000:
+			m_transport->SendCommandQueued("ACQ:MDEP 100k");
+			break;
+		case 1000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 1M");
+			break;
+		case 10000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 10M");
+			break;
+		case 25000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 25M");
+			break;
+		case 50000000:
+			if (m_opts.mso5.bw200M)
+				m_transport->SendCommandQueued("ACQ:MDEP 50M");
+			else
 				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
-				break;
-			case 200000000:
-				//m_transport->SendCommandQueued("ACQ:MDEP 200M");
-				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
-				break;
-			default:
-				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+			break;
+		case 100000000:
+			//m_transport->SendCommandQueued("ACQ:MDEP 100M");
+			LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+			break;
+		case 200000000:
+			//m_transport->SendCommandQueued("ACQ:MDEP 200M");
+			LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+			break;
+		default:
+			LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 		}
 		m_transport->SendCommandQueued(":TRIG:SWE " + trigger_sweep_mode);
 		// This is a little hairy - do we want to stop the instrument again if it was stopped previously? Probably?
 		if(trigger_status == "STOP")
 			m_transport->SendCommandQueued(":STOP");
+		break;
 	}
-	else if(m_protocol == DHO)
-	{	// DHO models
+	case DHO:
+		// DHO models
 		switch(depth)
 		{
-			case 1000:
-				m_transport->SendCommandQueued("ACQ:MDEP 1k");
-				break;
-			case 10000:
-				m_transport->SendCommandQueued("ACQ:MDEP 10k");
-				break;
-			case 100000:
-				m_transport->SendCommandQueued("ACQ:MDEP 100k");
-				break;
-			case 1000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 1M");
-				break;
-			case 10000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 10M");
-				break;
-			case 25000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 25M");
-				break;
-			case 50000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 50M");
-				break;
-			case 100000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 100M");
-				break;
-			case 250000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 250M");
-				break;
-			case 500000000:
-				m_transport->SendCommandQueued("ACQ:MDEP 500M");
-				break;
-			default:
-				LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+		case 1000:
+			m_transport->SendCommandQueued("ACQ:MDEP 1k");
+			break;
+		case 10000:
+			m_transport->SendCommandQueued("ACQ:MDEP 10k");
+			break;
+		case 100000:
+			m_transport->SendCommandQueued("ACQ:MDEP 100k");
+			break;
+		case 1000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 1M");
+			break;
+		case 10000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 10M");
+			break;
+		case 25000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 25M");
+			break;
+		case 50000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 50M");
+			break;
+		case 100000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 100M");
+			break;
+		case 250000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 250M");
+			break;
+		case 500000000:
+			m_transport->SendCommandQueued("ACQ:MDEP 500M");
+			break;
+		default:
+			LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
 		}
-	}
-	else
-	{
+		break;
+		
+	default:
 		LogError("Memory depth setting not implemented for this series");
+		break;
 	}
 	m_mdepthValid = false;
 }
@@ -1447,7 +1621,7 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 	m_mdepthValid = false;
 	double sampletime = GetSampleDepth() / (double)rate;
 	double timeScaleFactor = 10;
-	if(m_protocol == DHO)
+	if (m_family == DHO)
 	{	// Scale factor is not constant across all sample rates for DHO models
 		std::map<uint64_t, double> *srates = (m_lowSrate ? &dhoLowSampleRates : &dhoHighSampleRates);
 		auto d = srates->find(rate);
@@ -1614,7 +1788,7 @@ void RigolOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
  */
 void RigolOscilloscope::ForceHDMode(bool mode)
 {
-	if((m_protocol == DHO) && mode != m_highDefinition)
+	if ((m_family == DHO) && mode != m_highDefinition)
 	{
 		m_highDefinition = mode;
 		m_transport->SendCommandQueued(string(":WAV:FORM ") + (m_highDefinition ? "WORD" : "BYTE"));
