@@ -116,11 +116,18 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		break;
 		
 	case MSO2x_DS2x:
+	{
 		m_bandwidth = m_modelNumber % 1000 - nchans;
-		// TODO get the opts
-		
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:VAL? MEMDepth\n"));
+		int opt_validity = 0;
+		sscanf(reply.c_str(), "%d", &opt_validity);
+		if (opt_validity >= 2)
+		{
+			m_opts.mso2.deep_memory = true;
+		}
+		// TODO get the other opts (advanced triggering, decoding, CAN analysis)
 		break;
-		
+	}
 	case MSO5:
 	{
 		// Hacky workaround since :SYST:OPT:STAT doesn't work properly on some scopes
