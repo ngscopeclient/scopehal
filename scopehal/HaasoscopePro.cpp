@@ -155,7 +155,7 @@ HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 	}
 
 	m_conversionPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
 
@@ -306,7 +306,7 @@ bool HaasoscopePro::AcquireData()
 	uint32_t seqnum;
 	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
 		return false;
-	LogDebug("HaasoscopePro got seqnum %d \n",seqnum);
+	LogDebug("HaasoscopePro got seqnum %d \n",seqnum); // Note: run ngscopeclient with --debug to see these
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
@@ -391,9 +391,9 @@ bool HaasoscopePro::AcquireData()
 
 			//FIXME: stream timestamp from the server
 
-			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
 				return false;
-			LogDebug("HaasoscopePro got data bytes... %hhd %hhd %hhd ...\n", buf[0],buf[1],buf[2]);
+			LogDebug("HaasoscopePro got data bytes... %d %d %d ...\n", buf[0],buf[1],buf[2]);
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
@@ -421,10 +421,9 @@ bool HaasoscopePro::AcquireData()
 	//Prefer GPU path
 	if(g_hasShaderInt8 && g_hasPushDescriptor)
 	{
+		LogDebug("HaasoscopePro doing GPU path \n");
 		m_cmdBuf->begin({});
-
 		m_conversionPipeline->Bind(*m_cmdBuf);
-
 		for(size_t i=0; i<awfms.size(); i++)
 		{
 			auto cap = awfms[i];
@@ -438,7 +437,6 @@ bool HaasoscopePro::AcquireData()
 			args.offset = -offsets[i];
 
 			m_conversionPipeline->DispatchNoRebind(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
-
 			cap->MarkModifiedFromGpu();
 		}
 
@@ -449,15 +447,15 @@ bool HaasoscopePro::AcquireData()
 	//Fallback path if GPU doesn't have suitable integer support
 	else
 	{
-		//Process analog captures in parallel
-		#pragma omp parallel for
+		LogDebug("HaasoscopePro doing GPU path \n");
+		#pragma omp parallel for  //Process analog captures in parallel
 		for(size_t i=0; i<awfms.size(); i++)
 		{
 			auto cap = awfms[i];
 			cap->PrepareForCpuAccess();
-			Convert8BitSamples(
+			Convert16BitSamples(
 				(float*)&cap->m_samples[0],
-				(int8_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+				(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
 				scales[i],
 				offsets[i],
 				cap->m_samples.size());
