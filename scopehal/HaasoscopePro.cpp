@@ -51,7 +51,7 @@ using namespace std;
 /**
 	@brief Initialize the driver
 
-	@param transport	SCPITransport connected to a TS.NET instance
+	@param transport	SCPITransport connected to a HaasoscopePro application
  */
 HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 	: SCPIDevice(transport)
@@ -96,7 +96,7 @@ HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 	SetSampleDepth(10000);
 
 	//Set up the data plane socket
-	auto csock = dynamic_cast<SCPITwinLanTransport*>(m_transport);
+	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
 	if(!csock)
 		LogFatal("HaasoscopePro expects a SCPITwinLanTransport\n");
 
@@ -263,6 +263,8 @@ void HaasoscopePro::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 		m_bandwidthLimits[i] = limit_mhz;
 	}
 
+	return; // FIXME
+
 	if(limit_mhz == 0)
 		m_transport->SendCommandQueued(string(":") + m_channels[i]->GetHwname() + ":BAND FULL");
 	else
@@ -291,7 +293,7 @@ OscilloscopeChannel* HaasoscopePro::GetExternalTrigger()
 Oscilloscope::TriggerMode HaasoscopePro::PollTrigger()
 {
 	//Always report "triggered" so we can block on AcquireData() in ScopeThread
-	//TODO: peek function of some sort?
+	//FIXME: peek function of some sort?
 	return TRIGGER_MODE_TRIGGERED;
 }
 
@@ -304,6 +306,7 @@ bool HaasoscopePro::AcquireData()
 	uint32_t seqnum;
 	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
 		return false;
+	LogDebug("HaasoscopePro got seqnum %d \n",seqnum);
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
@@ -334,7 +337,7 @@ bool HaasoscopePro::AcquireData()
 	double wfms_s;
 	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
 		return false;
-
+	LogDebug("HaasoscopePro got wfms_s %f \n",wfms_s);
 	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
 
 	//Acquire data for each channel
@@ -358,6 +361,7 @@ bool HaasoscopePro::AcquireData()
 			return false;
 		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
+		LogDebug("HaasoscopePro got memdepth %lld \n",memdepth);
 
 		auto& abuf = m_analogRawWaveformBuffers[chnum];
 		abuf->resize(memdepth);
@@ -376,17 +380,20 @@ bool HaasoscopePro::AcquireData()
 			float offset = config[1];
 			//float trigphase = -config[2] * fs_per_sample;
 			float trigphase = config[2];
+			LogDebug("HaasoscopePro got scale offset trigphase %f %f %f \n", scale, offset, trigphase);
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
 
-			bool clipping;
+			uint8_t clipping;
 			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
 				return false;
+			LogDebug("HaasoscopePro got clipping %d \n", clipping);
 
-			//TODO: stream timestamp from the server
+			//FIXME: stream timestamp from the server
 
 			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
 				return false;
+			LogDebug("HaasoscopePro got data bytes... %hhd %hhd %hhd ...\n", buf[0],buf[1],buf[2]);
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
