@@ -541,7 +541,7 @@ vector<uint64_t> HaasoscopePro::GetSampleRatesNonInterleaved()
 			break;
 
 		auto block = rates.substr(istart, i-istart);
-		auto hz = stol(block);
+		auto hz = stoll(block);
 		ret.push_back(hz);
 
 		//skip the comma
