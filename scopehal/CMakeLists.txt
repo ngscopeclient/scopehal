@@ -246,10 +246,15 @@ target_link_libraries(scopehal
 	Vulkan::Loader
 	Vulkan::Headers
 	glslang::glslang
-	glslang::SPIRV
 	glfw
 	${WIN_LIBS}
 	)
+
+if(TARGET glslang::SPIRV)
+	target_link_libraries(scopehal
+		glslang::SPIRV
+	)
+endif()
 
 if(LXI_FOUND)
 	target_link_libraries(scopehal

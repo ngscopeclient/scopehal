@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,7 +63,7 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	uint i = (gl_GlobalInvocationID.y * 32768) + gl_GlobalInvocationID.x;
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 
 	uint inbase = i + offsetIn;
 	uint outbase = i + offsetOut;
