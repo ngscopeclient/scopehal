@@ -461,8 +461,7 @@ void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, std
 	}
 
 	//Find times of the zero crossings
-	bool first = true;
-	bool last = false;
+	bool last = data->m_samples[0] > threshold;
 	int64_t phoff = data->m_triggerPhase;
 	size_t len = data->m_samples.size();
 	float fscale = data->m_timescale;
@@ -470,14 +469,6 @@ void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, std
 	for(size_t i=1; i<len; i++)
 	{
 		bool value = data->m_samples[i] > threshold;
-
-		//Save the last value
-		if(first)
-		{
-			last = value;
-			first = false;
-			continue;
-		}
 
 		//Skip samples with no transition
 		if(last == value)
