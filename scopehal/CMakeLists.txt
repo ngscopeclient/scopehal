@@ -67,6 +67,7 @@ set(SCOPEHAL_SOURCES
 	VulkanInit.cpp
 
 	FileSystem.cpp
+	LevelCrossingDetector.cpp
 	Unit.cpp
 	Waveform.cpp
 	DensityFunctionWaveform.cpp
