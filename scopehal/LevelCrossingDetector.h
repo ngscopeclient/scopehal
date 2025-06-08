@@ -45,6 +45,12 @@ struct __attribute__((packed)) ZeroCrossingPushConstants
 	float threshold;
 };
 
+struct __attribute__((packed)) PreGatherPushConstants
+{
+	uint32_t numBlocks;
+	uint32_t stride;
+};
+
 /**
 	@brief Helper for GPU accelerated level-crossing searches
  */
@@ -61,8 +67,10 @@ public:
 
 protected:
 	std::unique_ptr<ComputePipeline> m_zeroCrossingPipeline;
+	std::unique_ptr<ComputePipeline> m_preGatherPipeline;
 
 	AcceleratorBuffer<int64_t> m_temporaryResults;
+	AcceleratorBuffer<int64_t> m_gatherIndexes;
 };
 
 #endif

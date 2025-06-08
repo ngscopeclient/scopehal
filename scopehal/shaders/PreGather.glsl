@@ -27,6 +27,11 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@brief Preprocessing for the main Gather shader
+ */
+
 #version 430
 #pragma shader_stage(compute)
 #extension GL_ARB_gpu_shader_int64 : require
@@ -38,83 +43,31 @@ layout(std430, binding=0) restrict writeonly buffer buf_pout
 
 layout(std430, binding=1) restrict readonly buffer buf_pin
 {
-	float pin[];
+	int64_t pin[];
 };
 
 layout(std430, push_constant) uniform constants
 {
-	int64_t triggerPhase;	//Trigger timestamp offset for the input
-	int64_t timescale;		//Input waveform timebase units per tick
-	uint inputSize;			//Total number of input samples
-	uint inputPerThread;	//Number of input samples handled by one thread
-	uint outputPerThread;	//Number of output samples handled by one thread
-							//(must be 1+inputPerThread to allow for the size field in the first slot)
-	float threshold;
+	uint numBlocks;
+	uint stride;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-float InterpolateTime(float fa, float fb, float voltage);
-
 /**
-	@brief First-pass zero crossing detection
-
-	Each thread independently processes a block of inputPerThread samples and outputs a variable-length block, from
-	0 to outputPerThread-1 in size, of samples
+	@brief Find the start point of each block of values in the final buffer
  */
 void main()
 {
-	//Find our block of inputs
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	uint instart = nthread * inputPerThread;
-	uint inend = instart + inputPerThread;
-	if(inend > inputSize)
-		inend = inputSize;
+	if(nthread >= numBlocks)
+		return;
 
-	//Find our block of outputs
-	int nouts = 0;
-	uint outstart = nthread * outputPerThread;
-	uint iout = outstart + 1;
+	//Sum all of the start values
+	int64_t nstart = 0;
+	for(uint i=0; i<nthread; i++)
+		nstart += pin[i*stride];
 
-	float fscale = float(timescale);
-
-	//Search for level crossings within our block
-	for(uint i=instart; i<inend; i++)
-	{
-		//If this is the first sample, we can't find an edge by definition
-		if(i == 0)
-			continue;
-
-		float fa = pin[i-1];
-		float fb = pin[i];
-
-		bool prevValue = fa > threshold;
-		bool currentValue = fb > threshold;
-
-		if(currentValue != prevValue)
-		{
-			float tfrac = fscale * InterpolateTime(fa, fb, threshold);
-
-			pout[iout] = triggerPhase + timescale*int64_t(i-1) + int64_t(tfrac);
-			iout ++;
-			nouts ++;
-		}
-	}
-
-	//Save number of outputs we found
-	pout[outstart] = nouts;
-}
-
-float InterpolateTime(float fa, float fb, float voltage)
-{
-	//If the voltage isn't between the two points, abort
-	bool ag = (fa > voltage);
-	bool bg = (fb > voltage);
-	if( (ag && bg) || (!ag && !bg) )
-		return 0;
-
-	//no need to divide by time, sample spacing is normalized to 1 timebase unit
-	float slope = (fb - fa);
-	float delta = voltage - fa;
-	return delta / slope;
+	//Save output
+	pout[nthread] = nstart;
 }

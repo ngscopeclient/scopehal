@@ -48,6 +48,14 @@ LevelCrossingDetector::LevelCrossingDetector()
 
 		m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+
+		m_preGatherPipeline = make_unique<ComputePipeline>(
+			"shaders/PreGather.spv",
+			2,
+			sizeof(PreGatherPushConstants));
+
+		m_gatherIndexes.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_gatherIndexes.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 	}
 }
 
@@ -68,39 +76,56 @@ void LevelCrossingDetector::FindZeroCrossings(
 	//TODO: we  should tune this
 	const uint64_t numThreads = 1024;
 
-	//Calculate some config
-	size_t depth = wfm->size();
-	ZeroCrossingPushConstants constants;
-	constants.triggerPhase = wfm->m_triggerPhase;
-	constants.timescale = wfm->m_timescale;
-	constants.inputSize = depth;
-	constants.inputPerThread = (constants.inputSize + numThreads) / numThreads;
-	constants.outputPerThread = constants.inputPerThread + 1;
-	constants.threshold = threshold;
-	m_temporaryResults.resize(constants.outputPerThread * numThreads);
-
 	cmdBuf.begin({});
 
-	//Run the first-pass shader to find the edges in a sparse list
+	//First shader pass: find edges and produce a sparse list
+	size_t depth = wfm->size();
+	ZeroCrossingPushConstants zpush;
+	zpush.triggerPhase = wfm->m_triggerPhase;
+	zpush.timescale = wfm->m_timescale;
+	zpush.inputSize = depth;
+	zpush.inputPerThread = (zpush.inputSize + numThreads) / numThreads;
+	zpush.outputPerThread = zpush.inputPerThread + 1;
+	zpush.threshold = threshold;
+	m_temporaryResults.resize(zpush.outputPerThread * numThreads);
+
 	m_zeroCrossingPipeline->BindBufferNonblocking(0, m_temporaryResults, cmdBuf, true);
 	m_zeroCrossingPipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
 	const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
-	m_zeroCrossingPipeline->Dispatch(cmdBuf, constants,
+	m_zeroCrossingPipeline->Dispatch(cmdBuf, zpush,
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
+
 	m_temporaryResults.MarkModifiedFromGpu();
+	m_zeroCrossingPipeline->AddComputeMemoryBarrier(cmdBuf);
+
+	//Second pass: find boundaries of each block to find where the output blocks start
+	PreGatherPushConstants ppush;
+	ppush.numBlocks = numThreads;
+	ppush.stride = zpush.outputPerThread;
+	m_gatherIndexes.resize(numThreads);
+
+	m_preGatherPipeline->BindBufferNonblocking(0, m_gatherIndexes, cmdBuf, true);
+	m_preGatherPipeline->BindBufferNonblocking(1, m_temporaryResults, cmdBuf);
+	m_preGatherPipeline->Dispatch(cmdBuf, ppush, numThreads, 1);
+
+	m_gatherIndexes.MarkModifiedFromGpu();
 
 	//TODO: reduction shaders
 
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
+	//Summarize
 	{
 		m_temporaryResults.PrepareForCpuAccess();
+		m_gatherIndexes.PrepareForCpuAccess();
 		LogNotice("GPU thread 0 found %" PRIi64 " timestamps\n", m_temporaryResults[0]);
+		LogNotice("GPU thread 1 found %" PRIi64 " timestamps\n", m_temporaryResults[zpush.outputPerThread]);
+		LogNotice("GPU thread 2 found %" PRIi64 " timestamps\n", m_temporaryResults[zpush.outputPerThread*2]);
 
 		LogIndenter li;
 		for(size_t i=0; i<5; i++)
-			LogNotice("%" PRIi64 "\n", m_temporaryResults[i+1]);
+			LogNotice("%" PRIi64 "\n", m_gatherIndexes[i]);
 	}
 }

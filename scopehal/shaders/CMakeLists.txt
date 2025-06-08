@@ -34,6 +34,7 @@ add_compute_shaders(
 		Convert16BitSamples.glsl
 		DeEmbedFilter.glsl
 		FindZeroCrossings.glsl
+		PreGather.glsl
 		RectangularWindow.glsl
 	)
 
