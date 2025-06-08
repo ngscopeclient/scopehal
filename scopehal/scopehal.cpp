@@ -57,6 +57,7 @@
 #include "TektronixOscilloscope.h"
 #include "TektronixHSIOscilloscope.h"
 #include "ThunderScopeOscilloscope.h"
+#include "HaasoscopePro.h"
 #include "TinySA.h"
 
 #include "AntikernelLabsTriggerCrossbar.h"
@@ -241,6 +242,7 @@ void DriverStaticInit()
 	AddDriverClass(DemoOscilloscope);
 	AddDriverClass(DigilentOscilloscope);
 	AddDriverClass(DSLabsOscilloscope);
+	AddDriverClass(HaasoscopePro);
 	AddDriverClass(KeysightDCA);
 	AddDriverClass(PicoOscilloscope);
 	AddDriverClass(RigolOscilloscope);
