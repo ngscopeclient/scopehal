@@ -55,7 +55,7 @@ float Averager::Average(
 {
 	//This value experimentally gives the best speedup for an NVIDIA 2080 Ti vs an Intel Xeon Gold 6144
 	//Maybe consider dynamic tuning in the future at initialization?
-	const uint64_t numThreads = 8192;
+	const uint64_t numThreads = 16384;
 
 	cmdBuf.begin({});
 
