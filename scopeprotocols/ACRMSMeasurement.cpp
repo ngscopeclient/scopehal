@@ -105,9 +105,18 @@ void ACRMSMeasurement::DoRefreshSparse(SparseAnalogWaveform* wfm)
 
 	//Calculate the global RMS value
 	//Sum the squares of all values after subtracting the DC value
+	//Kahan summation for improved accuracy
 	float temp = 0;
+	float c = 0;
 	for (size_t i = 0; i < length; i++)
-		temp += ((wfm->m_samples[i] - average) * (wfm->m_samples[i] - average));
+	{
+		float delta = wfm->m_samples[i] - average;
+		float deltaSquared = delta * delta;
+		float y = deltaSquared - c;
+		float t = temp + y;
+		c = (t - temp) - y;
+		temp = t;
+	}
 
 	//Divide by total number of samples and take the square root to get the final AC RMS
 	m_streams[1].m_value = sqrt(temp / length);
@@ -171,14 +180,23 @@ void ACRMSMeasurement::DoRefreshUniform(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
 {
-	float average = GetAvgVoltage(wfm);
+	float average = m_averager.Average(wfm, cmdBuf, queue);
 	auto length = wfm->size();
 
 	//Calculate the global RMS value
 	//Sum the squares of all values after subtracting the DC value
+	//Kahan summation for improved accuracy
 	float temp = 0;
+	float c = 0;
 	for (size_t i = 0; i < length; i++)
-		temp += ((wfm->m_samples[i] - average) * (wfm->m_samples[i] - average));
+	{
+		float delta = wfm->m_samples[i] - average;
+		float deltaSquared = delta * delta;
+		float y = deltaSquared - c;
+		float t = temp + y;
+		c = (t - temp) - y;
+		temp = t;
+	}
 
 	//Divide by total number of samples and take the square root to get the final AC RMS
 	m_streams[1].m_value = sqrt(temp / length);
