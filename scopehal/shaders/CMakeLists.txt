@@ -37,6 +37,7 @@ add_compute_shaders(
 		Gather.glsl
 		PreGather.glsl
 		RectangularWindow.glsl
+		ReductionSum.glsl
 	)
 
 add_dependencies(scopehal halshaders)

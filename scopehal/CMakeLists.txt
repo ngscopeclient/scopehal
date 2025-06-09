@@ -67,13 +67,15 @@ set(SCOPEHAL_SOURCES
 	VulkanInit.cpp
 
 	FileSystem.cpp
-	LevelCrossingDetector.cpp
 	Unit.cpp
 	Waveform.cpp
 	DensityFunctionWaveform.cpp
 	ConstellationWaveform.cpp
 	EyeMask.cpp
 	EyeWaveform.cpp
+
+	Averager.cpp
+	LevelCrossingDetector.cpp
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
