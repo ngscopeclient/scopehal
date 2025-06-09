@@ -51,6 +51,12 @@ struct __attribute__((packed)) PreGatherPushConstants
 	uint32_t stride;
 };
 
+struct __attribute__((packed)) GatherPushConstants
+{
+	uint32_t numBlocks;
+	uint32_t stride;
+};
+
 /**
 	@brief Helper for GPU accelerated level-crossing searches
  */
@@ -62,15 +68,18 @@ public:
 	void FindZeroCrossings(
 		UniformAnalogWaveform* wfm,
 		float threshold,
+		std::vector<int64_t>& edges,
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue);
 
 protected:
 	std::unique_ptr<ComputePipeline> m_zeroCrossingPipeline;
 	std::unique_ptr<ComputePipeline> m_preGatherPipeline;
+	std::unique_ptr<ComputePipeline> m_gatherPipeline;
 
 	AcceleratorBuffer<int64_t> m_temporaryResults;
 	AcceleratorBuffer<int64_t> m_gatherIndexes;
+	AcceleratorBuffer<int64_t> m_outbuf;
 };
 
 #endif

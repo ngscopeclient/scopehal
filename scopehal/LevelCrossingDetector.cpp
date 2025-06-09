@@ -56,14 +56,23 @@ LevelCrossingDetector::LevelCrossingDetector()
 
 		m_gatherIndexes.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_gatherIndexes.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+
+		m_gatherPipeline = make_unique<ComputePipeline>(
+			"shaders/Gather.spv",
+			3,
+			sizeof(GatherPushConstants));
+
+		m_outbuf.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_outbuf.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 	}
 }
 
 void LevelCrossingDetector::FindZeroCrossings(
 	UniformAnalogWaveform* wfm,
 	float threshold,
+	vector<int64_t>& edges,
 	vk::raii::CommandBuffer& cmdBuf,
-	std::shared_ptr<QueueHandle> queue)
+	shared_ptr<QueueHandle> queue)
 {
 	//Fallback in case GPU has no int64 support
 	if(!g_hasShaderInt64)
@@ -100,32 +109,41 @@ void LevelCrossingDetector::FindZeroCrossings(
 	m_zeroCrossingPipeline->AddComputeMemoryBarrier(cmdBuf);
 
 	//Second pass: find boundaries of each block to find where the output blocks start
+	//(the very last entry here is going to be the total number of edges we found)
 	PreGatherPushConstants ppush;
-	ppush.numBlocks = numThreads;
+	ppush.numBlocks = numThreads+1;
 	ppush.stride = zpush.outputPerThread;
-	m_gatherIndexes.resize(numThreads);
+	m_gatherIndexes.resize(numThreads + 1);
 
 	m_preGatherPipeline->BindBufferNonblocking(0, m_gatherIndexes, cmdBuf, true);
 	m_preGatherPipeline->BindBufferNonblocking(1, m_temporaryResults, cmdBuf);
-	m_preGatherPipeline->Dispatch(cmdBuf, ppush, numThreads, 1);
+	m_preGatherPipeline->Dispatch(cmdBuf, ppush, numThreads+1, 1);
 
 	m_gatherIndexes.MarkModifiedFromGpu();
+	m_preGatherPipeline->AddComputeMemoryBarrier(cmdBuf);
 
-	//TODO: reduction shaders
+	//Third pass: final reduction
+	GatherPushConstants gpush;
+	gpush.numBlocks = numThreads;
+	gpush.stride = zpush.outputPerThread;
+	m_outbuf.resize(depth);
+
+	m_gatherPipeline->BindBufferNonblocking(0, m_outbuf, cmdBuf, true);
+	m_gatherPipeline->BindBufferNonblocking(1, m_temporaryResults, cmdBuf);
+	m_gatherPipeline->BindBufferNonblocking(2, m_gatherIndexes, cmdBuf);
+	m_gatherPipeline->Dispatch(cmdBuf, gpush, numThreads, 1);
+
+	m_outbuf.MarkModifiedFromGpu();
 
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
-	//Summarize
-	{
-		m_temporaryResults.PrepareForCpuAccess();
-		m_gatherIndexes.PrepareForCpuAccess();
-		LogNotice("GPU thread 0 found %" PRIi64 " timestamps\n", m_temporaryResults[0]);
-		LogNotice("GPU thread 1 found %" PRIi64 " timestamps\n", m_temporaryResults[zpush.outputPerThread]);
-		LogNotice("GPU thread 2 found %" PRIi64 " timestamps\n", m_temporaryResults[zpush.outputPerThread*2]);
+	//Grab results
+	m_gatherIndexes.PrepareForCpuAccess();
+	m_outbuf.PrepareForCpuAccess();
 
-		LogIndenter li;
-		for(size_t i=0; i<5; i++)
-			LogNotice("%" PRIi64 "\n", m_gatherIndexes[i]);
-	}
+	//TODO: can we skip this copy?
+	int64_t len = m_gatherIndexes[numThreads];
+	edges.resize(len);
+	memcpy(&edges[0], &m_outbuf[0], len*sizeof(int64_t));
 }
