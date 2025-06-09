@@ -94,8 +94,9 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 		return len;
 	}
 
-	//TODO: we  should tune this
-	const uint64_t numThreads = 1024;
+	//This value experimentally gives the best speedup for an NVIDIA 2080 Ti vs an Intel Xeon Gold 6144
+	//Maybe consider dynamic tuning in the future at initialization?
+	const uint64_t numThreads = 8192;
 
 	cmdBuf.begin({});
 
@@ -150,7 +151,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
-	//Grab results
+	//Grab the length off the GPU immediately
 	m_gatherIndexes.PrepareForCpuAccess();
 	return m_gatherIndexes[numThreads];
 }
