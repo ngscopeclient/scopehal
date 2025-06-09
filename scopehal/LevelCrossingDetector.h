@@ -65,12 +65,14 @@ class LevelCrossingDetector
 public:
 	LevelCrossingDetector();
 
-	void FindZeroCrossings(
+	int64_t FindZeroCrossings(
 		UniformAnalogWaveform* wfm,
 		float threshold,
-		std::vector<int64_t>& edges,
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue);
+
+	AcceleratorBuffer<int64_t>& GetResults()
+	{ return m_outbuf; }
 
 protected:
 	std::unique_ptr<ComputePipeline> m_zeroCrossingPipeline;

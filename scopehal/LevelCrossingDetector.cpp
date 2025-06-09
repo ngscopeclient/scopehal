@@ -38,7 +38,7 @@ using namespace std;
 
 LevelCrossingDetector::LevelCrossingDetector()
 {
-	//Only initialize if we can actually run the shader (no bignum fallback, int64 is a hard requirement)
+	//Only initialize most stuff if we can actually run the shader (no bignum fallback, int64 is a hard requirement)
 	if(g_hasShaderInt64)
 	{
 		m_zeroCrossingPipeline = make_unique<ComputePipeline>(
@@ -46,7 +46,8 @@ LevelCrossingDetector::LevelCrossingDetector()
 			2,
 			sizeof(ZeroCrossingPushConstants));
 
-		m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		//don't bother with a CPU side allocation here
+		m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_NEVER);
 		m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 
 		m_preGatherPipeline = make_unique<ComputePipeline>(
@@ -54,6 +55,7 @@ LevelCrossingDetector::LevelCrossingDetector()
 			2,
 			sizeof(PreGatherPushConstants));
 
+		//we need this readable from the CPU to get the final index count
 		m_gatherIndexes.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_gatherIndexes.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 
@@ -65,21 +67,31 @@ LevelCrossingDetector::LevelCrossingDetector()
 		m_outbuf.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_outbuf.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 	}
+
+	//Still need output buffer
+	else
+	{
+		m_outbuf.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_outbuf.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_NEVER);
+	}
 }
 
-void LevelCrossingDetector::FindZeroCrossings(
+int64_t LevelCrossingDetector::FindZeroCrossings(
 	UniformAnalogWaveform* wfm,
 	float threshold,
-	vector<int64_t>& edges,
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
 {
 	//Fallback in case GPU has no int64 support
 	if(!g_hasShaderInt64)
 	{
-		//TODO
-		//Filter::FindZeroCrossings(wfm, threshold, edges);
-		return;
+		vector<int64_t> edges;
+		Filter::FindZeroCrossings(wfm, threshold, edges);
+
+		int64_t len = edges.size();
+		m_outbuf.resize(len);
+		memcpy(&m_outbuf[0], &edges[0], len*sizeof(int64_t));
+		return len;
 	}
 
 	//TODO: we  should tune this
@@ -140,10 +152,5 @@ void LevelCrossingDetector::FindZeroCrossings(
 
 	//Grab results
 	m_gatherIndexes.PrepareForCpuAccess();
-	m_outbuf.PrepareForCpuAccess();
-
-	//TODO: can we skip this copy?
-	int64_t len = m_gatherIndexes[numThreads];
-	edges.resize(len);
-	memcpy(&edges[0], &m_outbuf[0], len*sizeof(int64_t));
+	return m_gatherIndexes[numThreads];
 }
