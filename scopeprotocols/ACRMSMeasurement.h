@@ -35,18 +35,30 @@
 #ifndef ACRMSMeasurement_h
 #define ACRMSMeasurement_h
 
+#include "../scopehal/Averager.h"
+
 class ACRMSMeasurement : public Filter
 {
 public:
 	ACRMSMeasurement(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual DataLocation GetInputLocation() override;
 
+protected:
+	void DoRefreshSparse(SparseAnalogWaveform* wfm);
+	void DoRefreshUniform(
+		UniformAnalogWaveform* wfm,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue);
+
+	Averager m_averager;
+
+public:
 	PROTOCOL_DECODER_INITPROC(ACRMSMeasurement)
 };
 

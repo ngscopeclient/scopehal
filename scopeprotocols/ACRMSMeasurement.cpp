@@ -73,12 +73,12 @@ string ACRMSMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACRMSMeasurement::Refresh()
+void ACRMSMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -92,22 +92,22 @@ void ACRMSMeasurement::Refresh()
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
 
-	float average = GetAvgVoltage(sadin, uadin);
-	auto length = din->size();
+	if(uadin)
+		DoRefreshUniform(uadin, cmdBuf, queue);
+	else
+		DoRefreshSparse(sadin);
+}
+
+void ACRMSMeasurement::DoRefreshSparse(SparseAnalogWaveform* wfm)
+{
+	float average = GetAvgVoltage(wfm);
+	auto length = wfm->size();
 
 	//Calculate the global RMS value
 	//Sum the squares of all values after subtracting the DC value
 	float temp = 0;
-	if(uadin)
-	{
-		for (size_t i = 0; i < length; i++)
-			temp += ((uadin->m_samples[i] - average) * (uadin->m_samples[i] - average));
-	}
-	else if(sadin)
-	{
-		for (size_t i = 0; i < length; i++)
-			temp += ((sadin->m_samples[i] - average) * (sadin->m_samples[i] - average));
-	}
+	for (size_t i = 0; i < length; i++)
+		temp += ((wfm->m_samples[i] - average) * (wfm->m_samples[i] - average));
 
 	//Divide by total number of samples and take the square root to get the final AC RMS
 	m_streams[1].m_value = sqrt(temp / length);
@@ -117,20 +117,17 @@ void ACRMSMeasurement::Refresh()
 	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at average of the full scale range
-	if(uadin)
-		FindZeroCrossings(uadin, average, edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, average, edges);
+	FindZeroCrossings(wfm, average, edges);
 
 	//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
 	if(edges.size() < 2)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Create the output as a sparse waveform
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	auto cap = SetupEmptySparseAnalogOutputWaveform(wfm, 0, true);
 	cap->PrepareForCpuAccess();
 
 	size_t elen = edges.size();
@@ -138,21 +135,84 @@ void ACRMSMeasurement::Refresh()
 	for(size_t i = 0; i < (elen - 2); i += 2)
 	{
 		//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i] / din->m_timescale;
-		int64_t end = edges[i + 2] / din->m_timescale;
+		int64_t start = edges[i] / wfm->m_timescale;
+		int64_t end = edges[i + 2] / wfm->m_timescale;
 		int64_t j = 0;
 
 		//Simply sum the squares of all values in a cycle after subtracting the DC value
-		if(uadin)
+		for(j = start; (j <= end) && (j < (int64_t)length); j++)
+			temp += ((wfm->m_samples[j] - average) * (wfm->m_samples[j] - average));
+
+		//Get the difference between the end and start of cycle. This would be the number of samples
+		//on which AC RMS calculation was performed
+		int64_t delta = j - start - 1;
+
+		if (delta != 0)
 		{
-			for(j = start; (j <= end) && (j < (int64_t)length); j++)
-				temp += ((uadin->m_samples[j] - average) * (uadin->m_samples[j] - average));
+			//Divide by total number of samples for one cycle
+			temp /= delta;
+
+			//Take square root to get the final AC RMS Value of one cycle
+			temp = sqrt(temp);
+
+			//Push values to the waveform
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(delta);
+			cap->m_samples.push_back(temp);
 		}
-		else if(sadin)
-		{
-			for(j = start; (j <= end) && (j < (int64_t)length); j++)
-				temp += ((sadin->m_samples[j] - average) * (sadin->m_samples[j] - average));
-		}
+	}
+
+	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
+}
+
+void ACRMSMeasurement::DoRefreshUniform(
+	UniformAnalogWaveform* wfm,
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
+{
+	float average = GetAvgVoltage(wfm);
+	auto length = wfm->size();
+
+	//Calculate the global RMS value
+	//Sum the squares of all values after subtracting the DC value
+	float temp = 0;
+	for (size_t i = 0; i < length; i++)
+		temp += ((wfm->m_samples[i] - average) * (wfm->m_samples[i] - average));
+
+	//Divide by total number of samples and take the square root to get the final AC RMS
+	m_streams[1].m_value = sqrt(temp / length);
+
+	//Now we can do the cycle-by-cycle value
+	temp = 0;
+	vector<int64_t> edges;
+
+	//Auto-threshold analog signals at average of the full scale range
+	FindZeroCrossings(wfm, average, edges);
+
+	//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
+	if(edges.size() < 2)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+
+	//Create the output as a sparse waveform
+	auto cap = SetupEmptySparseAnalogOutputWaveform(wfm, 0, true);
+	cap->PrepareForCpuAccess();
+
+	size_t elen = edges.size();
+
+	for(size_t i = 0; i < (elen - 2); i += 2)
+	{
+		//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+		int64_t start = edges[i] / wfm->m_timescale;
+		int64_t end = edges[i + 2] / wfm->m_timescale;
+		int64_t j = 0;
+
+		//Simply sum the squares of all values in a cycle after subtracting the DC value
+		for(j = start; (j <= end) && (j < (int64_t)length); j++)
+			temp += ((wfm->m_samples[j] - average) * (wfm->m_samples[j] - average));
 
 		//Get the difference between the end and start of cycle. This would be the number of samples
 		//on which AC RMS calculation was performed
