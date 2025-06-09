@@ -36,6 +36,7 @@
 #define ACRMSMeasurement_h
 
 #include "../scopehal/Averager.h"
+#include "../scopehal/LevelCrossingDetector.h"
 
 class ACRMSMeasurement : public Filter
 {
@@ -57,6 +58,7 @@ protected:
 		std::shared_ptr<QueueHandle> queue);
 
 	Averager m_averager;
+	LevelCrossingDetector m_detector;
 
 public:
 	PROTOCOL_DECODER_INITPROC(ACRMSMeasurement)

@@ -203,13 +203,14 @@ void ACRMSMeasurement::DoRefreshUniform(
 
 	//Now we can do the cycle-by-cycle value
 	temp = 0;
-	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at average of the full scale range
-	FindZeroCrossings(wfm, average, edges);
+	size_t elen = m_detector.FindZeroCrossings(wfm, average, cmdBuf, queue);
+	auto& edges = m_detector.GetResults();
+	edges.PrepareForCpuAccess();
 
 	//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
-	if(edges.size() < 2)
+	if(elen < 2)
 	{
 		SetData(nullptr, 0);
 		return;
@@ -218,8 +219,6 @@ void ACRMSMeasurement::DoRefreshUniform(
 	//Create the output as a sparse waveform
 	auto cap = SetupEmptySparseAnalogOutputWaveform(wfm, 0, true);
 	cap->PrepareForCpuAccess();
-
-	size_t elen = edges.size();
 
 	for(size_t i = 0; i < (elen - 2); i += 2)
 	{
