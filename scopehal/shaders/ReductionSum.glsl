@@ -67,7 +67,6 @@ void main()
 		nend = numSamples - 1;
 
 	//TODO: Kahan summation to improve numerical stability
-	//TODO: play with memory access ordering
 	float partialSum = 0;
 	for(uint i=nstart; i<nend; i++)
 		partialSum += pin[i];
