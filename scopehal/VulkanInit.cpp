@@ -583,6 +583,21 @@ bool VulkanInit(bool skipGLFW)
 			}
 
 			LogDebug("Selected device %zu\n", bestDevice);
+
+			//Check if user wanted to override it
+			auto deviceOverride = getenv("SCOPEHAL_VULKAN_DEVICE_OVERRIDE");
+			if(deviceOverride)
+			{
+				auto ndev = atol(deviceOverride);
+				if( (ndev >= 0) && (ndev < (long)devices.size()) )
+				{
+					LogNotice("Automatic device selection overridden by SCOPEHAL_VULKAN_DEVICE_OVERRIDE, using device %ld instead\n", ndev);
+					bestDevice = ndev;
+				}
+				else
+					LogWarning("SCOPEHAL_VULKAN_DEVICE_OVERRIDE is set but has a nonsensical value, ignoring\n");
+			}
+
 			{
 				auto& device = devices[bestDevice];
 				g_vkComputePhysicalDevice = &devices[bestDevice];
