@@ -41,6 +41,7 @@
 struct __attribute__((packed)) ACRMSPushConstants
 {
 	uint32_t numSamples;
+	uint32_t numThreads;
 	uint32_t samplesPerThread;
 	float dcBias;
 };

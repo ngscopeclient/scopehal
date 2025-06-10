@@ -207,6 +207,7 @@ void ACRMSMeasurement::DoRefreshUniform(
 	//Do the bulk RMS calculation on the GPU
 	ACRMSPushConstants push;
 	push.numSamples = length;
+	push.numThreads = numThreads;
 	push.samplesPerThread = (length + numThreads) / numThreads;
 	push.dcBias = average;
 	m_temporaryResults.resize(numThreads);

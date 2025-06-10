@@ -38,6 +38,7 @@
 struct __attribute__((packed)) ReductionSumPushConstants
 {
 	uint32_t numSamples;
+	uint32_t numThreads;
 	uint32_t samplesPerThread;
 };
 

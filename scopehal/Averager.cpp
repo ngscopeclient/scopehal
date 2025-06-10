@@ -63,6 +63,7 @@ float Averager::Average(
 	size_t depth = wfm->size();
 	ReductionSumPushConstants push;
 	push.numSamples = depth;
+	push.numThreads = numThreads;
 	push.samplesPerThread = (depth + numThreads) / numThreads;
 	m_temporaryResults.resize(numThreads);
 

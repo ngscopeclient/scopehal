@@ -74,7 +74,7 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	if(nthread > numEdgePairs)
+	if(nthread >= numEdgePairs)
 		return;
 
 	//We work on pairs of edges

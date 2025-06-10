@@ -48,6 +48,7 @@ layout(std430, binding=1) restrict readonly buffer buf_pin
 layout(std430, push_constant) uniform constants
 {
 	uint numSamples;
+	uint numThreads;
 	uint samplesPerThread;
 	float dcBias;
 };
@@ -57,6 +58,8 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(nthread >= numThreads)
+		return;
 
 	//Find region to average
 	uint nstart = nthread * samplesPerThread;
