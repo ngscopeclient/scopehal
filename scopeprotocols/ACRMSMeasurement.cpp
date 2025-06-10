@@ -238,7 +238,7 @@ void ACRMSMeasurement::DoRefreshUniform(
 	//Create the output as a sparse waveform
 	auto cap = SetupEmptySparseAnalogOutputWaveform(wfm, 0, true);
 	cap->PrepareForCpuAccess();
-
+	cap->Resize((elen-2)/2);
 	for(size_t i = 0; i < (elen - 2); i += 2)
 	{
 		//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -254,19 +254,20 @@ void ACRMSMeasurement::DoRefreshUniform(
 		//on which AC RMS calculation was performed
 		int64_t delta = j - start - 1;
 
-		if (delta != 0)
-		{
-			//Divide by total number of samples for one cycle
+		//Divide by total number of samples for one cycle (with divide-by-zero check for garbage input)
+		if (delta == 0)
+			temp = 0;
+		else
 			temp /= delta;
 
-			//Take square root to get the final AC RMS Value of one cycle
-			temp = sqrt(temp);
+		//Take square root to get the final AC RMS Value of one cycle
+		temp = sqrt(temp);
 
-			//Push values to the waveform
-			cap->m_offsets.push_back(start);
-			cap->m_durations.push_back(delta);
-			cap->m_samples.push_back(temp);
-		}
+		//Push values to the waveform
+		size_t nout = i/2;
+		cap->m_offsets[nout] = start;
+		cap->m_durations[nout] = delta;
+		cap->m_samples[nout] = temp;
 	}
 
 	SetData(cap, 0);
