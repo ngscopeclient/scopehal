@@ -63,8 +63,8 @@ void main()
 	//Find region to average
 	uint nstart = nthread * samplesPerThread;
 	uint nend = nstart + samplesPerThread;
-	if(nend >= numSamples)
-		nend = numSamples - 1;
+	if(nend > numSamples)
+		nend = numSamples;
 
 	//TODO: Kahan summation to improve numerical stability
 	float partialSum = 0;

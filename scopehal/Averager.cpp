@@ -43,7 +43,7 @@ Averager::Averager()
 		2,
 		sizeof(ReductionSumPushConstants));
 
-	//we need this readable from the CPU to get the final index count
+	//we need this readable from the CPU to do the final summation
 	m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }

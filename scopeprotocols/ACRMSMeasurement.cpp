@@ -41,6 +41,15 @@ ACRMSMeasurement::ACRMSMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
+	m_rmsComputePipeline = make_unique<ComputePipeline>(
+		"shaders/ACRMS.spv",
+		2,
+		sizeof(ACRMSPushConstants));
+
+	//we need this readable from the CPU to do the final summation
+	m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
 	//Set up channels
 	CreateInput("din");
 }
@@ -183,20 +192,30 @@ void ACRMSMeasurement::DoRefreshUniform(
 	float average = m_averager.Average(wfm, cmdBuf, queue);
 	auto length = wfm->size();
 
-	//Calculate the global RMS value
-	//Sum the squares of all values after subtracting the DC value
-	//Kahan summation for improved accuracy
+	//This value experimentally gives the best speedup for an NVIDIA 2080 Ti vs an Intel Xeon Gold 6144
+	//Maybe consider dynamic tuning in the future at initialization?
+	const uint64_t numThreads = 16384;
+
+	//Do the bulk RMS calculation on the GPU
+	ACRMSPushConstants push;
+	push.numSamples = length;
+	push.samplesPerThread = (length + numThreads) / numThreads;
+	push.dcBias = average;
+	m_temporaryResults.resize(numThreads);
+	cmdBuf.begin({});
+	m_rmsComputePipeline->BindBufferNonblocking(0, m_temporaryResults, cmdBuf, true);
+	m_rmsComputePipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
+	m_rmsComputePipeline->Dispatch(cmdBuf, push, numThreads, 1);
+	m_temporaryResults.MarkModifiedFromGpu();
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	//Do the final summation of the temporary results
+	//These should all be roughly equal in value (famous last words) so don't both with Kahan here
+	m_temporaryResults.PrepareForCpuAccess();
 	float temp = 0;
-	float c = 0;
-	for (size_t i = 0; i < length; i++)
-	{
-		float delta = wfm->m_samples[i] - average;
-		float deltaSquared = delta * delta;
-		float y = deltaSquared - c;
-		float t = temp + y;
-		c = (t - temp) - y;
-		temp = t;
-	}
+	for(uint64_t i=0; i<numThreads; i++)
+		temp += m_temporaryResults[i];
 
 	//Divide by total number of samples and take the square root to get the final AC RMS
 	m_streams[1].m_value = sqrt(temp / length);

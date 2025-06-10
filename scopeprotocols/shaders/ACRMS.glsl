@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -29,49 +29,57 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ACRMSMeasurement
+	@brief Partial calculation of the RMS of an AC signal with the DC component removed
  */
-#ifndef ACRMSMeasurement_h
-#define ACRMSMeasurement_h
 
-#include "../scopehal/Averager.h"
-#include "../scopehal/LevelCrossingDetector.h"
+#version 430
+#pragma shader_stage(compute)
 
-struct __attribute__((packed)) ACRMSPushConstants
+layout(std430, binding=0) restrict writeonly buffer buf_pout
 {
-	uint32_t numSamples;
-	uint32_t samplesPerThread;
+	float pout[];
+};
+
+layout(std430, binding=1) restrict readonly buffer buf_pin
+{
+	float pin[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint numSamples;
+	uint samplesPerThread;
 	float dcBias;
 };
 
-class ACRMSMeasurement : public Filter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+/**
+	@brief Find the start point of each block of values in the final buffer
+ */
+void main()
 {
-public:
-	ACRMSMeasurement(const std::string& color);
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	//Find region to average
+	uint nstart = nthread * samplesPerThread;
+	uint nend = nstart + samplesPerThread;
+	if(nend > numSamples)
+		nend = numSamples;
 
-	static std::string GetProtocolName();
+	//Kahan summation to improve numerical stability
+	float temp = 0;
+	float c = 0;
+	for(uint i=nstart; i<nend; i++)
+	{
+		float delta = pin[i] - dcBias;
+		float deltaSquared = delta * delta;
+		float y = deltaSquared - c;
+		float t = temp + y;
+		c = (t - temp) - y;
+		temp = t;
+	}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-	virtual DataLocation GetInputLocation() override;
+	pout[nthread] = temp;
+}
 
-protected:
-	void DoRefreshSparse(SparseAnalogWaveform* wfm);
-	void DoRefreshUniform(
-		UniformAnalogWaveform* wfm,
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue);
-
-	Averager m_averager;
-	LevelCrossingDetector m_detector;
-
-	std::unique_ptr<ComputePipeline> m_rmsComputePipeline;
-	AcceleratorBuffer<float> m_temporaryResults;
-
-public:
-	PROTOCOL_DECODER_INITPROC(ACRMSMeasurement)
-};
-
-#endif
