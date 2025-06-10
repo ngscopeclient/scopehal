@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -29,59 +29,83 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ACRMSMeasurement
+	@brief Cycle by cycle AC RMS calculation
  */
-#ifndef ACRMSMeasurement_h
-#define ACRMSMeasurement_h
 
-#include "../scopehal/Averager.h"
-#include "../scopehal/LevelCrossingDetector.h"
+#version 430
+#pragma shader_stage(compute)
+#extension GL_ARB_gpu_shader_int64 : require
 
-struct __attribute__((packed)) ACRMSPushConstants
+layout(std430, binding=0) restrict writeonly buffer buf_poutSamples
 {
-	uint32_t numSamples;
-	uint32_t samplesPerThread;
-	float dcBias;
+	float poutSamples[];
 };
 
-struct __attribute__((packed)) ACRMSTrendPushConstants
+layout(std430, binding=1) restrict writeonly buffer buf_poutOffsets
+{
+	int64_t poutOffsets[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_poutDurations
+{
+	int64_t poutDurations[];
+};
+
+layout(std430, binding=3) restrict readonly buffer buf_pin
+{
+	float pin[];
+};
+
+layout(std430, binding=4) restrict readonly buffer buf_pedges
+{
+	int64_t pedges[];
+};
+
+layout(std430, push_constant) uniform constants
 {
 	int64_t timescale;
 	int64_t numSamples;
-	uint32_t numEdgePairs;
+	uint numEdgePairs;
 	float dcBias;
 };
 
-class ACRMSMeasurement : public Filter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	ACRMSMeasurement(const std::string& color);
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(nthread > numEdgePairs)
+		return;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	//We work on pairs of edges
+	uint i = nthread * 2;
 
-	static std::string GetProtocolName();
+	//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+	int64_t start = pedges[i] / timescale;
+	int64_t end = pedges[i + 2] / timescale;
+	int64_t j = 0;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-	virtual DataLocation GetInputLocation() override;
+	//Simply sum the squares of all values in a cycle after subtracting the DC value
+	//TODO: Kahan summation or do we assume not a lot of samples in one cycle?
+	float temp = 0;
+	for(j = start; (j <= end) && (j < numSamples); j++)
+	{
+		float delta = pin[uint(j)] - dcBias;
+		temp += delta * delta;
+	}
 
-protected:
-	void DoRefreshSparse(SparseAnalogWaveform* wfm);
-	void DoRefreshUniform(
-		UniformAnalogWaveform* wfm,
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue);
+	//Get the difference between the end and start of cycle. This would be the number of samples
+	//on which AC RMS calculation was performed
+	int64_t delta = j - start - 1;
 
-	Averager m_averager;
-	LevelCrossingDetector m_detector;
+	//Divide by total number of samples for one cycle (with divide-by-zero check for garbage input)
+	if (delta == 0)
+		temp = 0;
+	else
+		temp /= float(delta);
 
-	std::unique_ptr<ComputePipeline> m_rmsComputePipeline;
-	AcceleratorBuffer<float> m_temporaryResults;
+	poutSamples[nthread] = sqrt(temp);
+	poutOffsets[nthread] = start;
+	poutDurations[nthread] = delta;
+}
 
-	std::unique_ptr<ComputePipeline> m_trendComputePipeline;
-
-public:
-	PROTOCOL_DECODER_INITPROC(ACRMSMeasurement)
-};
-
-#endif

@@ -54,9 +54,6 @@ layout(std430, push_constant) uniform constants
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-/**
-	@brief Find the start point of each block of values in the final buffer
- */
 void main()
 {
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;

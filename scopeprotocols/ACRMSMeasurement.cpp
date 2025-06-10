@@ -50,6 +50,14 @@ ACRMSMeasurement::ACRMSMeasurement(const string& color)
 	m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
+	if(g_hasShaderInt64)
+	{
+		m_trendComputePipeline = make_unique<ComputePipeline>(
+			"shaders/ACRMS_Trend.spv",
+			5,
+			sizeof(ACRMSTrendPushConstants));
+	}
+
 	//Set up channels
 	CreateInput("din");
 }
@@ -220,13 +228,9 @@ void ACRMSMeasurement::DoRefreshUniform(
 	//Divide by total number of samples and take the square root to get the final AC RMS
 	m_streams[1].m_value = sqrt(temp / length);
 
-	//Now we can do the cycle-by-cycle value
-	temp = 0;
-
 	//Auto-threshold analog signals at average of the full scale range
 	size_t elen = m_detector.FindZeroCrossings(wfm, average, cmdBuf, queue);
 	auto& edges = m_detector.GetResults();
-	edges.PrepareForCpuAccess();
 
 	//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
 	if(elen < 2)
@@ -237,41 +241,77 @@ void ACRMSMeasurement::DoRefreshUniform(
 
 	//Create the output as a sparse waveform
 	auto cap = SetupEmptySparseAnalogOutputWaveform(wfm, 0, true);
-	cap->PrepareForCpuAccess();
 	cap->Resize((elen-2)/2);
-	for(size_t i = 0; i < (elen - 2); i += 2)
+
+	//GPU path needs native int64, no bignum fallback for now
+	if(g_hasShaderInt64)
 	{
-		//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i] / wfm->m_timescale;
-		int64_t end = edges[i + 2] / wfm->m_timescale;
-		int64_t j = 0;
+		cmdBuf.begin({});
 
-		//Simply sum the squares of all values in a cycle after subtracting the DC value
-		for(j = start; (j <= end) && (j < (int64_t)length); j++)
-			temp += ((wfm->m_samples[j] - average) * (wfm->m_samples[j] - average));
+		ACRMSTrendPushConstants tpush;
+		tpush.timescale		= wfm->m_timescale;
+		tpush.numSamples	= wfm->m_samples.size();
+		tpush.numEdgePairs	= (elen-2) / 2;
+		tpush.dcBias		= average;
 
-		//Get the difference between the end and start of cycle. This would be the number of samples
-		//on which AC RMS calculation was performed
-		int64_t delta = j - start - 1;
+		m_trendComputePipeline->BindBufferNonblocking(0, cap->m_samples, cmdBuf, true);
+		m_trendComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
+		m_trendComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
+		m_trendComputePipeline->BindBufferNonblocking(3, wfm->m_samples, cmdBuf);
+		m_trendComputePipeline->BindBufferNonblocking(4, edges, cmdBuf);
 
-		//Divide by total number of samples for one cycle (with divide-by-zero check for garbage input)
-		if (delta == 0)
+		const uint32_t compute_block_count = GetComputeBlockCount(tpush.numEdgePairs, 64);
+		m_trendComputePipeline->Dispatch(cmdBuf, tpush,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		cap->MarkModifiedFromGpu();
+	}
+
+	//CPU fallback if no int64 capability
+	else
+	{
+		cap->PrepareForCpuAccess();
+		edges.PrepareForCpuAccess();
+		temp = 0;
+		for(size_t i = 0; i < (elen - 2); i += 2)
+		{
+			//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+			int64_t start = edges[i] / wfm->m_timescale;
+			int64_t end = edges[i + 2] / wfm->m_timescale;
+			int64_t j = 0;
+
+			//Simply sum the squares of all values in a cycle after subtracting the DC value
 			temp = 0;
-		else
-			temp /= delta;
+			for(j = start; (j <= end) && (j < (int64_t)length); j++)
+				temp += ((wfm->m_samples[j] - average) * (wfm->m_samples[j] - average));
 
-		//Take square root to get the final AC RMS Value of one cycle
-		temp = sqrt(temp);
+			//Get the difference between the end and start of cycle. This would be the number of samples
+			//on which AC RMS calculation was performed
+			int64_t delta = j - start - 1;
 
-		//Push values to the waveform
-		size_t nout = i/2;
-		cap->m_offsets[nout] = start;
-		cap->m_durations[nout] = delta;
-		cap->m_samples[nout] = temp;
+			//Divide by total number of samples for one cycle (with divide-by-zero check for garbage input)
+			if (delta == 0)
+				temp = 0;
+			else
+				temp /= delta;
+
+			//Take square root to get the final AC RMS Value of one cycle
+			temp = sqrt(temp);
+
+			//Push values to the waveform
+			size_t nout = i/2;
+			cap->m_offsets[nout] = start;
+			cap->m_durations[nout] = delta;
+			cap->m_samples[nout] = temp;
+		}
+		cap->MarkModifiedFromCpu();
 	}
 
 	SetData(cap, 0);
-	cap->MarkModifiedFromCpu();
 }
 
 Filter::DataLocation ACRMSMeasurement::GetInputLocation()
