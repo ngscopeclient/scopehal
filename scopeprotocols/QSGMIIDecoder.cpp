@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -114,6 +114,10 @@ void QSGMIIDecoder::Refresh()
 		caps.push_back(cap);
 
 		SetData(cap, i);
+
+		//We know roughly how big each output buffer should be (1/4 the input)
+		//so preallocate that space to avoid excessive allocations
+		cap->Reserve(len/4);
 	}
 
 	//Find the first K28.1 (control 0x3c)

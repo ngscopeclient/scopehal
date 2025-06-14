@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -151,11 +151,17 @@ public:
 	/**
 		@brief Reallocates buffers so the waveform contains the specified number of samples.
 
-		If the waveform shrinks, excess memory is freed. If the waveform grows, new samples are uninitialized.
+		If the waveform shrinks, excess memory is not freed by default.
+		If the waveform grows, new samples are uninitialized.
 
 		@param size		New size of the waveform buffer, in samples
 	 */
 	virtual void Resize(size_t size) =0;
+
+	/**
+		@brief Preallocates buffers without changing the usable size of the waveform
+	 */
+	virtual void Reserve(size_t size) =0;
 
 	///@brief Returns the number of samples in this waveform
 	virtual size_t size() const  =0;
@@ -418,6 +424,9 @@ public:
 	virtual void Resize(size_t size) override
 	{ m_samples.resize(size); }
 
+	virtual void Reserve(size_t size) override
+	{ m_samples.reserve(size); }
+
 	virtual size_t size() const override
 	{ return m_samples.size(); }
 
@@ -538,6 +547,13 @@ public:
 		m_offsets.resize(size);
 		m_durations.resize(size);
 		m_samples.resize(size);
+	}
+
+	virtual void Reserve(size_t size) override
+	{
+		m_offsets.reserve(size);
+		m_durations.reserve(size);
+		m_samples.reserve(size);
 	}
 
 	virtual size_t size() const override
