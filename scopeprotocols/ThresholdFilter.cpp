@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,6 +48,14 @@ ThresholdFilter::ThresholdFilter(const string& color)
 	m_hysname = "Hysteresis";
 	m_parameters[m_hysname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_hysname].SetFloatVal(0);
+
+	if(g_hasShaderInt8)
+	{
+		m_computePipeline = make_unique<ComputePipeline>(
+			"shaders/Threshold.spv",
+			2,
+			sizeof(ThresholdPushConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,11 +83,17 @@ string ThresholdFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ThresholdFilter::Refresh()
+Filter::DataLocation ThresholdFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -91,14 +105,13 @@ void ThresholdFilter::Refresh()
 	float midpoint = m_parameters[m_threshname].GetFloatVal();
 	float hys = m_parameters[m_hysname].GetFloatVal();
 
-	din->PrepareForCpuAccess();
-
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	if(sdin)
 	{
 		auto cap = SetupSparseDigitalOutputWaveform(sdin, 0, 0, 0);
+		din->PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
 
 		//Threshold all of our samples
@@ -132,18 +145,49 @@ void ThresholdFilter::Refresh()
 	{
 		auto cap = SetupEmptyUniformDigitalOutputWaveform(din, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
 
 		//Threshold all of our samples
 		//Optimized inner loop if no hysteresis
 		if(hys == 0)
 		{
-			#pragma omp parallel for
-			for(size_t i=0; i<len; i++)
-				cap->m_samples[i] = udin->m_samples[i] > midpoint;
+			if(g_hasShaderInt8)
+			{
+				cmdBuf.begin({});
+
+				ThresholdPushConstants tpush;
+				tpush.numSamples	= udin->m_samples.size();
+				tpush.threshold		= midpoint;
+
+				m_computePipeline->BindBufferNonblocking(0, cap->m_samples, cmdBuf, true);
+				m_computePipeline->BindBufferNonblocking(1, udin->m_samples, cmdBuf);
+
+				const uint32_t compute_block_count = GetComputeBlockCount(tpush.numSamples, 64);
+				m_computePipeline->Dispatch(cmdBuf, tpush,
+					min(compute_block_count, 32768u),
+					compute_block_count / 32768 + 1);
+
+				cmdBuf.end();
+				queue->SubmitAndBlock(cmdBuf);
+
+				cap->MarkModifiedFromGpu();
+			}
+			else
+			{
+				din->PrepareForCpuAccess();
+				cap->PrepareForCpuAccess();
+
+				#pragma omp parallel for
+				for(size_t i=0; i<len; i++)
+					cap->m_samples[i] = udin->m_samples[i] > midpoint;
+
+				cap->MarkModifiedFromCpu();
+			}
 		}
 		else
 		{
+			din->PrepareForCpuAccess();
+			cap->PrepareForCpuAccess();
+
 			bool cur = udin->m_samples[0] > midpoint;
 			float thresh_rising = midpoint + hys/2;
 			float thresh_falling = midpoint - hys/2;
@@ -157,8 +201,8 @@ void ThresholdFilter::Refresh()
 					cur = true;
 				cap->m_samples[i] = cur;
 			}
-		}
 
-		cap->MarkModifiedFromCpu();
+			cap->MarkModifiedFromCpu();
+		}
 	}
 }

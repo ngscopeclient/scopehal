@@ -47,6 +47,7 @@ add_compute_shaders(
 		SubtractFilter.glsl
 		SubtractInPlace.glsl
 		SubtractOutOfPlace.glsl
+		Threshold.glsl
 		UpsampleFilter.glsl
 		WaterfallFilter.glsl
 	)
