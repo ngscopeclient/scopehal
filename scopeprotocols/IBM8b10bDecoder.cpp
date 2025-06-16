@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -115,9 +115,11 @@ void IBM8b10bDecoder::Refresh()
 	//Record the value of the data stream at each clock edge
 	//TODO: allow single rate clocks too?
 	SparseDigitalWaveform data;
-	SparseDigitalWaveform wsquelch;
 	SampleOnAnyEdgesBase(din, clkin, data);
 	data.PrepareForCpuAccess();
+
+	//Preallocate output buffer
+	data.Reserve(data.m_samples.size() / 10);
 
 	//Decode the actual data
 	int last_disp = -1;
