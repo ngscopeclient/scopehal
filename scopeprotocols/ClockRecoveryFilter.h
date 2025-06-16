@@ -52,6 +52,25 @@ public:
 protected:
 	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
 
+	void InnerLoopWithGating(
+		SparseDigitalWaveform& cap,
+		std::vector<int64_t>& edges,
+		int64_t tend,
+		int64_t initialPeriod,
+		int64_t halfPeriod,
+		int64_t fnyquist,
+		WaveformBase* gate,
+		SparseDigitalWaveform* sgate,
+		UniformDigitalWaveform* ugate);
+
+	void InnerLoopWithNoGating(
+		SparseDigitalWaveform& cap,
+		std::vector<int64_t>& edges,
+		int64_t tend,
+		int64_t initialPeriod,
+		int64_t halfPeriod,
+		int64_t fnyquist);
+
 #ifdef __x86_64__
 	void FillSquarewaveAVX2(SparseDigitalWaveform& cap);
 #endif

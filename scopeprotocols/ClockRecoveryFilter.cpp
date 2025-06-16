@@ -145,11 +145,10 @@ void ClockRecoveryFilter::Refresh()
 	//Get nominal period used for the first cycle of the NCO
 	int64_t initialPeriod = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
 	int64_t halfPeriod = initialPeriod / 2;
-	int64_t period = initialPeriod;
 
 	//Disallow frequencies higher than Nyquist of the input
-	auto fnyquist = 2*din->m_timescale;
-	if( period < fnyquist)
+	int64_t fnyquist = 2*din->m_timescale;
+	if( initialPeriod < fnyquist)
 	{
 		SetData(nullptr, 0);
 		return;
@@ -176,11 +175,69 @@ void ClockRecoveryFilter::Refresh()
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
+	cap->m_samples.reserve(edges.size());
+	if(gate)
+		InnerLoopWithGating(*cap, edges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
+	else
+		InnerLoopWithNoGating(*cap, edges, tend, initialPeriod, halfPeriod, fnyquist);
+
+	//Generate the squarewave and duration values to match the calculated timestamps
+	//TODO: GPU this?
+	//Important to FillDurations() after FillSquarewave() since FillDurations() expects to use sample size
+	#ifdef __x86_64__
+	if(g_hasAvx2)
+	{
+		FillSquarewaveAVX2(*cap);
+		FillDurationsAVX2(*cap);
+	}
+	else
+	#endif
+	{
+		FillSquarewaveGeneric(*cap);
+		FillDurationsGeneric(*cap);
+	}
+
+	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
+}
+
+/**
+	@brief Fills a waveform with a squarewave
+ */
+void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
+{
+	size_t len = cap.m_offsets.size();
+	cap.m_samples.resize(len);
+
+	bool value = false;
+	for(size_t i=0; i<len; i++)
+	{
+		value = !value;
+		cap.m_samples[i] = value;
+	}
+}
+
+/**
+	@brief Main PLL inner loop supporting an external gate/squelch signal
+ */
+void ClockRecoveryFilter::InnerLoopWithGating(
+	SparseDigitalWaveform& cap,
+	vector<int64_t>& edges,
+	int64_t tend,
+	int64_t initialPeriod,
+	int64_t halfPeriod,
+	int64_t fnyquist,
+	WaveformBase* gate,
+	SparseDigitalWaveform* sgate,
+	UniformDigitalWaveform* ugate)
+{
+	size_t igate = 0;
 	size_t nedge = 1;
 	int64_t edgepos = edges[0];
+	int64_t period = initialPeriod;
+
 	[[maybe_unused]] int64_t total_error = 0;
-	cap->m_samples.reserve(edges.size());
-	size_t igate = 0;
 
 	//If gated at T=0, start with output stopped
 	bool gating = false;
@@ -348,47 +405,111 @@ void ClockRecoveryFilter::Refresh()
 
 		//Add the sample (90 deg phase offset from the internal NCO)
 		if(!gating)
-			cap->m_offsets.push_back(edgepos + period/2);
-	}
-
-	//Generate the squarewave and duration values to match the calculated timestamps
-	//TODO: GPU this?
-	//Important to FillDurations() after FillSquarewave() since FillDurations() expects to use sample size
-	#ifdef __x86_64__
-	if(g_hasAvx2)
-	{
-		FillSquarewaveAVX2(*cap);
-		FillDurationsAVX2(*cap);
-	}
-	else
-	#endif
-	{
-		FillSquarewaveGeneric(*cap);
-		FillDurationsGeneric(*cap);
+			cap.m_offsets.push_back(edgepos + period/2);
 	}
 
 	total_error /= edges.size();
 	//LogTrace("average phase error %zu\n", total_error);
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
 }
 
-/**
-	@brief Fills a waveform with a squarewave
- */
-void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
+void ClockRecoveryFilter::InnerLoopWithNoGating(
+	SparseDigitalWaveform& cap,
+	vector<int64_t>& edges,
+	int64_t tend,
+	int64_t initialPeriod,
+	int64_t halfPeriod,
+	int64_t fnyquist)
 {
-	size_t len = cap.m_offsets.size();
-	cap.m_samples.resize(len);
+	size_t nedge = 1;
+	int64_t edgepos = edges[0];
+	int64_t period = initialPeriod;
 
-	bool value = false;
-	for(size_t i=0; i<len; i++)
+	[[maybe_unused]] int64_t total_error = 0;
+
+	int64_t tlast = 0;
+	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
-		value = !value;
-		cap.m_samples[i] = value;
+		float center = period/2;
+
+		//See if the next edge occurred in this UI.
+		//If not, just run the NCO open loop.
+		//Allow multiple edges in the UI if the frequency is way off.
+		int64_t tnext = edges[nedge];
+		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
+		{
+			//Find phase error
+			int64_t dphase = (edgepos - tnext) - period;
+
+			//If we're more than half a UI off, assume this is actually part of the next UI
+			if(dphase > halfPeriod)
+				dphase -= period;
+			if(dphase < -halfPeriod)
+				dphase += period;
+
+			total_error += fabs(dphase);
+
+			//Find frequency error
+			int64_t uiLen = (tnext - tlast);
+			float numUIs = round(uiLen * 1.0 / initialPeriod);
+			if(numUIs < 0.1)		//Sanity check: no correction if we have a glitch
+				uiLen = period;
+			else
+				uiLen /= numUIs;
+			int64_t dperiod = period - uiLen;
+
+			if(tlast != 0)
+			{
+				//Frequency error term
+				period -= dperiod * 0.006;
+
+				//Frequency drift term (delta from refclk)
+				//period -= (period - initialPeriod) * 0.0001;
+
+				//Phase error term
+				period -= dphase * 0.002;
+
+				//HACK: immediate bang-bang phase shift
+				if(dphase > 0)
+					edgepos -= period / 400;
+				else
+					edgepos += period / 400;
+
+				#ifdef PLL_DEBUG_OUTPUTS
+					debugPeriod->m_offsets.push_back(edgepos + period/2);
+					debugPeriod->m_durations.push_back(period);
+					debugPeriod->m_samples.push_back(period);
+
+					debugPhase->m_offsets.push_back(edgepos + period/2);
+					debugPhase->m_durations.push_back(period);
+					debugPhase->m_samples.push_back(dphase);
+
+					debugFreq->m_offsets.push_back(edgepos + period/2);
+					debugFreq->m_durations.push_back(period);
+					debugFreq->m_samples.push_back(dperiod);
+
+					debugDrift->m_offsets.push_back(edgepos + period/2);
+					debugDrift->m_durations.push_back(period);
+					debugDrift->m_samples.push_back(period - initialPeriod);
+				#endif
+
+				if(period < fnyquist)
+				{
+					LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
+					nedge = edges.size();
+					break;
+				}
+			}
+
+			tlast = tnext;
+			tnext = edges[++nedge];
+		}
+
+		//Add the sample (90 deg phase offset from the internal NCO)
+		cap.m_offsets.push_back(edgepos + period/2);
 	}
+
+	total_error /= edges.size();
+	//LogTrace("average phase error %zu\n", total_error);
 }
 
 #ifdef __x86_64__
