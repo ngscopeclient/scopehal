@@ -31,7 +31,10 @@
 #include "EyePattern.h"
 #include <algorithm>
 #ifdef __x86_64__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <immintrin.h>
+#pragma GCC diagnostic pop
 #endif
 
 using namespace std;
@@ -261,7 +264,9 @@ void EyePattern::Refresh(
 		if(uwfm)
 		{
 			#ifdef __x86_64__
-			if(g_hasAvx2)
+			if(g_hasAvx512F && g_hasFMA)
+				DensePackedInnerLoopAVX512F(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+			else if(g_hasAvx2)
 			{
 				if(g_hasFMA)
 					DensePackedInnerLoopAVX2FMA(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
@@ -606,6 +611,186 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 		{
 			//Abort if this pixel is out of bounds
 			if(oob[j])
+				continue;
+
+			//Plot each point (this only draws the right half of the eye, we copy to the left later)
+			data[off[j]]	 		+= EYE_ACCUM_SCALE - bin2[j];
+			data[off[j] + m_width]	+= bin2[j];
+		}
+	}
+
+	//Catch any stragglers
+	for(; i<wend && iclock < cend; i++)
+	{
+		//Find time of this sample.
+		//If it's past the end of the current UI, move to the next clock edge
+		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
+		int64_t offset = tstart - clock_edges[iclock];
+		if(offset < 0)
+			continue;
+		size_t nextclk = iclock + 1;
+		int64_t tnext = clock_edges[nextclk];
+		if(tstart >= tnext)
+		{
+			//Move to the next clock edge
+			iclock ++;
+			if(iclock >= cend)
+				break;
+
+			//Figure out the offset to the next edge
+			offset = tstart - tnext;
+		}
+
+		//Interpolate position
+		float pixel_x_f = (offset - m_xoff) * m_xscale;
+		float pixel_x_fround = floor(pixel_x_f);
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+		//Early out if off end of plot
+		int32_t pixel_x_round = floor(pixel_x_f);
+		if(pixel_x_round > xmax)
+			continue;
+
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		int64_t ttnext = tnext - tstart;
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
+
+		//Interpolate voltage, early out if clipping
+		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+		float nominal_pixel_y = nominal_voltage*yscale + yoff;
+		int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
+		if( (y1 >= ymax) || (y1 < 0) )
+			continue;
+
+		//Calculate how much of the pixel's intensity to put in each row
+		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+		int32_t bin2 = yfrac * EYE_ACCUM_SCALE;
+		int64_t* pix = data + y1*m_width + pixel_x_round;
+
+		//Plot each point (this only draws the right half of the eye, we copy to the left later)
+		pix[0] 		 += EYE_ACCUM_SCALE - bin2;
+		pix[m_width] += bin2;
+	}
+}
+
+__attribute__((target("avx512f,fma")))
+void EyePattern::DensePackedInnerLoopAVX512F(
+	UniformAnalogWaveform* waveform,
+	vector<int64_t>& clock_edges,
+	int64_t* data,
+	size_t wend,
+	size_t cend,
+	int32_t xmax,
+	int32_t ymax,
+	float xtimescale,
+	float yscale,
+	float yoff
+	)
+{
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	int64_t width = cap->GetUIWidth();
+	int64_t halfwidth = width/2;
+
+	size_t iclock = 0;
+
+	size_t wend_rounded = wend - (wend % 16);
+
+	//Splat some constants into vector regs
+	__m512i vxoff 		= _mm512_set1_epi32((int)m_xoff);
+	__m512 vxscale 		= _mm512_set1_ps(m_xscale);
+	__m512 vixtimescale	= _mm512_set1_ps(1.0f / xtimescale);
+	__m512 vyoff 		= _mm512_set1_ps(yoff);
+	__m512 vyscale 		= _mm512_set1_ps(yscale);
+	__m512 vaccum		= _mm512_set1_ps(EYE_ACCUM_SCALE);
+	__m512i vwidth		= _mm512_set1_epi32(m_width);
+	__m512 fzero		= _mm512_set1_ps(0);
+
+	float* samples = (float*)&waveform->m_samples[0];
+
+	//Main unrolled loop, 16 samples per iteration
+	size_t i = 0;
+	uint32_t bufmax = m_width * (m_height - 1);
+	for(; i<wend_rounded && iclock < cend; i+= 16)
+	{
+		//Figure out timestamp of this sample within the UI.
+		//This doesn't vectorize well, but it's pretty fast.
+		int32_t offset[16] __attribute__((aligned(32))) = {0};
+		for(size_t j=0; j<16; j++)
+		{
+			size_t k = i+j;
+
+			//Find time of this sample.
+			//If it's past the end of the current UI, move to the next clock edge
+			int64_t tstart = k * waveform->m_timescale + waveform->m_triggerPhase;
+			offset[j] = tstart - clock_edges[iclock];
+			if(offset[j] < 0)
+				continue;
+			size_t nextclk = iclock + 1;
+			int64_t tnext = clock_edges[nextclk];
+			if(tstart >= tnext)
+			{
+				//Move to the next clock edge
+				iclock ++;
+				if(iclock >= cend)
+					break;
+
+				//Figure out the offset to the next edge
+				offset[j] = tstart - tnext;
+			}
+
+			//Drop anything past half a UI if the next clock edge is a long ways out
+			//(this is needed for irregularly sampled data like DDR RAM)
+			int64_t ttnext = tnext - tstart;
+			if( (offset[j] > halfwidth) && (ttnext > width) )
+				offset[j] = -INT_MAX;
+		}
+
+		//Load waveform data (advanced to hide latency)
+		__m512i voffset		= _mm512_load_si512((__m512i*)offset);
+		__m512 vcur			= _mm512_loadu_ps(samples + i);
+		__m512 vnext		= _mm512_loadu_ps(samples + i + 1);
+
+		//Interpolate X position
+		voffset 			= _mm512_sub_epi32(voffset, vxoff);
+		__m512 foffset		= _mm512_cvtepi32_ps(voffset);
+		foffset				= _mm512_mul_ps(foffset, vxscale);
+		__m512 fround		= _mm512_add_round_ps(foffset, fzero, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+		__m512 fdx			= _mm512_sub_ps(foffset, fround);
+		fdx					= _mm512_mul_ps(fdx, vixtimescale);
+		__m512i vxfloori	= _mm512_cvttps_epi32(foffset);
+
+		//Interpolate voltage
+		__m512 vdv			= _mm512_sub_ps(vnext, vcur);
+		__m512 ynom			= _mm512_fmadd_ps(vdv, fdx, vcur);
+		ynom				= _mm512_fmadd_ps(ynom, vyscale, vyoff);
+		__m512 vyfloor		= _mm512_floor_ps(ynom);
+		__m512 vyfrac		= _mm512_sub_ps(ynom, vyfloor);
+		__m512i vyfloori	= _mm512_cvtps_epi32(vyfloor);
+
+		//Calculate how much of the pixel's intensity to put in each row
+		__m512 vbin2f		= _mm512_mul_ps(vyfrac, vaccum);
+		__m512i vbin2i		= _mm512_cvtps_epi32(vbin2f);
+
+		//Final address calculation
+		__m512i voff		= _mm512_mullo_epi32(vyfloori, vwidth);
+		voff				= _mm512_add_epi32(voff, vxfloori);
+
+		//Save stuff for output loop
+		int32_t pixel_x_round[16]	__attribute__((aligned(32)));
+		int32_t bin2[16]	__attribute__((aligned(32)));
+		uint32_t off[16]	__attribute__((aligned(32)));
+		_mm512_store_si512((__m512i*)pixel_x_round, vxfloori);
+		_mm512_store_si512((__m512i*)bin2, vbin2i);
+		_mm512_store_si512((__m512i*)off, voff);
+
+		//Final output loop. Doesn't vectorize well
+		for(size_t j=0; j<16; j++)
+		{
+			//Abort if this pixel is out of bounds
+			if( (pixel_x_round[j] > xmax) || (off[j] >= bufmax) )
 				continue;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
