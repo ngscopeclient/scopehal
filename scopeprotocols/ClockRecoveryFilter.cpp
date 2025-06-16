@@ -30,6 +30,10 @@
 #include "../scopehal/scopehal.h"
 #include "ClockRecoveryFilter.h"
 
+#ifdef __x86_64__
+#include <immintrin.h>
+#endif
+
 using namespace std;
 
 //#define PLL_DEBUG_OUTPUTS
@@ -348,17 +352,19 @@ void ClockRecoveryFilter::Refresh()
 	}
 
 	//Generate the squarewave and duration values to match the calculated timestamps
+	//TODO: GPU this?
+	//Important to FillDurations() after FillSquarewave() since FillDurations() expects to use sample size
 	#ifdef __x86_64__
 	if(g_hasAvx2)
 	{
+		FillSquarewaveAVX2(*cap);
 		FillDurationsAVX2(*cap);
-		FillSquarewaveGeneric(*cap);
 	}
 	else
 	#endif
 	{
-		FillDurationsGeneric(*cap);
 		FillSquarewaveGeneric(*cap);
+		FillDurationsGeneric(*cap);
 	}
 
 	total_error /= edges.size();
@@ -384,3 +390,39 @@ void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
 		cap.m_samples[i] = value;
 	}
 }
+
+#ifdef __x86_64__
+/**
+	@brief AVX2 optimized version of FillSquarewaveGeneric()
+ */
+__attribute__((target("avx2")))
+void ClockRecoveryFilter::FillSquarewaveAVX2(SparseDigitalWaveform& cap)
+{
+	size_t len = cap.m_offsets.size();
+	cap.m_samples.resize(len);
+	if(!len)
+		return;
+
+	//Load the squarewave dummy fill pattern
+	bool filler[32] =
+	{
+		false, true, false, true, false, true, false, true,
+		false, true, false, true, false, true, false, true,
+		false, true, false, true, false, true, false, true,
+		false, true, false, true, false, true, false, true
+	};
+	auto fill = _mm256_loadu_si256(reinterpret_cast<__m256i*>(filler));
+
+	size_t end = len - (len % 32);
+	uint8_t* ptr = reinterpret_cast<uint8_t*>(&cap.m_samples[0]);
+	for(size_t i=0; i<end; i+=32)
+		_mm256_storeu_si256(reinterpret_cast<__m256i*>(ptr + i ), fill);
+
+	bool value = false;
+	for(size_t i=end; i<len; i++)
+	{
+		value = !value;
+		cap.m_samples[i] = value;
+	}
+}
+#endif /* __x86_64__ */

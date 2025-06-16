@@ -52,6 +52,10 @@ public:
 protected:
 	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
 
+#ifdef __x86_64__
+	void FillSquarewaveAVX2(SparseDigitalWaveform& cap);
+#endif
+
 	std::string m_baudname;
 	std::string m_threshname;
 };
