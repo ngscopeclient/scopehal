@@ -174,7 +174,6 @@ void ClockRecoveryFilter::Refresh()
 	//TODO: use the real fibre channel PLL.
 	size_t nedge = 1;
 	int64_t edgepos = edges[0];
-	bool value = false;
 	[[maybe_unused]] int64_t total_error = 0;
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
@@ -345,20 +344,22 @@ void ClockRecoveryFilter::Refresh()
 
 		//Add the sample (90 deg phase offset from the internal NCO)
 		if(!gating)
-		{
-			value = !value;
-
 			cap->m_offsets.push_back(edgepos + period/2);
-			cap->m_samples.push_back(value);
-		}
 	}
 
+	//Generate the squarewave and duration values to match the calculated timestamps
 	#ifdef __x86_64__
 	if(g_hasAvx2)
+	{
 		FillDurationsAVX2(*cap);
+		FillSquarewaveGeneric(*cap);
+	}
 	else
 	#endif
+	{
 		FillDurationsGeneric(*cap);
+		FillSquarewaveGeneric(*cap);
+	}
 
 	total_error /= edges.size();
 	//LogTrace("average phase error %zu\n", total_error);
@@ -366,4 +367,20 @@ void ClockRecoveryFilter::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+}
+
+/**
+	@brief Fills a waveform with a squarewave
+ */
+void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
+{
+	size_t len = cap.m_offsets.size();
+	cap.m_samples.resize(len);
+
+	bool value = false;
+	for(size_t i=0; i<len; i++)
+	{
+		value = !value;
+		cap.m_samples[i] = value;
+	}
 }

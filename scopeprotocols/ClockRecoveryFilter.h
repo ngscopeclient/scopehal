@@ -50,6 +50,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(ClockRecoveryFilter)
 
 protected:
+	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
+
 	std::string m_baudname;
 	std::string m_threshname;
 };
