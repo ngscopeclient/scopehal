@@ -119,7 +119,7 @@ void IBM8b10bDecoder::Refresh()
 	data.PrepareForCpuAccess();
 
 	//Preallocate output buffer
-	data.Reserve(data.m_samples.size() / 10);
+	cap->Reserve(data.m_samples.size() / 10);
 
 	//Decode the actual data
 	int last_disp = -1;

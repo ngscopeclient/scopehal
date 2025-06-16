@@ -706,8 +706,16 @@ public:
 
 		samples.clear();
 		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
-		samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
-											//if it's smaller than this, we won't waste a lot of memory
+
+		//If the clock is sparse, assume it probably has edges on every sample and allocate that much buffer to start
+		//(we might overallocate here but it'll be a lot faster)
+		if(dynamic_cast<SparseDigitalWaveform*>(clock) != nullptr)
+			samples.Reserve(clock->size());
+		else
+		{
+			samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
+												//if it's smaller than this, we won't waste a lot of memory
+		}
 		samples.PrepareForCpuAccess();
 
 		//TODO: split up into blocks and multithread?
