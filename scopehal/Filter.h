@@ -706,6 +706,8 @@ public:
 
 		samples.clear();
 		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
+											//if it's smaller than this, we won't waste a lot of memory
 		samples.PrepareForCpuAccess();
 
 		//TODO: split up into blocks and multithread?
@@ -803,6 +805,8 @@ public:
 
 		samples.clear();
 		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
+											//if it's smaller than this, we won't waste a lot of memory
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -899,6 +903,8 @@ public:
 
 		samples.clear();
 		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
+											//if it's smaller than this, we won't waste a lot of memory
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -957,6 +963,8 @@ public:
 
 		samples.clear();
 		samples.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
+											//if it's smaller than this, we won't waste a lot of memory
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress
