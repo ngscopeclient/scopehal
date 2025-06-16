@@ -197,7 +197,7 @@ void EyePattern::Refresh(
 
 	//Initialize the capture
 	//TODO: timestamps? do we need those?
-	if(cap == NULL)
+	if(cap == nullptr)
 		cap = ReallocateWaveform();
 	cap->m_saturationLevel = m_parameters[m_saturationName].GetFloatVal();
 	int64_t* data = cap->GetAccumData();
@@ -227,7 +227,7 @@ void EyePattern::Refresh(
 
 	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)
-		RecalculateUIWidth();
+		RecalculateUIWidth(clock_edges, cap);
 
 	//Shift the clock by half a UI if it's edge aligned
 	//All of the eye creation logic assumes a center aligned clock.
@@ -625,12 +625,8 @@ EyeWaveform* EyePattern::ReallocateWaveform()
 	return cap;
 }
 
-void EyePattern::RecalculateUIWidth()
+void EyePattern::RecalculateUIWidth(vector<int64_t>& clock_edges, EyeWaveform* cap)
 {
-	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
-	if(!cap)
-		cap = ReallocateWaveform();
-
 	//If manual override, don't look at anything else
 	if(m_parameters[m_rateModeName].GetIntVal() == MODE_FIXED)
 	{
@@ -638,54 +634,28 @@ void EyePattern::RecalculateUIWidth()
 		return;
 	}
 
-	auto clock = GetInputWaveform(1);
-	if(!clock)
+	//average between 10 and 1000 UIs to get eye width
+	size_t count = clock_edges.size();
+	if(count < 10)
 		return;
-
-	//Find all toggles in the clock
-	vector<int64_t> clock_edges;
-	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clock);
-	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clock);
-	switch(m_parameters[m_polarityName].GetIntVal())
-	{
-		case CLOCK_RISING:
-			FindRisingEdges(sclk, uclk, clock_edges);
-			break;
-
-		case CLOCK_FALLING:
-			FindFallingEdges(sclk, uclk, clock_edges);
-			break;
-
-		case CLOCK_BOTH:
-			FindZeroCrossings(sclk, uclk, clock_edges);
-			break;
-	}
-
-	//If no clock edges, don't change anything
-	if(clock_edges.empty())
-		return;
+	if(count > 1000)
+		count = 1000;
 
 	//Find width of each UI
 	vector<int64_t> ui_widths;
-	for(size_t i=0; i<clock_edges.size()-1; i++)
+	for(size_t i=0; i<count; i++)
 		ui_widths.push_back(clock_edges[i+1] - clock_edges[i]);
 
-	//Need to average at least ten UIs to get meaningful data
-	size_t nuis = ui_widths.size();
-	if(nuis > 10)
+	//Sort, discard the top and bottom 10%, and average the rest to calculate nominal width
+	sort(ui_widths.begin(), ui_widths.begin() + count);
+	size_t navg = 0;
+	int64_t total = 0;
+	for(size_t i = count/10; i <= count*9/10; i++)
 	{
-		//Sort, discard the top and bottom 10%, and average the rest to calculate nominal width
-		sort(ui_widths.begin(), ui_widths.end());
-		size_t navg = 0;
-		int64_t total = 0;
-		for(size_t i = nuis/10; i <= nuis*9/10; i++)
-		{
-			total += ui_widths[i];
-			navg ++;
-		}
-
-		cap->m_uiWidth = (1.0 * total) / navg;
+		total += ui_widths[i];
+		navg ++;
 	}
+	cap->m_uiWidth = (1.0 * total) / navg;
 }
 
 /**

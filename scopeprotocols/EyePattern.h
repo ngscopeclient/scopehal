@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,7 +55,6 @@ public:
 
 	virtual void ClearSweeps() override;
 
-	void RecalculateUIWidth();
 	EyeWaveform* ReallocateWaveform();
 
 	void SetWidth(size_t width)
@@ -120,6 +119,8 @@ public:
 
 protected:
 	void DoMaskTest(EyeWaveform* cap);
+
+	void RecalculateUIWidth(std::vector<int64_t>& clock_edges, EyeWaveform* cap);
 
 	void SparsePackedInnerLoop(
 		SparseAnalogWaveform* waveform,
