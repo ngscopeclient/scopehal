@@ -262,7 +262,12 @@ void EyePattern::Refresh(
 		{
 			#ifdef __x86_64__
 			if(g_hasAvx2)
-				DensePackedInnerLoopAVX2(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+			{
+				if(g_hasFMA)
+					DensePackedInnerLoopAVX2FMA(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+				else
+					DensePackedInnerLoopAVX2(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+			}
 			else
 			#endif
 				DensePackedInnerLoop(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
@@ -380,6 +385,196 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		ynom				= _mm256_add_ps(vcur, ynom);
 		ynom				= _mm256_mul_ps(ynom, vyscale);
 		ynom				= _mm256_add_ps(ynom, vyoff);
+		__m256 vyfloor		= _mm256_floor_ps(ynom);
+		__m256 vyfrac		= _mm256_sub_ps(ynom, vyfloor);
+		__m256i vyfloori	= _mm256_cvtps_epi32(vyfloor);
+
+		//Calculate how much of the pixel's intensity to put in each row
+		__m256 vbin2f		= _mm256_mul_ps(vyfrac, vaccum);
+		__m256i vbin2i		= _mm256_cvtps_epi32(vbin2f);
+
+		//Final address calculation
+		__m256i voff		= _mm256_mullo_epi32(vyfloori, vwidth);
+		voff				= _mm256_add_epi32(voff, vxfloori);
+
+		//Save stuff for output loop
+		int32_t bin2[8]				__attribute__((aligned(32)));
+		uint32_t off[8]				__attribute__((aligned(32)));
+		_mm256_store_si256((__m256i*)bin2, vbin2i);
+		_mm256_store_si256((__m256i*)off, voff);
+
+		//Vector bounds check
+		int32_t oob[8]	__attribute__((aligned(32)));
+		__m256i oob_x 		= _mm256_cmpgt_epi32(vxfloori, vxmax);
+		__m256i oob_off		= _mm256_cmpgt_epi32(voff, vbufmax);
+		__m256i oob_any		= _mm256_or_si256(oob_x, oob_off);
+		__m256i oob_low		= _mm256_cmpgt_epi32(vzero, voff);
+		oob_any				= _mm256_or_si256(oob_any, oob_low);
+		_mm256_store_si256((__m256i*)oob, oob_any);
+
+		//Final output loop. Doesn't vectorize well
+		for(size_t j=0; j<8; j++)
+		{
+			//Abort if this pixel is out of bounds
+			if(oob[j])
+				continue;
+
+			//Plot each point (this only draws the right half of the eye, we copy to the left later)
+			data[off[j]]	 		+= EYE_ACCUM_SCALE - bin2[j];
+			data[off[j] + m_width]	+= bin2[j];
+		}
+	}
+
+	//Catch any stragglers
+	for(; i<wend && iclock < cend; i++)
+	{
+		//Find time of this sample.
+		//If it's past the end of the current UI, move to the next clock edge
+		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
+		int64_t offset = tstart - clock_edges[iclock];
+		if(offset < 0)
+			continue;
+		size_t nextclk = iclock + 1;
+		int64_t tnext = clock_edges[nextclk];
+		if(tstart >= tnext)
+		{
+			//Move to the next clock edge
+			iclock ++;
+			if(iclock >= cend)
+				break;
+
+			//Figure out the offset to the next edge
+			offset = tstart - tnext;
+		}
+
+		//Interpolate position
+		float pixel_x_f = (offset - m_xoff) * m_xscale;
+		float pixel_x_fround = floor(pixel_x_f);
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+		//Early out if off end of plot
+		int32_t pixel_x_round = floor(pixel_x_f);
+		if(pixel_x_round > xmax)
+			continue;
+
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		int64_t ttnext = tnext - tstart;
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
+
+		//Interpolate voltage, early out if clipping
+		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+		float nominal_pixel_y = nominal_voltage*yscale + yoff;
+		int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
+		if( (y1 >= ymax) || (y1 < 0) )
+			continue;
+
+		//Calculate how much of the pixel's intensity to put in each row
+		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+		int32_t bin2 = yfrac * EYE_ACCUM_SCALE;
+		int64_t* pix = data + y1*m_width + pixel_x_round;
+
+		//Plot each point (this only draws the right half of the eye, we copy to the left later)
+		pix[0] 		 += EYE_ACCUM_SCALE - bin2;
+		pix[m_width] += bin2;
+	}
+}
+
+__attribute__((target("avx2,fma")))
+void EyePattern::DensePackedInnerLoopAVX2FMA(
+	UniformAnalogWaveform* waveform,
+	vector<int64_t>& clock_edges,
+	int64_t* data,
+	size_t wend,
+	size_t cend,
+	int32_t xmax,
+	int32_t ymax,
+	float xtimescale,
+	float yscale,
+	float yoff
+	)
+{
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	int64_t width = cap->GetUIWidth();
+	int64_t halfwidth = width/2;
+
+	size_t iclock = 0;
+
+	size_t wend_rounded = wend - (wend % 8);
+
+	//Splat some constants into vector regs
+	__m256i vxoff 		= _mm256_set1_epi32((int)m_xoff);
+	__m256 vxscale 		= _mm256_set1_ps(m_xscale);
+	__m256 vixtimescale	= _mm256_set1_ps(1.0f / xtimescale);
+	__m256 vyoff 		= _mm256_set1_ps(yoff);
+	__m256 vyscale 		= _mm256_set1_ps(yscale);
+	__m256 vaccum		= _mm256_set1_ps(EYE_ACCUM_SCALE);
+	__m256i vwidth		= _mm256_set1_epi32(m_width);
+	__m256i vxmax		= _mm256_set1_epi32(xmax);
+	__m256i vzero		= _mm256_set1_epi32(0);
+
+	float* samples = (float*)&waveform->m_samples[0];
+
+	//Main unrolled loop, 8 samples per iteration
+	size_t i = 0;
+	uint32_t bufmax = m_width * (m_height - 1);
+	__m256i vbufmax		= _mm256_set1_epi32(bufmax - 1);
+	for(; i<wend_rounded && iclock < cend; i+= 8)
+	{
+		//Figure out timestamp of this sample within the UI.
+		//This doesn't vectorize well, but it's pretty fast.
+		int32_t offset[8] __attribute__((aligned(32))) = {0};
+		for(size_t j=0; j<8; j++)
+		{
+			size_t k = i+j;
+
+			//Find time of this sample.
+			//If it's past the end of the current UI, move to the next clock edge
+			int64_t tstart = k * waveform->m_timescale + waveform->m_triggerPhase;
+			offset[j] = tstart - clock_edges[iclock];
+			if(offset[j] < 0)
+				continue;
+			size_t nextclk = iclock + 1;
+			int64_t tnext = clock_edges[nextclk];
+			if(tstart >= tnext)
+			{
+				//Move to the next clock edge
+				iclock ++;
+				if(iclock >= cend)
+					break;
+
+				//Figure out the offset to the next edge
+				offset[j] = tstart - tnext;
+			}
+
+			//Drop anything past half a UI if the next clock edge is a long ways out
+			//(this is needed for irregularly sampled data like DDR RAM)
+			int64_t ttnext = tnext - tstart;
+			if( (offset[j] > halfwidth) && (ttnext > width) )
+				offset[j] = -INT_MAX;
+		}
+
+		//Interpolate X position
+		__m256i voffset		= _mm256_load_si256((__m256i*)offset);
+		voffset 			= _mm256_sub_epi32(voffset, vxoff);
+		__m256 foffset		= _mm256_cvtepi32_ps(voffset);
+		foffset				= _mm256_mul_ps(foffset, vxscale);
+		__m256 fround		= _mm256_round_ps(foffset, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+		__m256 fdx			= _mm256_sub_ps(foffset, fround);
+		fdx					= _mm256_mul_ps(fdx, vixtimescale);
+		__m256 vxfloor		= _mm256_floor_ps(foffset);
+		__m256i vxfloori	= _mm256_cvtps_epi32(vxfloor);
+
+		//Load waveform data
+		__m256 vcur			= _mm256_loadu_ps(samples + i);
+		__m256 vnext		= _mm256_loadu_ps(samples + i + 1);
+
+		//Interpolate voltage
+		__m256 vdv			= _mm256_sub_ps(vnext, vcur);
+		__m256 ynom			= _mm256_fmadd_ps(vdv, fdx, vcur);
+		ynom				= _mm256_fmadd_ps(ynom, vyscale, vyoff);
 		__m256 vyfloor		= _mm256_floor_ps(ynom);
 		__m256 vyfrac		= _mm256_sub_ps(ynom, vyfloor);
 		__m256i vyfloori	= _mm256_cvtps_epi32(vyfloor);
