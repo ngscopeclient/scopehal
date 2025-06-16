@@ -175,7 +175,7 @@ void ClockRecoveryFilter::Refresh()
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
-	cap->m_samples.reserve(edges.size());
+	cap->m_offsets.reserve(edges.size());
 	if(gate)
 		InnerLoopWithGating(*cap, edges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 	else
@@ -426,16 +426,20 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 
 	[[maybe_unused]] int64_t total_error = 0;
 
+	float initialFrequency = 1.0 / initialPeriod;
+	int64_t glitchCutoff = initialPeriod / 10;
+	size_t edgemax = edges.size() - 1;
+
 	int64_t tlast = 0;
-	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
+	for(; (edgepos < tend) && (nedge < edgemax); edgepos += period)
 	{
-		float center = period/2;
+		int64_t center = period/2;
 
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
+		while( (tnext + center < edgepos) && (nedge < edgemax) )
 		{
 			//Find phase error
 			int64_t dphase = (edgepos - tnext) - period;
@@ -446,16 +450,17 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 			if(dphase < -halfPeriod)
 				dphase += period;
 
-			total_error += fabs(dphase);
+			total_error += labs(dphase);
 
 			//Find frequency error
 			int64_t uiLen = (tnext - tlast);
-			float numUIs = round(uiLen * 1.0 / initialPeriod);
-			if(numUIs < 0.1)		//Sanity check: no correction if we have a glitch
-				uiLen = period;
-			else
+			int64_t dperiod = 0;
+			if(uiLen > glitchCutoff)		//Sanity check: no correction if we have a glitch
+			{
+				int64_t numUIs = round(uiLen * initialFrequency);
 				uiLen /= numUIs;
-			int64_t dperiod = period - uiLen;
+				dperiod = period - uiLen;
+			}
 
 			if(tlast != 0)
 			{
