@@ -95,7 +95,7 @@ void IBM8b10bDecoder::Refresh()
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -124,7 +124,13 @@ void IBM8b10bDecoder::Refresh()
 	//Decode the actual data
 	int last_disp = -1;
 	bool first = true;
-	size_t dlen = data.m_samples.size() - 11;
+	size_t nsamples = data.m_samples.size();
+	if(nsamples < 11)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	size_t dlen = nsamples - 11;
 	int64_t lastSymbolLength = 0;
 	int64_t lastSymbolEnd = 0;
 	int64_t lastSymbolStart = 0;
