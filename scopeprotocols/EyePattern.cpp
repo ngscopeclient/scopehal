@@ -310,17 +310,20 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	//Splat some constants into vector regs
 	__m256i vxoff 		= _mm256_set1_epi32((int)m_xoff);
 	__m256 vxscale 		= _mm256_set1_ps(m_xscale);
-	__m256 vxtimescale	= _mm256_set1_ps(xtimescale);
+	__m256 vixtimescale	= _mm256_set1_ps(1.0f / xtimescale);
 	__m256 vyoff 		= _mm256_set1_ps(yoff);
 	__m256 vyscale 		= _mm256_set1_ps(yscale);
 	__m256 vaccum		= _mm256_set1_ps(EYE_ACCUM_SCALE);
 	__m256i vwidth		= _mm256_set1_epi32(m_width);
+	__m256i vxmax		= _mm256_set1_epi32(xmax);
+	__m256i vzero		= _mm256_set1_epi32(0);
 
 	float* samples = (float*)&waveform->m_samples[0];
 
 	//Main unrolled loop, 8 samples per iteration
 	size_t i = 0;
 	uint32_t bufmax = m_width * (m_height - 1);
+	__m256i vbufmax		= _mm256_set1_epi32(bufmax - 1);
 	for(; i<wend_rounded && iclock < cend; i+= 8)
 	{
 		//Figure out timestamp of this sample within the UI.
@@ -363,7 +366,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		foffset				= _mm256_mul_ps(foffset, vxscale);
 		__m256 fround		= _mm256_round_ps(foffset, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
 		__m256 fdx			= _mm256_sub_ps(foffset, fround);
-		fdx					= _mm256_div_ps(fdx, vxtimescale);
+		fdx					= _mm256_mul_ps(fdx, vixtimescale);
 		__m256 vxfloor		= _mm256_floor_ps(foffset);
 		__m256i vxfloori	= _mm256_cvtps_epi32(vxfloor);
 
@@ -390,18 +393,25 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		voff				= _mm256_add_epi32(voff, vxfloori);
 
 		//Save stuff for output loop
-		int32_t pixel_x_round[8]	__attribute__((aligned(32)));
 		int32_t bin2[8]				__attribute__((aligned(32)));
 		uint32_t off[8]				__attribute__((aligned(32)));
-		_mm256_store_si256((__m256i*)pixel_x_round, vxfloori);
 		_mm256_store_si256((__m256i*)bin2, vbin2i);
 		_mm256_store_si256((__m256i*)off, voff);
+
+		//Vector bounds check
+		int32_t oob[8]	__attribute__((aligned(32)));
+		__m256i oob_x 		= _mm256_cmpgt_epi32(vxfloori, vxmax);
+		__m256i oob_off		= _mm256_cmpgt_epi32(voff, vbufmax);
+		__m256i oob_any		= _mm256_or_si256(oob_x, oob_off);
+		__m256i oob_low		= _mm256_cmpgt_epi32(vzero, voff);
+		oob_any				= _mm256_or_si256(oob_any, oob_low);
+		_mm256_store_si256((__m256i*)oob, oob_any);
 
 		//Final output loop. Doesn't vectorize well
 		for(size_t j=0; j<8; j++)
 		{
 			//Abort if this pixel is out of bounds
-			if( (pixel_x_round[j] > xmax) || (off[j] >= bufmax) )
+			if(oob[j])
 				continue;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)

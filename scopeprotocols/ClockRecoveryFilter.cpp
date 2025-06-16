@@ -104,7 +104,9 @@ string ClockRecoveryFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ClockRecoveryFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void ClockRecoveryFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	//Require a data signal, but not necessarily a gate
 	if(!VerifyInputOK(0))
@@ -467,9 +469,6 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 				//Frequency error term
 				period -= dperiod * 0.006;
 
-				//Frequency drift term (delta from refclk)
-				//period -= (period - initialPeriod) * 0.0001;
-
 				//Phase error term
 				period -= dphase * 0.002;
 
@@ -510,7 +509,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 		}
 
 		//Add the sample (90 deg phase offset from the internal NCO)
-		cap.m_offsets.push_back(edgepos + period/2);
+		cap.m_offsets.push_back(edgepos + center);
 	}
 
 	total_error /= edges.size();

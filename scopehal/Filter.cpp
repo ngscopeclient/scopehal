@@ -392,7 +392,7 @@ void Filter::FindRisingEdges(SparseAnalogWaveform* data, float threshold, std::v
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void Filter::FindZeroCrossings(SparseAnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
+void Filter::FindZeroCrossings(SparseAnalogWaveform* data, float threshold, vector<int64_t>& edges)
 {
 	pair<WaveformBase*, float> cachekey(data, threshold);
 
@@ -406,6 +406,9 @@ void Filter::FindZeroCrossings(SparseAnalogWaveform* data, float threshold, std:
 			return;
 		}
 	}
+
+	//Preallocate a bunch of outputs to reduce reallocations
+	edges.reserve(1024 * 1024);
 
 	//Find times of the zero crossings
 	bool first = true;
@@ -445,7 +448,7 @@ void Filter::FindZeroCrossings(SparseAnalogWaveform* data, float threshold, std:
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
+void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, vector<int64_t>& edges)
 {
 	pair<WaveformBase*, float> cachekey(data, threshold);
 
@@ -460,25 +463,37 @@ void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, std
 		}
 	}
 
+	//Preallocate a bunch of outputs to reduce reallocations
+	edges.reserve(1024 * 1024);
+
 	//Find times of the zero crossings
 	bool last = data->m_samples[0] > threshold;
-	int64_t phoff = data->m_triggerPhase;
 	size_t len = data->m_samples.size();
 	float fscale = data->m_timescale;
 
+	float flast = data->m_samples[0];
+	int64_t timescale = data->m_timescale;
+	int64_t timestamp = data->m_triggerPhase + timescale;
 	for(size_t i=1; i<len; i++)
 	{
-		bool value = data->m_samples[i] > threshold;
+		float fcur = data->m_samples[i];
+		bool value = fcur > threshold;
+		timestamp += timescale;
 
 		//Skip samples with no transition
 		if(last == value)
+		{
+			flast = fcur;
 			continue;
+		}
 
 		//Midpoint of the sample, plus the zero crossing
-		int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-		int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
-		edges.push_back(t);
+		float slope = (fcur - flast);
+		float delta = threshold - flast;
+		int64_t tfrac = (fscale * delta) / slope;
+		edges.push_back(timestamp + tfrac);
 		last = value;
+		flast = fcur;
 	}
 
 	//Add to cache
