@@ -556,20 +556,19 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 				offset[j] = -INT_MAX;
 		}
 
-		//Interpolate X position
+		//Load waveform data (advanced to hide latency)
 		__m256i voffset		= _mm256_load_si256((__m256i*)offset);
+		__m256 vcur			= _mm256_loadu_ps(samples + i);
+		__m256 vnext		= _mm256_loadu_ps(samples + i + 1);
+
+		//Interpolate X position
 		voffset 			= _mm256_sub_epi32(voffset, vxoff);
 		__m256 foffset		= _mm256_cvtepi32_ps(voffset);
 		foffset				= _mm256_mul_ps(foffset, vxscale);
 		__m256 fround		= _mm256_round_ps(foffset, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
 		__m256 fdx			= _mm256_sub_ps(foffset, fround);
 		fdx					= _mm256_mul_ps(fdx, vixtimescale);
-		__m256 vxfloor		= _mm256_floor_ps(foffset);
-		__m256i vxfloori	= _mm256_cvtps_epi32(vxfloor);
-
-		//Load waveform data
-		__m256 vcur			= _mm256_loadu_ps(samples + i);
-		__m256 vnext		= _mm256_loadu_ps(samples + i + 1);
+		__m256i vxfloori	= _mm256_cvttps_epi32(foffset);
 
 		//Interpolate voltage
 		__m256 vdv			= _mm256_sub_ps(vnext, vcur);
