@@ -105,7 +105,7 @@ void ClockRecoveryFilter::Refresh()
 	//Require a data signal, but not necessarily a gate
 	if(!VerifyInputOK(0))
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -134,7 +134,7 @@ void ClockRecoveryFilter::Refresh()
 		FindZeroCrossings(sddin, edges);
 	if(edges.empty())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -147,7 +147,7 @@ void ClockRecoveryFilter::Refresh()
 	auto fnyquist = 2*din->m_timescale;
 	if( period < fnyquist)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -349,10 +349,16 @@ void ClockRecoveryFilter::Refresh()
 			value = !value;
 
 			cap->m_offsets.push_back(edgepos + period/2);
-			cap->m_durations.push_back(period);
 			cap->m_samples.push_back(value);
 		}
 	}
+
+	#ifdef __x86_64__
+	if(g_hasAvx2)
+		FillDurationsAVX2(*cap);
+	else
+	#endif
+		FillDurationsGeneric(*cap);
 
 	total_error /= edges.size();
 	//LogTrace("average phase error %zu\n", total_error);
