@@ -473,17 +473,17 @@ void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, vec
 
 	float flast = data->m_samples[0];
 	int64_t timescale = data->m_timescale;
-	int64_t timestamp = data->m_triggerPhase + timescale;
+	int64_t timestamp = data->m_triggerPhase;
 	for(size_t i=1; i<len; i++)
 	{
 		float fcur = data->m_samples[i];
 		bool value = fcur > threshold;
-		timestamp += timescale;
 
 		//Skip samples with no transition
 		if(last == value)
 		{
 			flast = fcur;
+			timestamp += timescale;
 			continue;
 		}
 
@@ -494,6 +494,7 @@ void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, vec
 		edges.push_back(timestamp + tfrac);
 		last = value;
 		flast = fcur;
+		timestamp += timescale;
 	}
 
 	//Add to cache
