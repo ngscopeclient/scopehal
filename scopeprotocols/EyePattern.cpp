@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -727,7 +727,7 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 	{
 		//Figure out timestamp of this sample within the UI.
 		//This doesn't vectorize well, but it's pretty fast.
-		int32_t offset[16] __attribute__((aligned(32))) = {0};
+		int32_t offset[16] __attribute__((aligned(64))) = {0};
 		for(size_t j=0; j<16; j++)
 		{
 			size_t k = i+j;
@@ -794,9 +794,9 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 		voff				= _mm512_add_epi32(voff, vxfloori);
 
 		//Save stuff for output loop
-		int32_t pixel_x_round[16]	__attribute__((aligned(32)));
-		int32_t bin2[16]	__attribute__((aligned(32)));
-		uint32_t off[16]	__attribute__((aligned(32)));
+		int32_t pixel_x_round[16]	__attribute__((aligned(64)));
+		int32_t bin2[16]	__attribute__((aligned(64)));
+		uint32_t off[16]	__attribute__((aligned(64)));
 		_mm512_store_si512((__m512i*)pixel_x_round, vxfloori);
 		_mm512_store_si512((__m512i*)bin2, vbin2i);
 		_mm512_store_si512((__m512i*)off, voff);
