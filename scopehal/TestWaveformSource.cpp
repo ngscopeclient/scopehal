@@ -137,22 +137,27 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	auto ret = new UniformAnalogWaveform("NoisySine");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
-	ret->PrepareForCpuAccess();
 
-	normal_distribution<> noise(0, noise_stdev);
-
+	//Calculate a bunch of constants
+	const int numThreads = 32768;
+	NoisySinePushConstants push;
 	float samples_per_cycle = period * 1.0 / sampleperiod;
-	float radians_per_sample = 2 * M_PI / samples_per_cycle;
+	push.numSamples = depth;
+	push.samplesPerThread = (depth + numThreads) / numThreads;
+	push.rngSeed = m_rng();
+	push.startPhase = startphase;
+	push.scale = amplitude / 2;	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
+	push.sigma = noise_stdev;
+	push.radiansPerSample = 2 * M_PI / samples_per_cycle;
 
-	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
-	float scale = amplitude / 2;
+	//Do the actual waveform generation
+	cmdBuf.begin({});
+	m_noisySineComputePipeline.BindBufferNonblocking(0, ret->m_samples, cmdBuf, true);
+	m_noisySineComputePipeline.Dispatch(cmdBuf, push, numThreads, 1);
+	ret->MarkModifiedFromGpu();
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
-	for(size_t i=0; i<depth; i++)
-	{
-		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
-	}
-
-	ret->MarkModifiedFromCpu();
 	return ret;
 }
 
