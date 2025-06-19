@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,6 +40,17 @@
 #include "VulkanFFTPlan.h"
 #include <random>
 
+struct __attribute__((packed)) NoisySinePushConstants
+{
+	uint32_t numSamples;
+	uint32_t samplesPerThread;
+	uint32_t rngSeed;
+	float startPhase;
+	float scale;
+	float sigma;
+	float radiansPerSample;
+};
+
 /**
 	@brief Helper class for generating test waveforms
 
@@ -57,13 +68,14 @@ public:
 	TestWaveformSource& operator=(const TestWaveformSource&) =delete;
 
 	WaveformBase* GenerateNoisySinewave(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
 		float amplitude,
 		float startphase,
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
-		float noise_stdev = 0.01,
-		std::function<void(float)> downloadCallback = nullptr);
+		float noise_stdev = 0.01);
 
 	WaveformBase* GenerateNoisySinewaveSum(
 		float amplitude,
@@ -147,6 +159,9 @@ protected:
 
 	///@brief Compute pipeline for channel emulation
 	ComputePipeline m_channelEmulationComputePipeline;
+
+	///@brief Compute pipeline for noisy sinewave generation
+	ComputePipeline m_noisySineComputePipeline;
 
 	///@brief S-parameters of the channel
 	SParameters m_sparams;

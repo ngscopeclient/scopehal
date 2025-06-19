@@ -35,6 +35,7 @@ add_compute_shaders(
 		DeEmbedFilter.glsl
 		FindZeroCrossings.glsl
 		Gather.glsl
+		NoisySine.glsl
 		PreGather.glsl
 		RectangularWindow.glsl
 		ReductionSum.glsl

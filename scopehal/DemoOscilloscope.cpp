@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ngscopeclient                                                                                                        *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -557,30 +557,31 @@ bool DemoOscilloscope::AcquireData()
 		{
 			case 0:
 				waveforms[i] = m_source[i]->GenerateNoisySinewave(
-					0.9, 0.0, 1e6, sampleperiod, depth, noise[0], updateProgress);
+					*m_cmdBuf[i], m_queue[i], 0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
 				break;
 
 			case 1:
 				waveforms[i] = m_source[i]->GenerateNoisySinewaveSum(
 					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1], updateProgress);
+				waveforms[i]->MarkModifiedFromCpu();
 				break;
 
 			case 2:
-
 				waveforms[i] = m_source[i]->GeneratePRBS31(
 					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2], updateProgress);
+				waveforms[i]->MarkModifiedFromCpu();
 				break;
 
 			case 3:
 				waveforms[i] = m_source[i]->Generate8b10b(
 					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, lpf3, noise[3], updateProgress);
+				waveforms[i]->MarkModifiedFromCpu();
 				break;
 
 			default:
 				break;
 		}
 
-		waveforms[i]->MarkModifiedFromCpu();
 		this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 	}
 

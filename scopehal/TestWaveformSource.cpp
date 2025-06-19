@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,6 +55,7 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	, m_cachedBinSize(0)
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_channelEmulationComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
+	, m_noisySineComputePipeline("shaders/NoisySine.spv", 1, sizeof(NoisySinePushConstants))
 	, m_cachedNumPoints(0)
 	, m_cachedRawSize(0)
 {
@@ -114,26 +115,29 @@ WaveformBase* TestWaveformSource::GenerateStep(
 /**
 	@brief Generates a sinewave with AWGN added
 
+	@param cmdBuf			Vulkan command buffer to use
+	@param queue			Vulkan queue to use
 	@param amplitude		P-P amplitude of the waveform in volts
 	@param startphase		Starting phase in radians
 	@param period			Period of the sine, in femtoseconds
 	@param sampleperiod		Interval between samples, in femtoseconds
 	@param depth			Total number of samples to generate
 	@param noise_stdev		Standard deviation of the AWGN in volts
-	@param downloadCallback	Callback for download progress
  */
 WaveformBase* TestWaveformSource::GenerateNoisySinewave(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
 	float amplitude,
 	float startphase,
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
-	float noise_stdev,
-	std::function<void(float)> downloadCallback)
+	float noise_stdev)
 {
 	auto ret = new UniformAnalogWaveform("NoisySine");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
+	ret->PrepareForCpuAccess();
 
 	normal_distribution<> noise(0, noise_stdev);
 
@@ -146,11 +150,9 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	for(size_t i=0; i<depth; i++)
 	{
 		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
-
-		if( (i % 1024 == 0) && downloadCallback)
-			downloadCallback((float)i / (float)depth);
 	}
 
+	ret->MarkModifiedFromCpu();
 	return ret;
 }
 
