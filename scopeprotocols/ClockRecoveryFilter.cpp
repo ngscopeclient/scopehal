@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -346,7 +346,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 				if(dphase < -halfPeriod)
 					dphase += period;
 
-				total_error += fabs(dphase);
+				total_error += i64abs(dphase);
 
 				//Find frequency error
 				int64_t uiLen = (tnext - tlast);
@@ -452,7 +452,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 			if(dphase < -halfPeriod)
 				dphase += period;
 
-			total_error += labs(dphase);
+			total_error += i64abs(dphase);
 
 			//Find frequency error
 			int64_t uiLen = (tnext - tlast);

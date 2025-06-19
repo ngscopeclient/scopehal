@@ -82,6 +82,13 @@ extern bool g_hasAvx512DQ;
 extern bool g_hasAvx2;
 #endif
 
+//Helper for absolute value of an int64_t
+#ifdef _WIN32
+#define i64abs(x) llabs(x)
+#else
+#define i64abs(x) labs(x)
+#endif
+
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
 extern bool g_hasShaderFloat64;
