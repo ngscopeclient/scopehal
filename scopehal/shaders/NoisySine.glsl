@@ -65,27 +65,34 @@ void main()
 	uint lcgState = rngSeed + nthread;
 	for(uint i=istart; i <= iend; i += 2)
 	{
-		//Generate two pseudorandom uint32's
+		//Generate two pseudorandom uint32's with the first being nonzero
 		//Use glibc rand() parameters
-		uint rngOut[2];
+		uint rngOut[2] = {0, 0};
+		uint rngmax = 0xffffff;
 		for(uint j=0; j<2; j++)
 		{
-			lcgState = ( (lcgState * 1103515245) + 12345 ) & 0x7fffffff;
-			rngOut[j] = lcgState & 0xffff;
+			while(rngOut[j] == 0)
+			{
+				lcgState = ( (lcgState * 1103515245) + 12345 ) & 0x7fffffff;
+				rngOut[j] = lcgState & rngmax;
+
+				if(j == 1)
+					break;
+			}
 		}
 
 		//Convert the random ints to floats in [0, 1]
-		float u1 = float(rngOut[0]) / float(0xffff);
-		float u2 = float(rngOut[1]) / float(0xffff);
+		float u1 = float(rngOut[0]) / float(rngmax);
+		float u2 = float(rngOut[1]) / float(rngmax);
 
 		//Convert to uniform distribution using Box-Muller
 		float mag = sigma * sqrt(-2 * log(u1));
-		float noise0 = mag * cos(twopi * u2) /* + mean */;
-		float noise1 = mag * sin(twopi * u2) /* + mean */;
+		float noise0 = mag * cos(twopi * u2);
+		float noise1 = mag * sin(twopi * u2);
 
 		//Generate the output (second sample needs separate bounds check)
 		dout[i] = scale * sin(i * radiansPerSample + startPhase) + noise0;
-		if(i+1 < iend)
+		if(i+1 <= iend)
 			dout[i+1] = scale * sin((i+1) * radiansPerSample + startPhase) + noise1;
 	}
 }

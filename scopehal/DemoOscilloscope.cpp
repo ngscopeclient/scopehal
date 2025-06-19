@@ -556,8 +556,12 @@ bool DemoOscilloscope::AcquireData()
 		switch(i)
 		{
 			case 0:
-				waveforms[i] = m_source[i]->GenerateNoisySinewave(
-					*m_cmdBuf[i], m_queue[i], 0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+				{
+					auto wfm = AllocateAnalogWaveform("NoisySine");
+					waveforms[i] = wfm;
+					m_source[i]->GenerateNoisySinewave(
+						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+				}
 				break;
 
 			case 1:

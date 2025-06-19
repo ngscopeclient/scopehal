@@ -117,6 +117,7 @@ WaveformBase* TestWaveformSource::GenerateStep(
 
 	@param cmdBuf			Vulkan command buffer to use
 	@param queue			Vulkan queue to use
+	@param wfm				Waveform to fill
 	@param amplitude		P-P amplitude of the waveform in volts
 	@param startphase		Starting phase in radians
 	@param period			Period of the sine, in femtoseconds
@@ -124,9 +125,10 @@ WaveformBase* TestWaveformSource::GenerateStep(
 	@param depth			Total number of samples to generate
 	@param noise_stdev		Standard deviation of the AWGN in volts
  */
-WaveformBase* TestWaveformSource::GenerateNoisySinewave(
+void TestWaveformSource::GenerateNoisySinewave(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue,
+	UniformAnalogWaveform* wfm,
 	float amplitude,
 	float startphase,
 	float period,
@@ -134,9 +136,9 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	size_t depth,
 	float noise_stdev)
 {
-	auto ret = new UniformAnalogWaveform("NoisySine");
-	ret->m_timescale = sampleperiod;
-	ret->Resize(depth);
+	wfm->m_triggerPhase = 0;
+	wfm->m_timescale = sampleperiod;
+	wfm->Resize(depth);
 
 	//Calculate a bunch of constants
 	const int numThreads = 32768;
@@ -152,13 +154,11 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 
 	//Do the actual waveform generation
 	cmdBuf.begin({});
-	m_noisySineComputePipeline.BindBufferNonblocking(0, ret->m_samples, cmdBuf, true);
+	m_noisySineComputePipeline.BindBufferNonblocking(0, wfm->m_samples, cmdBuf, true);
 	m_noisySineComputePipeline.Dispatch(cmdBuf, push, numThreads, 1);
-	ret->MarkModifiedFromGpu();
+	wfm->MarkModifiedFromGpu();
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
-
-	return ret;
 }
 
 /**

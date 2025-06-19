@@ -69,10 +69,16 @@ void main()
 	if(nend > numSamples)
 		nend = numSamples;
 
-	//TODO: Kahan summation to improve numerical stability
+	//Kahan summation to improve numerical stability
 	float partialSum = 0;
+	float c = 0;
 	for(uint i=nstart; i<nend; i++)
-		partialSum += pin[i];
+	{
+		float y = pin[i];
+		float t = partialSum + y;
+		c = (t - partialSum) - y;
+		partialSum = t;
+	}
 
 	pout[nthread] = partialSum;
 }

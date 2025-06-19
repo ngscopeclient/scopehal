@@ -67,9 +67,10 @@ public:
 	TestWaveformSource(const TestWaveformSource&) =delete;
 	TestWaveformSource& operator=(const TestWaveformSource&) =delete;
 
-	WaveformBase* GenerateNoisySinewave(
+	void GenerateNoisySinewave(
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue,
+		UniformAnalogWaveform* wfm,
 		float amplitude,
 		float startphase,
 		float period,
