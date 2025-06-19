@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -108,7 +108,7 @@ void BINImportFilter::OnFileNameChanged()
 		//Parse waveform header
 		WaveHeader wh;
 		f.copy((char*)&wh, sizeof(WaveHeader), fpos);
-		fpos += sizeof(WaveHeader);
+		fpos += sizeof(WaveHeader);	//do not trust reported length in f.size
 
 		//TODO: make this metadata readable somewhere via properties etc
 		if (i == 0)
@@ -254,9 +254,9 @@ void BINImportFilter::OnFileNameChanged()
 				for(size_t k=0; k<wh.samples; k++)
 				{
 					//Do not violate strict aliasing, compiler will optimize out the memcpy
-					float* sample_f;
+					float sample_f;
 					memcpy(&sample_f, f.c_str() + fpos, sizeof(float));
-					wfm->m_samples.push_back(*sample_f);
+					wfm->m_samples.push_back(sample_f);
 					fpos += dh.depth;
 				}
 			}

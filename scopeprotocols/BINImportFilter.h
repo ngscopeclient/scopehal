@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,13 +50,14 @@ public:
 	{
 		char magic[2];		//File magic string ("AG" / "RG")
 		char version[2];	//File format version
-		uint32_t length;	//Length of file in bytes
+		uint32_t length;	//Length of file in bytes (in theory, seems to be wrong a lot for Rigol)
 		uint32_t count;		//Number of waveforms
+							//Note: Rigol MSO5000 seems to sometimes concatenate >1 file with multiple FileHeader's
 	};
 
 	struct WaveHeader
 	{
-		uint32_t size;		//Waveform header length (0x8C)
+		uint32_t size;		//Waveform header length (usually 0x8C, but MSO5000 reports 0x90 which seems wrong)
 		uint32_t type;		//Waveform type
 		uint32_t buffers;	//Number of buffers
 		uint32_t samples;	//Number of samples
