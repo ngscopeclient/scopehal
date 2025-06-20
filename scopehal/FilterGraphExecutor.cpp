@@ -109,7 +109,16 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 	//Update global performance stats
 	{
 		lock_guard<mutex> lock(m_perfStatsMutex);
-		m_lastExecutionTime = m_currentExecutionTime;
+
+		//For now, fixed half life exponential moving average
+		float halflife = 8;
+		float decay = 1 / pow(2, 1/halflife);
+
+		//TODO: staleness or removing of some sort for old entries?
+
+		//Add the new data
+		for(auto& it : m_currentExecutionTime)
+			m_lastExecutionTime[it.first] = (m_lastExecutionTime[it.first] * decay) + (it.second * (1-decay));
 	}
 }
 
