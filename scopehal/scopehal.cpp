@@ -35,6 +35,7 @@
 #include "scopehal.h"
 #include "scopehal-version.h"
 #include <libgen.h>
+#include <filesystem>
 
 #include "AgilentOscilloscope.h"
 #include "AlientekPowerSupply.h"
@@ -706,7 +707,7 @@ string GetDirOfCurrentExecutable()
 
 void InitializeSearchPaths()
 {
-	string binRootDir;
+	std::filesystem::path binRootDir;
 	//Search in the directory of the glscopeclient binary first
 #ifdef _WIN32
 	TCHAR binPath[MAX_PATH];
@@ -717,25 +718,22 @@ void InitializeSearchPaths()
 	else
 	{
 		g_searchPaths.push_back(binPath);
-
-		// On mingw, binPath would typically be /mingw64/bin now
-		//and our data files in /mingw64/share. Strip back one more layer
-		// of hierarchy so we can start appending.
-		binRootDir = dirname(binPath);
+		binRootDir = binPath;
 	}
 #else
 	binRootDir = GetDirOfCurrentExecutable();
-	if( !binRootDir.empty() )
+	if(!binRootDir.empty())
 	{
 		g_searchPaths.push_back(binRootDir);
 	}
 #endif
 
 	// Add the share directories associated with the binary location
-	if(binRootDir.size() > 0)
+	if(!binRootDir.empty())
 	{
-		g_searchPaths.push_back(binRootDir + "/share/ngscopeclient");
-		g_searchPaths.push_back(binRootDir + "/share/scopehal");
+		std::filesystem::path rootDir = binRootDir.parent_path();
+		g_searchPaths.push_back(rootDir / "share/ngscopeclient");
+		g_searchPaths.push_back(rootDir / "share/scopehal");
 	}
 
 	//Local directories preferred over system ones
