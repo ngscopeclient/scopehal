@@ -57,6 +57,7 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	, m_channelEmulationComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_noisySineComputePipeline("shaders/NoisySine.spv", 1, sizeof(NoisySinePushConstants))
 	, m_noisySineSumComputePipeline("shaders/NoisySineSum.spv", 1, sizeof(NoisySineSumPushConstants))
+	, m_degradeComputePipeline("shaders/DegradeSerialData.spv", 2, sizeof(DegradeSerialDataPushConstants))
 	, m_cachedNumPoints(0)
 	, m_cachedRawSize(0)
 {
@@ -223,6 +224,7 @@ void TestWaveformSource::GenerateNoisySinewaveSum(
 
 	@param cmdBuf			Vulkan command buffer to use for channel emulation
 	@param queue			Vulkan queue to use for channel emulation
+	@param wfm				Waveform to fill
 	@param amplitude		P-P amplitude of the waveform in volts
 	@param period			Unit interval, in femtoseconds
 	@param sampleperiod		Interval between samples, in femtoseconds
@@ -231,21 +233,20 @@ void TestWaveformSource::GenerateNoisySinewaveSum(
 	@param noise_stdev		Standard deviation of the AWGN in volts
 	@param downloadCallback	Callback for download progress
  */
-WaveformBase* TestWaveformSource::GeneratePRBS31(
+void TestWaveformSource::GeneratePRBS31(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue,
+	UniformAnalogWaveform* wfm,
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_stdev,
-	std::function<void(float)> downloadCallback
+	float noise_stdev
 	)
 {
-	auto ret = new UniformAnalogWaveform("PRBS31");
-	ret->m_timescale = sampleperiod;
-	ret->Resize(depth);
+	wfm->m_timescale = sampleperiod;
+	wfm->Resize(depth);
 
 	//Generate the PRBS as a square wave. Interpolate zero crossings as needed.
 	uint32_t prbs = rand();
@@ -270,7 +271,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 
 		//Not an edge, just repeat the value
 		if(last == value)
-			ret->m_samples[i] = value ? scale : -scale;
+			wfm->m_samples[i] = value ? scale : -scale;
 
 		//Edge - interpolate
 		else
@@ -281,16 +282,11 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 			float frac = 1 - (last_phase / sampleperiod);
 			float delta = cur_voltage - last_voltage;
 
-			ret->m_samples[i] = last_voltage + delta*frac;
+			wfm->m_samples[i] = last_voltage + delta*frac;
 		}
-
-		if( (i % 1024 == 0) && downloadCallback)
-			downloadCallback((float)i / (float)depth);
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
-
-	return ret;
+	DegradeSerialData(wfm, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
 }
 
 /**
@@ -306,20 +302,19 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	@param noise_stdev		Standard deviation of the AWGN in volts
 	@param downloadCallback	Callback for download progress
  */
-WaveformBase* TestWaveformSource::Generate8b10b(
+void TestWaveformSource::Generate8b10b(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue,
+	UniformAnalogWaveform* wfm,
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,
-	float noise_stdev,
-	std::function<void(float)> downloadCallback)
+	float noise_stdev)
 {
-	auto ret = new UniformAnalogWaveform("8B10B");
-	ret->m_timescale = sampleperiod;
-	ret->Resize(depth);
+	wfm->m_timescale = sampleperiod;
+	wfm->Resize(depth);
 
 	const int patternlen = 20;
 	const bool pattern[patternlen] =
@@ -351,7 +346,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 
 		//Not an edge, just repeat the value
 		if(last == value)
-			ret->m_samples[i] = value ? scale : -scale;
+			wfm->m_samples[i] = value ? scale : -scale;
 
 		//Edge - interpolate
 		else
@@ -362,16 +357,11 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 			float frac = 1 - (last_phase / sampleperiod);
 			float delta = cur_voltage - last_voltage;
 
-			ret->m_samples[i] = last_voltage + delta*frac;
+			wfm->m_samples[i] = last_voltage + delta*frac;
 		}
-
-		if( (i % 1024 == 0) && downloadCallback)
-			downloadCallback((float)i / (float)depth);
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
-
-	return ret;
+	DegradeSerialData(wfm, sampleperiod, depth, lpf, noise_stdev, cmdBuf, queue);
 }
 
 /**
@@ -483,13 +473,6 @@ void TestWaveformSource::DegradeSerialData(
 		m_vkReversePlan->AppendReverse(m_forwardOutBuf, m_reverseOutBuf, cmdBuf);
 		m_reverseOutBuf.MarkModifiedFromGpu();
 
-		//Done, block until the compute operations finish
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-
-		//Next step on the CPU
-		m_reverseOutBuf.PrepareForCpuAccess();
-
 		//Calculate the group delay of the channel at the middle frequency bin
 		auto& s21 = m_sparams[SPair(2, 1)];
 		int64_t groupDelay = s21.GetGroupDelay(s21.size() / 2) * FS_PER_SECOND;
@@ -500,19 +483,39 @@ void TestWaveformSource::DegradeSerialData(
 		size_t iend = depth;
 		size_t finalLen = iend - istart;
 
-		//Rescale the FFT output and copy to the output, then add noise
-		float fftscale = 1.0f / npoints;
-		for(size_t i=0; i<finalLen; i++)
-			cap->m_samples[i] = m_reverseOutBuf[i + istart] * fftscale + (float)noise(m_rng);
+		//Calculate a bunch of constants
+		const int numThreads = 32768;
+		DegradeSerialDataPushConstants push;
+		push.numSamples = finalLen;
+		push.samplesPerThread = (finalLen + numThreads) / numThreads;
+		push.rngSeed = m_rng();
+		push.sigma = noise_stdev;
+		push.scale = 1.0f / npoints;
+		push.inputOffset = istart;
+
+		//Renormalize the output and degrade the data
+		m_degradeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		m_degradeComputePipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf, true);
+		m_degradeComputePipeline.BindBufferNonblocking(1, m_reverseOutBuf, cmdBuf);
+		m_degradeComputePipeline.Dispatch(cmdBuf, push, numThreads, 1);
+
+		//Done, block until the compute operations finish
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Updated on the GPU
+		cap->MarkModifiedFromGpu();
 
 		//Resize the waveform to truncate garbage at the end
 		cap->Resize(finalLen);
 	}
 
+	//TODO: GPU accelerate this path
 	else
 	{
 		for(size_t i=0; i<depth; i++)
 			cap->m_samples[i] += noise(m_rng);
+		cap->MarkModifiedFromCpu();
 	}
 }
 

@@ -40,6 +40,16 @@
 #include "VulkanFFTPlan.h"
 #include <random>
 
+struct __attribute__((packed)) DegradeSerialDataPushConstants
+{
+	uint32_t numSamples;
+	uint32_t samplesPerThread;
+	uint32_t rngSeed;
+	uint32_t inputOffset;
+	float scale;
+	float sigma;
+};
+
 struct __attribute__((packed)) NoisySinePushConstants
 {
 	uint32_t numSamples;
@@ -104,27 +114,27 @@ public:
 		size_t depth,
 		float noise_stdev = 0.01);
 
-	WaveformBase* GeneratePRBS31(
+	void GeneratePRBS31(
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue,
+		UniformAnalogWaveform* wfm,
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
 		bool lpf = true,
-		float noise_stdev = 0.01,
-		std::function<void(float)> downloadCallback = nullptr);
+		float noise_stdev = 0.01);
 
-	WaveformBase* Generate8b10b(
+	void Generate8b10b(
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue,
+		UniformAnalogWaveform* wfm,
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
 		size_t depth,
 		bool lpf = true,
-		float noise_stdev = 0.01,
-		std::function<void(float)> downloadCallback = nullptr);
+		float noise_stdev = 0.01);
 
 	WaveformBase* GenerateStep(
 		float vlo,
@@ -181,6 +191,9 @@ protected:
 
 	///@brief Compute pipeline for noisy sinewave sum generation
 	ComputePipeline m_noisySineSumComputePipeline;
+
+	///@brief Compute pipeline for DegradeSerialData
+	ComputePipeline m_degradeComputePipeline;
 
 	///@brief S-parameters of the channel
 	SParameters m_sparams;

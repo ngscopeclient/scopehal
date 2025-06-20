@@ -507,9 +507,6 @@ bool DemoOscilloscope::AcquireData()
 	// prepare all channels to be 'about to download'
 	ChannelsDownloadStarted();
 
-	//cap waveform rate at 50 wfm/s to avoid saturating cpu
-	std::this_thread::sleep_for(std::chrono::microseconds(20 * 1000));
-
 	//Sweeping frequency
 	m_sweepFreq += 1e6;
 	if(m_sweepFreq > 1.5e9)
@@ -540,19 +537,14 @@ bool DemoOscilloscope::AcquireData()
 
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	WaveformBase* waveforms[4] = {NULL};
-	#pragma omp parallel for
+	WaveformBase* waveforms[4] = {nullptr};
 	for(int i=0; i<4; i++)
 	{
 		if(!m_channelsEnabled[i])
 			continue;
 
 		// Lambda passed to generate waveform methods to update "download" percentage
-		auto updateProgress = [i,this](float progress)
-			{
-				this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress);
-			};
-		this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
 		switch(i)
 		{
 			case 0:
@@ -574,22 +566,28 @@ bool DemoOscilloscope::AcquireData()
 				break;
 
 			case 2:
-				waveforms[i] = m_source[i]->GeneratePRBS31(
-					*m_cmdBuf[i], m_queue[i], 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2], updateProgress);
-				waveforms[i]->MarkModifiedFromCpu();
+				{
+					auto wfm = AllocateAnalogWaveform("PRBS31");
+					waveforms[i] = wfm;
+					m_source[i]->GeneratePRBS31(
+						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
+				}
 				break;
 
 			case 3:
-				waveforms[i] = m_source[i]->Generate8b10b(
-					*m_cmdBuf[i], m_queue[i], 0.9, 800e3, sampleperiod, depth, lpf3, noise[3], updateProgress);
-				waveforms[i]->MarkModifiedFromCpu();
+				{
+					auto wfm = AllocateAnalogWaveform("8B10B");
+					waveforms[i] = wfm;
+					m_source[i]->Generate8b10b(
+						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
+				}
 				break;
 
 			default:
 				break;
 		}
 
-		this->ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 	}
 
 	SequenceSet s;
