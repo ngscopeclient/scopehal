@@ -460,8 +460,11 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 			if(uiLen > glitchCutoff)		//Sanity check: no correction if we have a glitch
 			{
 				int64_t numUIs = round(uiLen * initialFrequency);
-				uiLen /= numUIs;
-				dperiod = period - uiLen;
+				if(numUIs != 0)	//divide by zero check needed in some cases
+				{
+					uiLen /= numUIs;
+					dperiod = period - uiLen;
+				}
 			}
 
 			if(tlast != 0)
