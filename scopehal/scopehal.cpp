@@ -732,8 +732,8 @@ void InitializeSearchPaths()
 	if(!binRootDir.empty())
 	{
 		std::filesystem::path rootDir = binRootDir.parent_path();
-		g_searchPaths.push_back(rootDir / "share/ngscopeclient");
-		g_searchPaths.push_back(rootDir / "share/scopehal");
+		g_searchPaths.push_back(string(rootDir / "share/ngscopeclient"));
+		g_searchPaths.push_back(string(rootDir / "share/scopehal"));
 	}
 
 	//Local directories preferred over system ones
