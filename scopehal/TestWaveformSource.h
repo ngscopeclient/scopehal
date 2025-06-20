@@ -51,6 +51,19 @@ struct __attribute__((packed)) NoisySinePushConstants
 	float radiansPerSample;
 };
 
+struct __attribute__((packed)) NoisySineSumPushConstants
+{
+	uint32_t numSamples;
+	uint32_t samplesPerThread;
+	uint32_t rngSeed;
+	float startPhase1;
+	float startPhase2;
+	float scale;
+	float sigma;
+	float radiansPerSample1;
+	float radiansPerSample2;
+};
+
 /**
 	@brief Helper class for generating test waveforms
 
@@ -78,7 +91,10 @@ public:
 		size_t depth,
 		float noise_stdev = 0.01);
 
-	WaveformBase* GenerateNoisySinewaveSum(
+	void GenerateNoisySinewaveSum(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		UniformAnalogWaveform* wfm,
 		float amplitude,
 		float startphase1,
 		float startphase2,
@@ -86,8 +102,7 @@ public:
 		float period2,
 		int64_t sampleperiod,
 		size_t depth,
-		float noise_stdev = 0.01,
-		std::function<void(float)> downloadCallback = nullptr);
+		float noise_stdev = 0.01);
 
 	WaveformBase* GeneratePRBS31(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -163,6 +178,9 @@ protected:
 
 	///@brief Compute pipeline for noisy sinewave generation
 	ComputePipeline m_noisySineComputePipeline;
+
+	///@brief Compute pipeline for noisy sinewave sum generation
+	ComputePipeline m_noisySineSumComputePipeline;
 
 	///@brief S-parameters of the channel
 	SParameters m_sparams;

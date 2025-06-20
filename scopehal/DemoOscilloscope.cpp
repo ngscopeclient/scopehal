@@ -565,9 +565,12 @@ bool DemoOscilloscope::AcquireData()
 				break;
 
 			case 1:
-				waveforms[i] = m_source[i]->GenerateNoisySinewaveSum(
-					0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1], updateProgress);
-				waveforms[i]->MarkModifiedFromCpu();
+				{
+					auto wfm = AllocateAnalogWaveform("NoisySineSum");
+					waveforms[i] = wfm;
+					m_source[i]->GenerateNoisySinewaveSum(
+						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
+				}
 				break;
 
 			case 2:

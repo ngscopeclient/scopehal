@@ -56,6 +56,7 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_channelEmulationComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_noisySineComputePipeline("shaders/NoisySine.spv", 1, sizeof(NoisySinePushConstants))
+	, m_noisySineSumComputePipeline("shaders/NoisySineSum.spv", 1, sizeof(NoisySineSumPushConstants))
 	, m_cachedNumPoints(0)
 	, m_cachedRawSize(0)
 {
@@ -164,6 +165,9 @@ void TestWaveformSource::GenerateNoisySinewave(
 /**
 	@brief Generates a sum of two sinewaves with AWGN added
 
+	@param cmdBuf			Vulkan command buffer to use
+	@param queue			Vulkan queue to use
+	@param wfm				Waveform to fill
 	@param amplitude		P-P amplitude of the waveform in volts
 	@param startphase1		Starting phase of the first sine in radians
 	@param startphase2		Starting phase of the second sine in radians
@@ -172,9 +176,11 @@ void TestWaveformSource::GenerateNoisySinewave(
 	@param sampleperiod		Interval between samples, in femtoseconds
 	@param depth			Total number of samples to generate
 	@param noise_stdev		Standard deviation of the AWGN in volts
-	@param downloadCallback	Callback for download progress
  */
-WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
+void TestWaveformSource::GenerateNoisySinewaveSum(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
+	UniformAnalogWaveform* wfm,
 	float amplitude,
 	float startphase1,
 	float startphase2,
@@ -182,32 +188,34 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveSum(
 	float period2,
 	int64_t sampleperiod,
 	size_t depth,
-	float noise_stdev,
-	std::function<void(float)> downloadCallback)
+	float noise_stdev)
 {
-	auto ret = new UniformAnalogWaveform("NoisySineSum");
-	ret->m_timescale = sampleperiod;
-	ret->Resize(depth);
+	wfm->m_triggerPhase = 0;
+	wfm->m_timescale = sampleperiod;
+	wfm->Resize(depth);
 
-	normal_distribution<> noise(0, noise_stdev);
+	//Calculate a bunch of constants
+	const int numThreads = 32768;
+	NoisySineSumPushConstants push;
+	float samples_per_cycle1 = period1 * 1.0 / sampleperiod;
+	float samples_per_cycle2 = period2 * 1.0 / sampleperiod;
+	push.numSamples = depth;
+	push.samplesPerThread = (depth + numThreads) / numThreads;
+	push.rngSeed = m_rng();
+	push.startPhase1 = startphase1;
+	push.startPhase2 = startphase2;
+	push.scale = amplitude / 4;	//sin is +/- 1, so need to divide amplitude by 4 to get scaling factor for sum
+	push.sigma = noise_stdev;
+	push.radiansPerSample1 = 2 * M_PI / samples_per_cycle1;
+	push.radiansPerSample2 = 2 * M_PI / samples_per_cycle2;
 
-	float radians_per_sample1 = 2 * M_PI * sampleperiod / period1;
-	float radians_per_sample2 = 2 * M_PI * sampleperiod / period2;
-
-	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor.
-	//Divide by 2 again to avoid clipping the sum of them
-	float scale = amplitude / 4;
-
-	for(size_t i=0; i<depth; i++)
-	{
-		ret->m_samples[i] = scale *
-			(sinf(i*radians_per_sample1 + startphase1) + sinf(i*radians_per_sample2 + startphase2))
-			+ noise(m_rng);
-		if( (i % 1024 == 0) && downloadCallback)
-			downloadCallback((float)i / (float)depth);
-	}
-
-	return ret;
+	//Do the actual waveform generation
+	cmdBuf.begin({});
+	m_noisySineSumComputePipeline.BindBufferNonblocking(0, wfm->m_samples, cmdBuf, true);
+	m_noisySineSumComputePipeline.Dispatch(cmdBuf, push, numThreads, 1);
+	wfm->MarkModifiedFromGpu();
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
 
 /**
