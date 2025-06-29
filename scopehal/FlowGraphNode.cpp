@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -387,7 +387,7 @@ void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
 
 		SetInput(
 			it.first.as<string>(),
-			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream),
+			StreamDescriptor(table.Lookup<OscilloscopeChannel*>(index), stream),
 			true
 			);
 	}

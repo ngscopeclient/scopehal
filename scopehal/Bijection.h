@@ -109,7 +109,7 @@ public:
 	{ return m_reverseMap.find(key) != m_reverseMap.end(); }
 
 	///@brief Erase all entries in the bijection
-	void clear()
+	virtual void clear()
 	{
 		m_forwardMap.clear();
 		m_reverseMap.clear();

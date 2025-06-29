@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,7 @@
 
 #include "InstrumentChannel.h"
 #include "ConfigWarningList.h"
-
+#include "SerializableObject.h"
 
 /**
 	@brief An arbitrary lab instrument. Oscilloscope, LA, PSU, DMM, etc
@@ -58,6 +58,7 @@
  */
 class Instrument
 	: public std::enable_shared_from_this<Instrument>
+	, public SerializableObject
 {
 public:
 	virtual ~Instrument();

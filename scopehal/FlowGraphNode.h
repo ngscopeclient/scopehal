@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,6 +43,7 @@ class StreamDescriptor;
 #include "FilterParameter.h"
 #include "Waveform.h"
 #include "Stream.h"
+#include "SerializableObject.h"
 
 /**
 	@brief Abstract base class for a node in the signal flow graph.
@@ -50,7 +51,7 @@ class StreamDescriptor;
 
 	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters.
  */
-class FlowGraphNode
+class FlowGraphNode : public SerializableObject
 {
 public:
 	FlowGraphNode();
