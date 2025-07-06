@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -306,7 +306,7 @@ bool HaasoscopePro::AcquireData()
 	uint32_t seqnum;
 	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
 		return false;
-	LogDebug("HaasoscopePro got seqnum %d \n",seqnum); // Note: run ngscopeclient with --debug to see these
+	LogTrace("HaasoscopePro got seqnum %d \n",seqnum); // Note: run ngscopeclient with --debug to see these
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
@@ -337,7 +337,7 @@ bool HaasoscopePro::AcquireData()
 	double wfms_s;
 	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
 		return false;
-	LogDebug("HaasoscopePro got wfms_s %f \n",wfms_s);
+	LogTrace("HaasoscopePro got wfms_s %f \n",wfms_s);
 	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
 
 	//Acquire data for each channel
@@ -361,7 +361,7 @@ bool HaasoscopePro::AcquireData()
 			return false;
 		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
-		LogDebug("HaasoscopePro got memdepth %lld \n",memdepth);
+		LogTrace("HaasoscopePro got memdepth %" PRIu64 " \n", memdepth);
 
 		auto& abuf = m_analogRawWaveformBuffers[chnum];
 		abuf->resize(memdepth);
@@ -380,20 +380,20 @@ bool HaasoscopePro::AcquireData()
 			float offset = config[1];
 			//float trigphase = -config[2] * fs_per_sample;
 			float trigphase = config[2];
-			LogDebug("HaasoscopePro got scale offset trigphase %f %f %f \n", scale, offset, trigphase);
+			LogTrace("HaasoscopePro got scale offset trigphase %f %f %f \n", scale, offset, trigphase);
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
 
 			uint8_t clipping;
 			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
 				return false;
-			LogDebug("HaasoscopePro got clipping %d \n", clipping);
+			LogTrace("HaasoscopePro got clipping %d \n", clipping);
 
 			//FIXME: stream timestamp from the server
 
 			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
 				return false;
-			LogDebug("HaasoscopePro got data bytes... %d %d %d ...\n", buf[0],buf[1],buf[2]);
+			LogTrace("HaasoscopePro got data bytes... %d %d %d ...\n", buf[0],buf[1],buf[2]);
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
@@ -419,9 +419,9 @@ bool HaasoscopePro::AcquireData()
 	}
 
 	//Prefer GPU path
-	if(g_hasShaderInt8 && g_hasPushDescriptor)
+	if(g_hasShaderInt16 && g_hasPushDescriptor)
 	{
-		LogDebug("HaasoscopePro doing GPU path \n");
+		LogTrace("HaasoscopePro doing GPU path \n");
 		m_cmdBuf->begin({});
 		m_conversionPipeline->Bind(*m_cmdBuf);
 		for(size_t i=0; i<awfms.size(); i++)
@@ -447,7 +447,7 @@ bool HaasoscopePro::AcquireData()
 	//Fallback path if GPU doesn't have suitable integer support
 	else
 	{
-		LogDebug("HaasoscopePro doing GPU path \n");
+		LogTrace("HaasoscopePro doing GPU path \n");
 		#pragma omp parallel for  //Process analog captures in parallel
 		for(size_t i=0; i<awfms.size(); i++)
 		{
