@@ -219,6 +219,14 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_SDA_3K;
 		m_maxBandwidth = 3000;
 	}
+	else if(m_model.find("SDA7") == 0)
+	{
+		if(m_model.find("ZI-A") != string::npos)
+			m_modelid = MODEL_SDA_7ZI_A;
+		else
+			m_model = MODEL_SDA_7ZI;
+		m_maxBandwidth = stoi(m_model.substr(4, 2)) * 100;
+	}
 	else if(m_model.find("WM8") == 0)
 	{
 		if(m_model.find("ZI-B") != string::npos)
@@ -912,7 +920,9 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 			nchans = 4;
 			break;
 
-		//All SDA / WaveMaster 8Zi have 4 channels
+		//All SDA / WaveMaster 7Zi and 8Zi have 4 channels
+		case MODEL_SDA_7ZI:
+		case MODEL_SDA_7ZI_A:
 		case MODEL_SDA_8ZI:
 		case MODEL_SDA_8ZI_A:
 		case MODEL_SDA_8ZI_B:
@@ -1285,6 +1295,9 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_HDO_4KA:
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_8K_HD:		//TODO: seems like multiple levels of interleaving possible
+		case MODEL_SDA_7ZI:
+		case MODEL_SDA_7ZI_A:
+		case MODEL_SDA_8ZI:
 		case MODEL_SDA_8ZI_A:
 		case MODEL_SDA_8ZI_B:
 		case MODEL_WAVEMASTER_8ZI_A:
@@ -1527,6 +1540,15 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 		//We should probably change this to SDA_FIRSTGEN or something?
 		case MODEL_SDA_3K:
 			ret.push_back(1000);
+			break;
+
+		case MODEL_SDA_7ZI:
+		case MODEL_SDA_7ZI_A:
+			ret.push_back(1000);
+			if(m_maxBandwidth >= 4000)
+				ret.push_back(3000);
+			if(m_maxBandwidth >= 6000)
+				ret.push_back(4000);
 			break;
 
 		case MODEL_WAVEMASTER_8ZI:
@@ -1772,6 +1794,8 @@ bool LeCroyOscilloscope::HasInputMux(size_t i)
 	switch(m_modelid)
 	{
 		//Add other models with muxes here
+		case MODEL_SDA_7ZI:
+		case MODEL_SDA_7ZI_A:
 		case MODEL_SDA_8ZI:
 		case MODEL_SDA_8ZI_A:
 		case MODEL_SDA_8ZI_B:
@@ -3152,6 +3176,9 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		if(m_modelid == MODEL_WAVERUNNER_8K)
 			ret.push_back(1000);
 
+		bool wm7 =
+			(m_modelid == MODEL_SDA_7ZI) ||
+			(m_modelid == MODEL_SDA_7ZI_A);
 		bool wm8 =
 			(m_modelid == MODEL_WAVEMASTER_8ZI_B) ||
 			(m_modelid == MODEL_SDA_8ZI) ||
@@ -3182,7 +3209,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(2 * m);
 		ret.push_back(5 * m);
 		ret.push_back(10 * m);
-		if(wm8)
+		if(wm8 || wm7)
 			ret.push_back(25 * m);
 		else
 			ret.push_back(20 * m);
@@ -3251,6 +3278,20 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 				ret.push_back(1250 * m);
 				ret.push_back(2500 * m);
 				ret.push_back(10 * g);
+				break;
+
+			case MODEL_SDA_7ZI:
+			case MODEL_SDA_7ZI_A:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+
+				//2.5 GHz and higher SKUs have double the ADCs
+				if(m_maxBandwidth > 2000)
+					ret.push_back(20 * g);
 				break;
 
 			case MODEL_SDA_8ZI:
@@ -3326,7 +3367,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesInterleaved()
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
-		case MODEL_WAVEMASTER_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI:
+		case MODEL_WAVEMASTER_8ZI_A:
 		case MODEL_WAVERUNNER_8K_HD:
 			break;
 
@@ -3377,6 +3419,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 		ret.push_back(2 * m);
 		switch(m_modelid)
 		{
+			case MODEL_SDA_7ZI:
+			case MODEL_SDA_7ZI_A:
 			case MODEL_SDA_8ZI:
 			case MODEL_SDA_8ZI_A:
 			case MODEL_SDA_8ZI_B:
@@ -3435,6 +3479,11 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			//standard memory
 			//TODO: extended options
 			case MODEL_WAVEMASTER_8ZI_B:
+				break;
+
+			//TODO: extended memory options
+			case MODEL_SDA_7ZI:
+			case MODEL_SDA_7ZI_A:
 				break;
 
 			//extended memory
