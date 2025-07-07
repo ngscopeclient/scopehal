@@ -3484,6 +3484,18 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			//TODO: extended memory options
 			case MODEL_SDA_7ZI:
 			case MODEL_SDA_7ZI_A:
+				ret.push_back(20 * m);
+				if(m_memoryDepthOption >= 32)
+				{
+					ret.push_back(20 * m);
+					ret.push_back(25 * m);
+					ret.push_back(32 * m);
+				}
+				if(m_memoryDepthOption >= 64)
+				{
+					ret.push_back(50 * m);
+					ret.push_back(64 * m);
+				}
 				break;
 
 			//extended memory
