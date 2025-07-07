@@ -433,7 +433,7 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
-			//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family
+			//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family (seems like 7Zi has this too)
 			else if(o == "-S")
 			{
 				type = "Hardware";
@@ -441,7 +441,7 @@ void LeCroyOscilloscope::DetectOptions()
 				m_memoryDepthOption = 32;
 				action = "Enabled";
 			}
-			else if(o == "-S")
+			else if(o == "-M")
 			{
 				type = "Hardware";
 				desc = "Medium (64M point) memory";
