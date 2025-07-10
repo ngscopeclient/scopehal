@@ -358,7 +358,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 				if(iclock >= cend)
 				{
 					//done, skip any trailing samples
-					for(; j<16; j++)
+					for(; j<8; j++)
 						offset[j] = -INT_MAX;
 					break;
 				}
@@ -555,7 +555,7 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 				if(iclock >= cend)
 				{
 					//done, skip any trailing samples
-					for(; j<16; j++)
+					for(; j<8; j++)
 						offset[j] = -INT_MAX;
 					break;
 				}
