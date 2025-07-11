@@ -1,7 +1,7 @@
 /************************************************************************************************************************                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -28,6 +28,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "OvershootMeasurement.h"
+#include "../scopehal/KahanSummation.h"
 
 using namespace std;
 
@@ -39,6 +40,7 @@ OvershootMeasurement::OvershootMeasurement(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "max", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
 }
@@ -48,7 +50,7 @@ OvershootMeasurement::OvershootMeasurement(const string& color)
 
 bool OvershootMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -73,7 +75,7 @@ void OvershootMeasurement::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -96,8 +98,11 @@ void OvershootMeasurement::Refresh()
 
 	int64_t		tmax = 0;
 	float		vmax = 0;
+	float		globalmax = -FLT_MAX;
 
 	//For each cycle, find how far we got above the top
+	KahanSummation sum;
+	size_t nedges = 0;
 	for(size_t i=0; i < len; i++)
 	{
 		//If we're below the midpoint, reset everything and add a new sample
@@ -113,9 +118,14 @@ void OvershootMeasurement::Refresh()
 					cap->m_durations[off-1] = tmax - cap->m_offsets[off-1];
 
 				//Add the new sample
+				float overshoot = vmax - top;
 				cap->m_offsets.push_back(tmax);
 				cap->m_durations.push_back(0);
-				cap->m_samples.push_back(vmax - top);
+				cap->m_samples.push_back(overshoot);
+
+				nedges ++;
+				globalmax = max(overshoot, globalmax);
+				sum += overshoot;
 			}
 
 			//Reset
@@ -134,6 +144,9 @@ void OvershootMeasurement::Refresh()
 		}
 	}
 	SetData(cap, 0);
+
+	m_streams[1].m_value = sum.GetSum() / nedges;
+	m_streams[2].m_value = globalmax;
 
 	cap->MarkModifiedFromCpu();
 }
