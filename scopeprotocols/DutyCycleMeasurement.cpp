@@ -56,6 +56,8 @@ bool DutyCycleMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+		return true;
 
 	return false;
 }
@@ -76,24 +78,52 @@ void DutyCycleMeasurement::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 	auto din = GetInputWaveform(0);
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	din->PrepareForCpuAccess();
+	if(din->size() < 2)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
 
-	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = GetAvgVoltage(sdin, udin);
-
-	//Timestamps of the edges
-	//TODO: gpu accelerate if possible
+	//Get timestamps of the edges
+	//TODO: gpu accelerate
 	vector<int64_t> edges;
-	if(sdin)
-		FindZeroCrossings(sdin, midpoint, edges);
+
+	bool initial_polarity;
+	if(sdin || udin)
+	{
+		//Find average voltage of the waveform and use that as the zero crossing
+		float midpoint = GetAvgVoltage(sdin, udin);
+		if(sdin)
+			FindZeroCrossings(sdin, midpoint, edges);
+		else
+			FindZeroCrossings(udin, midpoint, edges);
+
+		//Figure out edge polarity
+		initial_polarity = (GetValue(sdin, udin, 0) > midpoint);
+	}
 	else
-		FindZeroCrossings(udin, midpoint, edges);
+	{
+		if(sddin)
+		{
+			FindZeroCrossings(sddin, edges);
+			initial_polarity = sddin->m_samples[0];
+		}
+		else if(uddin)
+		{
+			FindZeroCrossings(uddin, edges);
+			initial_polarity = uddin->m_samples[0];
+		}
+	}
+
 	if(edges.size() < 2)
 	{
 		SetData(nullptr, 0);
@@ -104,9 +134,6 @@ void DutyCycleMeasurement::Refresh()
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
-
-	//Figure out edge polarity
-	bool initial_polarity = (GetValue(sdin, udin, 0) > midpoint);
 
 	//Find the duty cycle per cycle, then average
 	size_t elen = edges.size();
