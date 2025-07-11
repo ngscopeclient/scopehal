@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "DutyCycleMeasurement.h"
+#include "KahanSummation.h"
 
 using namespace std;
 
@@ -38,7 +39,8 @@ using namespace std;
 DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_PERCENT), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_PERCENT), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_PERCENT), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("din");
@@ -49,7 +51,7 @@ DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 
 bool DutyCycleMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -86,6 +88,7 @@ void DutyCycleMeasurement::Refresh()
 	float midpoint = GetAvgVoltage(sdin, udin);
 
 	//Timestamps of the edges
+	//TODO: gpu accelerate if possible
 	vector<int64_t> edges;
 	if(sdin)
 		FindZeroCrossings(sdin, midpoint, edges);
@@ -93,7 +96,7 @@ void DutyCycleMeasurement::Refresh()
 		FindZeroCrossings(udin, midpoint, edges);
 	if(edges.size() < 2)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -105,7 +108,10 @@ void DutyCycleMeasurement::Refresh()
 	//Figure out edge polarity
 	bool initial_polarity = (GetValue(sdin, udin, 0) > midpoint);
 
+	//Find the duty cycle per cycle, then average
 	size_t elen = edges.size();
+	KahanSummation sum;
+	int64_t nedges = 0;
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -128,9 +134,14 @@ void DutyCycleMeasurement::Refresh()
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(total);
 		cap->m_samples.push_back(duty);
+
+		sum += duty;
+		nedges ++;
 	}
 
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+
+	m_streams[1].m_value = sum.GetSum() / nedges;
 }
