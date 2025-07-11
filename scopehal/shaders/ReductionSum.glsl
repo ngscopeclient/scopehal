@@ -74,7 +74,7 @@ void main()
 	float c = 0;
 	for(uint i=nstart; i<nend; i++)
 	{
-		float y = pin[i];
+		float y = pin[i] - c;
 		float t = partialSum + y;
 		c = (t - partialSum) - y;
 		partialSum = t;
