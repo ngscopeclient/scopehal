@@ -23,14 +23,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 		message("-- LXI library not found, LXI (VXI-11/TCP and RAW/TCP ) instrument support will not be available.")
 		unset(LXI_LINK_LIBRARIES CACHE)
 	endif()
-
-
-	pkg_check_modules(LINUXGPIB libgpib QUIET IMPORTED_TARGET)
-	if(LINUXGPIB_FOUND)
-		message("-- Found Linux GPIB: ${LINUXGPIB_LINK_LIBRARIES}")
-	else()
-		message("-- Linux GPIB not found, GPIB instrument support will not be available.")
-	endif()
 endif()
 
 # This is needed for the precompiled header
@@ -81,7 +73,6 @@ set(SCOPEHAL_SOURCES
 	SCPISocketTransport.cpp
 	SCPITwinLanTransport.cpp
 	VICPSocketTransport.cpp
-	SCPILinuxGPIBTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
 	SCPISocketCANTransport.cpp
@@ -266,13 +257,6 @@ if(LXI_FOUND)
 		PkgConfig::TIRPC
 	)
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
-endif()
-
-if(LINUXGPIB_FOUND)
-	target_link_libraries(scopehal
-		PkgConfig::LINUXGPIB
-	)
-	target_compile_definitions(scopehal PUBLIC HAS_LINUXGPIB)
 endif()
 
 target_include_directories(scopehal

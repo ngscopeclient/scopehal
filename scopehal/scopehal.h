@@ -120,7 +120,6 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
 #include "SCPITwinLanTransport.h"
-#include "SCPILinuxGPIBTransport.h"
 #include "SCPILxiTransport.h"
 #include "SCPINullTransport.h"
 #include "SCPIUARTTransport.h"

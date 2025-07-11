@@ -178,9 +178,6 @@ void TransportStaticInit()
 #ifdef HAS_LXI
 	AddTransportClass(SCPILxiTransport);
 #endif
-#ifdef HAS_LINUXGPIB
-	AddTransportClass(SCPILinuxGPIBTransport);
-#endif
 }
 
 /**
@@ -368,6 +365,8 @@ void InitializePlugins()
 	for(auto dir : search_dirs)
 	{
 		DIR* hdir = opendir(dir.c_str());
+		LogDebug("Searching for plugins in %s\n", dir.c_str());
+		LogIndenter li;
 		if(!hdir)
 			continue;
 
@@ -386,14 +385,19 @@ void InitializePlugins()
 			//(for now, never unload the plugins)
 			string fname = dir + "/" + pent->d_name;
 			void* hlib = dlopen(fname.c_str(), RTLD_NOW);
-			if(hlib == NULL)
+			if(hlib == nullptr)
 				continue;
+			LogDebug("Checking %s\n", fname.c_str());
+			LogIndenter li2;
 
 			//If loaded, look for PluginInit()
 			typedef void (*PluginInit)();
 			PluginInit init = (PluginInit)dlsym(hlib, "PluginInit");
 			if(!init)
+			{
+				LogDebug("PluginInit not found, skipping\n");
 				continue;
+			}
 
 			//If found, it's a valid plugin
 			LogDebug("Loading plugin %s\n", fname.c_str());
