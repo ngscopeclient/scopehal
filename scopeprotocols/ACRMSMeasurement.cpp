@@ -242,7 +242,7 @@ void ACRMSMeasurement::DoRefreshUniform(
 
 	//Create the output as a sparse waveform
 	auto cap = SetupEmptySparseAnalogOutputWaveform(wfm, 0, true);
-	cap->Resize((elen-2)/2);
+	cap->Resize((elen-1)/2);
 
 	//GPU path needs native int64, no bignum fallback for now
 	if(g_hasShaderInt64)
@@ -252,7 +252,7 @@ void ACRMSMeasurement::DoRefreshUniform(
 		ACRMSTrendPushConstants tpush;
 		tpush.timescale		= wfm->m_timescale;
 		tpush.numSamples	= wfm->m_samples.size();
-		tpush.numEdgePairs	= (elen-2) / 2;
+		tpush.numEdgePairs	= (elen-1) / 2;
 		tpush.dcBias		= average;
 
 		m_trendComputePipeline->BindBufferNonblocking(0, cap->m_samples, cmdBuf, true);
