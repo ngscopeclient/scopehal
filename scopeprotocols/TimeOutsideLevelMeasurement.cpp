@@ -38,7 +38,7 @@ using namespace std;
 TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("din");
@@ -61,7 +61,7 @@ TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 
 bool TimeOutsideLevelMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -91,7 +91,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		m_streams[0].m_value = std::numeric_limits<float>::quiet_NaN();
 		return;
 	}
 
@@ -206,12 +206,5 @@ void TimeOutsideLevelMeasurement::Refresh()
 	int64_t totaltime = (hightime + lowtime) * din->m_timescale;
 
 	//Create the output
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-	cap->m_samples.push_back(totaltime);
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
+	m_streams[0].m_value = totaltime;
 }
