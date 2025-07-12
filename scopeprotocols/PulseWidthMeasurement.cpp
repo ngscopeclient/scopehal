@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "PulseWidthMeasurement.h"
+#include "../scopehal/KahanSummation.h"
 
 using namespace std;
 
@@ -40,6 +41,7 @@ PulseWidthMeasurement::PulseWidthMeasurement(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Amplitude", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
+	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("din");
@@ -50,7 +52,7 @@ PulseWidthMeasurement::PulseWidthMeasurement(const string& color)
 
 bool PulseWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -116,7 +118,7 @@ void PulseWidthMeasurement::Refresh()
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -126,7 +128,7 @@ void PulseWidthMeasurement::Refresh()
 	cap->PrepareForCpuAccess();
 
 	//Create the output for amplitude waveform for analog inputs only
-	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : NULL;	
+	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : NULL;
 	if(cap1)
 	{
 		cap1->m_timescale = 1;
@@ -134,6 +136,8 @@ void PulseWidthMeasurement::Refresh()
 	}
 
 	size_t elen = edges.size();
+	KahanSummation sum;
+	int64_t nedges = 0;
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -165,6 +169,9 @@ void PulseWidthMeasurement::Refresh()
 			cap1->m_offsets.push_back(start);
 			cap1->m_durations.push_back(delta);
 			cap1->m_samples.push_back(max_value);
+
+			nedges ++;
+			sum += delta;
 		}
 		else if (sadin)
 		{
@@ -194,11 +201,16 @@ void PulseWidthMeasurement::Refresh()
 			cap1->m_offsets.push_back(start);
 			cap1->m_durations.push_back(delta);
 			cap1->m_samples.push_back(max_value);
+
+			nedges ++;
+			sum += delta;
 		}
 	}
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
+
+	m_streams[2].m_value = sum.GetSum() / nedges;
 
 	if(sadin || uadin)
 	{
