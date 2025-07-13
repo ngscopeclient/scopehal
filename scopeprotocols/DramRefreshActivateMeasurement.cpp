@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,9 @@ using namespace std;
 DramRefreshActivateMeasurement::DramRefreshActivateMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "min", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	CreateInput("din");
 }
 
@@ -48,10 +50,10 @@ DramRefreshActivateMeasurement::DramRefreshActivateMeasurement(const string& col
 
 bool DramRefreshActivateMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
+	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != nullptr ) )
 		return true;
 
 	return false;
@@ -72,7 +74,7 @@ void DramRefreshActivateMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -89,6 +91,7 @@ void DramRefreshActivateMeasurement::Refresh()
 
 	int64_t tlast = 0;
 	size_t len = din->m_samples.size();
+	float tmin = FLT_MAX;
 	for(size_t i=0; i<len; i++)
 	{
 		int64_t tnow = din->m_offsets[i] * din->m_timescale;
@@ -113,10 +116,12 @@ void DramRefreshActivateMeasurement::Refresh()
 				continue;
 
 			//Valid access, measure the latency
+			int64_t delta = tact - tref;
 			cap->m_offsets.push_back(tlast);
 			cap->m_durations.push_back(tnow - tlast);
-			cap->m_samples.push_back(tact - tref);
+			cap->m_samples.push_back(delta);
 			tlast = tnow;
+			tmin = min(tmin, (float)delta);
 
 			//Purge the last-refresh timestamp so we don't report false times for the next activate
 			lastRef[sample.m_bank] = 0;
@@ -126,11 +131,12 @@ void DramRefreshActivateMeasurement::Refresh()
 	if(cap->m_samples.empty())
 	{
 		delete cap;
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
 	SetData(cap, 0);
+	m_streams[1].m_value = tmin;
 
 	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
