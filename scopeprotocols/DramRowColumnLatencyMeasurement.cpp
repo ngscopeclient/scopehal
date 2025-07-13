@@ -39,7 +39,8 @@ using namespace std;
 DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "min", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("din");
 }
 
@@ -48,7 +49,7 @@ DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& c
 
 bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
@@ -72,7 +73,7 @@ void DramRowColumnLatencyMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -90,9 +91,10 @@ void DramRowColumnLatencyMeasurement::Refresh()
 
 	int64_t tlast = 0;
 	size_t len = din->m_samples.size();
+	float tmin = FLT_MAX;
 	for(size_t i=0; i<len; i++)
 	{
-		int64_t tnow = din->m_offsets[i] * din->m_timescale;
+		int64_t tnow = din->m_offsets[i] * din->m_timescale + din->m_triggerPhase;
 
 		//Discard invalid bank IDs
 		auto sample = din->m_samples[i];
@@ -117,9 +119,13 @@ void DramRowColumnLatencyMeasurement::Refresh()
 				continue;
 
 			//Valid access, measure the latency
-			cap->m_offsets.push_back(tlast);
-			cap->m_durations.push_back(tnow - tlast);
-			cap->m_samples.push_back(tcol - tact);
+			int64_t delta = tcol - tact;
+			if(!cap->m_durations.empty())
+				cap->m_durations[cap->m_durations.size()-1] = tnow - tlast;
+			cap->m_offsets.push_back(tnow);
+			cap->m_durations.push_back(1);
+			cap->m_samples.push_back(delta);
+			tmin = min(tmin, (float)delta);
 			tlast = tnow;
 
 			//Purge the last-refresh activate so we don't report false times for the next read or write
@@ -135,6 +141,7 @@ void DramRowColumnLatencyMeasurement::Refresh()
 	}
 
 	SetData(cap, 0);
+	m_streams[1].m_value = tmin;
 
 	cap->MarkModifiedFromCpu();
 }

@@ -117,8 +117,10 @@ void DramRefreshActivateMeasurement::Refresh()
 
 			//Valid access, measure the latency
 			int64_t delta = tact - tref;
-			cap->m_offsets.push_back(tlast);
-			cap->m_durations.push_back(tnow - tlast);
+			if(!cap->m_durations.empty())
+				cap->m_durations[cap->m_durations.size()-1] = tnow - tlast;
+			cap->m_offsets.push_back(tnow);
+			cap->m_durations.push_back(1);
 			cap->m_samples.push_back(delta);
 			tlast = tnow;
 			tmin = min(tmin, (float)delta);
