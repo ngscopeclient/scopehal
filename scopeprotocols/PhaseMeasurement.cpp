@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -28,6 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
+#include "../scopehal/KahanSummation.h"
 #include "PhaseMeasurement.h"
 
 using namespace std;
@@ -40,7 +41,8 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 	, m_freqModeName("Frequency Mode")
 	, m_freqName("Center Frequency")
 {
-	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_DEGREES), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_DEGREES), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("din");
@@ -87,7 +89,7 @@ void PhaseMeasurement::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -138,13 +140,15 @@ void PhaseMeasurement::Refresh()
 	//Main measurement loop, update once per cycle at the rising edge
 	//This isn't quite as nice as the original implementation measuring instantaneous phase within a single cycle,
 	//but is MUCH more robust in the presence of amplitude noise or variation (e.g. pulse shaping as seen in PSK31)
+	KahanSummation sumI;
+	KahanSummation sumQ;
 	for(size_t i=0; i<outlen; i++)
 	{
 		//Calculate normalized phase of the LO
 		int64_t tnow = edges[i*2];
 		float theta = fmodf(tnow, period) / period;
 		theta = (theta - 0.5) * 2 * M_PI;
-		float finalPhase = (360 * theta / M_PI) + 180;
+		float finalPhase = -(360 * theta / M_PI);
 
 		if(finalPhase < -180)
 			finalPhase += 360;
@@ -155,10 +159,21 @@ void PhaseMeasurement::Refresh()
 		cap->m_durations[i] = 1;
 		cap->m_samples[i] = finalPhase;
 
+		//convert to I/Q and sum
+		float finalRad = finalPhase * M_PI / 180;
+		sumI += sin(finalRad);
+		sumQ += cos(finalRad);
+
 		//Resize last sample
 		if(i > 0)
 			cap->m_durations[i-1] = tnow - cap->m_offsets[i-1];
 	}
+
+	//Compute final I/Q vector sum and convert back
+	float finalI = sumI.GetSum() / outlen;
+	float finalQ = sumQ.GetSum() / outlen;
+	float theta = atan2(finalI, finalQ);
+	m_streams[1].m_value = 180 * theta / M_PI;
 
 	cap->MarkModifiedFromCpu();
 }
