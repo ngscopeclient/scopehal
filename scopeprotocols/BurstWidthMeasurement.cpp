@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,7 +53,7 @@ BurstWidthMeasurement::BurstWidthMeasurement(const string& color)
 
 bool BurstWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -84,7 +84,7 @@ void BurstWidthMeasurement::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -111,7 +111,7 @@ void BurstWidthMeasurement::Refresh()
 	//We need at least one full cycle of the waveform to have a meaningful burst width
 	if(edges.size() < 2)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -158,12 +158,12 @@ void BurstWidthMeasurement::Refresh()
 
 	if (cap->size() == 0)
 	{
-		cap->m_offsets.push_back(0);
-		cap->m_durations.push_back(0);
-		cap->m_samples.push_back(0);
+		SetData(nullptr, 0);
+		return;
 	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
+	else
+	{
+		SetData(cap, 0);
+		cap->MarkModifiedFromCpu();
+	}
 }
