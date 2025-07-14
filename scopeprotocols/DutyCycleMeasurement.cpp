@@ -97,7 +97,7 @@ void DutyCycleMeasurement::Refresh()
 	//TODO: gpu accelerate
 	vector<int64_t> edges;
 
-	bool initial_polarity;
+	bool initial_polarity = false;
 	if(sdin || udin)
 	{
 		//Find average voltage of the waveform and use that as the zero crossing
@@ -121,6 +121,11 @@ void DutyCycleMeasurement::Refresh()
 		{
 			FindZeroCrossings(uddin, edges);
 			initial_polarity = uddin->m_samples[0];
+		}
+		else
+		{
+			SetData(nullptr, 0);
+			return;
 		}
 	}
 
