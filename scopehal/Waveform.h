@@ -488,7 +488,7 @@ public:
 	{
 		if(name.empty())
 		{
-			m_samples.SetName(std::string("UniformWaveform<") + typeid(S).name() + ">.m_samples");
+			m_samples.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_samples");
 			m_offsets.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_offsets");
 			m_durations.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_durations");
 		}
