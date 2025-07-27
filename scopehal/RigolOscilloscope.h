@@ -96,14 +96,35 @@ public:
 	void ForceHDMode(bool mode);
 
 protected:
-	enum protocol_version
+	enum family
 	{
+		DS1x_OLD,
+		DS1x,
+		MSO2x_DS2x, // MSO2000A(-S) / DS2000A series
 		MSO5,	 //MSO5000 series
-		DS,
-		DS_OLD,
 		DHO,	//DHO800, DHO900, DHO1000 and DHO4000 series
 	};
-
+	
+	
+	typedef struct
+	{
+		bool advanced_trigger;
+		bool decoding;
+		bool CAN_analysis;
+		bool deep_memory;
+	} stOpts_MSO2xDS2x;
+	
+	typedef struct
+	{
+		bool bw200M;
+	} stOpts_MSO5;
+	
+	typedef union
+	{
+		stOpts_MSO2xDS2x mso2;
+		stOpts_MSO5 mso5;
+	} stOpts;
+	
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//hardware analog channel count, independent of LA option etc
@@ -131,11 +152,12 @@ protected:
 
 	int m_modelNumber;
 	unsigned int m_bandwidth;
-	bool m_opt200M;
+	stOpts m_opts;
+	
 	uint64_t m_maxMdepth; /* Maximum Memory depth for DHO model s*/
 	uint64_t m_maxSrate;  /* Maximum Sample rate for DHO models */
 	bool m_lowSrate;	  /* True for DHO low sample rate models (DHO800/900) */
-	protocol_version m_protocol;
+	family m_family;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
