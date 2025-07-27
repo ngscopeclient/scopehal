@@ -378,6 +378,8 @@ protected:
 	bool m_interleavingValid;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
+	bool m_dmmAutorangeValid;
+	bool m_dmmAutorange;
 	std::map<size_t, bool> m_probeIsActive;
 	std::map<size_t, bool> m_channelIsInverted;
 	float GetTriggerLevelWithInversion(Trigger* trig);
