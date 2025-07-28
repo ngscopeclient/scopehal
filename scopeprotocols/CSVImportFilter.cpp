@@ -83,6 +83,8 @@ void CSVImportFilter::OnFileNameChanged()
 	int64_t fs = 0;
 	GetTimestampOfFile(fname, timestamp, fs);
 
+	double start = GetTime();
+
 	FILE* fp = fopen(fname.c_str(), "r");
 	if(!fp)
 	{
@@ -107,10 +109,20 @@ void CSVImportFilter::OnFileNameChanged()
 
 		nrow ++;
 
-		//Discard blank lines
-		string s = Trim(line);
-		if(s.empty())
+		//Find first non-blank character
+		char* pline = line;
+		while(isspace(*pline))
+			pline ++;
+
+		//If it's a newline or nul, the line was blank - discard it
+		if( (*pline == '\0') || (*pline == '\n') )
 			continue;
+
+		//Discard trailing newline if any
+		auto slen = strlen(pline);
+		if(pline[slen-1] == '\n')
+			pline[slen-1] = '\0';
+		string s = pline;
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
 		if(s[0] == '#')
@@ -415,4 +427,7 @@ void CSVImportFilter::OnFileNameChanged()
 			}
 		}
 	}
+
+	double dt = GetTime() - start;
+	LogTrace("CSV loading took %.3f sec\n", dt);
 }
