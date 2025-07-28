@@ -219,14 +219,7 @@ void CSVImportFilter::OnFileNameChanged()
 
 					//Parse time to a float and convert to fs
 					if(m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS)
-					{
-						double timeSec;
-						if(tmp.find("e") == string::npos)
-							sscanf(tmp.c_str(), "%lf", &timeSec);
-						else
-							sscanf(tmp.c_str(), "%le", &timeSec);
-						timestamps.push_back(FS_PER_SECOND * timeSec);
-					}
+						timestamps.push_back(FS_PER_SECOND * strtof(tmp.c_str(), nullptr));
 
 					//other units are as-is
 					else
@@ -402,13 +395,7 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
 
 				//Read waveform data
-				float v;
-				auto tmp = lines[j][i];
-				if(tmp.find("e") == string::npos)
-					sscanf(tmp.c_str(), "%f", &v);
-				else
-					sscanf(tmp.c_str(), "%e", &v);
-				wfm->m_samples[j] = v;
+				wfm->m_samples[j] = strtof(lines[j][i].c_str(), nullptr);
 			}
 
 			if(TryNormalizeTimebase(wfm))
