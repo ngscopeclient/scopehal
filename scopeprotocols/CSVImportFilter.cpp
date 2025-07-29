@@ -107,9 +107,9 @@ void CSVImportFilter::OnFileNameChanged()
 	ClearStreams();
 
 	//Read the file
-	//More natural implementation is lots of lines, but that's expensive. Columnar structure has less allocation
+	//More natural implementation is lots of lines, but that's expensive. Columnar structure has less allocations
 	vector<string> names;
-	vector< vector<string> > columns;
+	vector< vector<char*> > vcolumns;
 	vector<int64_t> timestamps;
 	bool digilentFormat;
 	size_t nrow = 0;
@@ -217,6 +217,9 @@ void CSVImportFilter::OnFileNameChanged()
 			//End of field
 			if( (s[i] == ',') || (s[i] == '\n') )
 			{
+				//Replace the delimiter with a nul
+				s[i] = '\0';
+
 				//If this is the first row, check if it's numeric
 				if(names.empty() && timestamps.empty())
 				{
@@ -260,9 +263,10 @@ void CSVImportFilter::OnFileNameChanged()
 				//Data field. Save it
 				else
 				{
-					if(columns.size() <= ncol)
-						columns.resize(ncol+1);
-					columns[ncol].push_back(s.substr(fieldstart, i-fieldstart));
+					if(vcolumns.size() <= ncol)
+						vcolumns.resize(ncol+1);
+					vcolumns[ncol].push_back(pline+fieldstart);
+
 					ncol ++;
 				}
 
@@ -272,9 +276,10 @@ void CSVImportFilter::OnFileNameChanged()
 		}
 		if(fieldstart < slen)
 		{
-			if(columns.size() <= ncol)
-				columns.resize(ncol+1);
-			columns[ncol].push_back(s.substr(fieldstart, slen-fieldstart) );
+			if(vcolumns.size() <= ncol)
+				vcolumns.resize(ncol+1);
+			vcolumns[ncol].push_back(pline+fieldstart);
+
 			ncol ++;
 		}
 
@@ -300,7 +305,7 @@ void CSVImportFilter::OnFileNameChanged()
 
 	if(ncols == 0)
 		return;
-	size_t nrows = min(columns[0].size(), timestamps.size());
+	size_t nrows = min(vcolumns[0].size(), timestamps.size());
 
 	//Assign default names to channels if there's no header row or not enough names
 	LogTrace("Initial parsing completed, %zu lines, %zu columns, %zu names, %zu timestamps\n",
@@ -322,8 +327,8 @@ void CSVImportFilter::OnFileNameChanged()
 		bool digital = true;
 		for(size_t j=0; j<nrows && j<10; j++)
 		{
-			string field = columns[i][j];
-			if( (field != "0") && (field != "1") )
+			auto field = vcolumns[i][j];
+			if( (field[0] != '0' && field[0] != '1') || field[1] != '\0')
 			{
 				digital = false;
 				break;
@@ -392,7 +397,7 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
 
 				//Read waveform data
-				if(columns[i][j] == "1")
+				if(vcolumns[i][j][0] == '1')
 					wfm->m_samples[j] = true;
 				else
 					wfm->m_samples[j] = false;
@@ -433,7 +438,7 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
 
 				//Read waveform data
-				wfm->m_samples[j] = strtof(columns[i][j].c_str(), nullptr);
+				wfm->m_samples[j] = strtof(vcolumns[i][j], nullptr);
 			}
 
 			if(TryNormalizeTimebase(wfm))
