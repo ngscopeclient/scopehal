@@ -182,7 +182,7 @@ void CSVImportFilter::OnFileNameChanged()
 
 		//Parse into 2D vector of timestamps and strings
 		string s = pline;
-		string tmp;
+		size_t fieldstart = 0;
 		bool foundTimestamp = false;
 		vector<string> headerfields;
 		bool headerRow = false;
@@ -212,7 +212,7 @@ void CSVImportFilter::OnFileNameChanged()
 
 					//Save the header values
 					if(headerRow)
-						headerfields.push_back(tmp);
+						headerfields.push_back(s.substr(fieldstart, i-fieldstart));
 				}
 
 				//If this is a header row, don't also try to parse it as a timestamp
@@ -226,11 +226,11 @@ void CSVImportFilter::OnFileNameChanged()
 
 					//Parse time to a float and convert to fs
 					if(xUnitIsFs)
-						timestamps.push_back(FS_PER_SECOND * strtof(tmp.c_str(), nullptr));
+						timestamps.push_back(FS_PER_SECOND * strtof(pline+fieldstart, nullptr));
 
 					//other units are as-is
 					else
-						timestamps.push_back(stoll(tmp));
+						timestamps.push_back(strtoll(pline+fieldstart, nullptr, 10));
 				}
 
 				//Data field. Save it
@@ -238,21 +238,19 @@ void CSVImportFilter::OnFileNameChanged()
 				{
 					if(columns.size() <= ncol)
 						columns.resize(ncol+1);
-					columns[ncol].push_back(tmp);
+					columns[ncol].push_back(s.substr(fieldstart, i-fieldstart));
 					ncol ++;
 				}
-				tmp = "";
-			}
 
-			//Add to field
-			else
-				tmp += s[i];
+				//Start a new field
+				fieldstart = i+1;
+			}
 		}
-		if(tmp != "")
+		if(fieldstart < slen)
 		{
 			if(columns.size() <= ncol)
 				columns.resize(ncol+1);
-			columns[ncol].push_back(tmp);
+			columns[ncol].push_back(s.substr(fieldstart, slen-fieldstart) );
 			ncol ++;
 		}
 
