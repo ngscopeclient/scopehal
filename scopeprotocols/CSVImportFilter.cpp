@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "CSVImportFilter.h"
+#include <charconv>
 
 using namespace std;
 
@@ -261,7 +262,11 @@ void CSVImportFilter::OnFileNameChanged()
 
 					//Parse time to a float and convert to fs
 					if(xUnitIsFs)
-						timestamps.push_back(FS_PER_SECOND * strtof(pline+fieldstart, nullptr));
+					{
+						float tmp;
+						from_chars(pline+fieldstart, pline+i, tmp);
+						timestamps.push_back(FS_PER_SECOND * tmp);
+					}
 
 					//other units are as-is
 					else
@@ -446,7 +451,11 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
 
 				//Read waveform data
-				wfm->m_samples[j] = strtof(vcolumns[i][j], nullptr);
+				//TODO: faster to save length in vcolumns vs recomputing here?
+				float tmp;
+				const char* vline = vcolumns[i][j];
+				from_chars(vline, vline+strlen(vline), tmp);
+				wfm->m_samples[j] = tmp;
 			}
 
 			if(TryNormalizeTimebase(wfm))
