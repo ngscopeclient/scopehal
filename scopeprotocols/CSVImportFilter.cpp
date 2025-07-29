@@ -102,7 +102,7 @@ void CSVImportFilter::OnFileNameChanged()
 	bool digilentFormat;
 	size_t nrow = 0;
 	size_t ncols = 0;
-	while(/*!feof(fp)*/true)
+	while(true)
 	{
 		if(!fgets(line, sizeof(line), fp))
 			break;
@@ -309,7 +309,7 @@ void CSVImportFilter::OnFileNameChanged()
 			digwaves.push_back(wfm);
 
 			//no analog waveform
-			anwaves.push_back(NULL);
+			anwaves.push_back(nullptr);
 			SetData(wfm, i);
 		}
 		else
@@ -329,7 +329,7 @@ void CSVImportFilter::OnFileNameChanged()
 			anwaves.push_back(wfm);
 
 			//no digital waveform
-			digwaves.push_back(NULL);
+			digwaves.push_back(nullptr);
 			SetData(wfm, i);
 		}
 	}
