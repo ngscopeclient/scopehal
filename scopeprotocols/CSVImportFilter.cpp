@@ -116,6 +116,7 @@ void CSVImportFilter::OnFileNameChanged()
 	size_t ncols = 0;
 	char* pbuf = buf;
 	char* pend = buf + flen;
+	bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
 	while(true)
 	{
 		nrow ++;
@@ -208,7 +209,6 @@ void CSVImportFilter::OnFileNameChanged()
 		bool foundTimestamp = false;
 		vector<string> headerfields;
 		bool headerRow = false;
-		bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
 		size_t ncol = 0;
 		for(size_t i=0; i<=slen; i++)
 		{
