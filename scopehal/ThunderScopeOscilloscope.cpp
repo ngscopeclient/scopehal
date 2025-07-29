@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -469,11 +469,12 @@ bool ThunderScopeOscilloscope::AcquireData()
 	m_pendingWaveformsMutex.lock();
 	m_pendingWaveforms.push_back(s);
 
+	//If we get backed up, drop the extra waveforms
 	while (m_pendingWaveforms.size() > 2)
 	{
 		SequenceSet set = *m_pendingWaveforms.begin();
 		for(auto it : set)
-			delete it.second;
+			AddWaveformToAnalogPool(it.second);
 		m_pendingWaveforms.pop_front();
 
 		dropped++;
