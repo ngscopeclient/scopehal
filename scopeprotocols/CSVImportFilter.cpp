@@ -145,11 +145,10 @@ void CSVImportFilter::OnFileNameChanged()
 			if(pline[slen] == '\n')
 			{
 				pline[slen] = '\0';
-				slen --;
 				break;
 			}
 		}
-		pbuf += slen + 1;
+		pbuf += slen;
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
 		if(pline[0] == '#')
@@ -205,46 +204,55 @@ void CSVImportFilter::OnFileNameChanged()
 		}
 
 		//Parse into 2D vector of timestamps and strings
-		string s = pline;
 		size_t fieldstart = 0;
 		bool foundTimestamp = false;
 		vector<string> headerfields;
 		bool headerRow = false;
 		bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
 		size_t ncol = 0;
-		for(size_t i=0; i<slen; i++)
+		for(size_t i=0; i<=slen; i++)
 		{
 			//End of field
-			if( (s[i] == ',') || (s[i] == '\n') )
+			if( (pline[i] == ',') || (pline[i] == '\n') || (pline[i] == '\0') )
 			{
-				//Replace the delimiter with a nul
-				s[i] = '\0';
-
 				//If this is the first row, check if it's numeric
 				if(names.empty() && timestamps.empty())
 				{
 					//See if it's a header row
-					for(size_t j=0; pline[j] != '\0'; j++)
+					if(!headerRow)
 					{
-						auto c = pline[j];
-						if(	!isdigit(c) && !isspace(c) &&
-							(c != ',') && (c != '.') && (c != '-') && (c != 'e') && (c != '+'))
+						for(size_t j=0; pline[j] != '\0'; j++)
 						{
-							headerRow = true;
-							auto trimline = Trim(pline);
-							LogTrace("Found header row: %s\n", trimline.c_str());
-							break;
+							auto c = pline[j];
+							if(	!isdigit(c) && !isspace(c) &&
+								(c != ',') && (c != '.') && (c != '-') && (c != 'e') && (c != '+'))
+							{
+								headerRow = true;
+								auto trimline = Trim(pline);
+								LogTrace("Found header row: %s\n", trimline.c_str());
+								break;
+							}
 						}
 					}
 
 					//Save the header values
 					if(headerRow)
+					{
+						string s(pline);
 						headerfields.push_back(s.substr(fieldstart, i-fieldstart));
+					}
 				}
 
 				//If this is a header row, don't also try to parse it as a timestamp
 				if(headerRow)
+				{
+					//Start a new field
+					fieldstart = i+1;
 					continue;
+				}
+
+				//Replace the delimiter with a nul
+				pline[i] = '\0';
 
 				//Load timestamp
 				if(!foundTimestamp)
