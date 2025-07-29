@@ -95,8 +95,9 @@ void CSVImportFilter::OnFileNameChanged()
 	ClearStreams();
 
 	//Read the file
+	//More natural implementation is lots of lines, but that's expensive. Columnar structure has less allocation
 	vector<string> names;
-	vector< vector<string> > lines;
+	vector< vector<string> > columns;
 	vector<int64_t> timestamps;
 	char line[1024];
 	bool digilentFormat;
@@ -183,9 +184,10 @@ void CSVImportFilter::OnFileNameChanged()
 		string s = pline;
 		string tmp;
 		bool foundTimestamp = false;
-		vector<string> fields;
+		vector<string> headerfields;
 		bool headerRow = false;
 		bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
+		size_t ncol = 0;
 		for(size_t i=0; i<slen; i++)
 		{
 			//End of field
@@ -210,7 +212,7 @@ void CSVImportFilter::OnFileNameChanged()
 
 					//Save the header values
 					if(headerRow)
-						fields.push_back(tmp);
+						headerfields.push_back(tmp);
 				}
 
 				//If this is a header row, don't also try to parse it as a timestamp
@@ -233,7 +235,12 @@ void CSVImportFilter::OnFileNameChanged()
 
 				//Data field. Save it
 				else
-					fields.push_back(tmp);
+				{
+					if(columns.size() <= ncol)
+						columns.resize(ncol+1);
+					columns[ncol].push_back(tmp);
+					ncol ++;
+				}
 				tmp = "";
 			}
 
@@ -242,34 +249,40 @@ void CSVImportFilter::OnFileNameChanged()
 				tmp += s[i];
 		}
 		if(tmp != "")
-			fields.push_back(tmp);
+		{
+			if(columns.size() <= ncol)
+				columns.resize(ncol+1);
+			columns[ncol].push_back(tmp);
+			ncol ++;
+		}
 
 		//Header row gets special treatment
 		if(headerRow)
 		{
 			//delete name of timestamp column
-			fields.erase(fields.begin());
-
-			names = fields;
+			headerfields.erase(headerfields.begin());
+			names = headerfields;
 			continue;
 		}
 
 		//Sanity check field count
 		if(ncols == 0)
-			ncols = fields.size();
-		else if(ncols != fields.size())
+			ncols = ncol;
+		else if(ncol != ncols)
 		{
 			LogError("Malformed file (line %zu contains %zu fields, but file started with %zu fields)\n",
-				nrow, fields.size(), ncols);
-			break;
+				nrow, ncol, ncols);
+			return;
 		}
-
-		lines.push_back(fields);
 	}
+
+	if(ncols == 0)
+		return;
+	size_t nrows = min(columns[0].size(), timestamps.size());
 
 	//Assign default names to channels if there's no header row or not enough names
 	LogTrace("Initial parsing completed, %zu lines, %zu columns, %zu names, %zu timestamps\n",
-		lines.size(), ncols, names.size(), timestamps.size());
+		nrows, ncols, names.size(), timestamps.size());
 	for(size_t i=0; i<ncols; i++)
 	{
 		if(names.size() <= i)
@@ -285,9 +298,9 @@ void CSVImportFilter::OnFileNameChanged()
 
 		//Assume digital, then change to analog if we see anything other than a 0/1 in the first 10 lines
 		bool digital = true;
-		for(size_t j=0; j<lines.size() && j<10; j++)
+		for(size_t j=0; j<nrows && j<10; j++)
 		{
-			string field = lines[j][i];
+			string field = columns[i][j];
 			if( (field != "0") && (field != "1") )
 			{
 				digital = false;
@@ -305,7 +318,7 @@ void CSVImportFilter::OnFileNameChanged()
 			wfm->m_startTimestamp = timestamp;
 			wfm->m_startFemtoseconds = fs;
 			wfm->m_triggerPhase = 0;
-			wfm->Resize(lines.size());
+			wfm->Resize(nrows);
 			digwaves.push_back(wfm);
 
 			//no analog waveform
@@ -325,7 +338,7 @@ void CSVImportFilter::OnFileNameChanged()
 			wfm->m_startTimestamp = timestamp;
 			wfm->m_startFemtoseconds = fs;
 			wfm->m_triggerPhase = 0;
-			wfm->Resize(lines.size());
+			wfm->Resize(nrows);
 			anwaves.push_back(wfm);
 
 			//no digital waveform
@@ -344,13 +357,12 @@ void CSVImportFilter::OnFileNameChanged()
 			auto wfm = digwaves[i];
 
 			//Read the sample data
-			auto nlines = min(lines.size(), timestamps.size());
-			for(size_t j=0; j<nlines; j++)
+			for(size_t j=0; j<nrows; j++)
 			{
 				wfm->m_offsets[j] = timestamps[j];
 
 				//Last one? copy previous sample duration
-				if(j+1 == lines.size())
+				if(j+1 == nrows)
 					wfm->m_durations[j] = wfm->m_durations[j-1];
 
 				//Set sample duration of previous sample
@@ -358,7 +370,7 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
 
 				//Read waveform data
-				if(lines[j][i] == "1")
+				if(columns[i][j] == "1")
 					wfm->m_samples[j] = true;
 				else
 					wfm->m_samples[j] = false;
@@ -386,13 +398,12 @@ void CSVImportFilter::OnFileNameChanged()
 			auto wfm = anwaves[i];
 
 			//Read the sample data
-			auto nlines = min(lines.size(), timestamps.size());
-			for(size_t j=0; j<nlines; j++)
+			for(size_t j=0; j<nrows; j++)
 			{
 				wfm->m_offsets[j] = timestamps[j];
 
 				//Last one? copy previous sample duration
-				if(j+1 == lines.size())
+				if(j+1 == nrows)
 					wfm->m_durations[j] = wfm->m_durations[j-1];
 
 				//Set sample duration of previous sample
@@ -400,7 +411,7 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
 
 				//Read waveform data
-				wfm->m_samples[j] = strtof(lines[j][i].c_str(), nullptr);
+				wfm->m_samples[j] = strtof(columns[i][j].c_str(), nullptr);
 			}
 
 			if(TryNormalizeTimebase(wfm))
