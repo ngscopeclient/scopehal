@@ -102,7 +102,7 @@ void CSVImportFilter::OnFileNameChanged()
 	bool digilentFormat;
 	size_t nrow = 0;
 	size_t ncols = 0;
-	while(!feof(fp))
+	while(/*!feof(fp)*/true)
 	{
 		if(!fgets(line, sizeof(line), fp))
 			break;
@@ -121,12 +121,15 @@ void CSVImportFilter::OnFileNameChanged()
 		//Discard trailing newline if any
 		auto slen = strlen(pline);
 		if(pline[slen-1] == '\n')
-			pline[slen-1] = '\0';
-		string s = pline;
+		{
+			slen --;
+			pline[slen] = '\0';
+		}
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
-		if(s[0] == '#')
+		if(pline[0] == '#')
 		{
+			string s = pline;
 			if(s == "#Digilent WaveForms Oscilloscope Acquisition")
 			{
 				digilentFormat = true;
@@ -177,11 +180,13 @@ void CSVImportFilter::OnFileNameChanged()
 		}
 
 		//Parse into 2D vector of timestamps and strings
+		string s = pline;
 		string tmp;
 		bool foundTimestamp = false;
 		vector<string> fields;
 		bool headerRow = false;
-		for(size_t i=0; i<s.length(); i++)
+		bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
+		for(size_t i=0; i<slen; i++)
 		{
 			//End of field
 			if( (s[i] == ',') || (s[i] == '\n') )
@@ -218,7 +223,7 @@ void CSVImportFilter::OnFileNameChanged()
 					foundTimestamp = true;
 
 					//Parse time to a float and convert to fs
-					if(m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS)
+					if(xUnitIsFs)
 						timestamps.push_back(FS_PER_SECOND * strtof(tmp.c_str(), nullptr));
 
 					//other units are as-is
