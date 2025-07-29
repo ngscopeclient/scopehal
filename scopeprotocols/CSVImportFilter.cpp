@@ -85,12 +85,24 @@ void CSVImportFilter::OnFileNameChanged()
 
 	double start = GetTime();
 
+	//Read the entire file into a buffer
 	FILE* fp = fopen(fname.c_str(), "r");
 	if(!fp)
 	{
 		LogError("Couldn't open CSV file \"%s\"\n", fname.c_str());
 		return;
 	}
+	fseek(fp, 0, SEEK_END);
+	size_t flen = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	char* buf = new char[flen+1];
+	if(flen != fread(buf, 1, flen, fp))
+	{
+		LogError("file read error\n");
+		return;
+	}
+	buf[flen] = '\0';	//guarantee null termination at end of file
+	fclose(fp);
 
 	ClearStreams();
 
@@ -99,33 +111,45 @@ void CSVImportFilter::OnFileNameChanged()
 	vector<string> names;
 	vector< vector<string> > columns;
 	vector<int64_t> timestamps;
-	char line[1024];
 	bool digilentFormat;
 	size_t nrow = 0;
 	size_t ncols = 0;
+	char* pbuf = buf;
+	char* pend = buf + flen;
 	while(true)
 	{
-		if(!fgets(line, sizeof(line), fp))
-			break;
-
 		nrow ++;
 
-		//Find first non-blank character
-		char* pline = line;
+		//Stop if at end of file
+		char* pline = pbuf;
+		if(pline >= pend)
+			break;
+
+		//Find first non-blank character in the current line
 		while(isspace(*pline))
 			pline ++;
 
 		//If it's a newline or nul, the line was blank - discard it
 		if( (*pline == '\0') || (*pline == '\n') )
-			continue;
-
-		//Discard trailing newline if any
-		auto slen = strlen(pline);
-		if(pline[slen-1] == '\n')
 		{
-			slen --;
-			pline[slen] = '\0';
+			pbuf ++;
+			continue;
 		}
+
+		//Search until we find the end of the line, then trim the trailing newline if there is one
+		size_t slen = 0;
+		for(; (pline + slen) < pend; slen++)
+		{
+			if(pline[slen] == '\0')
+				break;
+			if(pline[slen] == '\n')
+			{
+				pline[slen] = '\0';
+				slen --;
+				break;
+			}
+		}
+		pbuf += slen + 1;
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
 		if(pline[0] == '#')
@@ -197,14 +221,14 @@ void CSVImportFilter::OnFileNameChanged()
 				if(names.empty() && timestamps.empty())
 				{
 					//See if it's a header row
-					for(size_t j=0; (j<sizeof(line)) && (line[j] != '\0'); j++)
+					for(size_t j=0; pline[j] != '\0'; j++)
 					{
-						auto c = line[j];
+						auto c = pline[j];
 						if(	!isdigit(c) && !isspace(c) &&
 							(c != ',') && (c != '.') && (c != '-') && (c != 'e') && (c != '+'))
 						{
 							headerRow = true;
-							auto trimline = Trim(line);
+							auto trimline = Trim(pline);
 							LogTrace("Found header row: %s\n", trimline.c_str());
 							break;
 						}
@@ -431,4 +455,6 @@ void CSVImportFilter::OnFileNameChanged()
 
 	double dt = GetTime() - start;
 	LogTrace("CSV loading took %.3f sec\n", dt);
+
+	delete[] buf;
 }
