@@ -424,18 +424,20 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 {
 	size_t nedge = 1;
 	int64_t edgepos = edges[0];
-	int64_t period = initialPeriod;
 
-	[[maybe_unused]] int64_t total_error = 0;
+	//[[maybe_unused]] int64_t total_error = 0;
 
 	float initialFrequency = 1.0 / initialPeriod;
 	int64_t glitchCutoff = initialPeriod / 10;
 	size_t edgemax = edges.size() - 1;
+	float fHalfPeriod = halfPeriod;
 
 	int64_t tlast = 0;
-	for(; (edgepos < tend) && (nedge < edgemax); edgepos += period)
+	int64_t iperiod = initialPeriod;
+	float fperiod = iperiod;
+	for(; (edgepos < tend) && (nedge < edgemax); edgepos += iperiod)
 	{
-		int64_t center = period/2;
+		int64_t center = iperiod/2;
 
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
@@ -444,43 +446,45 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 		while( (tnext + center < edgepos) && (nedge < edgemax) )
 		{
 			//Find phase error
-			int64_t dphase = (edgepos - tnext) - period;
+			int64_t dphase = (edgepos - tnext) - iperiod;
+			float fdphase = dphase;
 
 			//If we're more than half a UI off, assume this is actually part of the next UI
-			if(dphase > halfPeriod)
-				dphase -= period;
-			if(dphase < -halfPeriod)
-				dphase += period;
+			if(fdphase > fHalfPeriod)
+				fdphase -= fperiod;
+			if(fdphase < -fHalfPeriod)
+				fdphase += fperiod;
 
-			total_error += i64abs(dphase);
+			//total_error += i64abs(dphase);
 
 			//Find frequency error
-			int64_t uiLen = (tnext - tlast);
-			int64_t dperiod = 0;
+			float uiLen = (tnext - tlast);
+			float fdperiod = 0;
 			if(uiLen > glitchCutoff)		//Sanity check: no correction if we have a glitch
 			{
-				int64_t numUIs = round(uiLen * initialFrequency);
+				float numUIs = round(uiLen * initialFrequency);
 				if(numUIs != 0)	//divide by zero check needed in some cases
 				{
 					uiLen /= numUIs;
-					dperiod = period - uiLen;
+					fdperiod = fperiod - uiLen;
 				}
 			}
 
 			if(tlast != 0)
 			{
-				//Frequency error term
-				period -= dperiod * 0.006;
-
-				//Phase error term
-				period -= dphase * 0.002;
+				//Frequency and phase error term
+				float errorTerm = (fdperiod * 0.006) + (fdphase * 0.002);
+				fperiod -= errorTerm;
+				iperiod = fperiod;
 
 				//HACK: immediate bang-bang phase shift
+				int64_t bangbang = fperiod * 0.0025;
 				if(dphase > 0)
-					edgepos -= period / 400;
+					edgepos -= bangbang;
 				else
-					edgepos += period / 400;
+					edgepos += bangbang;
 
+				/*
 				#ifdef PLL_DEBUG_OUTPUTS
 					debugPeriod->m_offsets.push_back(edgepos + period/2);
 					debugPeriod->m_durations.push_back(period);
@@ -498,8 +502,9 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 					debugDrift->m_durations.push_back(period);
 					debugDrift->m_samples.push_back(period - initialPeriod);
 				#endif
+				*/
 
-				if(period < fnyquist)
+				if(iperiod < fnyquist)
 				{
 					LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
 					nedge = edges.size();
@@ -515,7 +520,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 		cap.m_offsets.push_back(edgepos + center);
 	}
 
-	total_error /= edges.size();
+	//total_error /= edges.size();
 	//LogTrace("average phase error %zu\n", total_error);
 }
 
