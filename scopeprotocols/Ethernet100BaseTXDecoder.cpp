@@ -98,22 +98,21 @@ void Ethernet100BaseTXDecoder::Refresh()
 	int oldstate = GetState(samples.m_samples[0]);
 	SparseDigitalWaveform bits;
 	bits.SetCpuOnlyHint();
-	bits.Reserve(1000000);
+	bits.Resize(ilen-1);
 	bits.PrepareForCpuAccess();
+	memcpy(bits.m_offsets.GetCpuPointer(), samples.m_offsets.GetCpuPointer(), (ilen-1)*sizeof(int64_t));
+	memcpy(bits.m_durations.GetCpuPointer(), samples.m_durations.GetCpuPointer(), (ilen-1)*sizeof(int64_t));
 	for(size_t i=1; i<ilen; i++)
 	{
 		int nstate = GetState(samples.m_samples[i]);
 
-		bits.m_offsets.push_back(samples.m_offsets[i]);
-		bits.m_durations.push_back(samples.m_durations[i]);
-
 		//No transition? Add a "0" bit
 		if(nstate == oldstate)
-			bits.m_samples.push_back(false);
+			bits.m_samples[i-1] = false;
 
 		//Transition? Add a "1" bit
 		else
-			bits.m_samples.push_back(true);
+			bits.m_samples[i-1] = true;
 
 		oldstate = nstate;
 	}
