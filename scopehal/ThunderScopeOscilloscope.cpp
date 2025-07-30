@@ -100,6 +100,15 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	if(!csock)
 		LogFatal("ThunderScopeOscilloscope expects a SCPITwinLanTransport\n");
 
+	//set initial bandwidth on all channels to full
+	m_bandwidthLimits.resize(4);
+	for(size_t i=0; i<4; i++)
+		SetChannelBandwidthLimit(i, 0);
+
+	//Set all channels off by default
+	for(size_t i=0; i<4; i++)
+		DisableChannel(i);
+
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -158,11 +167,6 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
-
-	//set initial bandwidth on all channels to full
-	m_bandwidthLimits.resize(4);
-	for(size_t i=0; i<4; i++)
-		SetChannelBandwidthLimit(i, 0);
 }
 
 /**
