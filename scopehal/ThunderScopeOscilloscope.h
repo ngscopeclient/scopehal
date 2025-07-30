@@ -91,7 +91,7 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
-	virtual bool CanInterleave();
+	virtual bool CanInterleave() override;
 
 protected:
 	void ResetPerCaptureDiagnostics();
