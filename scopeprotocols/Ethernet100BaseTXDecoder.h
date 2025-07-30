@@ -40,7 +40,7 @@ class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
 public:
 	Ethernet100BaseTXDecoder(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
@@ -59,7 +59,8 @@ protected:
 	}
 
 	bool TrySync(
-		SparseDigitalWaveform& bits,
+		std::vector<bool>& bits,
+		SparseAnalogWaveform& samples,
 		SparseDigitalWaveform& descrambled_bits,
 		size_t idle_offset,
 		size_t stop);

@@ -71,7 +71,9 @@ bool Ethernet100BaseTXDecoder::ValidateChannel(size_t i, StreamDescriptor stream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void Ethernet100BaseTXDecoder::Refresh()
+void Ethernet100BaseTXDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	ClearPackets();
 
@@ -97,36 +99,32 @@ void Ethernet100BaseTXDecoder::Refresh()
 	//MLT-3 decode
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int oldstate = GetState(samples.m_samples[0]);
-	SparseDigitalWaveform bits;
-	bits.SetCpuOnlyHint();
-	bits.Resize(ilen-1);
-	bits.PrepareForCpuAccess();
-	memcpy(bits.m_offsets.GetCpuPointer(), samples.m_offsets.GetCpuPointer(), (ilen-1)*sizeof(int64_t));
-	memcpy(bits.m_durations.GetCpuPointer(), samples.m_durations.GetCpuPointer(), (ilen-1)*sizeof(int64_t));
+	vector<bool> bits;
+	bits.resize(ilen-1);
 	for(size_t i=1; i<ilen; i++)
 	{
 		int nstate = GetState(samples.m_samples[i]);
 
 		//No transition? Add a "0" bit
 		if(nstate == oldstate)
-			bits.m_samples[i-1] = false;
+			bits[i-1] = false;
 
 		//Transition? Add a "1" bit
 		else
-			bits.m_samples[i-1] = true;
+			bits[i-1] = true;
 
 		oldstate = nstate;
 	}
 
 	//RX LFSR sync
-	size_t nbits = bits.m_samples.size();
+	size_t nbits = bits.size();
 	SparseDigitalWaveform descrambled_bits;
 	descrambled_bits.SetCpuOnlyHint();
 	descrambled_bits.PrepareForCpuAccess();
 	bool synced = false;
 	for(size_t idle_offset = 0; idle_offset<15000; idle_offset++)
 	{
-		if(TrySync(bits, descrambled_bits, idle_offset, nbits))
+		if(TrySync(bits, samples, descrambled_bits, idle_offset, nbits))
 		{
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
@@ -309,31 +307,32 @@ void Ethernet100BaseTXDecoder::Refresh()
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(
-	SparseDigitalWaveform& bits,
+	std::vector<bool>& bits,
+	SparseAnalogWaveform& samples,
 	SparseDigitalWaveform& descrambled_bits,
 	size_t idle_offset,
 	size_t stop)
 {
-	if( (idle_offset + 64) >= bits.m_samples.size())
+	if( (idle_offset + 64) >= bits.size())
 		return false;
 	descrambled_bits.clear();
 
 	//For now, assume the link is idle at the time we triggered
 	unsigned int lfsr =
-		( (!bits.m_samples[idle_offset + 0]) << 10 ) |
-		( (!bits.m_samples[idle_offset + 1]) << 9 ) |
-		( (!bits.m_samples[idle_offset + 2]) << 8 ) |
-		( (!bits.m_samples[idle_offset + 3]) << 7 ) |
-		( (!bits.m_samples[idle_offset + 4]) << 6 ) |
-		( (!bits.m_samples[idle_offset + 5]) << 5 ) |
-		( (!bits.m_samples[idle_offset + 6]) << 4 ) |
-		( (!bits.m_samples[idle_offset + 7]) << 3 ) |
-		( (!bits.m_samples[idle_offset + 8]) << 2 ) |
-		( (!bits.m_samples[idle_offset + 9]) << 1 ) |
-		( (!bits.m_samples[idle_offset + 10]) << 0 );
+		( (!bits[idle_offset + 0]) << 10 ) |
+		( (!bits[idle_offset + 1]) << 9 ) |
+		( (!bits[idle_offset + 2]) << 8 ) |
+		( (!bits[idle_offset + 3]) << 7 ) |
+		( (!bits[idle_offset + 4]) << 6 ) |
+		( (!bits[idle_offset + 5]) << 5 ) |
+		( (!bits[idle_offset + 6]) << 4 ) |
+		( (!bits[idle_offset + 7]) << 3 ) |
+		( (!bits[idle_offset + 8]) << 2 ) |
+		( (!bits[idle_offset + 9]) << 1 ) |
+		( (!bits[idle_offset + 10]) << 0 );
 
 	//Descramble
-	stop = min(stop, bits.m_samples.size());
+	stop = min(stop, bits.size());
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
 	descrambled_bits.m_samples.resize(len);
@@ -343,7 +342,7 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	for(size_t i=start; i < stop; i++)
 	{
 		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-		bool b = bits.m_samples[i] ^ (lfsr & 1);
+		bool b = bits[i] ^ (lfsr & 1);
 		descrambled_bits.m_samples[iout] = b;
 		iout ++;
 
@@ -363,10 +362,10 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	descrambled_bits.m_offsets.resize(len);
 	descrambled_bits.m_durations.resize(len);
 	memcpy(	descrambled_bits.m_offsets.GetCpuPointer(),
-			bits.m_offsets.GetCpuPointer() + start,
+			samples.m_offsets.GetCpuPointer() + start,
 			len * sizeof(int64_t));
 	memcpy(	descrambled_bits.m_durations.GetCpuPointer(),
-			bits.m_durations.GetCpuPointer() + start,
+			samples.m_durations.GetCpuPointer() + start,
 			len * sizeof(int64_t));
 
 	//Synced, all good
