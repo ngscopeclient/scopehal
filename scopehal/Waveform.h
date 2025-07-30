@@ -291,6 +291,18 @@ public:
 	virtual ~SparseWaveformBase()
 	{}
 
+	/**
+		@brief Helper function to indicate this waveform will only be used on the CPU
+	 */
+	virtual void SetCpuOnlyHint()
+	{
+		m_offsets.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_offsets.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_NEVER);
+
+		m_durations.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_durations.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_NEVER);
+	}
+
 	///@brief Start timestamps of each sample, in multiples of m_timescale
 	AcceleratorBuffer<int64_t> m_offsets;
 
@@ -528,6 +540,17 @@ public:
 
 	virtual ~SparseWaveform()
 	{}
+
+	/**
+		@brief Helper function to indicate this waveform will only be used on the CPU
+	 */
+	virtual void SetCpuOnlyHint()
+	{
+		SparseWaveformBase::SetCpuOnlyHint();
+
+		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
+		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);
+	}
 
 	///@brief Sample data
 	AcceleratorBuffer<S> m_samples;
