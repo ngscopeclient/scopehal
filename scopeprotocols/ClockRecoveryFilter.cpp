@@ -105,8 +105,8 @@ string ClockRecoveryFilter::GetProtocolName()
 // Actual decoder logic
 
 void ClockRecoveryFilter::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
 {
 	//Require a data signal, but not necessarily a gate
 	if(!VerifyInputOK(0))
@@ -116,8 +116,6 @@ void ClockRecoveryFilter::Refresh(
 	}
 
 	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
-
 	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
@@ -129,20 +127,38 @@ void ClockRecoveryFilter::Refresh(
 		gate->PrepareForCpuAccess();
 
 	//Timestamps of the edges
-	vector<int64_t> edges;
+	size_t nedges = 0;
+	AcceleratorBuffer<int64_t> vedges;
+	float threshold = m_parameters[m_threshname].GetFloatVal();
 	if(uadin)
-		FindZeroCrossings(uadin, m_parameters[m_threshname].GetFloatVal(), edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, m_parameters[m_threshname].GetFloatVal(), edges);
-	else if(uddin)
-		FindZeroCrossings(uddin, edges);
-	else if(sddin)
-		FindZeroCrossings(sddin, edges);
-	if(edges.empty())
+		nedges = m_detector.FindZeroCrossings(uadin, threshold, cmdBuf, queue);
+	else
+	{
+		din->PrepareForCpuAccess();
+
+		vector<int64_t> edges;
+		if(sadin)
+			FindZeroCrossings(sadin, m_parameters[m_threshname].GetFloatVal(), edges);
+		else if(uddin)
+			FindZeroCrossings(uddin, edges);
+		else if(sddin)
+			FindZeroCrossings(sddin, edges);
+		nedges = edges.size();
+
+		//Inefficient but this is a less frwuently used code path
+		vedges.resize(nedges);
+		vedges.PrepareForCpuAccess();
+		memcpy(vedges.GetCpuPointer(), &edges[0], nedges*sizeof(int64_t));
+	}
+	if(nedges == 0)
 	{
 		SetData(nullptr, 0);
 		return;
 	}
+
+	//Edge array
+	auto& edges = uadin ? m_detector.GetResults() : vedges;
+	edges.PrepareForCpuAccess();
 
 	//Get nominal period used for the first cycle of the NCO
 	int64_t initialPeriod = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
@@ -179,9 +195,9 @@ void ClockRecoveryFilter::Refresh(
 	//TODO: use the real fibre channel PLL.
 	cap->m_offsets.reserve(edges.size());
 	if(gate)
-		InnerLoopWithGating(*cap, edges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
+		InnerLoopWithGating(*cap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 	else
-		InnerLoopWithNoGating(*cap, edges, tend, initialPeriod, halfPeriod, fnyquist);
+		InnerLoopWithNoGating(*cap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
 
 	//Generate the squarewave and duration values to match the calculated timestamps
 	//TODO: GPU this?
@@ -225,7 +241,8 @@ void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
  */
 void ClockRecoveryFilter::InnerLoopWithGating(
 	SparseDigitalWaveform& cap,
-	vector<int64_t>& edges,
+	AcceleratorBuffer<int64_t>& edges,
+	size_t nedges,
 	int64_t tend,
 	int64_t initialPeriod,
 	int64_t halfPeriod,
@@ -247,7 +264,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 		gating = !GetValue(sgate, ugate, 0);
 
 	int64_t tlast = 0;
-	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
+	for(; (edgepos < tend) && (nedge < nedges-1); edgepos += period)
 	{
 		float center = period/2;
 
@@ -285,7 +302,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 						vector<int64_t> lengths;
 						for(size_t i=1; i<=512; i++)
 						{
-							if(i + nedge >= edges.size())
+							if(i + nedge >= nedges)
 								break;
 							lengths.push_back(edges[nedge+i] - edges[nedge+i-1]);
 						}
@@ -333,7 +350,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
+		while( (tnext + center < edgepos) && (nedge+1 < nedges) )
 		{
 			if(!gating)
 			{
@@ -395,7 +412,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 					if(period < fnyquist)
 					{
 						LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
-						nedge = edges.size();
+						nedge = nedges;
 						break;
 					}
 				}
@@ -416,7 +433,8 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 
 void ClockRecoveryFilter::InnerLoopWithNoGating(
 	SparseDigitalWaveform& cap,
-	vector<int64_t>& edges,
+	AcceleratorBuffer<int64_t>& edges,
+	size_t nedges,
 	int64_t tend,
 	int64_t initialPeriod,
 	int64_t halfPeriod,
@@ -429,8 +447,13 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 
 	float initialFrequency = 1.0 / initialPeriod;
 	int64_t glitchCutoff = initialPeriod / 10;
-	size_t edgemax = edges.size() - 1;
+	size_t edgemax = nedges - 1;
 	float fHalfPeriod = halfPeriod;
+
+	//Predict how many edges we're going to need and allocate space in advance
+	//(capture length divided by expected UI length plus 1M extra saples as of margin)
+	int64_t expectedNumEdges = (edges[edgemax] / initialPeriod) + 1000000;
+	cap.Reserve(expectedNumEdges);
 
 	int64_t tlast = 0;
 	int64_t iperiod = initialPeriod;
@@ -507,7 +530,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 				if(iperiod < fnyquist)
 				{
 					LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
-					nedge = edges.size();
+					nedge = nedges;
 					break;
 				}
 			}

@@ -35,6 +35,8 @@
 #ifndef ClockRecoveryFilter_h
 #define ClockRecoveryFilter_h
 
+#include "../scopehal/LevelCrossingDetector.h"
+
 class ClockRecoveryFilter : public Filter
 {
 public:
@@ -55,7 +57,8 @@ protected:
 
 	void InnerLoopWithGating(
 		SparseDigitalWaveform& cap,
-		std::vector<int64_t>& edges,
+		AcceleratorBuffer<int64_t>& edges,
+		size_t nedges,
 		int64_t tend,
 		int64_t initialPeriod,
 		int64_t halfPeriod,
@@ -66,7 +69,8 @@ protected:
 
 	void InnerLoopWithNoGating(
 		SparseDigitalWaveform& cap,
-		std::vector<int64_t>& edges,
+		AcceleratorBuffer<int64_t>& edges,
+		size_t nedges,
 		int64_t tend,
 		int64_t initialPeriod,
 		int64_t halfPeriod,
@@ -78,6 +82,8 @@ protected:
 
 	std::string m_baudname;
 	std::string m_threshname;
+
+	LevelCrossingDetector m_detector;
 };
 
 #endif
