@@ -264,7 +264,7 @@ void CSVImportFilter::OnFileNameChanged()
 					if(xUnitIsFs)
 					{
 						float tmp;
-						from_chars(pline+fieldstart, pline+i, tmp);
+						from_chars(pline+fieldstart, pline+i, tmp, std::chars_format::general);
 						timestamps.push_back(FS_PER_SECOND * tmp);
 					}
 
@@ -454,7 +454,7 @@ void CSVImportFilter::OnFileNameChanged()
 				//TODO: faster to save length in vcolumns vs recomputing here?
 				float tmp;
 				const char* vline = vcolumns[i][j];
-				from_chars(vline, vline+strlen(vline), tmp);
+				from_chars(vline, vline+strlen(vline), tmp, std::chars_format::general);
 				wfm->m_samples[j] = tmp;
 			}
 
