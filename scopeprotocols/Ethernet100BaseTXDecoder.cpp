@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -97,6 +97,8 @@ void Ethernet100BaseTXDecoder::Refresh()
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int oldstate = GetState(samples.m_samples[0]);
 	SparseDigitalWaveform bits;
+	bits.SetCpuOnlyHint();
+	bits.Reserve(1000000);
 	bits.PrepareForCpuAccess();
 	for(size_t i=1; i<ilen; i++)
 	{
@@ -119,6 +121,7 @@ void Ethernet100BaseTXDecoder::Refresh()
 	//RX LFSR sync
 	size_t nbits = bits.m_samples.size();
 	SparseDigitalWaveform descrambled_bits;
+	descrambled_bits.SetCpuOnlyHint();
 	descrambled_bits.PrepareForCpuAccess();
 	bool synced = false;
 	for(size_t idle_offset = 0; idle_offset<15000; idle_offset++)
@@ -139,10 +142,11 @@ void Ethernet100BaseTXDecoder::Refresh()
 	}
 
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
-	auto cap = new EthernetWaveform;
+	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(din,0, true);
+	cap->SetCpuOnlyHint();
+	cap->Reserve(1000000);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
@@ -332,20 +336,18 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	stop = min(stop, bits.m_samples.size());
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
-	descrambled_bits.m_offsets.reserve(len);
-	descrambled_bits.m_durations.reserve(len);
-	descrambled_bits.m_samples.reserve(len);
+	descrambled_bits.m_samples.resize(len);
+	descrambled_bits.PrepareForCpuAccess();
 	size_t window = 64 + idle_offset + 11;
+	size_t iout = 0;
 	for(size_t i=start; i < stop; i++)
 	{
 		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-
-		descrambled_bits.m_offsets.push_back(bits.m_offsets[i]);
-		descrambled_bits.m_durations.push_back(bits.m_durations[i]);
 		bool b = bits.m_samples[i] ^ (lfsr & 1);
-		descrambled_bits.m_samples.push_back(b);
+		descrambled_bits.m_samples[iout] = b;
+		iout ++;
 
-		if(descrambled_bits.m_samples.size() == window)
+		if(iout == window)
 		{
 			//We should have at least 64 "1" bits in a row once the descrambling is done.
 			//The minimum inter-frame gap is a lot bigger than this.
@@ -357,7 +359,18 @@ bool Ethernet100BaseTXDecoder::TrySync(
 		}
 	}
 
+	//Copy offset and durations
+	descrambled_bits.m_offsets.resize(len);
+	descrambled_bits.m_durations.resize(len);
+	memcpy(	descrambled_bits.m_offsets.GetCpuPointer(),
+			bits.m_offsets.GetCpuPointer() + start,
+			len * sizeof(int64_t));
+	memcpy(	descrambled_bits.m_durations.GetCpuPointer(),
+			bits.m_durations.GetCpuPointer() + start,
+			len * sizeof(int64_t));
+
 	//Synced, all good
+	descrambled_bits.MarkModifiedFromCpu();
 	return true;
 }
 
