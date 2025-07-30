@@ -483,7 +483,7 @@ public:
 	 */
 	void reserve(size_t size)
 	{
-		if(size >= m_capacity)
+		if(size > m_capacity)
 			Reallocate(size);
 	}
 
