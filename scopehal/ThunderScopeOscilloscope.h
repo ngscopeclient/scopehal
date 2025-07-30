@@ -72,6 +72,7 @@ public:
 	virtual bool CanEnableChannel(size_t i) override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
+	virtual void EnableChannel(size_t i) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
@@ -94,6 +95,7 @@ public:
 
 protected:
 	void ResetPerCaptureDiagnostics();
+	void RefreshSampleRate();
 
 	std::string GetChannelColor(size_t i);
 

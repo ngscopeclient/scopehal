@@ -91,10 +91,6 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 		SetChannelVoltageRange(i, 0, 5);
 	}
 
-	//Set initial memory configuration.
-	SetSampleRate(1000000000L);
-	SetSampleDepth(10000);
-
 	//Set up the data plane socket
 	auto csock = dynamic_cast<SCPITwinLanTransport*>(m_transport);
 	if(!csock)
@@ -117,6 +113,10 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(1000000000); //1us to allow trigphase interpolation
+
+	//Set initial memory configuration.
+	SetSampleRate(1000000000L);
+	SetSampleDepth(10000);
 
 	m_diagnosticValues["Hardware WFM/s"] = &m_diag_hardwareWFMHz;
 	m_diagnosticValues["Received WFM/s"] = &m_diag_receivedWFMHz;
@@ -233,7 +233,20 @@ string ThunderScopeOscilloscope::GetDriverNameInternal()
 
 void ThunderScopeOscilloscope::FlushConfigCache()
 {
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	//Refresh sample rate from hardware
+	RefreshSampleRate();
+}
+
+void ThunderScopeOscilloscope::RefreshSampleRate()
+{
+	auto reply = m_transport->SendCommandQueuedWithReply("RATE?");
+	m_srate = stoi(reply);
+}
+
+void ThunderScopeOscilloscope::EnableChannel(size_t i)
+{
+	RemoteBridgeOscilloscope::EnableChannel(i);
+	RefreshSampleRate();
 }
 
 double ThunderScopeOscilloscope::GetChannelAttenuation(size_t i)
