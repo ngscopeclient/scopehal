@@ -554,6 +554,12 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesInterleaved()
 	return ret;
 }
 
+//interleaving not supported
+bool ThunderScopeOscilloscope::CanInterleave()
+{
+	return false;
+}
+
 set<Oscilloscope::InterleaveConflict> ThunderScopeOscilloscope::GetInterleaveConflicts()
 {
 	//interleaving not supported
