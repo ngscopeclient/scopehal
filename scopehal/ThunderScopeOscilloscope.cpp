@@ -538,12 +538,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string rates;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("RATES?");
-		rates = m_transport->ReadReply();
-	}
+	string rates = m_transport->SendCommandQueuedWithReply("RATES?");
 
 	size_t i=0;
 	while(true)
@@ -588,12 +583,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string depths;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("DEPTHS?");
-		depths = m_transport->ReadReply();
-	}
+	string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
 
 	size_t i=0;
 	while(true)
@@ -654,23 +644,23 @@ void ThunderScopeOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel:
 	switch(type)
 	{
 		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 1M");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":TERM 1M");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC");
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 1M");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":COUP DC");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":TERM 1M");
 			break;
 
 		case OscilloscopeChannel::COUPLE_AC_50:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC");
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 50");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":TERM 50");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC");
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":TERM 50");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":COUP DC");
+			m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":TERM 50");
 			break;
 
 		default:
