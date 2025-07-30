@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -183,8 +183,7 @@ void DigilentOscilloscope::IdentifyHardware()
 	m_digitalChannelCount = 0;
 
 	//Ask the scope how many channels it has
-	m_transport->SendCommand("CHANS?");
-	m_analogChannelCount = stoi(m_transport->ReadReply());
+	m_analogChannelCount = stoi(m_transport->SendCommandQueuedWithReply("CHANS?"));
 }
 
 DigilentOscilloscope::~DigilentOscilloscope()
@@ -245,10 +244,9 @@ void DigilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 
 	//send attenuation info to hardware
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
 	snprintf(buf, sizeof(buf), ":%s:ATTEN %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), atten);
-	m_transport->SendCommand(buf);
+	m_transport->SendCommandQueued(buf);
 }
 
 unsigned int DigilentOscilloscope::GetChannelBandwidthLimit([[maybe_unused]] size_t i)
@@ -452,12 +450,7 @@ vector<uint64_t> DigilentOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string rates;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("RATES?");
-		rates = m_transport->ReadReply();
-	}
+	string rates = m_transport->SendCommandQueuedWithReply("RATES?");
 
 	size_t i=0;
 	while(true)
@@ -497,12 +490,7 @@ vector<uint64_t> DigilentOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string depths;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("DEPTHS?");
-		depths = m_transport->ReadReply();
-	}
+	string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
 
 	size_t i=0;
 	while(true)

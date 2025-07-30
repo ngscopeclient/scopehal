@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -325,8 +325,7 @@ void PicoOscilloscope::IdentifyHardware()
 	}
 
 	//Ask the scope how many channels it has
-	m_transport->SendCommand("CHANS?");
-	m_analogChannelCount = stoi(m_transport->ReadReply());
+	m_analogChannelCount = stoi(m_transport->SendCommandQueuedWithReply("CHANS?"));
 }
 
 PicoOscilloscope::~PicoOscilloscope()
@@ -419,8 +418,7 @@ void PicoOscilloscope::DisableChannel(size_t i)
 			return;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFF");
+	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFF");
 }
 
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
@@ -740,12 +738,7 @@ vector<uint64_t> PicoOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string rates;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("RATES?");
-		rates = m_transport->ReadReply();
-	}
+	string rates = m_transport->SendCommandQueuedWithReply("RATES?");
 
 	size_t i=0;
 	while(true)
@@ -785,12 +778,7 @@ vector<uint64_t> PicoOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string depths;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("DEPTHS?");
-		depths = m_transport->ReadReply();
-	}
+	string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
 
 	size_t i=0;
 	while(true)
@@ -829,7 +817,6 @@ uint64_t PicoOscilloscope::GetSampleDepth()
 
 void PicoOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(string("DEPTH ") + to_string(depth));
 	m_mdepth = depth;
 }
@@ -837,15 +824,11 @@ void PicoOscilloscope::SetSampleDepth(uint64_t depth)
 void PicoOscilloscope::SetSampleRate(uint64_t rate)
 {
 	m_srate = rate;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand( string("RATE ") + to_string(rate));
 }
 
 void PicoOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Don't allow setting trigger offset beyond the end of the capture
 	int64_t captureDuration = GetSampleDepth() * FS_PER_SECOND / GetSampleRate();
 	m_triggerOffset = min(offset, captureDuration);
@@ -939,7 +922,6 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 {
 	m_adcMode = (ADCMode)mode;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(mode)
 	{
 		case ADC_MODE_8BIT:
@@ -1012,7 +994,6 @@ void PicoOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 		m_digitalHysteresis[channel] = level;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(GetOscilloscopeChannel(channel)->GetHwname() + ":HYS " + to_string(level * 1000));
 }
 
@@ -1023,7 +1004,6 @@ void PicoOscilloscope::SetDigitalThreshold(size_t channel, float level)
 		m_digitalThresholds[channel] = level;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(GetOscilloscopeChannel(channel)->GetHwname() + ":THRESH " + to_string(level));
 }
 
@@ -1085,11 +1065,9 @@ bool PicoOscilloscope::IsDigitalPodPresent(size_t npod)
 			return m_digitalBankPresent[npod];
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(to_string(npod + 1) + "D:PRESENT?");
-	int present = stoi(m_transport->ReadReply());
+	int present = stoi(m_transport->SendCommandQueuedWithReply(to_string(npod + 1) + "D:PRESENT?"));
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if(present)
 	{
 		m_digitalBankPresent[npod] = true;
@@ -1470,11 +1448,10 @@ void PicoOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 {
 	m_awgEnabled = on;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	if(on)
-		m_transport->SendCommand("AWG:START");
+		m_transport->SendCommandQueued("AWG:START");
 	else
-		m_transport->SendCommand("AWG:STOP");
+		m_transport->SendCommandQueued("AWG:STOP");
 }
 
 float PicoOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
@@ -1485,9 +1462,7 @@ float PicoOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
 void PicoOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
 {
 	m_awgDutyCycle = duty;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AWG:DUTY ") + to_string(duty));
+	m_transport->SendCommandQueued(string("AWG:DUTY ") + to_string(duty));
 }
 
 float PicoOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
@@ -1503,8 +1478,7 @@ void PicoOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude
 	if(m_awgImpedance == IMPEDANCE_50_OHM)
 		amplitude *= 2;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AWG:RANGE ") + to_string(amplitude));
+	m_transport->SendCommandQueued(string("AWG:RANGE ") + to_string(amplitude));
 }
 
 float PicoOscilloscope::GetFunctionChannelOffset(int /*chan*/)
@@ -1520,8 +1494,7 @@ void PicoOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
 	if(m_awgImpedance == IMPEDANCE_50_OHM)
 		offset *= 2;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AWG:OFFS ") + to_string(offset));
+	m_transport->SendCommandQueued(string("AWG:OFFS ") + to_string(offset));
 }
 
 float PicoOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
@@ -1532,9 +1505,7 @@ float PicoOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
 void PicoOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 {
 	m_awgFrequency = hz;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AWG:FREQ ") + to_string(hz));
+	m_transport->SendCommandQueued(string("AWG:FREQ ") + to_string(hz));
 }
 
 FunctionGenerator::WaveShape PicoOscilloscope::GetFunctionChannelShape(int /*chan*/)
@@ -1546,51 +1517,50 @@ void PicoOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
 {
 	m_awgShape = shape;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(shape)
 	{
 		case SHAPE_SINE:
-			m_transport->SendCommand(string("AWG:SHAPE SINE"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE SINE"));
 			break;
 
 		case SHAPE_SQUARE:
-			m_transport->SendCommand(string("AWG:SHAPE SQUARE"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE SQUARE"));
 			break;
 
 		case SHAPE_TRIANGLE:
-			m_transport->SendCommand(string("AWG:SHAPE TRIANGLE"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE TRIANGLE"));
 			break;
 
 		case SHAPE_DC:
-			m_transport->SendCommand(string("AWG:SHAPE DC"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE DC"));
 			break;
 
 		case SHAPE_NOISE:
-			m_transport->SendCommand(string("AWG:SHAPE WHITENOISE"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE WHITENOISE"));
 			break;
 
 		case SHAPE_SAWTOOTH_UP:
-			m_transport->SendCommand(string("AWG:SHAPE RAMP_UP"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE RAMP_UP"));
 			break;
 
 		case SHAPE_SAWTOOTH_DOWN:
-			m_transport->SendCommand(string("AWG:SHAPE RAMP_DOWN"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE RAMP_DOWN"));
 			break;
 
 		case SHAPE_SINC:
-			m_transport->SendCommand(string("AWG:SHAPE SINC"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE SINC"));
 			break;
 
 		case SHAPE_GAUSSIAN:
-			m_transport->SendCommand(string("AWG:SHAPE GAUSSIAN"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE GAUSSIAN"));
 			break;
 
 		case SHAPE_HALF_SINE:
-			m_transport->SendCommand(string("AWG:SHAPE HALF_SINE"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE HALF_SINE"));
 			break;
 
 		case SHAPE_PRBS_NONSTANDARD:
-			m_transport->SendCommand(string("AWG:SHAPE PRBS"));
+			m_transport->SendCommandQueued(string("AWG:SHAPE PRBS"));
 			//per Martyn at Pico:
 			//lfsr42 <= lfsr42(lfsr42'HIGH - 1 downto 0) & (lfsr42(41) xnor lfsr42(40)
 			//xnor lfsr42(19) xnor lfsr42(18));
