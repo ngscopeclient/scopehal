@@ -89,6 +89,7 @@ void Ethernet100BaseTXDecoder::Refresh()
 
 	//Sample the input on the edges of the recovered clock
 	SparseAnalogWaveform samples;
+	samples.SetCpuOnlyHint();
 	samples.PrepareForCpuAccess();
 	SampleOnAnyEdgesBase(din, clk, samples);
 	size_t ilen = samples.size();
@@ -371,14 +372,4 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	//Synced, all good
 	descrambled_bits.MarkModifiedFromCpu();
 	return true;
-}
-
-int Ethernet100BaseTXDecoder::GetState(float voltage)
-{
-	if(voltage > 0.5)
-		return 1;
-	else if(voltage < -0.5)
-		return -1;
-	else
-		return 0;
 }
