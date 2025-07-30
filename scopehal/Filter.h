@@ -335,6 +335,44 @@ protected:
 	SparseAnalogWaveform* SetupSparseOutputWaveform(SparseWaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 	SparseDigitalWaveform* SetupSparseDigitalOutputWaveform(SparseWaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
+	/**
+		@brief Sets up an empty output waveform and copies basic metadata from the input.
+
+		A new output waveform is created if necessary, but when possible the existing one is reused.
+
+		@param din			Input waveform
+		@param stream		Stream index
+		@param clear		True to clear an existing waveform, false to leave it as-is
+
+		@return	The ready-to-use output waveform
+	 */
+	template<class T>
+	T* SetupEmptyWaveform(WaveformBase* din, size_t stream, bool clear = true)
+	{
+		//Create the waveform, but only if necessary
+		auto cap = dynamic_cast<T*>(GetData(stream));
+		if(cap == NULL)
+		{
+			cap = new T;
+			SetData(cap, stream);
+		}
+
+		//Copy configuration
+		cap->m_startTimestamp 		= din->m_startTimestamp;
+		cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+		cap->m_triggerPhase			= din->m_triggerPhase;
+		cap->m_timescale			= din->m_timescale;
+
+		//Bump rev number
+		cap->m_revision ++;
+
+		//Clear output
+		if(clear)
+			cap->clear();
+
+		return cap;
+	}
+
 public:
 	//Helpers for sub-sample interpolation
 
