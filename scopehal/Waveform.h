@@ -544,7 +544,7 @@ public:
 	/**
 		@brief Helper function to indicate this waveform will only be used on the CPU
 	 */
-	virtual void SetCpuOnlyHint()
+	virtual void SetCpuOnlyHint() override
 	{
 		SparseWaveformBase::SetCpuOnlyHint();
 
