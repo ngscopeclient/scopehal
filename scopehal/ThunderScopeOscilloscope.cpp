@@ -410,7 +410,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 			UniformAnalogWaveform* cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
-			cap->m_startTimestamp = time(NULL);
+			cap->m_startTimestamp = t;
 			cap->m_startFemtoseconds = fs;
 			if (clipping)
 				cap->m_flags |= WaveformBase::WAVEFORM_CLIPPING;
