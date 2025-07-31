@@ -59,7 +59,7 @@ protected:
 	}
 
 	bool TrySync(
-		std::vector<bool>& bits,
+		std::vector<uint8_t>& bits,
 		SparseAnalogWaveform& samples,
 		SparseDigitalWaveform& descrambled_bits,
 		size_t idle_offset,

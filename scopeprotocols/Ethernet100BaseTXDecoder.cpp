@@ -99,7 +99,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 	//MLT-3 decode
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int oldstate = GetState(samples.m_samples[0]);
-	vector<bool> bits;
+	vector<uint8_t> bits;
 	bits.resize(ilen-1);
 	for(size_t i=1; i<ilen; i++)
 	{
@@ -307,7 +307,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(
-	std::vector<bool>& bits,
+	vector<uint8_t>& bits,
 	SparseAnalogWaveform& samples,
 	SparseDigitalWaveform& descrambled_bits,
 	size_t idle_offset,
