@@ -263,9 +263,14 @@ void CSVImportFilter::OnFileNameChanged()
 					//Parse time to a float and convert to fs
 					if(xUnitIsFs)
 					{
-						float tmp;
-						from_chars(pline+fieldstart, pline+i, tmp, std::chars_format::general);
-						timestamps.push_back(FS_PER_SECOND * tmp);
+						//TODO: use fastfloat lib here
+						#ifdef __APPLE__
+							timestamps.push_back(FS_PER_SECOND * strtof(pline+i, nullptr));
+						#else
+							float tmp;
+							from_chars(pline+fieldstart, pline+i, tmp, std::chars_format::general);
+							timestamps.push_back(FS_PER_SECOND * tmp);
+						#endif
 					}
 
 					//other units are as-is
@@ -453,8 +458,12 @@ void CSVImportFilter::OnFileNameChanged()
 				//Read waveform data
 				//TODO: faster to save length in vcolumns vs recomputing here?
 				float tmp;
-				const char* vline = vcolumns[i][j];
-				from_chars(vline, vline+strlen(vline), tmp, std::chars_format::general);
+				#ifdef __APPLE__
+					tmp = strtof(pline+i, nullptr);
+				#else
+					const char* vline = vcolumns[i][j];
+					from_chars(vline, vline+strlen(vline), tmp, std::chars_format::general);
+				#endif
 				wfm->m_samples[j] = tmp;
 			}
 
