@@ -485,7 +485,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 			float fdperiod = 0;
 			if(uiLen > glitchCutoff)		//Sanity check: no correction if we have a glitch
 			{
-				float numUIs = round(uiLen * initialFrequency);
+				float numUIs = roundf(uiLen * initialFrequency);
 				if(numUIs != 0)	//divide by zero check needed in some cases
 				{
 					uiLen /= numUIs;
@@ -540,7 +540,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 		}
 
 		//Add the sample (90 deg phase offset from the internal NCO)
-		cap.m_offsets.push_back(edgepos + center);
+		cap.m_offsets.push_back_nomarkmod(edgepos + center);
 	}
 
 	//total_error /= edges.size();

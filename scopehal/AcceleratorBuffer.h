@@ -759,6 +759,16 @@ public:
 	}
 
 	/**
+		@brief Adds a new element to the end of the container, allocating space if needed but without calling MarkModifiedFromCpu
+	 */
+	void push_back_nomarkmod(const T& value)
+	{
+		size_t cursize = m_size;
+		resize(m_size + 1);
+		m_cpuPtr[cursize] = value;
+	}
+
+	/**
 		@brief Removes the last item in the container
 	 */
 	void pop_back()
