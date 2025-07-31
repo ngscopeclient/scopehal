@@ -745,40 +745,66 @@ public:
 		samples.clear();
 		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
 
+		//TODO: split up into blocks and multithread?
+		//TODO: AVX vcompress?
+		size_t len = clock->size();
+		size_t dlen = data->size();
+
 		//If the clock is sparse, assume it probably has edges on every sample and allocate that much buffer to start
 		//(we might overallocate here but it'll be a lot faster)
 		if(dynamic_cast<SparseDigitalWaveform*>(clock) != nullptr)
-			samples.Reserve(clock->size());
+		{
+			//Allocate exactly enough space
+			samples.Resize(clock->size());
+			samples.PrepareForCpuAccess();
+
+			size_t ndata = 0;
+			size_t nout = 0;
+			for(size_t i=1; i<len; i++)
+			{
+				//Throw away clock samples until we find an edge
+				if(clock->m_samples[i] == clock->m_samples[i-1])
+					continue;
+
+				//Throw away data samples until the data is synced with us
+				int64_t clkstart = GetOffsetScaled(clock, i);
+				while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
+					ndata ++;
+				if(ndata >= dlen)
+					break;
+
+				//Add the new sample
+				samples.m_offsets[nout] = clkstart;
+				samples.m_samples[nout] = data->m_samples[ndata];
+				nout ++;
+			}
+			samples.Resize(nout);
+			samples.MarkModifiedFromCpu();
+		}
 		else
 		{
 			samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
 												//if it's smaller than this, we won't waste a lot of memory
-		}
-		samples.PrepareForCpuAccess();
+			samples.PrepareForCpuAccess();
 
-		//TODO: split up into blocks and multithread?
-		//TODO: AVX vcompress?
+			size_t ndata = 0;
+			for(size_t i=1; i<len; i++)
+			{
+				//Throw away clock samples until we find an edge
+				if(clock->m_samples[i] == clock->m_samples[i-1])
+					continue;
 
-		size_t len = clock->size();
-		size_t dlen = data->size();
+				//Throw away data samples until the data is synced with us
+				int64_t clkstart = GetOffsetScaled(clock, i);
+				while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
+					ndata ++;
+				if(ndata >= dlen)
+					break;
 
-		size_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			int64_t clkstart = GetOffsetScaled(clock, i);
-			while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
-				ndata ++;
-			if(ndata >= dlen)
-				break;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(data->m_samples[ndata]);
+				//Add the new sample
+				samples.m_offsets.push_back(clkstart);
+				samples.m_samples.push_back(data->m_samples[ndata]);
+			}
 		}
 
 		//Compute sample durations
