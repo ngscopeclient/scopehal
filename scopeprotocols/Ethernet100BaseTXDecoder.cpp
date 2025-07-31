@@ -118,13 +118,12 @@ void Ethernet100BaseTXDecoder::Refresh(
 
 	//RX LFSR sync
 	size_t nbits = bits.size();
-	SparseDigitalWaveform descrambled_bits;
-	descrambled_bits.SetCpuOnlyHint();
-	descrambled_bits.PrepareForCpuAccess();
+	vector<uint8_t> descrambled_bits;
 	bool synced = false;
-	for(size_t idle_offset = 0; idle_offset<15000; idle_offset++)
+	size_t idle_offset = 0;
+	for(; idle_offset<15000; idle_offset++)
 	{
-		if(TrySync(bits, samples, descrambled_bits, idle_offset, nbits))
+		if(TrySync(bits, descrambled_bits, idle_offset, nbits))
 		{
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
@@ -152,13 +151,13 @@ void Ethernet100BaseTXDecoder::Refresh(
 	bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
 	size_t i = 0;
 	bool hit = true;
-	size_t des10 = descrambled_bits.m_samples.size() - 10;
+	size_t des10 = descrambled_bits.size() - 10;
 	for(i=0; i<des10; i++)
 	{
 		hit = true;
 		for(int j=0; j<10; j++)
 		{
-			bool b = descrambled_bits.m_samples[i+j];
+			bool b = descrambled_bits[i+j];
 			if(b != ssd[j])
 			{
 				hit = false;
@@ -225,15 +224,15 @@ void Ethernet100BaseTXDecoder::Refresh(
 	bool first = true;
 	uint8_t current_byte = 0;
 	uint64_t current_start = 0;
-	size_t deslen = descrambled_bits.m_samples.size()-5;
+	size_t deslen = descrambled_bits.size()-5;
 	for(; i<deslen; i+=5)
 	{
 		unsigned int code =
-			(descrambled_bits.m_samples[i+0] ? 16 : 0) |
-			(descrambled_bits.m_samples[i+1] ? 8 : 0) |
-			(descrambled_bits.m_samples[i+2] ? 4 : 0) |
-			(descrambled_bits.m_samples[i+3] ? 2 : 0) |
-			(descrambled_bits.m_samples[i+4] ? 1 : 0);
+			(descrambled_bits[i+0] ? 16 : 0) |
+			(descrambled_bits[i+1] ? 8 : 0) |
+			(descrambled_bits[i+2] ? 4 : 0) |
+			(descrambled_bits[i+3] ? 2 : 0) |
+			(descrambled_bits[i+4] ? 1 : 0);
 
 		//Handle special stuff
 		if(code == 0x18)
@@ -251,7 +250,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 			EthernetFrameSegment segment;
 			segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
 			cap->m_offsets.push_back(current_start * cap->m_timescale);
-			uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
+			uint64_t end = samples.m_offsets[idle_offset + i + 4] + samples.m_durations[idle_offset + i + 4];
 			cap->m_durations.push_back((end - current_start) * cap->m_timescale);
 			cap->m_samples.push_back(segment);
 
@@ -287,7 +286,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 		unsigned int decoded = code_5to4[code];
 		if(first)
 		{
-			current_start = descrambled_bits.m_offsets[i];
+			current_start = samples.m_offsets[idle_offset + i];
 			current_byte = decoded;
 		}
 		else
@@ -296,7 +295,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 
 			bytes.push_back(current_byte);
 			starts.push_back(current_start * cap->m_timescale);
-			uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
+			uint64_t end = samples.m_offsets[idle_offset + i + 4] + samples.m_durations[idle_offset + i + 4];
 			ends.push_back(end * cap->m_timescale);
 		}
 
@@ -308,14 +307,12 @@ void Ethernet100BaseTXDecoder::Refresh(
 
 bool Ethernet100BaseTXDecoder::TrySync(
 	vector<uint8_t>& bits,
-	SparseAnalogWaveform& samples,
-	SparseDigitalWaveform& descrambled_bits,
+	vector<uint8_t>& descrambled_bits,
 	size_t idle_offset,
 	size_t stop)
 {
 	if( (idle_offset + 64) >= bits.size())
 		return false;
-	descrambled_bits.clear();
 
 	//For now, assume the link is idle at the time we triggered
 	unsigned int lfsr =
@@ -335,15 +332,14 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	stop = min(stop, bits.size());
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
-	descrambled_bits.m_samples.resize(len);
-	descrambled_bits.PrepareForCpuAccess();
+	descrambled_bits.resize(len);
 	size_t window = 64 + idle_offset + 11;
 	size_t iout = 0;
 	for(size_t i=start; i < stop; i++)
 	{
 		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
 		bool b = bits[i] ^ (lfsr & 1);
-		descrambled_bits.m_samples[iout] = b;
+		descrambled_bits[iout] = b;
 		iout ++;
 
 		if(iout == window)
@@ -352,23 +348,12 @@ bool Ethernet100BaseTXDecoder::TrySync(
 			//The minimum inter-frame gap is a lot bigger than this.
 			for(int j=0; j<64; j++)
 			{
-				if(descrambled_bits.m_samples[j + idle_offset + 11] != 1)
+				if(descrambled_bits[j + idle_offset + 11] != 1)
 					return false;
 			}
 		}
 	}
 
-	//Copy offset and durations
-	descrambled_bits.m_offsets.resize(len);
-	descrambled_bits.m_durations.resize(len);
-	memcpy(	descrambled_bits.m_offsets.GetCpuPointer(),
-			samples.m_offsets.GetCpuPointer() + start,
-			len * sizeof(int64_t));
-	memcpy(	descrambled_bits.m_durations.GetCpuPointer(),
-			samples.m_durations.GetCpuPointer() + start,
-			len * sizeof(int64_t));
-
-	//Synced, all good
-	descrambled_bits.MarkModifiedFromCpu();
+	//All good if we get to here
 	return true;
 }
