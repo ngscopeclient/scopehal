@@ -458,10 +458,10 @@ void CSVImportFilter::OnFileNameChanged()
 				//Read waveform data
 				//TODO: faster to save length in vcolumns vs recomputing here?
 				float tmp;
+				const char* vline = vcolumns[i][j];
 				#ifdef __APPLE__
-					tmp = strtof(pline+i, nullptr);
+					tmp = strtof(vline, nullptr);
 				#else
-					const char* vline = vcolumns[i][j];
 					from_chars(vline, vline+strlen(vline), tmp, std::chars_format::general);
 				#endif
 				wfm->m_samples[j] = tmp;
