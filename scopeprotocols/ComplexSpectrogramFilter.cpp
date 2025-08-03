@@ -54,7 +54,7 @@ ComplexSpectrogramFilter::ComplexSpectrogramFilter(const string& color)
 	m_rectangularComputePipeline.Reinitialize(
 		"shaders/ComplexRectangularWindow.spv", 3, sizeof(WindowFunctionArgs));
 	m_cosineSumComputePipeline.Reinitialize(
-		"shaders/CosineSumWindow.spv", 3, sizeof(WindowFunctionArgs));
+		"shaders/ComplexCosineSumWindow.spv", 3, sizeof(WindowFunctionArgs));
 
 	m_postprocessComputePipeline.Reinitialize(
 		"shaders/ComplexSpectrogramPostprocess.spv", 2, sizeof(SpectrogramPostprocessArgs));
@@ -276,10 +276,11 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		args.offsetIn = block*fftlen;
 		args.offsetOut = block*fftlen;
 
+		const uint32_t compute_block_count = GetComputeBlockCount(fftlen, 64);
 		if(block == 0)
-			wpipe->Dispatch(cmdBuf, args, GetComputeBlockCount(fftlen, 64));
+			wpipe->Dispatch(cmdBuf, args, min(compute_block_count, 32768u), compute_block_count / 32768 + 1);
 		else
-			wpipe->DispatchNoRebind(cmdBuf, args, GetComputeBlockCount(fftlen, 64));
+			wpipe->DispatchNoRebind(cmdBuf, args, min(compute_block_count, 32768u), compute_block_count / 32768 + 1);
 	}
 	wpipe->AddComputeMemoryBarrier(cmdBuf);
 
