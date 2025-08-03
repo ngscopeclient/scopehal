@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,10 +50,11 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//If off end of array, stop
-	if(gl_GlobalInvocationID.x >= len)
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(nthread >= len)
 		return;
 
 	//Nope, do the subtraction
 	else
-		data[gl_GlobalInvocationID.x] -= sub[gl_GlobalInvocationID.x];
+		data[nthread] -= sub[nthread];
 }
