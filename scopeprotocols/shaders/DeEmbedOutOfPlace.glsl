@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,18 +60,19 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//If off end of array, stop
-	if(gl_GlobalInvocationID.x >= len)
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(nthread >= len)
 		return;
 
 	//Sin/cos values from rotation matrix
-	float sinval = sines[gl_GlobalInvocationID.x];
-	float cosval = cosines[gl_GlobalInvocationID.x];
+	float sinval = sines[nthread];
+	float cosval = cosines[nthread];
 
 	//Uncorrected complex value
-	float real_orig = din[gl_GlobalInvocationID.x*2 + 0];
-	float imag_orig = din[gl_GlobalInvocationID.x*2 + 1];
+	float real_orig = din[nthread*2 + 0];
+	float imag_orig = din[nthread*2 + 1];
 
 	//Apply the matrix and write back
-	dout[gl_GlobalInvocationID.x*2 + 0] = real_orig*cosval - imag_orig*sinval;
-	dout[gl_GlobalInvocationID.x*2 + 1] = real_orig*sinval + imag_orig*cosval;
+	dout[nthread*2 + 0] = real_orig*cosval - imag_orig*sinval;
+	dout[nthread*2 + 1] = real_orig*sinval + imag_orig*cosval;
 }

@@ -446,7 +446,11 @@ void CouplerDeEmbedFilter::ApplySParameters(
 	m_deEmbedComputePipeline.BindBufferNonblocking(1, samplesOut, cmdBuf, true);
 	m_deEmbedComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamSines, cmdBuf);
 	m_deEmbedComputePipeline.BindBufferNonblocking(3, params.m_resampledSparamCosines, cmdBuf);
-	m_deEmbedComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_deEmbedComputePipeline.DispatchNoRebind(
+		cmdBuf, (uint32_t)nouts,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesOut.MarkModifiedFromGpu();
 }
