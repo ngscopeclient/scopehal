@@ -304,12 +304,16 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	m_postprocessComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	m_postprocessComputePipeline.BindBufferNonblocking(0, m_rdoutbuf, cmdBuf);
 	m_postprocessComputePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf, true);
+	size_t xsize = GetComputeBlockCount(nouts, 64);
+	size_t ysize = ceil(nblocks * 1.0 / postargs.ygrid);
+	size_t zsize = postargs.ygrid;
+	//LogDebug("ComplexSpectrogramFilter: grid %zu x %zu x %zu\n", xsize, ysize, zsize);
 	m_postprocessComputePipeline.Dispatch(
 		cmdBuf,
 		postargs,
-		GetComputeBlockCount(nouts, 64),
-		ceil(nblocks * 1.0 / postargs.ygrid),
-		postargs.ygrid
+		xsize,
+		ysize,
+		zsize
 		);
 
 	//Done, block until the compute operations finish
