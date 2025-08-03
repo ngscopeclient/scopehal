@@ -473,7 +473,11 @@ void CouplerDeEmbedFilter::ApplySParametersInPlace(
 	m_deEmbedInPlaceComputePipeline.BindBufferNonblocking(0, samplesInout, cmdBuf);
 	m_deEmbedInPlaceComputePipeline.BindBufferNonblocking(1, params.m_resampledSparamSines, cmdBuf);
 	m_deEmbedInPlaceComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamCosines, cmdBuf);
-	m_deEmbedInPlaceComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_deEmbedInPlaceComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 	m_deEmbedInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesInout.MarkModifiedFromGpu();
 }

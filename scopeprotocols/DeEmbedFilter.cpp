@@ -297,7 +297,10 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 	m_deEmbedComputePipeline.BindBufferNonblocking(0, m_forwardOutBuf, cmdBuf);
 	m_deEmbedComputePipeline.BindBufferNonblocking(1, m_resampledSparamSines, cmdBuf);
 	m_deEmbedComputePipeline.BindBufferNonblocking(2, m_resampledSparamCosines, cmdBuf);
-	m_deEmbedComputePipeline.Dispatch(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_deEmbedComputePipeline.Dispatch(cmdBuf, (uint32_t)nouts,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	m_forwardOutBuf.MarkModifiedFromGpu();
 
@@ -313,7 +316,6 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 	m_normalizeComputePipeline.BindBufferNonblocking(0, m_reverseOutBuf, cmdBuf);
 	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
 
-	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
 	m_normalizeComputePipeline.Dispatch(cmdBuf, nargs,
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
