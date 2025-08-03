@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -172,7 +172,12 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
 	m_computePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf);
 	m_computePipeline.BindBufferNonblocking(2, cap->m_tempBuf, cmdBuf, true);
-	m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(args.width, 64), m_height);
+	const uint32_t compute_block_count = GetComputeBlockCount(args.width, 64);
+	m_computePipeline.Dispatch(
+		cmdBuf, args,
+		min(compute_block_count, 32768u),
+		m_height,
+		compute_block_count / 32768 + 1);
 
 	//Wait for the shader to finish
 	cmdBuf.pipelineBarrier(

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,7 +60,8 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//Bounds check
-	if(gl_GlobalInvocationID.x >= width)
+	uint xpos = (gl_GlobalInvocationID.z * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(xpos >= width)
 		return;
 	if(gl_GlobalInvocationID.y >= height)
 		return;
@@ -68,8 +69,8 @@ void main()
 	//Lower rows move down
 	if(gl_GlobalInvocationID.y < (height-1) )
 	{
-		dout[gl_GlobalInvocationID.y * width + gl_GlobalInvocationID.x] =
-			din[(gl_GlobalInvocationID.y+1) * width + gl_GlobalInvocationID.x];
+		dout[gl_GlobalInvocationID.y * width + xpos] =
+			din[(gl_GlobalInvocationID.y+1) * width + xpos];
 	}
 
 	//Topmost row gets new content
@@ -77,8 +78,8 @@ void main()
 	{
 		float vmin = 1.0 / 255.0;
 
-		uint binMin = uint(round(gl_GlobalInvocationID.x * timescaleRatio));
-		uint binMax = uint(round((gl_GlobalInvocationID.x+1) * timescaleRatio)) - 1;
+		uint binMin = uint(round(xpos * timescaleRatio));
+		uint binMax = uint(round((xpos+1) * timescaleRatio)) - 1;
 
 		float maxAmplitude = vmin;
 		for(uint i=binMin; (i <= binMax) && (i <= inlen); i++)
@@ -87,7 +88,6 @@ void main()
 			maxAmplitude = max(maxAmplitude, v);
 		}
 
-		dout[gl_GlobalInvocationID.y * width + gl_GlobalInvocationID.x] = maxAmplitude;
+		dout[gl_GlobalInvocationID.y * width + xpos] = maxAmplitude;
 	}
-
 }
