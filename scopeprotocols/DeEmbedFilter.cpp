@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -312,7 +312,11 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 	nargs.scale = scale;
 	m_normalizeComputePipeline.BindBufferNonblocking(0, m_reverseOutBuf, cmdBuf);
 	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-	m_normalizeComputePipeline.Dispatch(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
+
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_normalizeComputePipeline.Dispatch(cmdBuf, nargs,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
 	//Done, block until the compute operations finish

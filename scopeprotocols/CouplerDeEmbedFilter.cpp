@@ -424,7 +424,11 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 	m_normalizeComputePipeline.Bind(cmdBuf);
 	m_normalizeComputePipeline.BindBufferNonblocking(0, m_scalarTempBuf1, cmdBuf);
 	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-	m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
+
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
 	cap->MarkModifiedFromGpu();
