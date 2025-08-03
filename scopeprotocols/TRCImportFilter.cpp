@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -237,7 +237,7 @@ void TRCImportFilter::OnFileNameChanged()
 		buf.MarkModifiedFromCpu();
 
 		//The accelerated filter needs int16 support
-		/*if(g_hasShaderInt16 && g_gpuFilterEnabled)
+		if(g_hasShaderInt16)
 		{
 			m_commandBuffer->begin({});
 
@@ -252,7 +252,12 @@ void TRCImportFilter::OnFileNameChanged()
 
 			//Dispatch the compute operation and block until it completes
 			//We are in an event handler, so use the global transfer queue here
-			m_computePipeline16Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
+			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+			m_computePipeline16Bit->Dispatch(
+				*m_commandBuffer,
+				args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
 			m_commandBuffer->end();
 
 			g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
@@ -261,7 +266,7 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 
 		//Software fallback
-		else*/
+		else
 		{
 			wfm->PrepareForCpuAccess();
 
@@ -292,7 +297,7 @@ void TRCImportFilter::OnFileNameChanged()
 		buf.MarkModifiedFromCpu();
 
 		//The accelerated filter needs int8 support
-		/*if(g_hasShaderInt8 && g_gpuFilterEnabled)
+		if(g_hasShaderInt8)
 		{
 			m_commandBuffer->begin({});
 
@@ -307,7 +312,12 @@ void TRCImportFilter::OnFileNameChanged()
 
 			//Dispatch the compute operation and block until it completes
 			//We are in an event handler, so use the global transfer queue here
-			m_computePipeline8Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
+			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+			m_computePipeline8Bit->Dispatch(
+				*m_commandBuffer,
+				args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
 			m_commandBuffer->end();
 
 			g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
@@ -316,7 +326,7 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 
 		//Software fallback
-		else*/
+		else
 		{
 			wfm->PrepareForCpuAccess();
 

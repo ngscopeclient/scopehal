@@ -436,7 +436,11 @@ bool HaasoscopePro::AcquireData()
 			args.gain = scales[i];
 			args.offset = -offsets[i];
 
-			m_conversionPipeline->DispatchNoRebind(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+			m_conversionPipeline->DispatchNoRebind(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
 			cap->MarkModifiedFromGpu();
 		}
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,8 +52,9 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	if(gl_GlobalInvocationID.x >= size)
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(nthread >= size)
 		return;
 
-	pout[gl_GlobalInvocationID.x] = gain*float(int(pin[gl_GlobalInvocationID.x])) - offset;
+	pout[nthread] = gain*float(int(pin[nthread])) - offset;
 }
