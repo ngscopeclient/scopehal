@@ -76,6 +76,8 @@ public:
 protected:
 	bool m_modeValid;
 	bool m_secmodeValid;
+	bool m_dmmAutorangeValid;
+	bool m_dmmAutorange;
 	MeasurementTypes m_mode;
 	MeasurementTypes m_secmode;
 
