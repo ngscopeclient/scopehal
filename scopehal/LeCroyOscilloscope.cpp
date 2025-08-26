@@ -5009,8 +5009,16 @@ void LeCroyOscilloscope::PushTrigger()
 {
 	if(!m_trigger->GetInput(0))
 	{
-		LogWarning("LeCroyOscilloscope::PushTrigger: no input specified\n");
-		return;
+		//if it's a CDR trigger, force it to channel 4 on all scopes
+		if(dynamic_cast<CDRTrigger*>(m_trigger))
+			m_trigger->SetInput(0, m_channels[3]);
+
+		//for anything else ignore unspecified sources
+		else
+		{
+			LogWarning("LeCroyOscilloscope::PushTrigger: no input specified\n");
+			return;
+		}
 	}
 
 	//Source is the same for every channel
@@ -5097,6 +5105,27 @@ void LeCroyOscilloscope::PushNRZTrigger(CDRNRZPatternTrigger* trig)
 {
 	//FIXME
 	LogWarning("LeCroyOscilloscope::PushNRZTrigger unimplemented\n");
+}
+
+/**
+	@brief Check if a candidate 8b10b character is a valid K code point
+ */
+bool LeCroyOscilloscope::IsValid8B10BKCharacter(int code5, int code3)
+{
+	switch(code5)
+	{
+		case 28:
+			return true;
+
+		case 23:
+		case 27:
+		case 29:
+		case 30:
+			return (code3 == 7);
+
+		default:
+			return false;
+	}
 }
 
 /**
@@ -5219,8 +5248,12 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
 								si + "Type = \"KSymbol\"'");
 
-							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.KSymbol") +
-								si + "ValueOR = \"K" + val + "\"'");
+							//Validate K symbol
+							if(IsValid8B10BKCharacter(code5, code3))
+							{
+								m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.KSymbol") +
+									si + "ValueOR = \"K" + val + "\"'");
+							}
 							break;
 
 						case T8B10BSymbol::DSYMBOL:
@@ -5275,8 +5308,13 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 						case T8B10BSymbol::KSYMBOL:
 							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Type = \"KSymbol\"'");
-							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrKSymbol") +
-								si + "Value = \"K" + val + "\"'");
+
+							//Validate K symbol
+							if(IsValid8B10BKCharacter(code5, code3))
+							{
+								m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrKSymbol") +
+									si + "Value = \"K" + val + "\"'");
+							}
 							break;
 
 						case T8B10BSymbol::DSYMBOL:

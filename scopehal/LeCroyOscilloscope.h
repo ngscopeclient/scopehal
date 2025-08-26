@@ -305,6 +305,8 @@ protected:
 	void PushUartTrigger(UartTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
 
+	bool IsValid8B10BKCharacter(int code5, int code3);
+
 	void OnCDRTriggerAutoBaud();
 
 	void BulkCheckChannelEnableState();

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -235,7 +235,13 @@ string VICPSocketTransport::ReadReply([[maybe_unused]] bool endOnSemicolon, func
 			m_hostname.c_str(), nblocks, payload.size());
 	}
 	else
-		LogTrace("Got (%s): %s\n", m_hostname.c_str(), payload.c_str());
+	{
+		//avoid double newline in trace output
+		if(payload[payload.size()-1] == '\n')
+			LogTrace("Got (%s): %s", m_hostname.c_str(), payload.c_str());
+		else
+			LogTrace("Got (%s): %s\n", m_hostname.c_str(), payload.c_str());
+	}
 	return payload;
 }
 
