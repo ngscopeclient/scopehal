@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -734,6 +734,7 @@ void PCIeTransportDecoder::Refresh()
 							break;
 
 						case 1:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 							pack->m_headers["Status"] = "UR";
 							break;
 
@@ -742,10 +743,12 @@ void PCIeTransportDecoder::Refresh()
 							break;
 
 						case 4:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 							pack->m_headers["Status"] = "CA";
 							break;
 
 						default:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 							pack->m_headers["Status"] = "Invalid";
 							break;
 					}
