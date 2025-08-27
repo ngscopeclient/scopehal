@@ -3425,13 +3425,14 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			case MODEL_SDA_8ZI_A:
 			case MODEL_SDA_8ZI_B:
 				ret.push_back(4 * m);
+				ret.push_back(8 * m);
 				break;
 
 			default:
 				ret.push_back(5 * m);
+				ret.push_back(10 * m);
 				break;
 		}
-		ret.push_back(10 * m);
 
 		switch(m_modelid)
 		{
@@ -3503,7 +3504,6 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			case MODEL_SDA_8ZI_A:
 			case MODEL_SDA_8ZI_B:
 				ret.insert(ret.begin()+4, 4*k);
-
 				ret.push_back(20 * m);
 				ret.push_back(25 * m);
 				ret.push_back(40 * m);
