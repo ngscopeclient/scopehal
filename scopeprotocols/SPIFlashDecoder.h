@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,6 +76,7 @@ public:
 		CMD_READ_1_1_4,		//Fast read, SPI address, QSPI data
 		CMD_READ_1_4_4,		//Fast read, QSPI address, QSPI data
 		CMD_RESET,
+		CMD_MODE_RESET,
 		CMD_WRITE_ENABLE,
 		CMD_WRITE_DISABLE,
 		CMD_BLOCK_ERASE,

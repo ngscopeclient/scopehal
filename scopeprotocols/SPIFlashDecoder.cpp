@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -567,9 +567,20 @@ void SPIFlashDecoder::Refresh()
 							break;
 
 						//Reset should occur by itself, ignore any data after that
+						case 0xf0:
+							current_cmd = SPIFlashSymbol::CMD_RESET;
+							state = STATE_IDLE;
+
+							//Most flashes w/ 32 bit addressing revert to 24 bit on a reset.
+							//TODO: only some models do this? or depends on nonvolatile SFR?
+							num_address_bytes = 3;
+
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+							break;
+
 						case 0x99:
 						case 0xff:
-							current_cmd = SPIFlashSymbol::CMD_RESET;
+							current_cmd = SPIFlashSymbol::CMD_MODE_RESET;
 							state = STATE_IDLE;
 
 							//Most flashes w/ 32 bit addressing revert to 24 bit on a reset.
@@ -911,6 +922,17 @@ void SPIFlashDecoder::Refresh()
 							data_type = SPIFlashSymbol::TYPE_PART_ID;
 							break;
 
+						case SPIFlashSymbol::TYPE_PART_ID:
+							if(pack->m_data.size() >= 3)
+							{
+								//End the symbol
+								cap->m_durations[pos] = (dout->m_offsets[iin] + dout->m_durations[iin]) -
+														cap->m_offsets[pos];
+
+								data_type = SPIFlashSymbol::TYPE_DATA;
+								pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+							}
+
 						default:
 							break;
 					}
@@ -1095,6 +1117,8 @@ string SPIFlashWaveform::GetText(size_t i)
 					return "Write Status";
 				case SPIFlashSymbol::CMD_RESET:
 					return "Reset";
+				case SPIFlashSymbol::CMD_MODE_RESET:
+					return "Mode Reset";
 				case SPIFlashSymbol::CMD_WRITE_DISABLE:
 					return "Write Disable";
 				case SPIFlashSymbol::CMD_WRITE_ENABLE:
@@ -1302,7 +1326,9 @@ string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s
 bool SPIFlashDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 {
 	//Merge read-status packets
-	if( (first->m_headers["Op"] == "Read Status") && (next->m_headers["Op"] == "Read Status") )
+	string firstHeader = first->m_headers["Op"];
+	string secondHeader = next->m_headers["Op"];
+	if( (first->m_headers["Op"].find("Read Status Register") == 0) && (firstHeader == secondHeader) )
 		return true;
 
 	return false;
@@ -1310,7 +1336,7 @@ bool SPIFlashDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 
 Packet* SPIFlashDecoder::CreateMergedHeader(Packet* pack, size_t /*i*/)
 {
-	if(pack->m_headers["Op"] == "Read Status")
+	if(pack->m_headers["Op"].find("Read Status Register") == 0)
 	{
 		Packet* ret = new Packet;
 		ret->m_offset = pack->m_offset;
