@@ -1296,6 +1296,12 @@ string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s
 				//QSPI NOR
 				case 0x4014:
 					return "W25Q80xx";
+				case 0x4015:
+					return "W25Q16xx";
+				case 0x4016:
+					return "W25Q32xx";
+				case 0x4017:
+					return "W25Q64xx";
 				case 0x4018:
 					return "W25Q128xx";
 				case 0x6015:
