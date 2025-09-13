@@ -90,10 +90,6 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
-	virtual uint64_t GetSampleRate() override;
-	virtual void SetSampleRate(uint64_t rate) override;
-	virtual uint64_t GetSampleDepth() override;
-	virtual void SetSampleDepth(uint64_t depth) override;
 
 protected:
 	void ResetPerCaptureDiagnostics();
@@ -123,12 +119,6 @@ protected:
 
 	///@brief Counter of average trigger rate
 	HzClock m_receiveClock;
-
-	///@brief Sample rate
-	uint64_t m_rate;
-
-	///@brief Memory depth
-	uint64_t m_depth;
 
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;

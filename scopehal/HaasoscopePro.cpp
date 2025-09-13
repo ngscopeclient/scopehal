@@ -159,35 +159,11 @@ HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 
 	m_clippingBuffer.resize(1);
 
-	m_depth = 4e3;
-	m_rate = 3.2e9; // must be in the list of returned sample rates!
-
 	//set initial bandwidth on all channels to full
 	m_bandwidthLimits.resize(4);
 	for(size_t i=0; i<4; i++)
 		SetChannelBandwidthLimit(i, 0);
 }
-
-uint64_t HaasoscopePro::GetSampleRate()
-{
-	return m_rate;
-}
-
-uint64_t HaasoscopePro::GetSampleDepth()
-{
-	return m_depth;
-}
-
-void HaasoscopePro::SetSampleDepth(uint64_t depth)
-{
-	m_depth = depth;
-}
-
-void HaasoscopePro::SetSampleRate(uint64_t rate)
-{
-	m_rate = rate;
-}
-
 
 /**
 	@brief Reset performance counters at the start of a capture
