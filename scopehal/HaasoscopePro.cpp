@@ -92,8 +92,8 @@ HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 	}
 
 	//Set initial memory configuration.
-	SetSampleRate(1000000000L);
-	SetSampleDepth(10000);
+	SetSampleRate(3200000000L);
+	SetSampleDepth(4000);
 
 	//Set up the data plane socket
 	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
