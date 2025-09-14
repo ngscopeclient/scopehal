@@ -573,6 +573,18 @@ void ThunderScopeOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	}
 }
 
+void ThunderScopeOscilloscope::SetSampleDepth(uint64_t depth)
+{
+	m_transport->SendCommandQueued(string("ACQ:DEPTH ") + to_string(depth));
+	m_mdepth = depth;
+}
+
+void ThunderScopeOscilloscope::SetSampleRate(uint64_t rate)
+{
+	m_srate = rate;
+	m_transport->SendCommandQueued(string("ACQ:RATE ") + to_string(rate));
+}
+
 vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
