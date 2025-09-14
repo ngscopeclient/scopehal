@@ -239,7 +239,7 @@ void ThunderScopeOscilloscope::FlushConfigCache()
 
 void ThunderScopeOscilloscope::RefreshSampleRate()
 {
-	auto reply = m_transport->SendCommandQueuedWithReply("RATE?");
+	auto reply = m_transport->SendCommandQueuedWithReply("ACQ:RATE?");
 	m_srate = stoi(reply);
 }
 
@@ -542,7 +542,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string rates = m_transport->SendCommandQueuedWithReply("RATES?");
+	string rates = m_transport->SendCommandQueuedWithReply("ACQ:RATES?");
 
 	size_t i=0;
 	while(true)
@@ -587,7 +587,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
+	string depths = m_transport->SendCommandQueuedWithReply("ACQ:DEPTHS?");
 
 	size_t i=0;
 	while(true)
