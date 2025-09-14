@@ -538,6 +538,41 @@ void ThunderScopeOscilloscope::ForceTrigger()
 	ResetPerCaptureDiagnostics();
 }
 
+void ThunderScopeOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+{
+	//Type
+	m_transport->SendCommandQueued("TRIG:TYPE EDGE");
+
+	//Delay
+	m_transport->SendCommandQueued("TRIG:DELAY " + to_string(m_triggerOffset));
+
+	//Source
+	auto chan = dynamic_cast<OscilloscopeChannel*>(trig->GetInput(0).m_channel);
+	m_transport->SendCommandQueued("TRIG:SOU " + chan->GetHwname());
+
+	//Level
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TRIG:EDGE:LEV %f", trig->GetLevel() / chan->GetAttenuation());
+	m_transport->SendCommandQueued(buf);
+
+	//Slope
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			m_transport->SendCommandQueued("TRIG:EDGE:DIR RISING");
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			m_transport->SendCommandQueued("TRIG:EDGE:DIR FALLING");
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			m_transport->SendCommandQueued("TRIG:EDGE:DIR ANY");
+			break;
+		default:
+			LogWarning("Unknown edge type\n");
+			return;
+	}
+}
+
 vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
