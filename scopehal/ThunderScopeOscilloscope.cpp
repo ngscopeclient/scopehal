@@ -239,7 +239,7 @@ void ThunderScopeOscilloscope::FlushConfigCache()
 
 void ThunderScopeOscilloscope::RefreshSampleRate()
 {
-	auto reply = m_transport->SendCommandQueuedWithReply("RATE?");
+	auto reply = m_transport->SendCommandQueuedWithReply("ACQ:RATE?");
 	m_srate = stoi(reply);
 }
 
@@ -538,11 +538,58 @@ void ThunderScopeOscilloscope::ForceTrigger()
 	ResetPerCaptureDiagnostics();
 }
 
+void ThunderScopeOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+{
+	//Type
+	m_transport->SendCommandQueued("TRIG:TYPE EDGE");
+
+	//Delay
+	m_transport->SendCommandQueued("TRIG:DELAY " + to_string(m_triggerOffset));
+
+	//Source
+	auto chan = dynamic_cast<OscilloscopeChannel*>(trig->GetInput(0).m_channel);
+	m_transport->SendCommandQueued("TRIG:SOU " + chan->GetHwname());
+
+	//Level
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TRIG:EDGE:LEV %f", trig->GetLevel() / chan->GetAttenuation());
+	m_transport->SendCommandQueued(buf);
+
+	//Slope
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			m_transport->SendCommandQueued("TRIG:EDGE:DIR RISING");
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			m_transport->SendCommandQueued("TRIG:EDGE:DIR FALLING");
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			m_transport->SendCommandQueued("TRIG:EDGE:DIR ANY");
+			break;
+		default:
+			LogWarning("Unknown edge type\n");
+			return;
+	}
+}
+
+void ThunderScopeOscilloscope::SetSampleDepth(uint64_t depth)
+{
+	m_transport->SendCommandQueued(string("ACQ:DEPTH ") + to_string(depth));
+	m_mdepth = depth;
+}
+
+void ThunderScopeOscilloscope::SetSampleRate(uint64_t rate)
+{
+	m_srate = rate;
+	m_transport->SendCommandQueued(string("ACQ:RATE ") + to_string(rate));
+}
+
 vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string rates = m_transport->SendCommandQueuedWithReply("RATES?");
+	string rates = m_transport->SendCommandQueuedWithReply("ACQ:RATES?");
 
 	size_t i=0;
 	while(true)
@@ -587,7 +634,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
+	string depths = m_transport->SendCommandQueuedWithReply("ACQ:DEPTHS?");
 
 	size_t i=0;
 	while(true)
