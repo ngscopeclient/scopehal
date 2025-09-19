@@ -77,6 +77,7 @@ public:
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
 	virtual bool AcquireData() override;
+	void PushEdgeTrigger(EdgeTrigger* trig);
 
 	// Captures
 	virtual void Start() override;
@@ -92,6 +93,8 @@ public:
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
 	virtual bool CanInterleave() override;
+	void SetSampleDepth(uint64_t depth) override;
+	void SetSampleRate(uint64_t rate) override;
 
 protected:
 	void ResetPerCaptureDiagnostics();
