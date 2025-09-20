@@ -87,7 +87,10 @@ void CSVImportFilter::OnFileNameChanged()
 	double start = GetTime();
 
 	//Read the entire file into a buffer
-	FILE* fp = fopen(fname.c_str(), "r");
+	//Read it as binary because "read whole file" is problematic in text mode
+	//since length can change and we'll get less than we asked for
+	//(see https://github.com/ngscopeclient/scopehal/issues/1002)
+	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
 		LogError("Couldn't open CSV file \"%s\"\n", fname.c_str());
@@ -132,7 +135,7 @@ void CSVImportFilter::OnFileNameChanged()
 			pline ++;
 
 		//If it's a newline or nul, the line was blank - discard it
-		if( (*pline == '\0') || (*pline == '\n') )
+		if( (*pline == '\0') || (*pline == '\n') || (*pline == '\r') )
 		{
 			pbuf ++;
 			continue;
@@ -144,7 +147,7 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			if(pline[slen] == '\0')
 				break;
-			if(pline[slen] == '\n')
+			if( (pline[slen] == '\n') || (pline[slen] == '\r') )
 			{
 				pline[slen] = '\0';
 				break;
@@ -214,7 +217,7 @@ void CSVImportFilter::OnFileNameChanged()
 		for(size_t i=0; i<=slen; i++)
 		{
 			//End of field
-			if( (pline[i] == ',') || (pline[i] == '\n') || (pline[i] == '\0') )
+			if( (pline[i] == ',') || (pline[i] == '\n') || (pline[i] == '\r') || (pline[i] == '\0') )
 			{
 				//If this is the first row, check if it's numeric
 				if(names.empty() && timestamps.empty())
