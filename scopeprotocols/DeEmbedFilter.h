@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,6 +60,9 @@ public:
 	size_t test_GetOutLen()
 	{ return m_cachedOutLen; }
 
+	size_t test_GetNouts()
+	{ return m_cachedNouts; }
+
 	AcceleratorBuffer<float>& test_GetCachedInputBuffer()
 	{ return m_forwardInBuf; }
 
@@ -95,6 +98,7 @@ protected:
 
 	size_t m_cachedNumPoints;
 	size_t m_cachedOutLen;
+	size_t m_cachedNouts;
 	size_t m_cachedIstart;
 
 	AcceleratorBuffer<float> m_forwardInBuf;

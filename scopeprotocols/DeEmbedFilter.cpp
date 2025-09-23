@@ -65,6 +65,7 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
 	m_cachedOutLen = 0;
+	m_cachedNouts = 0;
 	m_cachedIstart = 0;
 
 	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -271,6 +272,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shar
 	size_t outlen = iend - istart;
 	cap->Resize(outlen);
 	m_cachedOutLen = outlen;
+	m_cachedNouts = nouts;
 
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
