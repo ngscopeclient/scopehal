@@ -105,18 +105,19 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	for(size_t i=0; i<4; i++)
 		DisableChannel(i);
 
+	//Set initial memory configuration: 1M point depth @ 1 Gsps
+	//This must happen before the trigger is configured, since trigger validation depends on knowing memory depth
+	SetSampleRate(1000000000L);
+	SetSampleDepth(1000000);
+
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
 	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
 	SetTrigger(trig);
-	PushTrigger();
 	SetTriggerOffset(1000000000); //1us to allow trigphase interpolation
-
-	//Set initial memory configuration.
-	SetSampleRate(1000000000L);
-	SetSampleDepth(10000);
+	//don't need a second PushTrigger() call, SetTriggerOffset will implicitly do one
 
 	m_diagnosticValues["Hardware WFM/s"] = &m_diag_hardwareWFMHz;
 	m_diagnosticValues["Received WFM/s"] = &m_diag_receivedWFMHz;

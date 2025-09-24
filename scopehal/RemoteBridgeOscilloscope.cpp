@@ -119,7 +119,6 @@ void RemoteBridgeOscilloscope::SetSampleRate(uint64_t rate)
 	m_transport->SendCommandQueued( string("RATE ") + to_string(rate));
 }
 
-
 void RemoteBridgeOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
