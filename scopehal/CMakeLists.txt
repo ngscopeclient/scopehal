@@ -192,6 +192,7 @@ set(SCOPEHAL_SOURCES
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
 	RidenPowerSupply.cpp
+	SinilinkPowerSupply.cpp
 	KuaiquPowerSupply.cpp
 
 	StandardColors.cpp
