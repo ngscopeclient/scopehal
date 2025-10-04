@@ -341,6 +341,10 @@ float SiglentFunctionGenerator::GetFunctionChannelFrequency(int chan)
 
 void SiglentFunctionGenerator::SetFunctionChannelFrequency(int chan, float hz)
 {
+	if(m_cachedFrequencyValid[chan] && std::abs(m_cachedFrequency[chan] - hz) < 1e-6)
+	{
+		return;
+	}
 	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz));
 
 	m_cachedFrequency[chan] = hz;
