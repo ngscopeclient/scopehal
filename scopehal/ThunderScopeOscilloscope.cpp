@@ -45,6 +45,11 @@
 
 using namespace std;
 
+enum ThunderscopeDataType_e {
+	DATATYPE_I8 = 2,
+	DATATYPE_I16 = 4
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
@@ -164,8 +169,11 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 				bufname.c_str()));
 	}
 
-	m_conversionPipeline = make_unique<ComputePipeline>(
+	m_conversion8BitPipeline = make_unique<ComputePipeline>(
 		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		
+	m_conversion16BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
 }
@@ -315,8 +323,13 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 
 bool ThunderScopeOscilloscope::AcquireData()
 {
-	const uint8_t r = 'K';
+	const uint8_t r = 'S';
 	m_transport->SendRawData(1, &r);
+
+	//Read Version No.
+	uint8_t version;
+	if(!m_transport->ReadRawData(sizeof(version), (uint8_t*)&version))
+		return false;
 
 	//Read the sequence number of the current waveform
 	uint32_t seqnum;
@@ -357,6 +370,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 
 	//Acquire data for each channel
 	uint8_t chnum;
+	uint8_t dataType;
 	uint64_t memdepth;
 	float config[3];
 	SequenceSet s;
@@ -400,10 +414,15 @@ bool ThunderScopeOscilloscope::AcquireData()
 			bool clipping;
 			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
 				return false;
+				
+			if(!m_transport->ReadRawData(sizeof(dataType), (uint8_t*)&dataType))
+				return false;
 
 			//TODO: stream timestamp from the server
-
-			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
+			uint32_t depth = memdepth * sizeof(int8_t);
+			if(dataType == DATATYPE_I16)
+				depth = memdepth * sizeof(int16_t);
+			if(!m_transport->ReadRawData(depth, (uint8_t*)buf))
 				return false;
 			abuf->MarkModifiedFromCpu();
 
@@ -430,18 +449,18 @@ bool ThunderScopeOscilloscope::AcquireData()
 	}
 
 	//Prefer GPU path
-	if(g_hasShaderInt8 && g_hasPushDescriptor)
+	if(g_hasShaderInt8 && g_hasPushDescriptor && (dataType == DATATYPE_I8))
 	{
 		m_cmdBuf->begin({});
 
-		m_conversionPipeline->Bind(*m_cmdBuf);
+		m_conversion8BitPipeline->Bind(*m_cmdBuf);
 
 		for(size_t i=0; i<awfms.size(); i++)
 		{
 			auto cap = awfms[i];
 
-			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+			m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversion8BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
 
 			ConvertRawSamplesShaderArgs args;
 			args.size = cap->size();
@@ -449,7 +468,37 @@ bool ThunderScopeOscilloscope::AcquireData()
 			args.offset = -offsets[i];
 
 			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-			m_conversionPipeline->DispatchNoRebind(
+			m_conversion8BitPipeline->DispatchNoRebind(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			cap->MarkModifiedFromGpu();
+		}
+
+		m_cmdBuf->end();
+		m_queue->SubmitAndBlock(*m_cmdBuf);
+	}
+	else if(g_hasShaderInt16 && g_hasPushDescriptor && (dataType == DATATYPE_I16))
+	{
+		m_cmdBuf->begin({});
+
+		m_conversion16BitPipeline->Bind(*m_cmdBuf);
+
+		for(size_t i=0; i<awfms.size(); i++)
+		{
+			auto cap = awfms[i];
+
+			m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversion16BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scales[i];
+			args.offset = -offsets[i];
+
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+			m_conversion16BitPipeline->DispatchNoRebind(
 				*m_cmdBuf, args,
 				min(compute_block_count, 32768u),
 				compute_block_count / 32768 + 1);
@@ -470,12 +519,24 @@ bool ThunderScopeOscilloscope::AcquireData()
 		{
 			auto cap = awfms[i];
 			cap->PrepareForCpuAccess();
-			Convert8BitSamples(
-				(float*)&cap->m_samples[0],
-				(int8_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				offsets[i],
-				cap->m_samples.size());
+			if(dataType == DATATYPE_I8)
+			{
+				Convert8BitSamples(
+					(float*)&cap->m_samples[0],
+					(int8_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+					scales[i],
+					offsets[i],
+					cap->m_samples.size());
+			}
+			else if(dataType == DATATYPE_I16)
+			{
+				Convert16BitSamples(
+					(float*)&cap->m_samples[0],
+					(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+					scales[i],
+					offsets[i],
+					cap->m_samples.size());
+			}
 			cap->MarkModifiedFromCpu();
 		}
 	}

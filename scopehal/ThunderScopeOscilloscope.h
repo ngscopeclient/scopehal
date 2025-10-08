@@ -139,7 +139,10 @@ protected:
 	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 
 	///@brief Compute pipeline for converting raw ADC codes to float32 samples
-	std::unique_ptr<ComputePipeline> m_conversionPipeline;
+	std::unique_ptr<ComputePipeline> m_conversion8BitPipeline;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
 
 	///@brief Buffer for storing channel clip state
 	AcceleratorBuffer<uint32_t> m_clippingBuffer;
