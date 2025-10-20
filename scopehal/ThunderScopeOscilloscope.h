@@ -93,8 +93,15 @@ public:
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
 	virtual bool CanInterleave() override;
+	virtual bool HasInterleavingControls() override;
 	void SetSampleDepth(uint64_t depth) override;
 	void SetSampleRate(uint64_t rate) override;
+
+	//ADC modes
+	virtual bool IsADCModeConfigurable() override;
+	virtual std::vector<std::string> GetADCModeNames(size_t channel) override;
+	virtual size_t GetADCMode(size_t channel) override;
+	virtual void SetADCMode(size_t channel, size_t mode) override;
 
 protected:
 	void ResetPerCaptureDiagnostics();
@@ -149,6 +156,13 @@ protected:
 
 	///@brief Bandwidth limiters
 	std::vector<unsigned int> m_bandwidthLimits;
+
+	///@brief ADC modes
+	enum ADCMode
+	{
+		MODE_8BIT,
+		MODE_12BIT
+	} m_adcMode;
 
 public:
 

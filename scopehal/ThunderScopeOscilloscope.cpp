@@ -67,6 +67,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	, m_diag_totalWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
 	, m_diag_droppedWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
 	, m_diag_droppedPercent(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT))
+	, m_adcMode(MODE_8BIT)
 {
 	m_analogChannelCount = 4;
 
@@ -171,11 +172,13 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 
 	m_conversion8BitPipeline = make_unique<ComputePipeline>(
 		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
-		
+
 	m_conversion16BitPipeline = make_unique<ComputePipeline>(
 		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
+
+	//TODO: query ADC mode on hardware
 }
 
 /**
@@ -414,7 +417,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 			bool clipping;
 			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
 				return false;
-				
+
 			if(!m_transport->ReadRawData(sizeof(dataType), (uint8_t*)&dataType))
 				return false;
 
@@ -685,6 +688,11 @@ bool ThunderScopeOscilloscope::CanInterleave()
 	return false;
 }
 
+bool ThunderScopeOscilloscope::HasInterleavingControls()
+{
+	return false;
+}
+
 set<Oscilloscope::InterleaveConflict> ThunderScopeOscilloscope::GetInterleaveConflicts()
 {
 	//interleaving not supported
@@ -784,6 +792,48 @@ void ThunderScopeOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel:
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_channelCouplings[i] = type;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ADC modes
+
+bool ThunderScopeOscilloscope::IsADCModeConfigurable()
+{
+	return true;
+}
+
+vector<string> ThunderScopeOscilloscope::GetADCModeNames([[maybe_unused]] size_t channel)
+{
+	vector<string> ret;
+	ret.push_back("8 bit");
+	ret.push_back("12 bit");
+	return ret;
+}
+
+size_t ThunderScopeOscilloscope::GetADCMode([[maybe_unused]] size_t channel)
+{
+	return m_adcMode;
+}
+
+void ThunderScopeOscilloscope::SetADCMode([[maybe_unused]] size_t channel, size_t mode)
+{
+	switch(mode)
+	{
+		case 0:
+			m_adcMode = MODE_8BIT;
+			m_transport->SendCommandQueued("ACQ:RES 8");
+			break;
+
+		//12 bit mode has lower Fmax so need to refresh sample rate in case the scope clamped us
+		case 1:
+			m_adcMode = MODE_12BIT;
+			m_transport->SendCommandQueued("ACQ:RES 12");
+			RefreshSampleRate();
+			break;
+
+		default:
+			break;
 	}
 }
 

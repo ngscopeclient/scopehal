@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -565,6 +565,11 @@ public:
 	virtual bool SetInterleaving(bool combine) =0;
 
 	/**
+		@brief Returns true if the scope has a user controllavble interleaving feature, false if not
+	 */
+	virtual bool HasInterleavingControls();
+
+	/**
 		@brief Returns true if we have no interleave conflicts, false if we have conflicts
 	 */
 	virtual bool CanInterleave();
@@ -692,6 +697,11 @@ public:
 		@brief Gets the bank containing a given channel.
 	 */
 	virtual AnalogBank GetAnalogBank(size_t channel);
+
+	/**
+		@brief Returns true if the ADC is a per-channel setting, false if global for the entire instrument
+	 */
+	virtual bool IsADCModePerChannel();
 
 	/**
 		@brief Returns true if the ADC is configurable, false if it can only run in one mode.

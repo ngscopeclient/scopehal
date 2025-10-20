@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -681,6 +681,11 @@ int64_t Oscilloscope::GetDeskewForChannel(size_t /*channel*/)
 	return 0;
 }
 
+bool Oscilloscope::HasInterleavingControls()
+{
+	return true;
+}
+
 bool Oscilloscope::CanInterleave()
 {
 	//Check each conflict in the list
@@ -813,6 +818,12 @@ Oscilloscope::AnalogBank Oscilloscope::GetAnalogBank(size_t /*channel*/)
 			ret.push_back(chan);
 	}
 	return ret;
+}
+
+bool Oscilloscope::IsADCModePerChannel()
+{
+	//default is to assume adc mode is a global setting
+	return false;
 }
 
 bool Oscilloscope::IsADCModeConfigurable()
