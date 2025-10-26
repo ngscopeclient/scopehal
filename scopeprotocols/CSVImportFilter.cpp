@@ -117,14 +117,14 @@ auto fname = m_parameters[m_fpname].ToString();
 	vector<string> names;
 	vector< vector<char*> > vcolumns;
 	vector<int64_t> timestamps;
-	bool digilentFormat = false; // 初始化变量
+	bool digilentFormat = false;
 	size_t nrow = 0;
 	size_t ncols = 0;
 	char* pbuf = buf;
 	char* pend = buf + flen;
 	bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
 	
-	while(pbuf < pend)  // 修改循环条件
+	while(pbuf < pend)  // Modify loop stop conditions
 	{
 		nrow++;
 
@@ -140,7 +140,7 @@ auto fname = m_parameters[m_fpname].ToString();
 		//If we've reached the end or the line starts with newline characters, it's a blank line - discard it
 		if(pline >= pend || *pline == '\0' || *pline == '\n' || *pline == '\r')
 		{
-			// 跳过所有连续的换行符
+			// Skip all consecutive line breaks
 			while(pbuf < pend && (*pbuf == '\n' || *pbuf == '\r'))
 				pbuf++;
 			continue;
@@ -155,12 +155,12 @@ auto fname = m_parameters[m_fpname].ToString();
 				break;
 			if(current_char == '\n' || current_char == '\r')
 			{
-				// 处理 \r\n 序列
+				// Process \r\n sequence
 				if(current_char == '\r' && (pline + slen + 1) < pend && pline[slen+1] == '\n')
 				{
 					pline[slen] = '\0';
 					pline[slen+1] = '\0';
-					slen++; // 额外跳过 \n
+					slen++; // Extra Skip \n
 				}
 				else
 				{
@@ -169,7 +169,7 @@ auto fname = m_parameters[m_fpname].ToString();
 				break;
 			}
 		}
-		pbuf += slen + 1; // +1 跳过换行符
+		pbuf += slen + 1; // +1 Skip line breaks
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
 		if(pline[0] == '#')
@@ -229,7 +229,7 @@ auto fname = m_parameters[m_fpname].ToString();
 		vector<string> headerfields;
 		bool headerRow = false;
 		size_t ncol = 0;
-		size_t line_length = strlen(pline); // 使用实际的字符串长度
+		size_t line_length = strlen(pline); // Use actual string length
 		
 		for(size_t i=0; i<=line_length; i++)
 		{
