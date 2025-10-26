@@ -69,7 +69,7 @@ string CSVImportFilter::GetProtocolName()
 
 void CSVImportFilter::OnFileNameChanged()
 {
-	auto fname = m_parameters[m_fpname].ToString();
+auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
 		return;
 
@@ -103,6 +103,8 @@ void CSVImportFilter::OnFileNameChanged()
 	if(flen != fread(buf, 1, flen, fp))
 	{
 		LogError("file read error\n");
+		delete[] buf;
+		fclose(fp);
 		return;
 	}
 	buf[flen] = '\0';	//guarantee null termination at end of file
@@ -115,15 +117,16 @@ void CSVImportFilter::OnFileNameChanged()
 	vector<string> names;
 	vector< vector<char*> > vcolumns;
 	vector<int64_t> timestamps;
-	bool digilentFormat;
+	bool digilentFormat = false; // 初始化变量
 	size_t nrow = 0;
 	size_t ncols = 0;
 	char* pbuf = buf;
 	char* pend = buf + flen;
 	bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
-	while(true)
+	
+	while(pbuf < pend)  // 修改循环条件
 	{
-		nrow ++;
+		nrow++;
 
 		//Stop if at end of file
 		char* pline = pbuf;
@@ -131,13 +134,15 @@ void CSVImportFilter::OnFileNameChanged()
 			break;
 
 		//Find first non-blank character in the current line
-		while(isspace(*pline))
-			pline ++;
+		while(pline < pend && isspace(*pline) && *pline != '\n' && *pline != '\r')
+			pline++;
 
-		//If it's a newline or nul, the line was blank - discard it
-		if( (*pline == '\0') || (*pline == '\n') || (*pline == '\r') )
+		//If we've reached the end or the line starts with newline characters, it's a blank line - discard it
+		if(pline >= pend || *pline == '\0' || *pline == '\n' || *pline == '\r')
 		{
-			pbuf ++;
+			// 跳过所有连续的换行符
+			while(pbuf < pend && (*pbuf == '\n' || *pbuf == '\r'))
+				pbuf++;
 			continue;
 		}
 
@@ -145,15 +150,26 @@ void CSVImportFilter::OnFileNameChanged()
 		size_t slen = 0;
 		for(; (pline + slen) < pend; slen++)
 		{
-			if(pline[slen] == '\0')
+			char current_char = pline[slen];
+			if(current_char == '\0')
 				break;
-			if( (pline[slen] == '\n') || (pline[slen] == '\r') )
+			if(current_char == '\n' || current_char == '\r')
 			{
-				pline[slen] = '\0';
+				// 处理 \r\n 序列
+				if(current_char == '\r' && (pline + slen + 1) < pend && pline[slen+1] == '\n')
+				{
+					pline[slen] = '\0';
+					pline[slen+1] = '\0';
+					slen++; // 额外跳过 \n
+				}
+				else
+				{
+					pline[slen] = '\0';
+				}
 				break;
 			}
 		}
-		pbuf += slen;
+		pbuf += slen + 1; // +1 跳过换行符
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
 		if(pline[0] == '#')
@@ -164,7 +180,6 @@ void CSVImportFilter::OnFileNameChanged()
 				digilentFormat = true;
 				LogTrace("Found Digilent metadata header\n");
 			}
-
 			else if(digilentFormat)
 			{
 				if(s.find("#Date Time: ") == 0)
@@ -214,10 +229,12 @@ void CSVImportFilter::OnFileNameChanged()
 		vector<string> headerfields;
 		bool headerRow = false;
 		size_t ncol = 0;
-		for(size_t i=0; i<=slen; i++)
+		size_t line_length = strlen(pline); // 使用实际的字符串长度
+		
+		for(size_t i=0; i<=line_length; i++)
 		{
 			//End of field
-			if( (pline[i] == ',') || (pline[i] == '\n') || (pline[i] == '\r') || (pline[i] == '\0') )
+			if(pline[i] == ',' || pline[i] == '\0')
 			{
 				//If this is the first row, check if it's numeric
 				if(names.empty() && timestamps.empty())
@@ -225,14 +242,14 @@ void CSVImportFilter::OnFileNameChanged()
 					//See if it's a header row
 					if(!headerRow)
 					{
-						for(size_t j=0; pline[j] != '\0'; j++)
+						for(size_t j=fieldstart; j<i; j++)
 						{
 							auto c = pline[j];
 							if(	!isdigit(c) && !isspace(c) &&
 								(c != ',') && (c != '.') && (c != '-') && (c != 'e') && (c != '+'))
 							{
 								headerRow = true;
-								auto trimline = Trim(pline);
+								auto trimline = Trim(string(pline));
 								LogTrace("Found header row: %s\n", trimline.c_str());
 								break;
 							}
@@ -242,8 +259,8 @@ void CSVImportFilter::OnFileNameChanged()
 					//Save the header values
 					if(headerRow)
 					{
-						string s(pline);
-						headerfields.push_back(s.substr(fieldstart, i-fieldstart));
+						string field(pline + fieldstart, i - fieldstart);
+						headerfields.push_back(field);
 					}
 				}
 
@@ -255,9 +272,6 @@ void CSVImportFilter::OnFileNameChanged()
 					continue;
 				}
 
-				//Replace the delimiter with a nul
-				pline[i] = '\0';
-
 				//Load timestamp
 				if(!foundTimestamp)
 				{
@@ -268,47 +282,66 @@ void CSVImportFilter::OnFileNameChanged()
 					{
 						//TODO: use fastfloat lib here
 						#ifdef __APPLE__
-							timestamps.push_back(FS_PER_SECOND * strtof(pline+i, nullptr));
+							timestamps.push_back(FS_PER_SECOND * strtof(pline+fieldstart, nullptr));
 						#else
 							float tmp;
 							from_chars(pline+fieldstart, pline+i, tmp, std::chars_format::general);
 							timestamps.push_back(FS_PER_SECOND * tmp);
 						#endif
 					}
-
 					//other units are as-is
 					else
 						timestamps.push_back(strtoll(pline+fieldstart, nullptr, 10));
 				}
-
 				//Data field. Save it
 				else
 				{
 					if(vcolumns.size() <= ncol)
 						vcolumns.resize(ncol+1);
 					vcolumns[ncol].push_back(pline+fieldstart);
-
-					ncol ++;
+					ncol++;
 				}
 
 				//Start a new field
 				fieldstart = i+1;
 			}
 		}
-		if(fieldstart < slen)
+		
+		// Handle the last field if there's no trailing comma
+		if(fieldstart < line_length)
 		{
-			if(vcolumns.size() <= ncol)
-				vcolumns.resize(ncol+1);
-			vcolumns[ncol].push_back(pline+fieldstart);
-
-			ncol ++;
+			if(!headerRow && !foundTimestamp)
+			{
+				foundTimestamp = true;
+				//Parse time to a float and convert to fs
+				if(xUnitIsFs)
+				{
+					#ifdef __APPLE__
+						timestamps.push_back(FS_PER_SECOND * strtof(pline+fieldstart, nullptr));
+					#else
+						float tmp;
+						from_chars(pline+fieldstart, pline+line_length, tmp, std::chars_format::general);
+						timestamps.push_back(FS_PER_SECOND * tmp);
+					#endif
+				}
+				else
+					timestamps.push_back(strtoll(pline+fieldstart, nullptr, 10));
+			}
+			else if(!headerRow)
+			{
+				if(vcolumns.size() <= ncol)
+					vcolumns.resize(ncol+1);
+				vcolumns[ncol].push_back(pline+fieldstart);
+				ncol++;
+			}
 		}
 
 		//Header row gets special treatment
 		if(headerRow)
 		{
 			//delete name of timestamp column
-			headerfields.erase(headerfields.begin());
+			if(!headerfields.empty())
+				headerfields.erase(headerfields.begin());
 			names = headerfields;
 			continue;
 		}
@@ -320,12 +353,16 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			LogError("Malformed file (line %zu contains %zu fields, but file started with %zu fields)\n",
 				nrow, ncol, ncols);
+			delete[] buf;
 			return;
 		}
 	}
 
 	if(ncols == 0)
+	{
+		delete[] buf;
 		return;
+	}
 	size_t nrows = min(vcolumns[0].size(), timestamps.size());
 
 	//Assign default names to channels if there's no header row or not enough names
