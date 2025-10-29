@@ -194,6 +194,7 @@ set(SCOPEHAL_SOURCES
 	RidenPowerSupply.cpp
 	SinilinkPowerSupply.cpp
 	KuaiquPowerSupply.cpp
+    WattWaveX4.cpp
 
 	StandardColors.cpp
 	Filter.cpp

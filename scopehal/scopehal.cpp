@@ -60,6 +60,7 @@
 #include "ThunderScopeOscilloscope.h"
 #include "HaasoscopePro.h"
 #include "TinySA.h"
+#include "WattWaveX4.h"
 
 #include "AntikernelLabsTriggerCrossbar.h"
 #include "MultiLaneBERT.h"
@@ -254,6 +255,7 @@ void DriverStaticInit()
 	AddDriverClass(TektronixHSIOscilloscope);
 	AddDriverClass(ThunderScopeOscilloscope);
 	AddDriverClass(TinySA);
+	AddDriverClass(WattWaveX4);
 #ifdef __linux
 	AddDriverClass(SocketCANAnalyzer);
 #endif
