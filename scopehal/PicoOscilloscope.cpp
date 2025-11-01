@@ -221,18 +221,21 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		m_awgChannel = nullptr;
 
 	//Add the external trigger input
-	m_extTrigChannel =
-		new OscilloscopeChannel(
-		this,
-		"EX",
-		"#808080",
-		Unit(Unit::UNIT_FS),
-		Unit(Unit::UNIT_COUNTS),
-		Stream::STREAM_TYPE_TRIGGER,
-		m_channels.size());
-	m_channels.push_back(m_extTrigChannel);
-	m_extTrigChannel->SetDefaultDisplayName();
-
+	if(m_picoHasExttrig)
+	{
+		m_extTrigChannel =
+			new OscilloscopeChannel(
+			this,
+			"EX",
+			"#808080",
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_TRIGGER,
+			m_channels.size());
+		m_channels.push_back(m_extTrigChannel);
+		m_extTrigChannel->SetDefaultDisplayName();
+	}
+	
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -539,6 +542,7 @@ void PicoOscilloscope::EnableChannel(size_t i)
 	}
 
 	RemoteBridgeOscilloscope::EnableChannel(i);
+	//LogDebug(" --- :%s:ON\n", m_channels[i]->GetHwname().c_str());
 
 	//Memory configuration might have changed. Update availabe sample rates and memory depths.
 	GetSampleRatesNonInterleaved();
@@ -560,7 +564,9 @@ void PicoOscilloscope::DisableChannel(size_t i)
 			return;
 	}
 
-	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFF");
+	//?//m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFF");
+	RemoteBridgeOscilloscope::DisableChannel(i);
+	//LogDebug(" --- :%s:OFF\n", m_channels[i]->GetHwname().c_str());
 
 	//Memory configuration might have changed. Update availabe sample rates and memory depths.
 	GetSampleRatesNonInterleaved();
