@@ -41,7 +41,18 @@ using namespace std;
 #define RATE_5GSPS		(INT64_C(5000) * INT64_C(1000) * INT64_C(1000))
 #define RATE_2P5GSPS	(INT64_C(2500) * INT64_C(1000) * INT64_C(1000))
 #define RATE_1P25GSPS	(INT64_C(1250) * INT64_C(1000) * INT64_C(1000))
+#define RATE_1GSPS		(INT64_C(1000) * INT64_C(1000) * INT64_C(1000))
 #define RATE_625MSPS	(INT64_C(625)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_500MSPS	(INT64_C(500)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_400MSPS	(INT64_C(400)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_250MSPS	(INT64_C(250)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_200MSPS	(INT64_C(200)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_125MSPS	(INT64_C(125)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_100MSPS	(INT64_C(100)  * INT64_C(1000) * INT64_C(1000))
+#define RATE_80MSPS		(INT64_C(80)   * INT64_C(1000) * INT64_C(1000))
+#define RATE_62P5MSPS	(INT64_C(625)  * INT64_C(1000) * INT64_C(100))
+#define RATE_50MSPS		(INT64_C(50)   * INT64_C(1000) * INT64_C(1000))
+#define RATE_40MSPS		(INT64_C(40)   * INT64_C(1000) * INT64_C(1000))
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
@@ -56,7 +67,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	IdentifyHardware();
 
 	//Set resolution
-	SetADCMode(0, ADC_MODE_8BIT);
+	SetADCMode(0, 0);
 
 	//Add analog channel objects
 	for(size_t i = 0; i < m_analogChannelCount; i++)
@@ -84,39 +95,79 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		SetChannelVoltageRange(i, 0, 5);
 	}
 
-	//Add digital channels (named 1D0...7 and 2D0...7)
+	//Add digital channels (named 1D0...7 and 2D0...7 for Pods, D0...15 for MSO models)
 	m_digitalChannelBase = m_analogChannelCount;
-	for(size_t i=0; i<m_digitalChannelCount; i++)
+	switch(m_picoSeries)
 	{
-		//Hardware name of the channel
-		size_t ibank = i / 8;
-		size_t ichan = i % 8;
-		string chname = "1D0";
-		chname[0] += ibank;
-		chname[2] += ichan;
+		case 3:
+		case 5:
+		{
+			for(size_t i=0; i<m_digitalChannelCount; i++)
+			{
+				//Hardware name of the channel
+				size_t ibank = i / 8;
+				size_t ichan = i % 8;
+				string chname = "1D0";
+				chname[0] += ibank;
+				chname[2] += ichan;
 
-		//Create the channel
-		size_t chnum = i + m_digitalChannelBase;
-		auto chan = new OscilloscopeChannel(
-			this,
-			chname,
-			GetChannelColor(ichan),
-			Unit(Unit::UNIT_FS),
-			Unit(Unit::UNIT_COUNTS),
-			Stream::STREAM_TYPE_DIGITAL,
-			chnum);
-		m_channels.push_back(chan);
-		chan->SetDefaultDisplayName();
+				//Create the channel
+				size_t chnum = i + m_digitalChannelBase;
+				auto chan = new OscilloscopeChannel(
+					this,
+					chname,
+					GetChannelColor(ichan),
+					Unit(Unit::UNIT_FS),
+					Unit(Unit::UNIT_COUNTS),
+					Stream::STREAM_TYPE_DIGITAL,
+					chnum);
+				m_channels.push_back(chan);
+				chan->SetDefaultDisplayName();
+				//Change the display name to D0...D15
+				chname = "D" + to_string(i);
+				chan->SetDisplayName(chname);
+				//Hysteresis is fixed to 250mV for MSO models
+				SetDigitalHysteresis(chnum, 0.25);
+				SetDigitalThreshold(chnum, 0);
+			}
+		}
+		break;
 
-		SetDigitalHysteresis(chnum, 0.1);
-		SetDigitalThreshold(chnum, 0);
+		case 6:
+		{
+			for(size_t i=0; i<m_digitalChannelCount; i++)
+			{
+				//Hardware name of the channel
+				size_t ibank = i / 8;
+				size_t ichan = i % 8;
+				string chname = "1D0";
+				chname[0] += ibank;
+				chname[2] += ichan;
+
+				//Create the channel
+				size_t chnum = i + m_digitalChannelBase;
+				auto chan = new OscilloscopeChannel(
+					this,
+					chname,
+					GetChannelColor(ichan),
+					Unit(Unit::UNIT_FS),
+					Unit(Unit::UNIT_COUNTS),
+					Stream::STREAM_TYPE_DIGITAL,
+					chnum);
+				m_channels.push_back(chan);
+				chan->SetDefaultDisplayName();
+
+				SetDigitalHysteresis(chnum, 0.1);
+				SetDigitalThreshold(chnum, 0);
+			}
+		}
 	}
-
+	
 	//Set initial memory configuration.
-	switch(m_series)
+	switch(m_picoSeries)
 	{
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
+		case 3:
+		case 5:
 		{
 			//62.5 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
 			SetSampleRate(62500000L);
@@ -124,9 +175,15 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		}
 		break;
 
-		case SERIES_6403E:
-		case SERIES_6x0xE:
-		case SERIES_6x2xE:
+		case 4:
+		{
+			//40 Msps is the highest rate the 4000 series supports with all channels active.
+			SetSampleRate(40000000L);
+			SetSampleDepth(100000);
+		}
+		break;
+
+		case 6:
 		{
 			//625 Msps is the highest rate the 6000 series supports with all channels, including MSO, active.
 			SetSampleRate(625000000L);
@@ -140,50 +197,45 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial AWG configuration
-	switch(m_series)
+	if(m_picoHasAwg)
 	{
 		//has function generator
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
-		case SERIES_6403E:
-		case SERIES_6x0xE:
-		case SERIES_6x2xE:
-			SetFunctionChannelAmplitude(0, 0.1);
-			SetFunctionChannelShape(0, SHAPE_SQUARE);
-			SetFunctionChannelDutyCycle(0, 0.5);
-			SetFunctionChannelFrequency(0, 1e6);
-			SetFunctionChannelOffset(0, 0);
-			SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
-			SetFunctionChannelActive(0, false);
-			m_awgChannel = new FunctionGeneratorChannel(
-				this,
-				"AWG",
-				"#808080",
-				m_channels.size());
-			m_channels.push_back(m_awgChannel);
+		SetFunctionChannelAmplitude(0, 0.1);
+		SetFunctionChannelShape(0, SHAPE_SQUARE);
+		SetFunctionChannelDutyCycle(0, 0.5);
+		SetFunctionChannelFrequency(0, 1e6);
+		SetFunctionChannelOffset(0, 0);
+		SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
+		SetFunctionChannelActive(0, false);
+		m_awgChannel = new FunctionGeneratorChannel(
+			this,
+			"AWG",
+			"#808080",
+			m_channels.size());
+		m_channels.push_back(m_awgChannel);
 
-			//Default to not showing in the filter graph to avoid clutter
-			m_awgChannel->m_visibilityMode = InstrumentChannel::VIS_HIDE;
-			break;
-
-		//no AWG
-		default:
-			m_awgChannel = nullptr;
+		//Default to not showing in the filter graph to avoid clutter
+		m_awgChannel->m_visibilityMode = InstrumentChannel::VIS_HIDE;
 	}
+	else
+		m_awgChannel = nullptr;
 
 	//Add the external trigger input
-	m_extTrigChannel =
-		new OscilloscopeChannel(
-		this,
-		"EX",
-		"#808080",
-		Unit(Unit::UNIT_FS),
-		Unit(Unit::UNIT_COUNTS),
-		Stream::STREAM_TYPE_TRIGGER,
-		m_channels.size());
-	m_channels.push_back(m_extTrigChannel);
-	m_extTrigChannel->SetDefaultDisplayName();
-
+	if(m_picoHasExttrig)
+	{
+		m_extTrigChannel =
+			new OscilloscopeChannel(
+			this,
+			"EX",
+			"#808080",
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_TRIGGER,
+			m_channels.size());
+		m_channels.push_back(m_extTrigChannel);
+		m_extTrigChannel->SetDefaultDisplayName();
+	}
+	
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -274,58 +326,155 @@ void PicoOscilloscope::IdentifyHardware()
 	m_digitalChannelCount = 0;
 
 	//Figure out device family
-	if(m_model.length() < 5)
+	m_picoSeries = m_model[0] - '0';
+	m_picoMinAdc = 8;
+	m_picoHasAwg = false;
+	m_picoHasExttrig = false;
+	m_picoHasBwlimiter = false;
+	m_picoHas50ohm = false;
+	m_BandwidthLimitLow = 20000000;		//most common setting 20MHz
+	m_BandwidthLimitHigh = 200000000;	//and 200MHz
+	
+	/*if(m_model.length() < 4)
 	{
 		LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
-		m_series = SERIES_UNKNOWN;
-	}
-	else if(m_model[0] == '3')
+		m_picoSeries = 0;
+	}*/
+	switch(m_picoSeries)
 	{
-		m_series = SERIES_3x0xD;
-		if(m_model.find("MSO") != string::npos)
+		case 3:
 		{
-			// PicoScope3000 support 16 Digital Channels for MSO (or nothing)
+			m_BandwidthLimitHigh = 0;
+			if(m_model[4] != 'A')
+				m_picoHasAwg = true;
+				
+			if(m_model[4] == 'D')
+			{
+				m_picoHasBwlimiter = true;
+				m_awgBufferSize = 32768;
+			}
+			else
+			{
+				m_awgBufferSize = 32768;
+				switch(m_model[3])
+				{
+					case '4':
+					case '5':
+						m_awgBufferSize = 8192;
+						break;
+					case '6':
+						m_awgBufferSize = 16384;
+						break;
+				}
+			}
+			
+			if(m_model.find("MSO") != string::npos)
+			{
+				m_digitalChannelCount = 16;
+				m_picoHasExttrig = false;
+			}
+			else
+			{
+				m_picoHasExttrig = true;
+			}
+			m_adcModes = {8};
+			break;
+		}
+		
+		case 4:
+		{
+			m_picoHasAwg = true;
+			m_awgBufferSize = 16384;
+			m_picoMinAdc = 12;
+			m_picoHasBwlimiter = false;
+			m_BandwidthLimitLow = 0;
+			m_BandwidthLimitHigh = 0;
+			
+			if(m_model.find("4444") != string::npos)
+			{
+				m_picoHasAwg = false;
+				m_picoHasExttrig = false;
+				m_picoHasBwlimiter = true;
+				m_BandwidthLimitLow = 100000;
+				m_BandwidthLimitHigh = 1000000;
+				m_awgBufferSize = 0;
+			}
+			m_adcModes = {12, 14};
+			break;
+		}
+		
+		case 5:
+		{
+			m_BandwidthLimitHigh = 0;
+			m_picoHasBwlimiter = true;
+			if(m_model[4] == 'A')
+			{
+				m_awgBufferSize = 0;
+			}
+			else if(m_model[4] == 'B')
+			{
+				m_picoHasAwg = true;
+				switch(m_model[3])
+				{
+					case '2':
+						m_awgBufferSize = 16384;
+						break;
+					case '3':
+						m_awgBufferSize = 32768;
+						break;
+					case '4':
+						m_awgBufferSize = 49152;
+						break;
+				}
+			}
+			else if(m_model[4] == 'D')
+			{
+				m_picoHasAwg = true;
+				m_awgBufferSize = 32768;
+			}
+			
+			if(m_model.find("MSO") != string::npos)
+			{
+				m_digitalChannelCount = 16;
+				m_picoHasExttrig = false;
+			}
+			else
+			{
+				m_picoHasExttrig = true;
+			}
+			m_adcModes = {8, 12, 14, 15, 16};
+			break;
+		}
+		
+		case 6:
+		{
 			m_digitalChannelCount = 16;
-			m_series = SERIES_3x0xDMSO;
-			LogWarning("SERIES_3x0xDMSO PicoScope model \"%s\"\n", m_model.c_str());
+			m_picoHas50ohm = true;
+			m_picoHasExttrig = true;
+			m_picoHasBwlimiter = true;
+			m_picoHasAwg = true;
+			m_awgBufferSize = 40960;
+			if(m_model.find("6428") != string::npos)
+			{
+				m_picoHasBwlimiter = false;
+			}
+			if(m_model[3] == '5' or m_model[3] == '6')
+				m_BandwidthLimitHigh = 0;
+			m_adcModes = {8, 10, 12};
+			break;
 		}
-		else
+		
+		default:
 		{
-			LogWarning("SERIES_3x0xD PicoScope model \"%s\"\n", m_model.c_str());
+			LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
+			break;
 		}
 	}
-	else if(m_model[0] == '6')
-	{
-		//We have two MSO pod connectors
-		m_digitalChannelCount = 16;
-
-		switch(m_model[2])
-		{
-			case '2':
-				m_series = SERIES_6x2xE;
-				break;
-
-			case '0':
-				if(m_model == "6403E")
-					m_series = SERIES_6403E;
-				else
-					m_series = SERIES_6x0xE;
-				break;
-
-			default:
-				LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
-				m_series = SERIES_UNKNOWN;
-				break;
-		}
-	}
-	else
-	{
-		LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
-		m_series = SERIES_UNKNOWN;
-	}
-
-	//Ask the scope how many channels it has
+	//Ask the scope how many channels it has available or enabled
 	m_analogChannelCount = stoi(m_transport->SendCommandQueuedWithReply("CHANS?"));
+
+	LogDebug("PicoScope model \"%s\", series: %i, digital channels: %zu, BW-Limiter: %s/%u/%u, AWG: %s/%u, Ext.Trig: %s, 50 ohm: %s\n", 
+		m_model.c_str(), m_picoSeries, m_digitalChannelCount, m_picoHasBwlimiter ? "1" : "0", m_BandwidthLimitLow, m_BandwidthLimitHigh, m_picoHasAwg ? "1" : "0", m_awgBufferSize, m_picoHasExttrig ? "1" : "0", m_picoHas50ohm ? "1" : "0");
 }
 
 PicoOscilloscope::~PicoOscilloscope()
@@ -337,19 +486,11 @@ PicoOscilloscope::~PicoOscilloscope()
 
 unsigned int PicoOscilloscope::GetInstrumentTypes() const
 {
-	switch(m_series)
-	{
-		//has function generator
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
-		case SERIES_6x0xE:
-		case SERIES_6x2xE:
-			return Instrument::INST_OSCILLOSCOPE | Instrument::INST_FUNCTION;
-
-		//no special features
-		default:
-			return Instrument::INST_OSCILLOSCOPE;
-	}
+	
+	if(m_picoHasAwg)
+		return Instrument::INST_OSCILLOSCOPE | Instrument::INST_FUNCTION;
+	else
+		return Instrument::INST_OSCILLOSCOPE;
 }
 
 uint32_t PicoOscilloscope::GetInstrumentTypesForChannel(size_t i) const
@@ -401,6 +542,11 @@ void PicoOscilloscope::EnableChannel(size_t i)
 	}
 
 	RemoteBridgeOscilloscope::EnableChannel(i);
+	//LogDebug(" --- :%s:ON\n", m_channels[i]->GetHwname().c_str());
+
+	//Memory configuration might have changed. Update availabe sample rates and memory depths.
+	GetSampleRatesNonInterleaved();
+	GetSampleDepthsNonInterleaved();
 }
 
 void PicoOscilloscope::DisableChannel(size_t i)
@@ -418,30 +564,37 @@ void PicoOscilloscope::DisableChannel(size_t i)
 			return;
 	}
 
-	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFF");
+	//?//m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFF");
+	RemoteBridgeOscilloscope::DisableChannel(i);
+	//LogDebug(" --- :%s:OFF\n", m_channels[i]->GetHwname().c_str());
+
+	//Memory configuration might have changed. Update availabe sample rates and memory depths.
+	GetSampleRatesNonInterleaved();
+	GetSampleDepthsNonInterleaved();
 }
 
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
-	switch(m_series)
+	switch(m_picoSeries)
 	{
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
+		case 6:
 		{
-			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+			if(m_model.find("6428") == string::npos)
+			{
+				ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+				ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+			}
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+			//ret.push_back(OscilloscopeChannel::COUPLE_GND);
+			break;
 		}
-		break;
-
-		case SERIES_6x0xE:
-		case SERIES_6x2xE:
 		default:
 		{
 			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
-			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
-			ret.push_back(OscilloscopeChannel::COUPLE_GND);
+			//ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+			//ret.push_back(OscilloscopeChannel::COUPLE_GND);
 		}
 	}
 	return ret;
@@ -884,18 +1037,29 @@ Oscilloscope::AnalogBank PicoOscilloscope::GetAnalogBank(size_t /*channel*/)
 
 bool PicoOscilloscope::IsADCModeConfigurable()
 {
-	switch(m_series)
+	switch(m_picoSeries)
 	{
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
+		case 3:
 			return false;
+			break;
 
-		case SERIES_6x0xE:
-		case SERIES_6403E:
-			return false;
+		case 4:
+			if(m_model.find("4444") == string::npos)
+				return true;
+			else
+				return false;
+			break;
 
-		case SERIES_6x2xE:
+		case 5:
 			return true;
+			break;
+
+		case 6:
+			if(m_model[2] == '2')
+				return true;
+			else
+				return false;
+			break;
 
 		default:
 			LogWarning("PicoOscilloscope::IsADCModeConfigurable: unknown series\n");
@@ -905,46 +1069,71 @@ bool PicoOscilloscope::IsADCModeConfigurable()
 
 vector<string> PicoOscilloscope::GetADCModeNames(size_t /*channel*/)
 {
-	//All scopes with variable resolution start at 8 bit and go up from there
 	vector<string> ret;
-	ret.push_back("8 Bit");
-	if(Is10BitModeAvailable())
+	
+	switch(m_picoSeries)
 	{
-		ret.push_back("10 Bit");
-		if(Is12BitModeAvailable())
-			ret.push_back("12 Bit");
+		case 4:
+			if(m_model.find("4444") == string::npos)
+				ret.push_back("12 Bit");
+			break;
+
+		case 5:
+			ret.push_back("8 Bit");
+			if(Is12BitModeAvailable())
+			{
+				ret.push_back("12 Bit");
+				if(Is14BitModeAvailable())
+				{
+					ret.push_back("14 Bit");
+					if(Is15BitModeAvailable())
+					{
+						ret.push_back("15 Bit");
+						if(Is16BitModeAvailable())
+							ret.push_back("16 Bit");
+					}
+				}
+			}
+			break;
+
+		case 6:
+			ret.push_back("8 Bit");
+			if(Is10BitModeAvailable())
+			{
+				ret.push_back("10 Bit");
+				if(Is12BitModeAvailable())
+					ret.push_back("12 Bit");
+			}
+			break;
+
+		default:
+			break;
 	}
+
 	return ret;
 }
 
 size_t PicoOscilloscope::GetADCMode(size_t /*channel*/)
 {
-	return m_adcMode;
+	size_t n = 0;
+	for (int i : m_adcModes)
+	{
+ 		if(m_adcBits == i)
+			break;
+		n++;
+	}
+	return n;
 }
 
 void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 {
-	m_adcMode = (ADCMode)mode;
+	m_adcBits = m_adcModes[mode];
+	m_transport->SendCommand("BITS " + to_string(m_adcBits));
 
-	switch(mode)
-	{
-		case ADC_MODE_8BIT:
-			m_transport->SendCommand("BITS 8");
-			break;
-
-		case ADC_MODE_10BIT:
-			m_transport->SendCommand("BITS 10");
-			break;
-
-		case ADC_MODE_12BIT:
-			m_transport->SendCommand("BITS 12");
-			break;
-
-		default:
-			LogWarning("PicoOscilloscope::SetADCMode requested invalid mode %zu, interpreting as 8 bit\n", mode);
-			m_adcMode = ADC_MODE_8BIT;
-			break;
-	}
+	
+	//Memory configuration might have changed. Update availabe sample rates and memory depths.
+	GetSampleRatesNonInterleaved();
+	GetSampleDepthsNonInterleaved();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -971,7 +1160,10 @@ Oscilloscope::DigitalBank PicoOscilloscope::GetDigitalBank(size_t channel)
 
 bool PicoOscilloscope::IsDigitalHysteresisConfigurable()
 {
-	return true;
+	if(m_picoSeries == 6)
+		return true;
+	else
+		return false;
 }
 
 bool PicoOscilloscope::IsDigitalThresholdConfigurable()
@@ -1003,12 +1195,43 @@ void PicoOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 
 void PicoOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
+	switch(m_picoSeries)
 	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_digitalThresholds[channel] = level;
-	}
+		case 3:
+		case 5:
+		{
+			//MSO scopes: sync threshold for the whole channel w/8 lanes
+			size_t chnum = channel - m_digitalChannelBase;
+			int n = 8;
+			if(chnum<8)
+				n = 0;
+			for(size_t i=0; i<8; i++)
+			{
+				//Set the threshold for every lane of the channel
+				chnum = i + n + m_digitalChannelBase;
+				{
+					lock_guard<recursive_mutex> lock(m_cacheMutex);
+					m_digitalThresholds[chnum] = level;
+				}
+				//Only actually set the threshold on the first hardware channel though
+				if(i==0)
+				{
+					m_transport->SendCommand(GetOscilloscopeChannel(chnum)->GetHwname() + ":THRESH " + to_string(level));
+				}
+			}
+			break;
+		}
 
-	m_transport->SendCommand(GetOscilloscopeChannel(channel)->GetHwname() + ":THRESH " + to_string(level));
+		default:
+		{
+			{
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				m_digitalThresholds[channel] = level;
+			}
+			m_transport->SendCommand(GetOscilloscopeChannel(channel)->GetHwname() + ":THRESH " + to_string(level));
+			break;
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1127,33 +1350,56 @@ bool PicoOscilloscope::CanEnableChannel(size_t i)
 	}
 
 	//Fall back to the main path if we get here
-	switch(m_series)
+	switch(m_picoSeries)
 	{
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
+		case 3:
 			return CanEnableChannel6000Series8Bit(i);
 			break;
 
-		//6000 series
-		case SERIES_6403E:
-		case SERIES_6x0xE:
-		case SERIES_6x2xE:
-			switch(GetADCMode(0))
+		case 4:
+			switch(m_adcBits)
 			{
-				case ADC_MODE_8BIT:
-					return CanEnableChannel6000Series8Bit(i);
-
-				case ADC_MODE_10BIT:
-					return CanEnableChannel6000Series10Bit(i);
-
-				case ADC_MODE_12BIT:
-					return CanEnableChannel6000Series12Bit(i);
-
+				case 12:
+					return CanEnableChannel4000Series12Bit(i);
+				case 14:
+					return CanEnableChannel4000Series14Bit(i);
 				default:
-					break;
+					return false;
+			}
+			break;
+			
+		case 5:
+			switch(m_adcBits)
+			{
+				case 8:
+					return CanEnableChannel5000Series8Bit(i);
+				case 12:
+					return CanEnableChannel5000Series12Bit(i);
+				case 14:
+					return CanEnableChannel5000Series14Bit(i);
+				case 15:
+					return CanEnableChannel5000Series15Bit(i);
+				case 16:
+					return CanEnableChannel5000Series16Bit(i);
+				default:
+					return false;
+			}
+			break;
+
+		case 6:
+			switch(m_adcBits)
+			{
+				case 8:
+					return CanEnableChannel6000Series8Bit(i);
+				case 10:
+					return CanEnableChannel6000Series10Bit(i);
+				case 12:
+					return CanEnableChannel6000Series12Bit(i);
+				default:
+					return false;
 			}
 		default:
-			break;
+			return false;
 	}
 
 	//When in doubt, assume all channels are available
@@ -1177,7 +1423,7 @@ bool PicoOscilloscope::CanEnableChannel6000Series8Bit(size_t i)
 			return false;
 
 		//6403E only allows *one* 5 Gsps channel
-		else if(m_series == SERIES_6403E)
+		else if(m_model.find("6403") != string::npos)
 			return (EnabledChannelCount == 0);
 
 		//No banking restrictions for MSO pods if we have enough memory bandwidth
@@ -1221,7 +1467,7 @@ bool PicoOscilloscope::CanEnableChannel6000Series8Bit(size_t i)
 			return true;
 
 		//6403E allows up to 2 channels, one AB and one CD
-		else if(m_series == SERIES_6403E)
+		else if(m_model.find("6403") != string::npos)
 		{
 			//Can enable a left bank channel if there's none in use
 			if(i < 2)
@@ -1353,10 +1599,198 @@ bool PicoOscilloscope::CanEnableChannel6000Series12Bit(size_t i)
 	}
 }
 
+/**
+	@brief Checks if we can enable a channel on a 5000 series scope configured for 8-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel5000Series8Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+	
+	if(rate > RATE_1GSPS)
+		return false;
+
+	//1 Gsps allows only one channel/pod
+	else if(rate >= RATE_500MSPS)
+		return (EnabledChannelCount == 0);
+
+	//500 Msps is allowed up to 2 total channels/pods
+	else if(rate >= RATE_250MSPS)
+		return (EnabledChannelCount <= 1);
+
+	//250 Msps is allowed up to 4 total channels/pods
+	else if(rate >= RATE_125MSPS)
+		return (EnabledChannelCount <= 3);
+
+	//Slow enough that there's no capacity limits
+	else
+		return true;
+}
+
+/**
+	@brief Checks if we can enable a channel on a 5000 series scope configured for 12-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel5000Series12Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//1 Gsps not allowed
+	if(rate > RATE_500MSPS)
+		return false;
+
+	//500 Msps allows only one channel/pod
+	else if(rate >= RATE_250MSPS)
+		return (EnabledChannelCount == 0);
+
+	//250 Msps is allowed up to 2 total channels/pods
+	else if(rate >= RATE_125MSPS)
+		return (EnabledChannelCount <= 1);
+
+	//125 Msps is allowed up to 4 total channels/pods
+	else if(rate >= RATE_62P5MSPS)
+		return (EnabledChannelCount <= 3);
+
+	//Slow enough that there's no capacity limits
+	else
+		return true;
+}
+
+/**
+	@brief Checks if we can enable a channel on a 5000 series scope configured for 14-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel5000Series14Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	if(rate > RATE_125MSPS)
+		return false;
+
+	//125 Msps is allowed up to 4 total channels/pods
+	else if(rate >= RATE_62P5MSPS)
+		return (EnabledChannelCount <= 3);
+
+	//Slow enough that there's no capacity limits
+	else
+		return true;
+}
+
+/**
+	@brief Checks if we can enable a channel on a 5000 series scope configured for 15-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel5000Series15Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//15-bit allows up to 2 channels at 125 Msps plus one or two digital channels
+	if(rate > RATE_125MSPS)
+		return false;
+
+	//No banking restrictions on MSO pods
+	else if(IsChannelIndexDigital(i))
+		return true;
+
+	//Too many channels enabled?
+	else if(GetEnabledAnalogChannelCount() >= 2)
+		return false;
+
+	//125 Msps is allowed up to 2 channels
+	else
+		return (EnabledChannelCount <= 1);
+}
+
+/**
+	@brief Checks if we can enable a channel on a 5000 series scope configured for 16-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel5000Series16Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//16-bit allows just one channel at 62.5 Msps plus one or two digital channels
+	if(rate > RATE_62P5MSPS)
+		return false;
+
+	//No banking restrictions on MSO pods
+	else if(IsChannelIndexDigital(i))
+		return true;
+
+	//Too many channels enabled?
+	else if(GetEnabledAnalogChannelCount() >= 1)
+		return false;
+
+	//125 Msps is allowed only one channel
+	else
+		return (EnabledChannelCount == 0);
+}
+
+/**
+	@brief Checks if we can enable a channel on a 4000 series scope configured for 12-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel4000Series12Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	if(m_model.find("4444") != string::npos)
+	{
+		if(rate > RATE_400MSPS)
+			return false;
+
+		else if(rate >= RATE_200MSPS)
+			return (EnabledChannelCount == 0);
+
+		else if(rate >= RATE_100MSPS)
+			return (EnabledChannelCount <= 1);
+
+		else
+			return (EnabledChannelCount <= 3);
+	}
+	else
+	{
+		if(rate > RATE_80MSPS)
+			return false;
+
+		//80 Msps is allowed up to 4 total channels
+		else if(rate >= RATE_40MSPS)
+			return (EnabledChannelCount <= 3);
+
+		//40 Msps is allowed up to 8 total channels
+		else
+			return (EnabledChannelCount <= 7);
+	}
+}
+
+/**
+	@brief Checks if we can enable a channel on a 4000 series scope configured for 14-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel4000Series14Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//Only 4444 can do 14 bit
+	if(m_model.find("4444") == string::npos)
+		return false;
+		
+	else if(rate > RATE_50MSPS)
+		return false;
+
+	//50 Msps is allowed up to 4 total channels
+	else
+		return (EnabledChannelCount <= 3);
+}
+
+/**
+	@brief Checks if higher ADC resolutions are available
+ */
+
 bool PicoOscilloscope::Is10BitModeAvailable()
 {
-	//FlexRes only available on one series at the moment
-	if(m_series != SERIES_6x2xE)
+	//10-bit only available for 6x2xE models
+	if( !(m_picoSeries == 6) and (m_model[2] == '2') )
 		return false;
 
 	int64_t rate = GetSampleRate();
@@ -1403,23 +1837,120 @@ bool PicoOscilloscope::Is10BitModeAvailable()
 
 bool PicoOscilloscope::Is12BitModeAvailable()
 {
-	//FlexRes only available on one series at the moment
-	if(m_series != SERIES_6x2xE)
-		return false;
-
 	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
 
-	//12 bit mode only available at 1.25 Gsps and below
-	if(rate > RATE_1P25GSPS)
-		return false;
-
-	//1.25 Gsps and below have the same banking restrictions: at most one channel from the left and right half
-	else
+	switch(m_picoSeries)
 	{
-		if(m_analogChannelCount == 8)
-			return (GetEnabledAnalogChannelCountAToD() <= 1) && (GetEnabledAnalogChannelCountEToH() <= 1);
-		else
-			return (GetEnabledAnalogChannelCountAToB() <= 1) && (GetEnabledAnalogChannelCountCToD() <= 1);
+		case 4:
+			return true;
+			
+		case 5:
+			//12 bit mode only available at 500 Msps and below
+			if(rate > RATE_500MSPS)
+				return false;
+			//500 Msps only one channel
+			else if(rate > RATE_250MSPS)
+				return (EnabledChannelCount <= 1);
+			//250 Msps allows 2 channels
+			else if(rate > RATE_125MSPS)
+				return (EnabledChannelCount <= 2);
+			//125 Msps allows 4 channels
+			else if(rate > RATE_62P5MSPS)
+				return (EnabledChannelCount <= 4);
+			//62.5 Msps allows more than 4 channels
+			else
+				return true;
+			
+		case 6:
+			//12 bit mode only available at 1.25 Gsps and below
+			if(rate > RATE_1P25GSPS)
+				return false;
+
+			//1.25 Gsps and below have the same banking restrictions: at most one channel from the left and right half
+			else
+			{
+				if(m_analogChannelCount == 8)
+					return (GetEnabledAnalogChannelCountAToD() <= 1) && (GetEnabledAnalogChannelCountEToH() <= 1);
+				else
+					return (GetEnabledAnalogChannelCountAToB() <= 1) && (GetEnabledAnalogChannelCountCToD() <= 1);
+			}
+		default:
+			return false;
+	}
+}
+
+bool PicoOscilloscope::Is14BitModeAvailable()
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	switch(m_picoSeries)
+	{
+		case 4:
+			if(m_model.find("4444") == string::npos)
+				return false;
+			else
+			{
+				//14 bit mode only available at 50 Msps and below
+				if(rate > RATE_50MSPS)
+					return false;
+				else
+					return true;
+			}
+		case 5:
+			//14 bit mode only available at 125 Msps and below
+			if(rate > RATE_125MSPS)
+				return false;
+			//125 Msps allows 4 channels
+			else if(rate > RATE_62P5MSPS)
+				return (EnabledChannelCount <= 4);
+			//62.5 Msps allows more than 4 channels
+			else
+				return true;
+			
+		default:
+			return false;
+	}
+}
+
+bool PicoOscilloscope::Is15BitModeAvailable()
+{
+	int64_t rate = GetSampleRate();
+	//size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	switch(m_picoSeries)
+	{
+		case 5:
+			//15 bit mode only available at 125 Msps and below
+			if(rate > RATE_125MSPS)
+				return false;
+			//125 Msps allows 2 channels plus one or two digital channels, but no more
+			else
+				return (GetEnabledAnalogChannelCount() <= 2);
+			
+		default:
+			return false;
+	}
+}
+
+bool PicoOscilloscope::Is16BitModeAvailable()
+{
+	int64_t rate = GetSampleRate();
+	//size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	switch(m_picoSeries)
+	{
+		case 5:
+			//16 bit mode only available at 62.5 Msps and below
+			if(rate > RATE_62P5MSPS)
+				return false;
+			//62.5 Msps allows 1 channels plus one or two digital channels, but no more
+			else
+				return (GetEnabledAnalogChannelCount() <= 1);
+			
+		default:
+			return false;
 	}
 }
 
