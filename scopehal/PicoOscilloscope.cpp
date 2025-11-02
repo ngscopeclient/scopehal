@@ -232,10 +232,10 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 			Unit(Unit::UNIT_COUNTS),
 			Stream::STREAM_TYPE_TRIGGER,
 			m_channels.size());
-		m_channels.push_back(m_extTrigChannel);
+			m_channels.push_back(m_extTrigChannel);
 		m_extTrigChannel->SetDefaultDisplayName();
 	}
-	
+
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -258,6 +258,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 		m_queue->m_family );
+
 	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
@@ -519,7 +520,9 @@ void PicoOscilloscope::FlushConfigCache()
 bool PicoOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	if(i == m_extTrigChannel->GetIndex())
+	if(!m_picoHasExttrig)
+		return false;
+	else if(i == m_extTrigChannel->GetIndex())
 		return false;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -602,7 +605,9 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(GetOscilloscopeChannel(i) == m_extTrigChannel)
+	if(!m_picoHasExttrig)
+		return 1;
+	else if(GetOscilloscopeChannel(i) == m_extTrigChannel)
 		return 1;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
