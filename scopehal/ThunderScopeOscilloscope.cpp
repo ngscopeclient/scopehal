@@ -587,7 +587,12 @@ void ThunderScopeOscilloscope::Start()
 {
 	m_triggerArmed = true; //FIXME
 
-	RemoteBridgeOscilloscope::Start();
+	m_transport->SendCommandQueued("NORMAL");
+	m_transport->SendCommandQueued("RUN");
+
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+
 	ResetPerCaptureDiagnostics();
 }
 
@@ -599,7 +604,12 @@ void ThunderScopeOscilloscope::StartSingleTrigger()
 
 void ThunderScopeOscilloscope::ForceTrigger()
 {
-	RemoteBridgeOscilloscope::ForceTrigger();
+	m_transport->SendCommandQueued("SINGLE");
+	m_transport->SendCommandQueued("FORCE");
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+
 	ResetPerCaptureDiagnostics();
 }
 
