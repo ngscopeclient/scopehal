@@ -221,7 +221,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		m_awgChannel = nullptr;
 
 	//Add the external trigger input
-	if(m_picoHasExttrig)
+	//if(m_picoHasExttrig) //TODO fix crash on linux
 	{
 		m_extTrigChannel =
 			new OscilloscopeChannel(
@@ -333,8 +333,8 @@ void PicoOscilloscope::IdentifyHardware()
 	m_picoHasExttrig = false;
 	m_picoHasBwlimiter = false;
 	m_picoHas50ohm = false;
-	m_BandwidthLimitLow = 20000000;		//most common setting 20MHz
-	m_BandwidthLimitHigh = 200000000;	//and 200MHz
+	m_BandwidthLimitLow = 20;		//most common setting 20MHz
+	m_BandwidthLimitHigh = 200;	//and 200MHz
 	
 	/*if(m_model.length() < 4)
 	{
@@ -396,8 +396,10 @@ void PicoOscilloscope::IdentifyHardware()
 				m_picoHasAwg = false;
 				m_picoHasExttrig = false;
 				m_picoHasBwlimiter = true;
-				m_BandwidthLimitLow = 100000;
-				m_BandwidthLimitHigh = 1000000;
+				//m_BandwidthLimitLow = 0.1; //100kHz currently not possible
+				//m_BandwidthLimitHigh = 1; //1MHz
+				m_BandwidthLimitLow = 1;
+				m_BandwidthLimitHigh = 0;
 				m_awgBufferSize = 0;
 			}
 			m_adcModes = {12, 14};
@@ -475,7 +477,7 @@ void PicoOscilloscope::IdentifyHardware()
 	m_analogChannelCount = stoi(m_transport->SendCommandQueuedWithReply("CHANS?"));
 
 	LogDebug("PicoScope model \"%s\", series: %i, digital channels: %zu, BW-Limiter: %s/%u/%u, AWG: %s/%u, Ext.Trig: %s, 50 ohm: %s\n", 
-		m_model.c_str(), m_picoSeries, m_digitalChannelCount, m_picoHasBwlimiter ? "1" : "0", m_BandwidthLimitLow, m_BandwidthLimitHigh, m_picoHasAwg ? "1" : "0", m_awgBufferSize, m_picoHasExttrig ? "1" : "0", m_picoHas50ohm ? "1" : "0");
+		m_model.c_str(), m_picoSeries, m_digitalChannelCount, m_picoHasBwlimiter ? "Y" : "N", m_BandwidthLimitLow, m_BandwidthLimitHigh, m_picoHasAwg ? "Y" : "N", m_awgBufferSize, m_picoHasExttrig ? "Y" : "N", m_picoHas50ohm ? "Y" : "N");
 }
 
 PicoOscilloscope::~PicoOscilloscope()
@@ -520,9 +522,7 @@ void PicoOscilloscope::FlushConfigCache()
 bool PicoOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	if(!m_picoHasExttrig)
-		return false;
-	else if(i == m_extTrigChannel->GetIndex())
+	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -605,9 +605,7 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(!m_picoHasExttrig)
-		return 1;
-	else if(GetOscilloscopeChannel(i) == m_extTrigChannel)
+	if(GetOscilloscopeChannel(i) == m_extTrigChannel)
 		return 1;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -626,13 +624,30 @@ void PicoOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelOffsets[i] *= delta;
 }
 
-unsigned int PicoOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+vector<unsigned int> PicoOscilloscope::GetChannelBandwidthLimiters(size_t i)
 {
-	return 0;
+	vector<unsigned int> ret;
+	
+	ret.push_back(0);
+	if(m_BandwidthLimitLow != 0)
+	{
+		ret.push_back(m_BandwidthLimitLow);
+		if(m_BandwidthLimitHigh != 0)
+			ret.push_back(m_BandwidthLimitHigh);
+	}
+	return ret;
+	
 }
 
-void PicoOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+unsigned int PicoOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
+	int ret = stoi(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWLIM?"));
+	return ret;
+}
+
+void PicoOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+{
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":BWLIM " + to_string(limit_mhz));
 }
 
 OscilloscopeChannel* PicoOscilloscope::GetExternalTrigger()
