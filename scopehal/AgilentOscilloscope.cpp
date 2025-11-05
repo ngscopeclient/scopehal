@@ -632,11 +632,17 @@ vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
 {
 	WaveformPreamble ret;
+	string reply;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":WAV:SOUR " + channel);
-	m_transport->SendCommand(":WAV:PRE?");
-	string reply = m_transport->ReadReply();
+	// The DSO-X 2022A sometimes only replies '+0' which isn't documented in the Programmer's Guide. Retrying once seems
+	// to solve it reliably. 19 is the shortest representable string length that conforms to the sscanf format
+	for (int i = 0; i < 2 && reply.length() < 19; i++)
+	{
+		m_transport->SendCommand(":WAV:PRE?");
+		reply = m_transport->ReadReply();
+	}
 	sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
 			&ret.format, &ret.type, &ret.length, &ret.average_count,
 			&ret.xincrement, &ret.xorigin, &ret.xreference,
