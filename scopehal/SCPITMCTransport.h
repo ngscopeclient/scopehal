@@ -72,15 +72,8 @@ protected:
 	std::string m_devicePath;
 
 	int m_handle;
-	int m_timeout;
-
-	int m_staging_buf_size;
-	unsigned char *m_staging_buf;
-	int m_data_in_staging_buf;
-	int m_data_offset;
-	bool m_data_depleted;
-	bool m_fix_buggy_driver;
-	int m_transfer_size;
+	unsigned char *m_buf;
+	size_t m_max_read_size;
 };
 
 #endif
