@@ -155,9 +155,9 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	// If the MSO option is enabled, add digital channels
 	if (options.find("MSO") != options.end())
 	{
-		m_digitalChannelCount = 16;
+		m_digitalChannelCount = nchans * 4;
 		m_digitalChannelBase = m_channels.size();
-		for(int i = 0; i < 16; i++)
+		for(unsigned int i = 0; i < m_digitalChannelCount; i++)
 		{
 			//Create the channel
 			auto chan = new OscilloscopeChannel(
@@ -766,7 +766,7 @@ bool AgilentOscilloscope::AcquireData()
 
 		// Fetch waveform data for each pod containing enabled channels
 		map<string, vector<uint8_t>> raw_waveforms;
-		for(int i = 0; i < 8; i++)
+		for(unsigned int i = 0; i < 8 && i < m_digitalChannelCount; i++)
 		{
 			if(IsChannelEnabled(i + m_digitalChannelBase))
 			{
@@ -774,7 +774,7 @@ bool AgilentOscilloscope::AcquireData()
 				break;
 			}
 		}
-		for(int i = 8; i < 16; i++)
+		for(unsigned int i = 8; i < 16 && i < m_digitalChannelCount; i++)
 		{
 			if(IsChannelEnabled(i + m_digitalChannelBase))
 			{
