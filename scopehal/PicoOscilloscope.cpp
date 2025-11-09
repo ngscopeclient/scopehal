@@ -221,7 +221,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		m_awgChannel = nullptr;
 
 	//Add the external trigger input
-	//if(m_picoHasExttrig) //TODO fix crash on linux
+	if(m_picoHasExttrig)
 	{
 		m_extTrigChannel =
 			new OscilloscopeChannel(
@@ -334,7 +334,7 @@ void PicoOscilloscope::IdentifyHardware()
 	m_picoHasBwlimiter = false;
 	m_picoHas50ohm = false;
 	m_BandwidthLimitLow = 20;		//most common setting 20MHz
-	m_BandwidthLimitHigh = 200;	//and 200MHz
+	m_BandwidthLimitHigh = 200;		//and 200MHz
 	
 	/*if(m_model.length() < 4)
 	{
@@ -522,8 +522,10 @@ void PicoOscilloscope::FlushConfigCache()
 bool PicoOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	if(i == m_extTrigChannel->GetIndex())
+	if(!m_picoHasExttrig)
 		return false;
+	//if(i == m_extTrigChannel->GetIndex())
+	//	return false;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelsEnabled[i];
@@ -545,7 +547,6 @@ void PicoOscilloscope::EnableChannel(size_t i)
 	}
 
 	RemoteBridgeOscilloscope::EnableChannel(i);
-	//LogDebug(" --- :%s:ON\n", m_channels[i]->GetHwname().c_str());
 
 	//Memory configuration might have changed. Update availabe sample rates and memory depths.
 	GetSampleRatesNonInterleaved();
@@ -567,9 +568,7 @@ void PicoOscilloscope::DisableChannel(size_t i)
 			return;
 	}
 
-	//?//m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFF");
 	RemoteBridgeOscilloscope::DisableChannel(i);
-	//LogDebug(" --- :%s:OFF\n", m_channels[i]->GetHwname().c_str());
 
 	//Memory configuration might have changed. Update availabe sample rates and memory depths.
 	GetSampleRatesNonInterleaved();
@@ -605,8 +604,12 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(GetOscilloscopeChannel(i) == m_extTrigChannel)
-		return 1;
+	if(m_picoHasExttrig)
+	{
+		//this will crash if m_extTrigChannel was not created, hence the prior check for m_picoHasExttrig
+		if(GetOscilloscopeChannel(i) == m_extTrigChannel)
+			return 1;
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelAttenuations[i];
@@ -624,7 +627,7 @@ void PicoOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelOffsets[i] *= delta;
 }
 
-vector<unsigned int> PicoOscilloscope::GetChannelBandwidthLimiters(size_t i)
+vector<unsigned int> PicoOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
 {
 	vector<unsigned int> ret;
 	
@@ -1622,7 +1625,7 @@ bool PicoOscilloscope::CanEnableChannel6000Series12Bit(size_t i)
 /**
 	@brief Checks if we can enable a channel on a 5000 series scope configured for 8-bit ADC resolution
  */
-bool PicoOscilloscope::CanEnableChannel5000Series8Bit(size_t i)
+bool PicoOscilloscope::CanEnableChannel5000Series8Bit(size_t /*i*/)
 {
 	int64_t rate = GetSampleRate();
 	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
@@ -1650,7 +1653,7 @@ bool PicoOscilloscope::CanEnableChannel5000Series8Bit(size_t i)
 /**
 	@brief Checks if we can enable a channel on a 5000 series scope configured for 12-bit ADC resolution
  */
-bool PicoOscilloscope::CanEnableChannel5000Series12Bit(size_t i)
+bool PicoOscilloscope::CanEnableChannel5000Series12Bit(size_t /*i*/)
 {
 	int64_t rate = GetSampleRate();
 	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
@@ -1679,7 +1682,7 @@ bool PicoOscilloscope::CanEnableChannel5000Series12Bit(size_t i)
 /**
 	@brief Checks if we can enable a channel on a 5000 series scope configured for 14-bit ADC resolution
  */
-bool PicoOscilloscope::CanEnableChannel5000Series14Bit(size_t i)
+bool PicoOscilloscope::CanEnableChannel5000Series14Bit(size_t /*i*/)
 {
 	int64_t rate = GetSampleRate();
 	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
@@ -1749,7 +1752,7 @@ bool PicoOscilloscope::CanEnableChannel5000Series16Bit(size_t i)
 /**
 	@brief Checks if we can enable a channel on a 4000 series scope configured for 12-bit ADC resolution
  */
-bool PicoOscilloscope::CanEnableChannel4000Series12Bit(size_t i)
+bool PicoOscilloscope::CanEnableChannel4000Series12Bit(size_t /*i*/)
 {
 	int64_t rate = GetSampleRate();
 	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
@@ -1786,7 +1789,7 @@ bool PicoOscilloscope::CanEnableChannel4000Series12Bit(size_t i)
 /**
 	@brief Checks if we can enable a channel on a 4000 series scope configured for 14-bit ADC resolution
  */
-bool PicoOscilloscope::CanEnableChannel4000Series14Bit(size_t i)
+bool PicoOscilloscope::CanEnableChannel4000Series14Bit(size_t /*i*/)
 {
 	int64_t rate = GetSampleRate();
 	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
