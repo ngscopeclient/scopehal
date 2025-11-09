@@ -522,10 +522,12 @@ void PicoOscilloscope::FlushConfigCache()
 bool PicoOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	if(!m_picoHasExttrig)
-		return false;
-	//if(i == m_extTrigChannel->GetIndex())
-	//	return false;
+	if(m_picoHasExttrig)
+	{
+		//this will crash if m_extTrigChannel was not created, hence the prior check for m_picoHasExttrig
+		if(i == m_extTrigChannel->GetIndex())
+			return false;
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelsEnabled[i];
