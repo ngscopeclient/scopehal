@@ -2196,6 +2196,16 @@ int64_t RigolOscilloscope::GetTriggerOffset()
 	return m_triggerOffset;	
 }
 
+bool RigolOscilloscope::HasInterleavingControls()
+{
+	return false;
+}
+
+bool RigolOscilloscope::CanInterleave()
+{
+	return false;
+}
+
 bool RigolOscilloscope::IsInterleaving()
 {
 	return false;
