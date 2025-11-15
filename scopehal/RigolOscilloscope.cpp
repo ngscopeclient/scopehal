@@ -2150,6 +2150,8 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 	auto depth = GetSampleDepth();
 	auto width_fs = static_cast<int64_t>(round(FS_PER_SECOND * depth / rate));
 	auto halfwidth_fs = width_fs /2;
+	if (offset > width_fs)
+		offset = width_fs; // we want to ensure, the trigger is inside the capture range 0~mdepth
 	m_transport->SendCommandQueued(string(":TIM:MAIN:OFFS ") + to_string((halfwidth_fs - offset) * SECONDS_PER_FS));
 
 }
