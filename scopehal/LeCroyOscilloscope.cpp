@@ -1210,6 +1210,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	else
 		return false;
 
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	return m_channelsEnabled[i];
 }
 
@@ -1264,6 +1265,7 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 		m_transport->SendCommandQueued(tmp);
 	}
 
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = true;
 }
 
