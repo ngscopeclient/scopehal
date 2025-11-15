@@ -931,12 +931,30 @@ vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/
 			}
 			break;
 		
-		case Series::DS1000:
-		case Series::DS1000Z:
 		case Series::DHO800:
 		case Series::DHO900:
 		case Series::DHO1000:
 		case Series::DHO4000:
+			switch(m_bandwidth)
+			{
+
+				case 70:
+				case 100:
+				case 200:
+					// TODO: 20 MHZ BW limit is forced when scale is below 200 uV/div (DHO4000 user manual)
+					return {20, 0};
+				case 400:
+				case 800:
+					// DHO4404/DHO480420 MHz, 250 MHz
+					// TODO: 250 MHZ BW limit is forced when scale is below 500 uV/div (DHO4000 user manual)
+					return {20, 250, 0};
+				default:
+					LogError("Invalid model bandwidth\n");
+			}
+			break;
+
+		case Series::DS1000:
+		case Series::DS1000Z:
 			return {20, 0};
 		
 		case Series::UNKNOWN:
