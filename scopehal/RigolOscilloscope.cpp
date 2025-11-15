@@ -912,6 +912,7 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 }
 
+// Our requirements: has to be ordered, zero (full BW) position is not important
 vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
 {
 	switch(m_series)
@@ -974,99 +975,55 @@ unsigned int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":BWL?"));
 
+	unsigned int limit {};
+	sscanf(reply.c_str(), "%uM", &limit);
+	// parsing will fail when reply is `OFF` and result in default value 0, which means full BW
+
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		if(reply == "20M")
-			m_channelBandwidthLimits[i] = 20;
-		if(reply == "100M")
-			m_channelBandwidthLimits[i] = 100;
-		if(reply == "200M")
-			m_channelBandwidthLimits[i] = 200;
-		else
-			m_channelBandwidthLimits[i] = m_bandwidth;
-		return m_channelBandwidthLimits[i];
+		m_channelBandwidthLimits[i] = limit;
 	}
+	LogTrace("Channel %zd, current BW limit: %u MHZ", i, limit);
+	return limit;
 }
 
 void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	switch(m_series) {
-		case Series::MSO5000:
-		case Series::DHO1000:
-		case Series::DHO4000:
-		case Series::DHO800:
-		case Series::DHO900:
+	auto const available_limits = GetChannelBandwidthLimiters(i);
 
-			switch(m_bandwidth)
-			{
-				case 70:
-				case 100:
-				case 125:
-					if((limit_mhz <= 20) & (limit_mhz != 0))
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-					break;
+	// `available_limits` is vector of increasing limits (with 0 at the end representing full BW)
+	// Search for closest limit above `limit_mhz`, fall back to full rangeBW
+	auto const new_limit = [&]() -> unsigned int {
+		if (limit_mhz == 0)
+			return 0;
 
-				case 200:
-				case 250:
-					if((limit_mhz <= 20) & (limit_mhz != 0))
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-					else if((limit_mhz <= 100) & (limit_mhz != 0))
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 100M");
-					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-					break;
+		for (auto const limit : available_limits) // yeah, we also iterate over 0 (Full BW) at the end of the vector
+		{
+			if (limit_mhz <= limit)
+				return limit;
+		}
+		// fallback to 0 which means full BW
+		return 0;
+	}();
 
-				case 350:
-				case 400:
-				case 800:
-					if((limit_mhz <= 20) & (limit_mhz != 0))
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-					else if((limit_mhz <= 100) & (limit_mhz != 0))
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 100M");
-					else if((limit_mhz <= 200) & (limit_mhz != 0))
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 200M");
-					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-					break;
+	// `new_limit` now holds value of limit suported by the device or 0 in case of full BW
 
-				default:
-					LogError("Invalid model number\n");
-					return;
-			}
-			break;
-			
-			case Series::DS1000:
-			case Series::DS1000Z:
-			{
-				if((limit_mhz <= 20) & (limit_mhz != 0))
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
-				else
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
-				break;
-			}
+	if (new_limit > 0)
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL " + to_string(new_limit) + "M");
+	else
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL OFF");
 
-			case Series::UNKNOWN:
-				LogError("RigolOscilloscope: unknown model, invalid state!\n");
-				return;
-
-	}
+	if (limit_mhz == 0)
+		LogTrace("requested channel %zd, set no limit\n", i);
+	else if (limit_mhz != new_limit)
+		LogWarning("RigolOscilloscope: requested channel %zd, BW limit %d MHZ, set %d MHz\n", i, limit_mhz, new_limit);
+	else
+		LogTrace("requested channel %zd, set BW limit %d MHZ\n", i, new_limit);
 
 	{
+		//TODO: shouldn't we just rather invalidate cached value in `m_channelBandwidthLimits` and get a value by readback?
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		if(limit_mhz == 0)
-			m_channelBandwidthLimits[i] = m_bandwidth;	  // max
-		else if(limit_mhz <= 20)
-			m_channelBandwidthLimits[i] = 20;
-		else if(m_bandwidth == 70)
-			m_channelBandwidthLimits[i] = 70;
-		else if((limit_mhz <= 100) | (m_bandwidth == 100))
-			m_channelBandwidthLimits[i] = 100;
-		else if((limit_mhz <= 200) | (m_bandwidth == 200))
-			m_channelBandwidthLimits[i] = 200;
-		else
-			m_channelBandwidthLimits[i] = m_bandwidth;	  // 350 MHz
+		m_channelBandwidthLimits[i] = new_limit;
 	}
 }
 
