@@ -2140,6 +2140,12 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 	//TODO: should we also protect these with mutex?
 	m_srateValid = false;
 	m_mdepthValid = false;
+	// To prevent trigger offset travelling on Srate change (timebase change),
+	// re-set trigger location, because difference (time) between
+	// our trigger reference point (start of sample buffer) and
+	// scope trigger reference point (mid of the sample buffer) changed.
+	SetTriggerOffset(m_triggerOffset);
+	
 }
 
 void RigolOscilloscope::SetTriggerOffset(int64_t offset)
