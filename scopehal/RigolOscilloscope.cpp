@@ -41,6 +41,11 @@
 #include <thread>
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wswitch"
+// #pragma GCC diagnostic warning "-Wswitch-enum"
+
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2310,3 +2315,5 @@ void RigolOscilloscope::ForceHDMode(bool mode)
 			break;
 	}
 }
+
+#pragma GCC diagnostic pop
