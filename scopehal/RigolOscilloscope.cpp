@@ -1217,9 +1217,11 @@ bool RigolOscilloscope::AcquireData()
 			// manual specifies 250k as a maximum for bytes output
 			// maxpoints = 250 * 1000;
 
-			// on my DS1054Z FW ... this larger chunk also works well and
-			// we get around ~20% speed-up when downloading a lot of data
-			maxpoints = 1024  * 1024;
+			// During experiments with my DS1054Z FW 00.04.05.SP2,
+			// 250kB limits applies when all channels are enabled.
+			// It is possible to use larger chunks with less channels.
+			// With single channel and 1 MB block, around ~20% speed-up is observable.
+			maxpoints = 1000 * 1000 / GetChannelDivisor();
 			break;
 		case Series::MSO5000:
 			maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
