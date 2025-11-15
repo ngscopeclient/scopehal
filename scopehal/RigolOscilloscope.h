@@ -90,24 +90,50 @@ public:
 	virtual void SetSampleRate(uint64_t rate) override;
 	virtual void SetTriggerOffset(int64_t offset) override;
 	virtual int64_t GetTriggerOffset() override;
+	virtual bool HasInterleavingControls() override;
+	virtual bool CanInterleave() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
 
 	void ForceHDMode(bool mode);
 
 protected:
-	enum protocol_version
+	enum class Series
 	{
-		MSO5,	 //MSO5000 series
-		DS,
-		DS_OLD,
-		DHO,	//DHO800, DHO900, DHO1000 and DHO4000 series
+		UNKNOWN,
+
+		DS1000,
+		DS1000Z,
+		// MSODS2000,
+		// MSO4000,
+		MSO5000,
+		// MSODS7000,
+		// MSO8000,
+		// DS70000,
+
+		DHO1000,
+		DHO4000,
+		DHO800,
+		DHO900,
+	};
+
+	enum class CaptureFormat : int {
+		BYTE = 0, // a waveform point occupies one byte (namely 8 bits).
+		WORD = 1, // a waveform point occupies two bytes (namely 16 bits) in which the lower 8 bits are valid and the higher 8 bits are 0.
+		ASC = 2   // waveform points in character number. Waveform points are returned in scientific notation and separated by commas./
+	};
+
+	enum class CaptureType : int {
+		NORMAL = 0,  // NORMal: read the waveform data displayed on the screen.
+		MAXIMUM = 1, // MAXimum: read the waveform data displayed on the screen when the instrument is in the run state and the waveform data in the internal memory in the stop state.
+		RAW = 2      // RAW: read the waveform data in the internal memory. Note that the waveform data in the internal memory can only be read when the oscilloscope is in the stop state and the oscilloscope can not be operated.
+		// NOTE: If the MATH channel is selected, only the NORMal mode is valid.
 	};
 
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//hardware analog channel count, independent of LA option etc
-	unsigned int m_analogChannelCount;
+	size_t m_analogChannelCount;
 
 	//config cache
 	std::map<size_t, double> m_channelAttenuations;
@@ -129,13 +155,20 @@ protected:
 
 	bool m_liveMode;
 
-	int m_modelNumber;
+	struct Model {
+		std::string prefix; // e.g.: DS
+		unsigned int number; // e.g.: 1054
+		std::string suffix; // e.g.: Z
+	} m_modelNew;
+	
 	unsigned int m_bandwidth;
-	bool m_opt200M;
-	uint64_t m_maxMdepth; /* Maximum Memory depth for DHO model s*/
-	uint64_t m_maxSrate;  /* Maximum Sample rate for DHO models */
-	bool m_lowSrate;	  /* True for DHO low sample rate models (DHO800/900) */
-	protocol_version m_protocol;
+	bool m_opt200M {}; // 200M memory depth is MSO5000 specific option 
+	bool m_opt24M {};  // 24M memory depth is DS1000Z specific option 
+	uint64_t m_maxMdepth {}; // Maximum Memory depth for DHO models
+	uint64_t m_maxSrate {};  // Maximum Sample rate for DHO models
+	bool m_lowSrate {};	  // True for DHO low sample rate models (DHO800/900)
+	Series m_series;
+	// protocol_version m_protocol;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
@@ -143,7 +176,26 @@ protected:
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullEdgeTrigger();
 
+	struct CapturePreamble {
+		CaptureFormat format;
+		CaptureType type;
+		std::size_t npoints; // an integer between 1 and 12000000.
+		std::size_t averages; // the number of averages in the average sample mode and 1 in other modes.
+		double sec_per_sample; // the time difference between two neighboring points in the X direction.
+		double xorigin; // the time from the trigger point to the "Reference Time" in the X direction.
+		double xreference; // the reference time of the data point in the X direction.
+		double yincrement; // the waveform increment in the Y direction.
+		double yorigin; // the vertical offset relative to the "Vertical Reference Position" in the Y direction.
+		double yreference; // the vertical reference position in the Y direction.
+	};
+	std::vector<std::uint64_t> m_depths;
+
+	std::optional<CapturePreamble> GetCapturePreamble();
 	void PrepareStart();
+	void DecodeDeviceSeries();
+	void AnalyzeDeviceCapabilities();
+	void UpdateDynamicCapabilities(); // capabilities dependent on enabled chanel count
+	std::size_t GetChannelDivisor(); // helper function to get memory depth/sample rate divisor base on current scope state (amount of enabled channels)
 
 public:
 	static std::string GetDriverNameInternal();
