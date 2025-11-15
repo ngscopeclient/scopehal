@@ -67,7 +67,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		LogError("device series not recognized nor supported\n");
 		return;
 	}
-	LogVerbose("RigolOscilloscope: series: %d\n", int(m_series));
+	LogTrace("RigolOscilloscope: series: %d\n", int(m_series));
 
 	AnalyzeDeviceCapabilities();
 	UpdateDynamicCapabilities();
@@ -190,7 +190,11 @@ uint32_t RigolOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 
 void RigolOscilloscope::DecodeDeviceSeries()
 {
-	//Last digit of the model number is the number of channels
+	LogTrace("Decoding device series\n");
+	// Called once from the ctor so we don't lock any mutex as there is only one reference to this object
+	// and no concurrent access is possible at this time.
+
+	// Last digit of the model number is the number of channels
 	m_series = [&]() -> Series
 	{
 		// scope name is always, no numeric prefix, followed by numeric model number optionally followed by alfanumeric suffix
@@ -206,7 +210,7 @@ void RigolOscilloscope::DecodeDeviceSeries()
 				return Series::UNKNOWN;
 			}
 			m_modelNew.prefix.resize(length);
-			LogVerbose("parsed model prefix %s\n", m_modelNew.prefix.c_str());
+			LogTrace("parsed model prefix %s\n", m_modelNew.prefix.c_str());
 			cursor += length;
 		}
 
@@ -218,7 +222,7 @@ void RigolOscilloscope::DecodeDeviceSeries()
 				LogError("could not parse scope model number\n");
 				return Series::UNKNOWN;
 			}
-			LogVerbose("parsed model numer %d\n", m_modelNew.number);
+			LogTrace("parsed model numer %d\n", m_modelNew.number);
 			cursor += length;
 		}
 
@@ -270,6 +274,10 @@ void RigolOscilloscope::DecodeDeviceSeries()
 }
 
 void RigolOscilloscope::AnalyzeDeviceCapabilities() {
+	// Called once from the ctor so we don't lock any mutex as there is only one reference to this object
+	// and no concurrent access is possible at this time.
+	LogTrace("Analyzing scope capabilities\n");
+
 	// Last digit of the model number is the number of channels
 	switch(m_series) {
 
@@ -302,7 +310,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 				m_transport->SendCommandQueued("ACQ:MDEP 24000000");
 				m_opt24M = Trim(m_transport->SendCommandQueuedWithReply("ACQ:MDEP?")) == "24000000";
 				if (m_opt24M)
-					LogVerbose("this DS1000Z device has 24M option installed\n");
+					LogTrace("DS1000Z: 24 Mpts memory option detected\n");
 	
 				// Reset memory depth to original value
 				m_transport->SendCommandQueued("ACQ:MDEP " + originalMdepth);
@@ -333,6 +341,9 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_transport->SendCommandQueued("ACQ:MDEP 200M");
 			// Yes, it actually returns a stringified float, manual says "scientific notation"
 			m_opt200M = Trim(m_transport->SendCommandQueuedWithReply("ACQ:MDEP?")) == "2.0000E+08";
+			if (m_opt200M) {
+				LogTrace("MSO5000: 200 Mpts memory option detected\n");
+			}
 
 			// Reset memory depth
 			m_transport->SendCommandQueued("ACQ:MDEP 1M");
@@ -412,17 +423,25 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_maxMdepth = 50*1000*1000;
 			m_maxSrate  = 2*1000*1000*1000;
 			/* probe for bandwidth upgrades and memory upgrades on DHO1000 series */
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n")) == "1") {
 				m_maxMdepth = 100*1000*1000;
+				LogTrace("DHO1000: 100 Mpts memory option detected\n");
+			}
 			
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW7T10\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW7T10\n")) == "1") {
 				m_bandwidth = 100;
+				LogTrace("DHO1000: 100 MHz bandwidth option detected\n");
+			}
 
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW7T20\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW7T20\n")) == "1") {
 				m_bandwidth = 200;
+				LogTrace("DHO1000: 200 MHz bandwidth option detected\n");
+			}
 
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW10T20\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW10T20\n")) == "1") {
 				m_bandwidth = 200;
+				LogTrace("DHO1000: 200 MHz bandwidth option detected\n");
+			}
 
 			break;
 		}
@@ -440,17 +459,25 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_maxMdepth = 250*1000*1000;
 			m_maxSrate  = 4*1000*1000*1000U;
 			/* probe for bandwidth upgrades and memory upgrades on DHO4000 series */
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n")) == "1") {
 				m_maxMdepth = 500*1000*1000;
+				LogTrace("DHO4000: 500 Mpts memory option detected\n");
+			}
 			
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T4\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T4\n")) == "1") {
 				m_bandwidth = 400;
+				LogTrace("DHO4000: 400 MHz bandwidth option detected\n");
+			}
 
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T8\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T8\n")) == "1") {
 				m_bandwidth = 800;
+				LogTrace("DHO4000: 800 MHz bandwidth option detected\n");
+			}
 
-			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW4T8\n")) == "1")
+			if (Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW4T8\n")) == "1") {
 				m_bandwidth = 800;
+				LogTrace("DHO4000: 800 MHz bandwidth option detected\n");
+			}
 			break;
 		}
 
@@ -458,6 +485,8 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			LogError("RigolOscilloscope: unknown model, invalid state!\n");
 		}
 	}
+	
+	LogTrace("Device bandwidth: %d MHz\n", m_bandwidth);
 }
 
 static std::vector<uint64_t> dhoSampleDepths {
@@ -496,8 +525,7 @@ static std::vector<uint64_t> mso5000SampleDepths {
 };
 
 void RigolOscilloscope::UpdateDynamicCapabilities() {
-	//FIXME
-	LogVerbose("updating dynamic capabilities");
+	LogTrace("updating dynamic capabilities\n");
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	switch (m_series)
 	{
@@ -1162,7 +1190,6 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 		// TODO: check if Protocol::MSO5000 procool could use this polling method
 		// TODO: consider to invalidate cached depth on trigger command
 		const auto sampleDepth = GetSampleDepth();
-		LogVerbose("RigolOscilloscope:PollTrigger:DS1000Z: sdepth %" PRIu64 "\n", sampleDepth);
 		if (sampleDepth) {
 			const auto preamble = GetCapturePreamble();
 			if (preamble.has_value() && preamble->npoints == sampleDepth) {
@@ -1178,8 +1205,6 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 	
 	if(stat != "STOP")
 		m_triggerWasLive = true;
-
-	LogVerbose("RigolOscilloscope:PollTrigger:DS1000Z: stat reply %s, m_triggerArmed %d, m_triggerWasLive %d,  \n", stat.c_str(), m_triggerArmed, m_triggerWasLive);
 
 	if(stat == "TD")
 		return TRIGGER_MODE_TRIGGERED;
@@ -1209,10 +1234,10 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 
 bool RigolOscilloscope::AcquireData()
 {
-	LogTrace("Acquiring data\n");
-
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	LogIndenter li;
+
+	LogTrace("Acquiring data\n");
 
 	// Notify about download operation start
 	ChannelsDownloadStarted();
@@ -1457,7 +1482,7 @@ bool RigolOscilloscope::AcquireData()
 				/* we get the percentage of this particular download; convert this into linear percentage across all chunks */
 				float bytes_progress = npoint * (m_highDefinition ? 2 : 1) + progress * bytesToRead;
 				float bytes_total = npoints * (m_highDefinition ? 2 : 1);
-				// LogVerbose("download progress %5.3f\n", bytes_progress / bytes_total);
+				// LogTrace("download progress %5.3f\n", bytes_progress / bytes_total);
 				ChannelsDownloadStatusUpdate(channelIdx, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, bytes_progress / bytes_total);
 			};
 			m_transport->ReadRawData(bytesToRead, temp_buf.data(), downloadCallback);
@@ -1496,7 +1521,7 @@ bool RigolOscilloscope::AcquireData()
 		}
 
 		auto ts_end = chrono::steady_clock::now();
-		LogVerbose("download took %ld ms\n", chrono::duration_cast<chrono::milliseconds>(ts_end - ts_start).count());
+		LogTrace("download took %ld ms\n", chrono::duration_cast<chrono::milliseconds>(ts_end - ts_start).count());
 
 		// Notify about end of download for this channel
 		ChannelsDownloadStatusUpdate(channelIdx, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
@@ -1958,7 +1983,7 @@ uint64_t RigolOscilloscope::GetSampleRate()
 		if(m_srateValid)
 			return m_srate;
 	
-		LogVerbose("smaplerate updating, m_srate %" PRIu64 "\n", m_srate);
+		LogTrace("smaplerate updating, m_srate %" PRIu64 "\n", m_srate);
 	}
 	// m_transport->SendCommandQueued("*WAI");
 
@@ -1971,7 +1996,7 @@ uint64_t RigolOscilloscope::GetSampleRate()
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_srate = (uint64_t)rate;
 		m_srateValid = true;
-		LogVerbose("smaplerate updated, m_srate %" PRIu64 "\n", m_srate);
+		LogTrace("smaplerate updated, m_srate %" PRIu64 "\n", m_srate);
 		return rate;
 	}
 }
@@ -1983,7 +2008,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 		if(m_mdepthValid)
 			return m_mdepth;
 	
-		LogVerbose("mem depth updating, m_mdepth %" PRIu64 "\n", m_mdepth);
+		LogTrace("mem depth updating, m_mdepth %" PRIu64 "\n", m_mdepth);
 	}
 
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?"));
@@ -1996,7 +2021,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_mdepth = (uint64_t)depth;
 		m_mdepthValid = true;
-		LogVerbose("mem depth updated, m_mdepth %" PRIu64 "\n", m_mdepth);
+		LogTrace("mem depth updated, m_mdepth %" PRIu64 "\n", m_mdepth);
 		return m_mdepth;
 	}
 }
