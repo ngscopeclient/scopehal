@@ -663,17 +663,19 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 	}
 
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":DISP?"));
-	if(reply == "0")
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelsEnabled[i] = false;
-		return false;
-	}
-	else
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelsEnabled[i] = true;
-		return true;
+		if(reply == "0")
+		{
+			m_channelsEnabled[i] = false;
+			return false;
+		}
+		else
+		{
+			m_channelsEnabled[i] = true;
+			return true;
+		}
 	}
 }
 
@@ -681,7 +683,10 @@ void RigolOscilloscope::EnableChannel(size_t i)
 {
 	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP ON");
 	// invalidate channel enable cache until confirmed on next IsChannelEnabled
-	m_channelsEnabled.erase(i);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelsEnabled.erase(i);
+	}
 	UpdateDynamicCapabilities();
 }
 
@@ -689,7 +694,10 @@ void RigolOscilloscope::DisableChannel(size_t i)
 {
 	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP OFF");
 	// invalidate channel enable cache until confirmed on next IsChannelEnabled
-	m_channelsEnabled.erase(i);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelsEnabled.erase(i);
+	}
 	UpdateDynamicCapabilities();
 }
 
@@ -714,14 +722,16 @@ OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i
 
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":COUP?"));
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	if(reply == "AC")
-		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_AC_1M;
-	else if(reply == "DC")
-		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_DC_1M;
-	else /* if(reply == "GND") */
-		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_GND;
-	return m_channelCouplings[i];
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(reply == "AC")
+			m_channelCouplings[i] = OscilloscopeChannel::COUPLE_AC_1M;
+		else if(reply == "DC")
+			m_channelCouplings[i] = OscilloscopeChannel::COUPLE_DC_1M;
+		else /* if(reply == "GND") */
+			m_channelCouplings[i] = OscilloscopeChannel::COUPLE_GND;
+		return m_channelCouplings[i];
+	}
 }
 
 void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
@@ -767,9 +777,11 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 	sscanf(reply.c_str(), "%lf", &atten);
 	//TODO: check sscanf return value for parsing errors
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelAttenuations[i] = atten;
-	return atten;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = atten;
+		return atten;
+	}
 }
 
 void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
@@ -916,16 +928,18 @@ unsigned int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":BWL?"));
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	if(reply == "20M")
-		m_channelBandwidthLimits[i] = 20;
-	if(reply == "100M")
-		m_channelBandwidthLimits[i] = 100;
-	if(reply == "200M")
-		m_channelBandwidthLimits[i] = 200;
-	else
-		m_channelBandwidthLimits[i] = m_bandwidth;
-	return m_channelBandwidthLimits[i];
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		if(reply == "20M")
+			m_channelBandwidthLimits[i] = 20;
+		if(reply == "100M")
+			m_channelBandwidthLimits[i] = 100;
+		if(reply == "200M")
+			m_channelBandwidthLimits[i] = 200;
+		else
+			m_channelBandwidthLimits[i] = m_bandwidth;
+		return m_channelBandwidthLimits[i];
+	}
 }
 
 void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
@@ -1113,8 +1127,10 @@ float RigolOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 	sscanf(reply.c_str(), "%f", &offset);
 	//TODO: check sscanf return value for parsing errors
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelOffsets[i] = offset;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelOffsets[i] = offset;
+	}
 	return offset;
 }
 
@@ -1122,8 +1138,10 @@ void RigolOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offs
 {
 	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFFS " + to_string(offset));
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelOffsets[i] = offset;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelOffsets[i] = offset;
+	}
 }
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
@@ -1579,6 +1597,7 @@ void RigolOscilloscope::PrepareStart()
 void RigolOscilloscope::Start()
 {
 	LogTrace("Start\n");
+	//TODO: consider locking transport as it should not get interrupted by something else (or can it?)
 	switch (m_series)
 	{
 		case Series::DS1000:
@@ -1851,7 +1870,11 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 			// For DHO model, srates depend on high/low sample rate models, max srate and number of enabled channels
 			uint64_t maxSrate = m_maxSrate / GetEnabledChannelCount();
 			vector<uint64_t> ret;
-			for (auto curSrateItem : (m_lowSrate ? dhoLowSampleRates : dhoHighSampleRates))
+			auto& srates = [&]() -> std::map<uint64_t, double>& {
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				return (m_lowSrate ? dhoLowSampleRates : dhoHighSampleRates);
+			}();
+			for (auto curSrateItem : srates)
 			{
 				auto curSrate = curSrateItem.first;
 				if(curSrate<=maxSrate)
@@ -1901,6 +1924,7 @@ set<Oscilloscope::InterleaveConflict> RigolOscilloscope::GetInterleaveConflicts(
 
 vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 {
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_depths;
 }
 
@@ -1929,10 +1953,13 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t RigolOscilloscope::GetSampleRate()
 {
-	if(m_srateValid)
-		return m_srate;
-
-	LogVerbose("smaplerate updating, m_srate %" PRIu64 "\n", m_srate);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_srateValid)
+			return m_srate;
+	
+		LogVerbose("smaplerate updating, m_srate %" PRIu64 "\n", m_srate);
+	}
 	// m_transport->SendCommandQueued("*WAI");
 
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:SRAT?"));
@@ -1940,25 +1967,38 @@ uint64_t RigolOscilloscope::GetSampleRate()
 	double rate;
 	sscanf(ret.c_str(), "%lf", &rate);
 	//TODO: check sscanf return value for parsing errors
-	m_srate = (uint64_t)rate;
-	m_srateValid = true;
-	LogVerbose("smaplerate updated, m_srate %" PRIu64 "\n", m_srate);
-	return rate;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_srate = (uint64_t)rate;
+		m_srateValid = true;
+		LogVerbose("smaplerate updated, m_srate %" PRIu64 "\n", m_srate);
+		return rate;
+	}
 }
 
 uint64_t RigolOscilloscope::GetSampleDepth()
 {
-	if(m_mdepthValid)
-		return m_mdepth;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_mdepthValid)
+			return m_mdepth;
+	
+		LogVerbose("mem depth updating, m_mdepth %" PRIu64 "\n", m_mdepth);
+	}
 
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?"));
 
 	double depth;
 	sscanf(ret.c_str(), "%lf", &depth);
 	//TODO: check sscanf return value for parsing errors
-	m_mdepth = (uint64_t)depth;
-	m_mdepthValid = true;
-	return m_mdepth;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_mdepth = (uint64_t)depth;
+		m_mdepthValid = true;
+		LogVerbose("mem depth updated, m_mdepth %" PRIu64 "\n", m_mdepth);
+		return m_mdepth;
+	}
 }
 
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
@@ -1970,6 +2010,7 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			// The MSO5 series will only process a sample depth setting if the oscilloscope is in auto or normal mode.
 			// It's frustrating, but to accommodate, we'll grab the current mode and status for restoration later, then stick the
 			// scope into auto mode
+			lock_guard<recursive_mutex> lock(m_transport->GetMutex()); // this sequence may not be interrupted by others
 			string trigger_sweep_mode = m_transport->SendCommandQueuedWithReply(":TRIG:SWE?");
 			string trigger_status = m_transport->SendCommandQueuedWithReply(":TRIG:STAT?");
 			m_transport->SendCommandQueued(":TRIG:SWE AUTO");
@@ -2068,15 +2109,21 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 				return;
 			}
 			// memory depth is configurable only when scope is not stopped
-			string original_trigger_status = m_transport->SendCommandQueuedWithReply(":TRIG:STAT?");
-			m_transport->SendCommandQueued(":RUN");
-			m_transport->SendCommandQueued("ACQ:MDEP " + to_string(depth));
-			//TODO: whould we also use switch to accept only valid values?
-			// m_transport->SendCommandQueued("ACQ:MDEP " + to_string(depth));
-			if(original_trigger_status == "STOP")
-				m_transport->SendCommandQueued(":STOP");
-			m_transport->FlushCommandQueue();
-			m_srateValid = false; // changing depth and keeping timebase quite often results in chnage of srate
+			{
+				string original_trigger_status = m_transport->SendCommandQueuedWithReply(":TRIG:STAT?");
+				lock_guard<recursive_mutex> lock(m_transport->GetMutex()); // this sequence may not be interrupted by others
+				m_transport->SendCommandQueued(":RUN");
+				m_transport->SendCommandQueued("ACQ:MDEP " + to_string(depth));
+				//TODO: whould we also use switch to accept only valid values?
+				// m_transport->SendCommandQueued("ACQ:MDEP " + to_string(depth));
+				if(original_trigger_status == "STOP")
+					m_transport->SendCommandQueued(":STOP");
+				m_transport->FlushCommandQueue();
+			}
+			{
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				m_srateValid = false; // changing depth and keeping timebase quite often results in chnage of srate
+			}
 			break;
 		}
 
@@ -2086,13 +2133,19 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			break;
 	}
 	
-	m_mdepthValid = false;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_mdepthValid = false;
+	}
 }
 
 void RigolOscilloscope::SetSampleRate(uint64_t rate)
 {
 	//FIXME, you can set :TIMebase:SCALe
-	m_mdepthValid = false;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_mdepthValid = false;
+	}
 	double sampletime = GetSampleDepth() / (double)rate;
 	
 	switch (m_series)
@@ -2103,7 +2156,12 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 		case Series::DHO900:
 		{	// Scale factor is not constant across all sample rates for DHO models
 			double timeScaleFactor = 10;
-			auto& srates = (m_lowSrate ? dhoLowSampleRates : dhoHighSampleRates);
+			
+			auto& srates = [&]() -> std::map<uint64_t, double>& {
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				return (m_lowSrate ? dhoLowSampleRates : dhoHighSampleRates);
+			}();
+
 			auto d = srates.find(rate);
 			if (d != srates.end())
 			{
@@ -2139,9 +2197,11 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 	}
 
 
-	//TODO: should we also protect these with mutex?
-	m_srateValid = false;
-	m_mdepthValid = false;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_srateValid = false;
+		m_mdepthValid = false;
+	}
 	// To prevent trigger offset travelling on Srate change (timebase change),
 	// re-set trigger location, because difference (time) between
 	// our trigger reference point (start of sample buffer) and
@@ -2240,17 +2300,20 @@ void RigolOscilloscope::PullTrigger()
  */
 void RigolOscilloscope::PullEdgeTrigger()
 {
-	//Clear out any triggers of the wrong type
-	if((m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL))
-	{
-		delete m_trigger;
-		m_trigger = NULL;
-	}
-
-	//Create a new trigger if necessary
-	if(m_trigger == NULL)
-		m_trigger = new EdgeTrigger(this);
-	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	auto et = [&]() -> EdgeTrigger* {
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		//Clear out any triggers of the wrong type
+		if((m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL))
+		{
+			delete m_trigger;
+			m_trigger = NULL;
+		}
+	
+		//Create a new trigger if necessary
+		if(m_trigger == NULL)
+			m_trigger = new EdgeTrigger(this);
+		return dynamic_cast<EdgeTrigger*>(m_trigger);
+	}();
 
 	//Source
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(":TRIG:EDGE:SOUR?"));
@@ -2326,11 +2389,18 @@ void RigolOscilloscope::ForceHDMode(bool mode)
 		case Series::DHO4000:
 		case Series::DHO800:
 		case Series::DHO900:
-			if (mode == m_highDefinition)
-				break;
-			m_highDefinition = mode;
-			m_transport->SendCommandQueued(string(":WAV:FORM ") + (m_highDefinition ? "WORD" : "BYTE"));
+		{
+			bool highDefinition {};
+			{
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				if (mode == m_highDefinition)
+					break;
+				m_highDefinition = highDefinition = mode;
+			}
+			m_transport->SendCommandQueued(string(":WAV:FORM ") + (highDefinition ? "WORD" : "BYTE"));
 			break;
+		}
+
 
 		case Series::UNKNOWN:
 		case Series::DS1000:
