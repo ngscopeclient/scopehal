@@ -2154,6 +2154,11 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 		offset = width_fs; // we want to ensure, the trigger is inside the capture range 0~mdepth
 	m_transport->SendCommandQueued(string(":TIM:MAIN:OFFS ") + to_string((halfwidth_fs - offset) * SECONDS_PER_FS));
 
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_triggerOffsetValid = false;
+	}
+
 }
 
 int64_t RigolOscilloscope::GetTriggerOffset()
