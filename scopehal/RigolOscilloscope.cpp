@@ -2313,7 +2313,6 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 
 int64_t RigolOscilloscope::GetTriggerOffset()
 {
-	//Early out if the value is in cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_triggerOffsetValid)

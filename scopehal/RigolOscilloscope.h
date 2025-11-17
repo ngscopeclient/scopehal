@@ -98,6 +98,7 @@ public:
 	void ForceHDMode(bool mode);
 
 protected:
+	// private/internal types and functions
 	enum class Series
 	{
 		UNKNOWN,
@@ -155,16 +156,18 @@ protected:
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
-	//hardware analog channel count, independent of LA option etc
+	// hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
 
-	//config cache
+	// config cache, values that can be updated whenever needed
+	// all access to these shall be exclusive using `m_cacheMutex`
 	std::map<size_t, double> m_channelAttenuations;
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, float> m_channelOffsets;
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, unsigned int> m_channelBandwidthLimits;
 	std::map<int, bool> m_channelsEnabled;
+	std::vector<std::uint64_t> m_depths;
 	bool m_srateValid;
 	uint64_t m_srate;
 	bool m_mdepthValid;
@@ -172,6 +175,7 @@ protected:
 	int64_t m_triggerOffset;
 	bool m_triggerOffsetValid;
 
+	// state variables, may alter values during runtime
 	bool m_triggerArmed;
 	bool m_triggerWasLive;
 	bool m_triggerOneShot;
@@ -179,6 +183,7 @@ protected:
 
 	bool m_liveMode;
 
+	// constants once the ctor finishes
 	struct Model {
 		std::string prefix; // e.g.: DS
 		unsigned int number; // e.g.: 1054
@@ -192,15 +197,12 @@ protected:
 	uint64_t m_maxSrate {};  // Maximum Sample rate for DHO models
 	bool m_lowSrate {};	  // True for DHO low sample rate models (DHO800/900)
 	Series m_series;
-	// protocol_version m_protocol;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullEdgeTrigger();
-
-	std::vector<std::uint64_t> m_depths;
 
 public:
 	static std::string GetDriverNameInternal();
