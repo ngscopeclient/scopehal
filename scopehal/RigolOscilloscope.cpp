@@ -1565,8 +1565,10 @@ bool RigolOscilloscope::AcquireData()
 	return true;
 }
 
-void RigolOscilloscope::PrepareStart()
-{	
+void RigolOscilloscope::StartPre() 
+{
+	m_liveMode = false;
+	m_mdepthValid = false; // Memory depth might have been changed on scope
 	switch (m_series)
 	{
 		case Series::DHO1000:
@@ -1594,10 +1596,19 @@ void RigolOscilloscope::PrepareStart()
 	}
 }
 
+void RigolOscilloscope::StartPost() 
+{
+	m_triggerArmed = true;
+
+}
+
+
 void RigolOscilloscope::Start()
 {
-	LogTrace("Start\n");
 	//TODO: consider locking transport as it should not get interrupted by something else (or can it?)
+	LogTrace("Start\n");
+	StartPre();
+	m_triggerOneShot = false;
 	switch (m_series)
 	{
 		case Series::DS1000:
@@ -1627,7 +1638,6 @@ void RigolOscilloscope::Start()
 			{
 				m_liveMode = false;
 			}
-			PrepareStart();
 			m_transport->SendCommandQueued(m_liveMode ? ":RUN" : ":SING");
 			m_transport->SendCommandQueued("*WAI");
 			break;
@@ -1635,17 +1645,15 @@ void RigolOscilloscope::Start()
 		case Series::UNKNOWN:
 			break;
 	}
-
-	m_triggerArmed = true;
-	m_triggerOneShot = false;
+	StartPost();
 }
 
 void RigolOscilloscope::StartSingleTrigger()
 {
 	LogTrace("Start single trigger\n");
-	m_liveMode = false;
-	m_mdepthValid = false; // Memory depth might have been changed on scope
-	PrepareStart();
+	
+	StartPre();
+	m_triggerOneShot = true;
 	switch (m_series)
 	{
 		case Series::DS1000:
@@ -1666,13 +1674,12 @@ void RigolOscilloscope::StartSingleTrigger()
 		case Series::UNKNOWN:
 			break;
 	}
-
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
+	StartPost();
 }
 
 void RigolOscilloscope::Stop()
 {
+	LogTrace("Explicit STOP requested");
 	m_transport->SendCommandQueued(":STOP");
 	m_liveMode = false;
 	m_triggerArmed = false;
@@ -1683,7 +1690,8 @@ void RigolOscilloscope::ForceTrigger()
 {
 	m_liveMode = false;
 	m_mdepthValid = false; // Memory depth might have been changed on scope
-	PrepareStart();
+	m_triggerOneShot = true;
+	StartPre();
 	switch (m_series)
 	{
 		case Series::DS1000Z:
@@ -1700,6 +1708,7 @@ void RigolOscilloscope::ForceTrigger()
 			LogError("RigolOscilloscope::ForceTrigger not implemented for this model\n");
 			break;
 	}
+	StartPost();
 }
 
 bool RigolOscilloscope::IsTriggerArmed()

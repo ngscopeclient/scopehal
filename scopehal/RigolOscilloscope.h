@@ -130,6 +130,8 @@ protected:
 		// NOTE: If the MATH channel is selected, only the NORMal mode is valid.
 	};
 
+	void StartPre();
+	void StartPost();
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//hardware analog channel count, independent of LA option etc
