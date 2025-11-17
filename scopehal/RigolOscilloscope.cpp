@@ -575,7 +575,7 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 			vector<std::uint64_t> depths;
 			for (auto &depth : ds1000zSampleDepths)
 			{
-				if (depth == 24'000'000 and (not m_opt24M or divisor != 1))
+				if (depth == 24'000'000 and (not m_opt24M))
 					continue;
 
 				depths.emplace_back(depth/divisor);
