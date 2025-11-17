@@ -605,14 +605,14 @@ std::size_t RigolOscilloscope::GetChannelDivisor() {
 std::optional<RigolOscilloscope::CapturePreamble> RigolOscilloscope::GetCapturePreamble() {
 	//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply("WAV:PRE?"));
-	LogDebug("Preamble = %s\n", reply.c_str());
+	// LogDebug("Preamble = %s\n", reply.c_str());
 
 	CapturePreamble preamble {};
 	int format;
 	int type;
 
 	auto parsed_length = sscanf(reply.c_str(),
-		"%d,%d,%zu,%zu,%lf,%lf,%lf,%lf,%lf,%lf",
+		"%d,%d,%" PRIuLEAST32 ",%" PRIuLEAST32 ",%lf,%lf,%lf,%lf,%lf,%lf",
 		// is there a way of getting rid of reinterpret_cast without sacrificing typed enums and without helper variables?
 		&format,
 		&type,
@@ -645,8 +645,8 @@ std::optional<RigolOscilloscope::CapturePreamble> RigolOscilloscope::GetCaptureP
 	// the other option was pointer reinterpret cast :/
 	preamble.format = CaptureFormat(format);
 	preamble.type = CaptureType(type);
-	LogDebug("X: %ld points, %f origin, ref %f time/sample %lf\n", preamble.npoints, preamble.xorigin, preamble.xreference, preamble.sec_per_sample);
-	LogDebug("Y: %f inc, %f origin, %f ref\n", preamble.yincrement, preamble.yorigin, preamble.yreference);
+	LogTrace("X: %" PRIuLEAST32 " points, %f origin, ref %f time/sample %lf\n", preamble.npoints, preamble.xorigin, preamble.xreference, preamble.sec_per_sample);
+	LogTrace("Y: %f inc, %f origin, %f ref\n", preamble.yincrement, preamble.yorigin, preamble.yreference);
 	return preamble;
 }
 
@@ -1152,28 +1152,66 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 	if(m_liveMode)
 		return TRIGGER_MODE_TRIGGERED;
 
+	LogTrace("m_triggerArmed %d, m_triggerWasLive %d\n", m_triggerArmed, m_triggerWasLive);
+
 	if (m_series == Series::DS1000Z) {
 		// DS1000Z report trigger status in unreliable way.
 		// When triggered, it reports STOP for some time.
 		// Then it goes though RUN->WAIT->TRIG and ends up in STOP,
-		// but sometimes it completely skips transition to other states and
+		// but sometimes it completely skips transition to other states (not quick enough poll) and
 		// remains in STOP mode for a whole time even though there are new data.
 		// As a workaround, we monitor output WAV:PREamble which also report sample count.
 		// Once it matches configured memory depth, we consider capture to be complete.
 		// This is also much faster than waiting for trigger states.
 
-		// TODO: check if Protocol::MSO5000 procool could use this polling method
+		// TODO: check if other series could use this method
 		// TODO: consider to invalidate cached depth on trigger command
-		const auto sampleDepth = GetSampleDepth();
-		if (sampleDepth) {
+		if (m_triggerArmed)
+		{
+			const auto sampleDepth = GetSampleDepth();
 			const auto preamble = GetCapturePreamble();
-			if (preamble.has_value() && preamble->npoints == sampleDepth) {
-				m_triggerArmed = false;
-				m_triggerWasLive = false;
-				return TRIGGER_MODE_TRIGGERED;
+			if (sampleDepth and preamble.has_value())
+			{
+				if (preamble->npoints == sampleDepth) {
+					// reached the target sample count
+					m_triggerArmed = false;
+					m_triggerWasLive = false;
+					return TRIGGER_MODE_TRIGGERED;
+				}
+	
+				if (m_triggerWasLive) // was live and sampling not finished
+					return TRIGGER_MODE_RUN;
+	
+				// was not live and no points were sampled yet or stale value from last acq
+				// acq have not started yet
+				if (preamble->npoints == 0 or preamble->npoints == m_pointsWhenStarted)
+					return TRIGGER_MODE_WAIT;
+	
+				// wa not live, but something was sampled -> switch to live
+				m_triggerWasLive = true;
+				return TRIGGER_MODE_RUN;
+			}
+			else
+			{
+				if (not sampleDepth)
+					LogError("failed to get sample depth\n");
+				else if (not preamble)
+					LogError("failed to get preamble\n");
 			}
 		}
-
+		else
+		{
+			if (m_triggerWasLive)
+			{
+				// after manually stopped acquisition
+				LogTrace("Last poll after manually stopped partial acquisition\n");
+				m_triggerWasLive = false;
+				// return TRIGGER_MODE_
+				// TRIGGERED; // returning triggered could result in (partial) data download
+				return TRIGGER_MODE_STOP;
+			}
+			return TRIGGER_MODE_STOP;
+		}
 	}
 
 	auto stat = Trim(m_transport->SendCommandQueuedWithReply(":TRIG:STAT?"));
@@ -1195,6 +1233,8 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 		//The scope will go from "run" to "stop" state on trigger with only a momentary pass through "TD".
 		//If we armed the trigger recently and we're now stopped, this means we must have triggered.
 		// DS1000 QUIRK
+
+		// It also takes sime time before the scope transitiona _from_ STOP to any other state
 		if(m_triggerArmed && (m_series != Series::DS1000 || m_triggerWasLive))
 		{
 			m_triggerArmed = false;
@@ -1216,6 +1256,8 @@ bool RigolOscilloscope::AcquireData()
 
 	// Notify about download operation start
 	ChannelsDownloadStarted();
+
+	m_triggerWasLive = false; // premature stop may have resulted in `m_triggerWasLive` staying true (did not reach triggered state)
 
 	// Rigol scopes do not have a capture time so we fake it
 	double now = GetTime();
@@ -1600,6 +1642,16 @@ void RigolOscilloscope::StartPost()
 {
 	m_triggerArmed = true;
 
+	{
+		auto preamble = GetCapturePreamble();
+		if (preamble.has_value())
+		{
+			m_pointsWhenStarted = preamble->npoints;
+			LogTrace("set m_pointsWhenStarted to %" PRIuLEAST32 "\n", m_pointsWhenStarted);
+		}
+		else
+			LogError("empty preable");
+	}
 }
 
 

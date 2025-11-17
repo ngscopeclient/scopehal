@@ -130,8 +130,29 @@ protected:
 		// NOTE: If the MATH channel is selected, only the NORMal mode is valid.
 	};
 
+
+	struct CapturePreamble {
+		CaptureFormat format;
+		CaptureType type;
+		std::uint_least32_t npoints; // an integer between 1 and 12000000.
+		std::uint_least32_t averages; // the number of averages in the average sample mode and 1 in other modes.
+		double sec_per_sample; // the time difference between two neighboring points in the X direction.
+		double xorigin; // the time from the trigger point to the "Reference Time" in the X direction.
+		double xreference; // the reference time of the data point in the X direction.
+		double yincrement; // the waveform increment in the Y direction.
+		double yorigin; // the vertical offset relative to the "Vertical Reference Position" in the Y direction.
+		double yreference; // the vertical reference position in the Y direction.
+	};
+
+	std::optional<CapturePreamble> GetCapturePreamble();
 	void StartPre();
 	void StartPost();
+	void DecodeDeviceSeries();
+	void AnalyzeDeviceCapabilities();
+	void UpdateDynamicCapabilities(); // capabilities dependent on enabled chanel count
+	std::size_t GetChannelDivisor(); // helper function to get memory depth/sample rate divisor base on current scope state (amount of enabled channels)
+
+protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//hardware analog channel count, independent of LA option etc
@@ -154,6 +175,7 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerWasLive;
 	bool m_triggerOneShot;
+	std::uint_least32_t m_pointsWhenStarted; // used for some series as a part of trigger state detection workaround, sampled points reported right after arming
 
 	bool m_liveMode;
 
@@ -178,26 +200,7 @@ protected:
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullEdgeTrigger();
 
-	struct CapturePreamble {
-		CaptureFormat format;
-		CaptureType type;
-		std::size_t npoints; // an integer between 1 and 12000000.
-		std::size_t averages; // the number of averages in the average sample mode and 1 in other modes.
-		double sec_per_sample; // the time difference between two neighboring points in the X direction.
-		double xorigin; // the time from the trigger point to the "Reference Time" in the X direction.
-		double xreference; // the reference time of the data point in the X direction.
-		double yincrement; // the waveform increment in the Y direction.
-		double yorigin; // the vertical offset relative to the "Vertical Reference Position" in the Y direction.
-		double yreference; // the vertical reference position in the Y direction.
-	};
 	std::vector<std::uint64_t> m_depths;
-
-	std::optional<CapturePreamble> GetCapturePreamble();
-	void PrepareStart();
-	void DecodeDeviceSeries();
-	void AnalyzeDeviceCapabilities();
-	void UpdateDynamicCapabilities(); // capabilities dependent on enabled chanel count
-	std::size_t GetChannelDivisor(); // helper function to get memory depth/sample rate divisor base on current scope state (amount of enabled channels)
 
 public:
 	static std::string GetDriverNameInternal();
