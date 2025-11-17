@@ -1785,33 +1785,35 @@ struct Ds1000zSrate {
 };
 
 static std::vector<Ds1000zSrate> ds1000zSampleRates {
-	{                20, 1                 }, // 12k
-	{                50, 1                 }, // 12k
-	{               100, 1                 }, // 12k
-	{               200, 1 | 2             }, // 12k 120k
-	{               500, 1 | 2             }, // 12k 120k
-	{              1000, 1 | 2             }, // 12k 120k
-	{              2000, 1 | 2 | 4         }, // 12k 120k 1M2
-	{              5000, 1 | 2 | 4         }, // 12k 120k 1M2
-	{         10 * 1000, 1 | 2 | 4         }, // 12k 120k 1M2
-	{         20 * 1000, 1 | 2 | 4         }, // 12k 120k 1M2 12M
-	{         40 * 1000,                 16}, //                  24M
-	{         50 * 1000, 1 | 2 | 4 | 8     }, // 12k 120k 1M2 12M
-	{        100 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{        200 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{        400 * 1000,                 16}, //                  24M
-	{        500 * 1000, 1 | 2 | 4 | 8     }, // 12k 120k 1M2 12M
-	{   1 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{   2 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{   4 * 1000 * 1000,                 16}, //                  24M
-	{   5 * 1000 * 1000, 1 | 2 | 4 | 8     }, // 12k 120k 1M2 12M
-	{  10 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{  25 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{  50 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{ 125 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{ 250 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{ 500 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M
-	{1000 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}  // 12k 120k 1M2 12M 24M
+	//          1 CH sr                          1CH mDepths                  2 CH sr  3/4 CH sr  display halt of memory?
+	{                20, 1                 }, // 12k                           10        5         N
+	{                50, 1                 }, // 12k                           25       12 !       N   this special case looks to be caused by integer representation of the samplerate
+	{               100, 1                 }, // 12k                           50       25         N
+	{               200, 1 | 2             }, // 12k 120k                     100       50         N
+	{               500, 1 | 2             }, // 12k 120k                     250      125         N
+	{              1000, 1 | 2             }, // 12k 120k                     500      250         N
+	{              2000, 1 | 2 | 4         }, // 12k 120k 1M2                  1k      500         N
+	{              5000, 1 | 2 | 4         }, // 12k 120k 1M2                  2k5      1k25       N
+	{         10 * 1000, 1 | 2 | 4         }, // 12k 120k 1M2                  5k       2k5        N
+	{         20 * 1000, 1 | 2 | 4         }, // 12k 120k 1M2 12M             10k       5k         N
+	{         40 * 1000,                 16}, //                  24M         20k       10k        N
+	{         50 * 1000, 1 | 2 | 4 | 8     }, // 12k 120k 1M2 12M             25k      12k5        N
+	{        100 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M         50k      25k         N
+	{        200 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M        100k      50k         N
+	{        400 * 1000,                 16}, //                  24M        200k     100k         N
+	{        500 * 1000, 1 | 2 | 4 | 8     }, // 12k 120k 1M2 12M            250k     125k         N
+	{   1 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M        500k     250k         N
+	{   2 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M          1M     500k         N
+	{   4 * 1000 * 1000,                 16}, //                  24M          2M       1M         N
+	{   5 * 1000 * 1000, 1 | 2 | 4 | 8     }, // 12k 120k 1M2 12M              2M5      1M25       N
+	{  10 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M          5M       2M5        N
+	// 10 Msps is magical threshold above which the regularity breaks
+	{  25 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M         10M !     5M !       Y
+	{  50 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M         25M      12M5        Y
+	{ 125 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M         50M !    25M !       Y
+	{ 250 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M        125M      50M !       Y
+	{ 500 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}, // 12k 120k 1M2 12M 24M        250M     125M         Y
+	{1000 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}  // 12k 120k 1M2 12M 24M        500M     250M         Y
 };
 
 vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
@@ -1828,7 +1830,19 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 			auto mdepth = GetSampleDepth();
 			for (const auto& rate : ds1000zSampleRates)
 				if (rate.supportsMdepth(mdepth, divisor))
-					rates.push_back(rate.m_value / divisor);
+				{
+					// 125M is never divided by 2
+					// 125M /2 -> 50M  /2 -> 25M
+					// 250M /2 -> 125M /2 -> 50M
+					if (rate.m_value == 125'000'000 and divisor != 1)
+						rates.push_back(100'000'000 / divisor);
+					else if (rate.m_value == 25'000'000 and divisor != 1)
+						rates.push_back(20'000'000 / divisor);
+					else if (rate.m_value == 250'000'000 and divisor == 4)
+						rates.push_back(200'000'000 / divisor);
+					else
+						rates.push_back(rate.m_value / divisor);
+				}
 			return rates;
 		}
 
@@ -2182,7 +2196,14 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 			//     Mdepth = Srate * wlength
 			//     Mdepth = Srate * Tscale * 12
 			//     Mdepth / (Srate * 12) =  * Tscale
-			m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(sampletime / 12 / 2)); // not sure why we need that / 2
+			auto const divisor = GetChannelDivisor();
+			LogTrace("setting target samplerate %lu, divisor %zu\n", rate, divisor);
+			auto const timescale = [&]() -> float {
+				if (divisor != 4 and (rate / divisor) >= 25'000'000)
+					return sampletime / 12 / 2;
+				return sampletime / 12;
+			}();
+			m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(timescale));
 			// Due to unknown reason, when we read SCAL right fter changing, we get the old value
 			// solution is to execute _any_ command with response (e.g. *IDN? works).
 			// Another requirement is that this read has to happen after the acquisition finishes which could take a long time on samplerates
