@@ -155,9 +155,9 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	// If the MSO option is enabled, add digital channels
 	if (options.find("MSO") != options.end())
 	{
-		m_digitalChannelCount = 16;
+		m_digitalChannelCount = nchans * 4;
 		m_digitalChannelBase = m_channels.size();
-		for(int i = 0; i < 16; i++)
+		for(unsigned int i = 0; i < m_digitalChannelCount; i++)
 		{
 			//Create the channel
 			auto chan = new OscilloscopeChannel(
@@ -632,11 +632,17 @@ vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
 {
 	WaveformPreamble ret;
+	string reply;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":WAV:SOUR " + channel);
-	m_transport->SendCommand(":WAV:PRE?");
-	string reply = m_transport->ReadReply();
+	// The DSO-X 2022A sometimes only replies '+0' which isn't documented in the Programmer's Guide. Retrying once seems
+	// to solve it reliably. 19 is the shortest representable string length that conforms to the sscanf format
+	for (int i = 0; i < 2 && reply.length() < 19; i++)
+	{
+		m_transport->SendCommand(":WAV:PRE?");
+		reply = m_transport->ReadReply();
+	}
 	sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
 			&ret.format, &ret.type, &ret.length, &ret.average_count,
 			&ret.xincrement, &ret.xorigin, &ret.xreference,
@@ -766,7 +772,7 @@ bool AgilentOscilloscope::AcquireData()
 
 		// Fetch waveform data for each pod containing enabled channels
 		map<string, vector<uint8_t>> raw_waveforms;
-		for(int i = 0; i < 8; i++)
+		for(unsigned int i = 0; i < 8 && i < m_digitalChannelCount; i++)
 		{
 			if(IsChannelEnabled(i + m_digitalChannelBase))
 			{
@@ -774,7 +780,7 @@ bool AgilentOscilloscope::AcquireData()
 				break;
 			}
 		}
-		for(int i = 8; i < 16; i++)
+		for(unsigned int i = 8; i < 16 && i < m_digitalChannelCount; i++)
 		{
 			if(IsChannelEnabled(i + m_digitalChannelBase))
 			{
