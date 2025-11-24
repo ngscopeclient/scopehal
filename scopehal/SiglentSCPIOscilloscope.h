@@ -319,6 +319,7 @@ protected:
 	// Firmware version
 	int m_ubootMajorVersion;
 	int m_ubootMinorVersion;
+	int m_ubootPatchVersion;
 	int m_fwMajorVersion;
 	int m_fwMinorVersion;
 	int m_fwPatchVersion;

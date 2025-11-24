@@ -266,19 +266,35 @@ void SiglentSCPIOscilloscope::ParseFirmwareVersion()
 	//Check if version requires size workaround (1.3.9R6 and older)
 	m_ubootMajorVersion = 0;
 	m_ubootMinorVersion = 0;
+	m_ubootPatchVersion = 0;
 	m_fwMajorVersion = 0;
 	m_fwMinorVersion = 0;
 	m_fwPatchVersion = 0;
 	m_fwPatchRevision = 0;
 
-	//Version format for 1.5.2R3 and older
-	sscanf(m_fwVersion.c_str(), (m_fwVersion.find('R') != std::string::npos) ? "%d.%d.%d.%d.%dR%d" : "%d.%d.%d.%d.%d.%d",
-		&m_ubootMajorVersion,
-		&m_ubootMinorVersion,
-		&m_fwMajorVersion,
-		&m_fwMinorVersion,
-		&m_fwPatchVersion,
-		&m_fwPatchRevision);
+	int dotCount = std::ranges::count(m_fwVersion,'.');
+	if(dotCount == 6)
+	{	// Latest firmware versions have a patch uboot number
+		sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%d.%d.%d",
+			&m_ubootMajorVersion,
+			&m_ubootMinorVersion,
+			&m_ubootPatchVersion,
+			&m_fwMajorVersion,
+			&m_fwMinorVersion,
+			&m_fwPatchVersion,
+			&m_fwPatchRevision);
+	}
+	else
+	{	//Version format for 1.5.2R3 and older
+		sscanf(m_fwVersion.c_str(), (m_fwVersion.find('R') != std::string::npos) ? "%d.%d.%d.%d.%dR%d" : "%d.%d.%d.%d.%d.%d",
+			&m_ubootMajorVersion,
+			&m_ubootMinorVersion,
+			&m_fwMajorVersion,
+			&m_fwMinorVersion,
+			&m_fwPatchVersion,
+			&m_fwPatchRevision);
+	}
+	//LogDebug("Found version %d.%d.%d.%d.%d.%d.%d\n",m_ubootMajorVersion,m_ubootMinorVersion,m_ubootPatchVersion,m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion,m_fwPatchRevision);
 }
 
 void SiglentSCPIOscilloscope::IdentifyHardware()
@@ -364,8 +380,9 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			m_protocolId = PROTOCOL_E11;
 
 			ParseFirmwareVersion();
-			if(m_fwMajorVersion>=1 && m_fwMinorVersion >= 2)
+			if(m_fwMajorVersion==1 && m_fwMinorVersion == 2 && m_fwPatchVersion < 3)
 			{	// Only pre-production firmware version (e.g. 1.1.7) uses SCPI standard size reporting
+				// Fix has been made in firmware 1.2.3+
 				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
 				m_requireSizeWorkaround = true;
 			}
@@ -377,7 +394,8 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
-			m_requireSizeWorkaround = true;
+			// No need for size workaround on SDS3000X HD, at least with fimware versions 1.0.4.2+
+			m_requireSizeWorkaround = false;
 		}
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
@@ -1575,6 +1593,8 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 	uint32_t len = getLength;
 	if(hdSizeWorkaround)
 		len *= 2;
+
+	//LogDebug("Got length %" PRIu32 " from scope, hdSizeWorkaround = %s, expected bytes = %" PRIu32 ", maxsize = %" PRIu32 " => reading %" PRIu32 " bytes.\n",getLength, hdSizeWorkaround ? "true" : "false", len, maxsize, min(len, maxsize));
 	len = min(len, maxsize);
 
 	m_transport->ReadRawData(len, (unsigned char*)data, progress);
@@ -2153,6 +2173,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
 						}
+						// Safe-check data size
+						if(analogWaveformDataSize[i] > ((int)acqBytes)) analogWaveformDataSize[i] = acqBytes;
 						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 					}
 				}
