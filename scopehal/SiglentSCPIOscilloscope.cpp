@@ -123,6 +123,7 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_paginated(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
@@ -169,6 +170,31 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 	va_end(va);
 
 	m_transport->SendCommandQueued(opString);
+}
+
+void SiglentSCPIOscilloscope::flush()
+{
+	m_transport->ReadReply();
+}
+
+void SiglentSCPIOscilloscope::flushWaveformData()
+{	// Read any pending waveform data until we get the double 0x0a end marker
+	uint8_t tmp;
+	while(true)
+	{
+		size_t avaiable = m_transport->ReadRawData(1, &tmp);
+		if(!avaiable) break;
+		if(tmp == 0x0a)
+		{
+			avaiable = m_transport->ReadRawData(1, &tmp);
+			if(!avaiable) break;
+			if(tmp == 0x0a) break;
+		}
+	}
+	m_transport->FlushRXBuffer();
+	// Protocol error might be caused by invalid acq points or max points => clear cache
+	m_acqPointsValid = false;
+	m_maxPointsValid = false;
 }
 
 void SiglentSCPIOscilloscope::SharedCtorInit()
@@ -1577,6 +1603,10 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 		if(i == 19)
 		{
 			LogError("ReadWaveformBlock: threw away 20 bytes of data and never saw a '#'\n");
+			// This is a protocol error, flush pending rx data
+			flush();
+			// Stop aqcuisition after this protocol error
+			Stop();
 			return 0;
 		}
 	}
@@ -2152,13 +2182,21 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						if(!paginated)
 						{	// All data fits one page
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
+							if(m_paginated)
+							{	// Previous acquisition was paginated => reset start value
+								m_transport->SendCommand(":WAVEFORM:START 0");
+								m_paginated = false;
+							}
 							m_transport->SendCommand(":WAVEFORM:DATA?");
 							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 							// This is the 0x0a0a at the end
 							m_transport->ReadRawData(2, (unsigned char*)tmp);
+							// Detect prtocol error and consume the rest of the stream
+							if(tmp[0] != 0x0a || tmp[1] != 0x0a) flushWaveformData();
 						}
 						else
 						{	// We need pagination
+							m_paginated = true;
 							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
 							for(uint64_t page = 0; page < pages; page++)
 							{
@@ -2171,6 +2209,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
+								// Detect prtocol error and consume the rest of the stream
+								if(tmp[0] != 0x0a || tmp[1] != 0x0a) flushWaveformData();
 							}
 						}
 						// Safe-check data size
@@ -3291,10 +3331,15 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 {
 	m_sampleRate = rate;
 	m_sampleRateValid = false;
-
+	
 	m_memoryDepthValid = false;
+	// Acq Points and max points will have to be updated too
+	m_acqPointsValid = false;
+	m_maxPointsValid = false;
+
 	double sampletime = GetSampleDepth() / (double)rate;
 	double scale = sampletime / 10;
+	LogDebug("Set Sample Rate depth = %lld, rate = %lld, time = %f, scale = %f\n",GetSampleDepth(),rate,sampletime,scale);
 
 	switch(m_modelid)
 	{
@@ -3308,7 +3353,38 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS3000X_HD:
+			{
+			// We cannot change srate when in run/stop mode
+			// Get Trigger State to restore it after setting changing memory detph
+			TriggerMode triggerMode = PollTrigger();
+			sendOnly(":TRIGGER:MODE AUTO");
 			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
+			// Wait for srate to be updated on the scope
+			uint64_t newRate;
+			uint8_t attempt = 0;
+			while(true)
+			{
+				m_sampleRateValid = false;
+				newRate = GetSampleRate();
+				if(newRate == rate) break;
+				attempt++;
+				if(attempt > 10)
+				{
+					m_sampleRateValid = false;
+					break;
+				}
+			}
+			LogDebug("Rate = %lld, newRate = %lld\n",rate,newRate);
+			if(IsTriggerArmed())
+			{	// restart trigger
+				sendOnly(":TRIGGER:MODE SINGLE");
+			}
+			else
+			{	// Restore previous trigger mode
+				sendOnly(":TRIGGER:MODE %s", ((triggerMode == TRIGGER_MODE_STOP) ? "STOP" : "AUTO"));
+			}
+
+			}
 			break;
 
 		//Timebase must be multiples of 1-2-5 so truncate any fractional component

@@ -72,6 +72,8 @@ public:
 private:
 	std::string converse(const char* fmt, ...);
 	void sendOnly(const char* fmt, ...);
+	void flush();
+	void flushWaveformData();
 
 protected:
 	void IdentifyHardware();
@@ -344,6 +346,9 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 	bool m_triggerForced;
+
+	// Pagination state
+	bool m_paginated;
 
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
