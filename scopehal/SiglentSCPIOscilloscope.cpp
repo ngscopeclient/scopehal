@@ -3339,7 +3339,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 
 	double sampletime = GetSampleDepth() / (double)rate;
 	double scale = sampletime / 10;
-	LogDebug("Set Sample Rate depth = %lld, rate = %lld, time = %f, scale = %f\n",GetSampleDepth(),rate,sampletime,scale);
+	//LogDebug("Set Sample Rate depth = %" PRIu64 ", rate = %" PRIu64 ", time = %f, scale = %f\n",GetSampleDepth(),rate,sampletime,scale);
 
 	switch(m_modelid)
 	{
@@ -3376,7 +3376,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 					break;
 				}
 			}
-			LogDebug("Rate = %lld, newRate = %lld\n",rate,newRate);
+			//LogDebug("Rate = %" PRIu64 ", newRate = %" PRIu64 "\n",rate,newRate);
 			if(IsTriggerArmed())
 			{	// restart trigger
 				sendOnly(":TRIGGER:MODE SINGLE");
