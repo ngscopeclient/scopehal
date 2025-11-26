@@ -298,7 +298,7 @@ void SiglentSCPIOscilloscope::ParseFirmwareVersion()
 	m_fwPatchVersion = 0;
 	m_fwPatchRevision = 0;
 
-	int dotCount = std::ranges::count(m_fwVersion,'.');
+	int dotCount = std::count(m_fwVersion.begin(), m_fwVersion.end(),'.');
 	if(dotCount == 6)
 	{	// Latest firmware versions have a patch uboot number
 		sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%d.%d.%d",
@@ -3354,11 +3354,13 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS3000X_HD:
 			{
-			// We cannot change srate when in run/stop mode
+			// We cannot change srate when in Stop mode
 			// Get Trigger State to restore it after setting changing memory detph
 			TriggerMode triggerMode = PollTrigger();
 			sendOnly(":TRIGGER:MODE AUTO");
+			// Time scale and srate need to both be set for the scope to consistantly update sample rate
 			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
+			sendOnly(":ACQUIRE:SRATE %1.2E", (double)rate);
 			// Wait for srate to be updated on the scope
 			uint64_t newRate;
 			uint8_t attempt = 0;
@@ -3379,9 +3381,11 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 			{	// restart trigger
 				sendOnly(":TRIGGER:MODE SINGLE");
 			}
-			else
+			else if (triggerMode == TRIGGER_MODE_STOP)
 			{	// Restore previous trigger mode
-				sendOnly(":TRIGGER:MODE %s", ((triggerMode == TRIGGER_MODE_STOP) ? "STOP" : "AUTO"));
+				sendOnly(":TRIGGER:MODE STOP");
+				m_triggerArmed = false;
+				m_triggerOneShot = true;
 			}
 
 			}
