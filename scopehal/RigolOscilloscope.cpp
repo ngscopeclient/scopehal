@@ -130,22 +130,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		case Series::UNKNOWN:
 			break;
 	}
-
-	switch (m_series) {
-		case Series::DS1000:
-		case Series::MSO5000:
-		case Series::DHO1000:
-		case Series::DHO4000:
-		case Series::DHO800:
-		case Series::DHO900:
-			for(size_t i = 0; i < m_analogChannelCount; i++)
-				m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":VERN ON");
-			break;
-
-		case Series::MSODS1000Z:
-		case Series::UNKNOWN:
-			break;
-	}
+	
+	for(size_t i = 0; i < m_analogChannelCount; i++)
+		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":VERN ON");
 
 	switch (m_series) {
 		case Series::MSODS1000Z:
