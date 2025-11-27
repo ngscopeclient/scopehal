@@ -1627,7 +1627,13 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 	//LogDebug("Got length %" PRIu32 " from scope, hdSizeWorkaround = %s, expected bytes = %" PRIu32 ", maxsize = %" PRIu32 " => reading %" PRIu32 " bytes.\n",getLength, hdSizeWorkaround ? "true" : "false", len, maxsize, min(len, maxsize));
 	len = min(len, maxsize);
 
-	m_transport->ReadRawData(len, (unsigned char*)data, progress);
+	size_t readBytes = 0;
+	while(readBytes < len)
+	{
+		size_t newBytes = m_transport->ReadRawData(len-readBytes, (unsigned char*)(data+readBytes), progress);
+		if(newBytes == 0) break;
+		readBytes += newBytes;
+	}
 
 	if(hdSizeWorkaround)
 		return getLength*2;
@@ -2171,47 +2177,72 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				uint64_t acqPoints = GetAcqPoints();
 				uint64_t pageSize = GetMaxPoints();
 				uint64_t pages = ceil(acqPoints/pageSize);
+				if(pages < 1) pages = 1;
+				uint64_t pageSizeBytes = m_highDefinition ? (pageSize*2) : pageSize;
 				uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
 				bool paginated = (pages > 1);
+				uint64_t readBytes;
+				//LogDebug("Acqu points = %" PRIu64 ", Acqu bytes = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",acqPoints,acqBytes,pages,pageSize,pageSizeBytes);
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
 					if(analogEnabled[i])
 					{	// Allocate buffer
 						analogWaveformData[i] = new char[acqBytes];
-						if(!paginated)
-						{	// All data fits one page
-							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
-							if(m_paginated)
-							{	// Previous acquisition was paginated => reset start value
-								m_transport->SendCommand(":WAVEFORM:START 0");
-								m_paginated = false;
-							}
-							m_transport->SendCommand(":WAVEFORM:DATA?");
-							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
-							// This is the 0x0a0a at the end
-							m_transport->ReadRawData(2, (unsigned char*)tmp);
-							// Detect prtocol error and consume the rest of the stream
-							if(tmp[0] != 0x0a || tmp[1] != 0x0a) flushWaveformData();
-						}
-						else
-						{	// We need pagination
-							m_paginated = true;
-							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
-							for(uint64_t page = 0; page < pages; page++)
-							{
+						// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
+						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
+						for(uint64_t page = 0; page < pages; page++)
+						{
+							if(paginated)
+							{	// Remember current mode for next acquisitions
+								m_paginated = true;
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
 								auto progress = [i, this, page, pages] (float fprogress) {
 									float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 									ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 								};
-								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
-								// This is the 0x0a0a at the end
-								m_transport->ReadRawData(2, (unsigned char*)tmp);
-								// Detect prtocol error and consume the rest of the stream
-								if(tmp[0] != 0x0a || tmp[1] != 0x0a) flushWaveformData();
+								readBytes = (uint64_t)ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
+								if(readBytes == 0)
+								{
+									LogError("Protocol error, aborting acquisition.");
+									ChannelsDownloadFinished();
+									return false;
+								}
+								analogWaveformDataSize[i] += readBytes;
 							}
+							else
+							{	// See if we here prviously paginated
+								if(m_paginated)
+								{	// Previous acquisition was paginated => reset start value
+									m_transport->SendCommand(":WAVEFORM:START 0");
+									m_paginated = false;
+								}
+								m_transport->SendCommand(":WAVEFORM:DATA?");
+								readBytes = (uint64_t)ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+								if(readBytes == 0)
+								{
+									LogError("Protocol error, aborting acquisition.");
+									ChannelsDownloadFinished();
+									return false;
+								}
+								analogWaveformDataSize[i] = readBytes;
+							}
+							// SDS2000X HD driver 1.2.3.1 does not always honor the returned GetMaxPoints()
+							// When this is happening, the actual page size is smaller than GetMaxPoints()
+							// To handle this, we need to dynamically adapt pagination to this actual page size
+							if((readBytes != 0) && (readBytes < acqBytes) && (readBytes != pageSizeBytes))
+							{	// Actual page size is different from the one reported by GetMaxPoints() => update pagination
+								pageSizeBytes = readBytes;
+								pageSize = m_highDefinition ? (pageSizeBytes / 2) : pageSizeBytes;
+								pages = ceil(acqPoints/pageSize);
+								paginated = (pages > 1);
+								LogDebug("Repaginating ! Num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",pages,pageSize,pageSizeBytes);
+							}
+							// This is the 0x0a0a at the end
+							m_transport->ReadRawData(2, (unsigned char*)tmp);
+							// Detect prtocol error and consume the rest of the stream
+							//if(tmp[0] != 0x0a || tmp[1] != 0x0a) flushWaveformData();
 						}
 						// Safe-check data size
 						if(analogWaveformDataSize[i] > ((int)acqBytes)) analogWaveformDataSize[i] = acqBytes;
@@ -2225,7 +2256,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					// For digital channels, page size is half the size of analog channels (as per empirical determination...)
 					pageSize /= 2;
 					pages = ceil(digitalAcqPoints/pageSize);
+					if(pages < 1) pages = 1;
 					paginated = (pages > 1);
+					//LogDebug("Digital acq => Acq points = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",digitalAcqPoints,pages,pageSize,pageSizeBytes);
 					uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
 					// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
 					if(wasPaginated && !paginated)
@@ -2238,30 +2271,50 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						if(digitalEnabled[i])
 						{	// Allocate buffer
 							digitalWaveformDataBytes[i] = new char[acqDigitalBytes];
-							if(!paginated)
-							{	// All data fits one page
-								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
-								m_transport->SendCommand(":WAVEFORM:DATA?");
-								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
-								// This is the 0x0a0a at the end
-								m_transport->ReadRawData(2, (unsigned char*)tmp);
-							}
-							else
-							{	// We need pagination
-								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
-								for(uint64_t page = 0; page < pages; page++)
+							m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
+							for(uint64_t page = 0; page < pages; page++)
+							{
+								// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
+								if(paginated)
 								{
-									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 									m_transport->SendCommand(":WAVEFORM:DATA?");
 									auto progress = [i, this, page, pages] (float fprogress) {
 										float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 									};
-									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
-									// This is the 0x0a0a at the end
-									m_transport->ReadRawData(2, (unsigned char*)tmp);
+									readBytes = (uint64_t)ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
+									if(readBytes == 0)
+									{
+										LogError("Protocol error, aborting acquisition.");
+										ChannelsDownloadFinished();
+										return false;
+									}
+									digitalWaveformDataSize[i] += readBytes;
 								}
+								else
+								{	// All data fits one page
+									m_transport->SendCommand(":WAVEFORM:DATA?");
+									readBytes = (uint64_t)ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+									if(readBytes == 0)
+									{
+										LogError("Protocol error, aborting acquisition.");
+										ChannelsDownloadFinished();
+										return false;
+									}
+									digitalWaveformDataSize[i] = readBytes;
+								}
+								// 8 points per byte in digital mode
+								uint64_t readPoints = readBytes*8;
+								if((readPoints != 0) &&(readPoints < digitalAcqPoints) && (readPoints != pageSize))
+								{	// Actual page size is different from the one reported by GetMaxPoints() => update pagination
+									pageSize = readPoints;
+									pages = ceil(digitalAcqPoints/pageSize);
+									paginated = (pages > 1);
+									LogDebug("Repaginating ! => Num pages = %" PRIu64 ", pageSize = %" PRIu64 "\n",pages,pageSize);
+								}
+								// This is the 0x0a0a at the end
+								m_transport->ReadRawData(2, (unsigned char*)tmp);
 							}
 							ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 						}
@@ -3377,11 +3430,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 				}
 			}
 			//LogDebug("Rate = %" PRIu64 ", newRate = %" PRIu64 "\n",rate,newRate);
-			if(IsTriggerArmed())
-			{	// restart trigger
-				sendOnly(":TRIGGER:MODE SINGLE");
-			}
-			else if (triggerMode == TRIGGER_MODE_STOP)
+			if (triggerMode == TRIGGER_MODE_STOP)
 			{	// Restore previous trigger mode
 				sendOnly(":TRIGGER:MODE STOP");
 				m_triggerArmed = false;
