@@ -104,7 +104,7 @@ protected:
 		UNKNOWN,
 
 		DS1000,
-		DS1000Z,
+		MSODS1000Z,
 		// MSODS2000,
 		// MSO4000,
 		MSO5000,

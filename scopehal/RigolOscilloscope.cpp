@@ -117,7 +117,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
 			break;
 		
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 		case Series::DHO1000:
 		case Series::DHO4000:
@@ -142,13 +142,13 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 				m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":VERN ON");
 			break;
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::UNKNOWN:
 			break;
 	}
 
 	switch (m_series) {
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 		case Series::DHO1000:
 		case Series::DHO4000:
@@ -241,7 +241,7 @@ void RigolOscilloscope::DecodeDeviceSeries()
 					if(m_modelNew.suffix[0] == 'D' || m_modelNew.suffix[0] == 'E')
 						return Series::DS1000;
 					else if(m_modelNew.suffix[0] == 'Z')
-						return Series::DS1000Z;
+						return Series::MSODS1000Z;
 					break;
 				
 				// case 2:
@@ -286,7 +286,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_bandwidth = m_modelNew.number % 1000 - m_analogChannelCount;
 			break;
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		{
 			m_analogChannelCount = m_modelNew.number % 10;
 			m_bandwidth = m_modelNew.number % 1000 - m_analogChannelCount;
@@ -564,7 +564,7 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 			return;
 		}
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		{
 			// For the analog channel:
 			// ― 1 CH:   12000|120000|1200000|12000000|24000000
@@ -955,7 +955,7 @@ vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/
 			break;
 
 		case Series::DS1000:
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 			return {20, 0};
 		
 		case Series::UNKNOWN:
@@ -1037,7 +1037,7 @@ float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 	string reply;
 	switch (m_series) {
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 			reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":RANGE?"));
 			break;
 
@@ -1062,7 +1062,7 @@ float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		switch (m_series) {
-			case Series::DS1000Z:
+			case Series::MSODS1000Z:
 				return m_channelVoltageRanges[i] = range;
 
 			case Series::DS1000:
@@ -1090,7 +1090,7 @@ void RigolOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, floa
 	}
 
 	switch (m_series) {
-			case Series::DS1000Z:
+			case Series::MSODS1000Z:
 				m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":RANGE " + to_string(range));
 				return;
 			
@@ -1154,7 +1154,7 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 
 	LogTrace("m_triggerArmed %d, m_triggerWasLive %d\n", m_triggerArmed, m_triggerWasLive);
 
-	if (m_series == Series::DS1000Z) {
+	if (m_series == Series::MSODS1000Z) {
 		// DS1000Z report trigger status in unreliable way.
 		// When triggered, it reports STOP for some time.
 		// Then it goes though RUN->WAIT->TRIG and ends up in STOP,
@@ -1273,7 +1273,7 @@ bool RigolOscilloscope::AcquireData()
 		case Series::DS1000:
 			maxpoints = 8192; // FIXME
 			break;
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 			// manual specifies 250k as a maximum for bytes output
 			// maxpoints = 250 * 1000;
 
@@ -1333,7 +1333,7 @@ bool RigolOscilloscope::AcquireData()
 				break;
 			}
 
-			case Series::DS1000Z:
+			case Series::MSODS1000Z:
 			case Series::MSO5000:
 			case Series::DHO1000:
 			case Series::DHO4000:
@@ -1395,7 +1395,7 @@ bool RigolOscilloscope::AcquireData()
 					m_transport->SendCommandQueued(string(":WAV:DATA? ") + m_channels[channelIdx]->GetHwname());
 					break;
 				
-				case Series::DS1000Z:
+				case Series::MSODS1000Z:
 				{
 					// specify block sample range
 					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint+1));	//ONE based indexing WTF
@@ -1583,7 +1583,7 @@ bool RigolOscilloscope::AcquireData()
 				m_transport->SendCommandQueued(":RUN");
 				break;
 
-			case Series::DS1000Z:
+			case Series::MSODS1000Z:
 			case Series::MSO5000:
 			case Series::DHO1000:
 			case Series::DHO4000:
@@ -1631,7 +1631,7 @@ void RigolOscilloscope::StartPre()
 			break;
 
 		case Series::DS1000:
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 		case Series::UNKNOWN:
 			break;
@@ -1668,7 +1668,7 @@ void RigolOscilloscope::Start()
 			m_transport->SendCommandQueued(":RUN");
 			break;
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 			m_transport->SendCommandQueued(":SING");
 			m_transport->SendCommandQueued("*WAI");
@@ -1713,7 +1713,7 @@ void RigolOscilloscope::StartSingleTrigger()
 			m_transport->SendCommandQueued(":RUN");
 			break;
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 		case Series::DHO1000:
 		case Series::DHO4000:
@@ -1746,7 +1746,7 @@ void RigolOscilloscope::ForceTrigger()
 	StartPre();
 	switch (m_series)
 	{
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 		case Series::DHO1000:
 		case Series::DHO4000:
@@ -1884,7 +1884,7 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 	//FIXME
 	switch (m_series)
 	{
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		{
 			vector<uint64_t> rates {};
 			auto divisor = GetChannelDivisor();
@@ -1988,7 +1988,7 @@ set<Oscilloscope::InterleaveConflict> RigolOscilloscope::GetInterleaveConflicts(
 			return {};
 		case Series::UNKNOWN:
 		case Series::DS1000:
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 			break;
 	}
@@ -2015,7 +2015,7 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsInterleaved()
 			return GetSampleDepthsNonInterleaved();
 		
 		case Series::DS1000:
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 		case Series::UNKNOWN:
 			break;
@@ -2177,7 +2177,7 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			break;
 		}
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		{
 			if (depth == 24'000'000 and not m_opt24M) {
 				LogError("This DS1000Z device does not have 24M option installed\n");
@@ -2246,7 +2246,7 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 			break;
 		}
 
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		{
 			// The following equation describes the relationship among memory depth, sample rate, and waveform length:
 			//     Memory Depth = Sample Rate x Waveform Length
@@ -2485,7 +2485,7 @@ void RigolOscilloscope::ForceHDMode(bool mode)
 
 		case Series::UNKNOWN:
 		case Series::DS1000:
-		case Series::DS1000Z:
+		case Series::MSODS1000Z:
 		case Series::MSO5000:
 			//TODO: report/log invalidity of this
 			break;
