@@ -217,46 +217,45 @@ void RigolOscilloscope::DecodeDeviceSeries()
 		m_modelNew.suffix.assign(cursor, m_model.end());
 
 		// decode into device family
+		if(m_modelNew.prefix == "DS" or m_modelNew.prefix == "MSO")
 		{
 			switch(m_modelNew.number / 1000)
 			{
 				case 1:
-					if(strcmp(m_modelNew.prefix.c_str(), "DS") != 0)
-						break;
-					if(m_modelNew.suffix.size() < 1)
-						break;
-					if(m_modelNew.suffix[0] == 'D' || m_modelNew.suffix[0] == 'E')
-						return Series::DS1000;
-					else if(m_modelNew.suffix[0] == 'Z')
-						return Series::MSODS1000Z;
+						if(m_modelNew.suffix.size() < 1)
+							break;
+						if(m_modelNew.suffix[0] == 'D' || m_modelNew.suffix[0] == 'E')
+							return Series::DS1000;
+						else if(m_modelNew.suffix[0] == 'Z')
+							return Series::MSODS1000Z;
 					break;
-				
-				// case 2:
-				// 	if(strcmp(m_modelNew.prefix.c_str(), "DS") == 0 || strcmp(m_modelNew.prefix.c_str(), "MSO") == 0)
-				// 		return Series::MSODS2000;
-				// 	break;
-				
-				case 5:
-					if(strcmp(m_modelNew.prefix.c_str(), "MSO") == 0)
-						return Series::MSO5000;
-					break;
-				
-				// case 7:
-				// 	if(strcmp(m_modelNew.prefix.c_str(), "DS") == 0 || strcmp(m_modelNew.prefix.c_str(), "MSO") == 0)
-				// 		return Series::MSODS7000;
-				// 	break;
-				
-				// case 8:
-				// 	if(strcmp(m_modelNew.prefix.c_str(), "MSO") == 0)
-				// 		return Series::MSO8000;
-				// 	break;
-				
-				default:
-					break;
+				case 5: return Series::MSO5000;
+				default: break;
 			}
-			LogError("model %s was not recognized\n", m_model.c_str());
-			return Series::UNKNOWN;
 		}
+		else if (m_modelNew.prefix == "DHO")
+		{
+			if (m_modelNew.number < 1000)
+			{
+				switch (m_modelNew.number / 100)
+				{
+					case 8: return Series::DHO800;
+					case 9: return Series::DHO900;
+					default: break;
+				}
+			}
+			else
+			{
+				switch (m_modelNew.number / 1000)
+				{
+					case 1: return Series::DHO1000;
+					case 4: return Series::DHO4000;
+					default: break;
+				}
+			}
+		}
+		LogError("model %s was not recognized\n", m_model.c_str());
+			return Series::UNKNOWN;
 	}();
 }
 
