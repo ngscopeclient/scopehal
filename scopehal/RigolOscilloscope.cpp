@@ -60,6 +60,15 @@ static auto parseDouble(string const &input, const string &fmt = "%lf", double c
 	return parseNumeric<double>(input, fmt, fallback_value);
 }
 
+//TODO: this would make sens to move to some utility library
+template<typename T>
+struct CallOnEOC {
+	T onExit;
+	CallOnEOC(T onExit_) : onExit(onExit_) {}
+	~CallOnEOC() {
+		onExit();
+	}
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
