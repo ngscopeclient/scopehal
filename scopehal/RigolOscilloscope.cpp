@@ -92,7 +92,6 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	LogTrace("RigolOscilloscope: series: %d\n", int(m_series));
 
 	AnalyzeDeviceCapabilities();
-	UpdateDynamicCapabilities();
 
 	for(auto i = 0U; i < m_analogChannelCount; i++)
 	{
@@ -172,7 +171,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	}
 
 	FlushConfigCache();
-
+	
+	UpdateDynamicCapabilities();
 	//make sure all setup commands finish before we proceed
 	m_transport->FlushCommandQueue();
 }
