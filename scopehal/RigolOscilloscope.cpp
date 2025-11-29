@@ -48,6 +48,19 @@
 
 using namespace std;
 
+template<typename T>
+static T parseNumeric(string const &input, const string &fmt, T const &fallback_value = {}) {
+	T output {fallback_value};
+	sscanf(input.c_str(), fmt.c_str(), &output);
+	return output;
+}
+
+static auto parseDouble(string const &input, const string &fmt = "%lf", double const &fallback_value = numeric_limits<double>::quiet_NaN())
+{
+	return parseNumeric<double>(input, fmt, fallback_value);
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
