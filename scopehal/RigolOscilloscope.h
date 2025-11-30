@@ -193,12 +193,9 @@ protected:
 	std::map<size_t, float> m_bankThresholds;
 	std::map<int, bool> m_channelsEnabled;
 	std::vector<std::uint64_t> m_depths;
-	bool m_srateValid;
-	uint64_t m_srate;
-	bool m_mdepthValid;
-	uint64_t m_mdepth;
-	int64_t m_triggerOffset;
-	bool m_triggerOffsetValid;
+	std::optional<uint64_t> m_srate;
+	std::optional<uint64_t> m_mdepth;
+	std::optional<int64_t> m_triggerOffset;
 	std::optional<bool> m_laEnabled;
 
 	// state variables, may alter values during runtime

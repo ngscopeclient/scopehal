@@ -616,8 +616,8 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 				depths.emplace_back(depth/divisor);
 			}
 			m_depths = std::move(depths);
-			m_mdepthValid = false;
-			m_srateValid = false;
+			m_mdepth.reset();
+			m_srate.reset();
 			return;
 		}
 
@@ -733,9 +733,9 @@ void RigolOscilloscope::FlushConfigCache()
 	m_channelBandwidthLimits.clear();
 	m_bankThresholds.clear();
 
-	m_srateValid = false;
-	m_mdepthValid = false;
-	m_triggerOffsetValid = false;
+	m_srate.reset();
+	m_mdepth.reset();
+	m_triggerOffset.reset();
 	m_laEnabled.reset();
 
 	delete m_trigger;
@@ -1983,7 +1983,7 @@ bool RigolOscilloscope::AcquireData()
 
 	// download data for each bank
 
-	m_srateValid = false;
+	m_srate.reset();
 	int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate(); // MSO1000Z returns invalid increment value for digital channels, so we take it from here
 	for(auto bank = banksToDownload.begin(); bank != banksToDownload.end(); ++bank)
 	{
@@ -2286,7 +2286,7 @@ bool RigolOscilloscope::AcquireData()
 void RigolOscilloscope::StartPre() 
 {
 	m_liveMode = false;
-	m_mdepthValid = false; // Memory depth might have been changed on scope
+	m_mdepth.reset(); // Memory depth might have been changed on scope
 	switch (m_series)
 	{
 		case Series::DHO1000:
@@ -2358,7 +2358,7 @@ void RigolOscilloscope::Start()
 			// Limit live mode to one channel setup to prevent grabbing waveforms from to different triggers on seperate channels
 			if(GetEnabledChannelCount()==1)
 			{
-				m_mdepthValid = false;
+				m_mdepth.reset();
 				GetSampleDepth();
 				m_liveMode = (m_mdepth == 1000);
 			}
@@ -2417,7 +2417,7 @@ void RigolOscilloscope::Stop()
 void RigolOscilloscope::ForceTrigger()
 {
 	m_liveMode = false;
-	m_mdepthValid = false; // Memory depth might have been changed on scope
+	m_mdepth.reset(); // Memory depth might have been changed on scope
 	m_triggerOneShot = true;
 	StartPre();
 	switch (m_series)
@@ -2706,10 +2706,10 @@ uint64_t RigolOscilloscope::GetSampleRate()
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(m_srateValid)
-			return m_srate;
+		if(m_srate.has_value())
+			return *m_srate;
 	
-		LogTrace("smaplerate updating, m_srate %" PRIu64 "\n", m_srate);
+		LogTrace("smaplerate updating\n");
 	}
 	// m_transport->SendCommandQueued("*WAI");
 
@@ -2721,8 +2721,7 @@ uint64_t RigolOscilloscope::GetSampleRate()
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_srate = (uint64_t)rate;
-		m_srateValid = true;
-		LogTrace("smaplerate updated, m_srate %" PRIu64 "\n", m_srate);
+		LogTrace("smaplerate updated, m_srate %" PRIu64 "\n", *m_srate);
 		return rate;
 	}
 }
@@ -2731,10 +2730,10 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(m_mdepthValid)
-			return m_mdepth;
+		if(m_mdepth.has_value())
+			return *m_mdepth;
 	
-		LogTrace("mem depth updating, m_mdepth %" PRIu64 "\n", m_mdepth);
+		LogTrace("mem depth updating\n");
 	}
 
 	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?"));
@@ -2746,9 +2745,8 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_mdepth = (uint64_t)depth;
-		m_mdepthValid = true;
-		LogTrace("mem depth updated, m_mdepth %" PRIu64 "\n", m_mdepth);
-		return m_mdepth;
+		LogTrace("mem depth updated, m_mdepth %" PRIu64 "\n", *m_mdepth);
+		return *m_mdepth;
 	}
 }
 
@@ -2873,7 +2871,7 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			}
 			{
 				lock_guard<recursive_mutex> lock(m_cacheMutex);
-				m_srateValid = false; // changing depth and keeping timebase quite often results in chnage of srate
+				m_srate.reset(); // changing depth and keeping timebase quite often results in chnage of srate
 			}
 			break;
 		}
@@ -2886,18 +2884,21 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 	
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_mdepthValid = false;
+		m_mdepth.reset();
 	}
 }
 
 void RigolOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//FIXME, you can set :TIMebase:SCALe
+	// Rigol scopes do not have samplerate controls. Only timebase can be adjusted :TIMebase:SCALe
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_mdepthValid = false;
+		m_mdepth.reset();
 	}
 	double sampletime = GetSampleDepth() / (double)rate;
+	// locally cache current value before we change the timebase,
+	// so w can restore it after th timebase change
+	auto const triggerOffset = GetTriggerOffset();
 	
 	switch (m_series)
 	{
@@ -2957,14 +2958,14 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_srateValid = false;
-		m_mdepthValid = false;
+		m_srate.reset();
+		m_mdepth.reset();
 	}
 	// To prevent trigger offset travelling on Srate change (timebase change),
 	// re-set trigger location, because difference (time) between
 	// our trigger reference point (start of sample buffer) and
 	// scope trigger reference point (mid of the sample buffer) changed.
-	SetTriggerOffset(m_triggerOffset);
+	SetTriggerOffset(triggerOffset);
 	
 }
 
@@ -2982,7 +2983,7 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_triggerOffsetValid = false;
+		m_triggerOffset.reset();
 	}
 
 }
@@ -2991,28 +2992,28 @@ int64_t RigolOscilloscope::GetTriggerOffset()
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(m_triggerOffsetValid)
-			return m_triggerOffset;
+		if(m_triggerOffset.has_value())
+			return *m_triggerOffset;
 	}
 
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(":TIM:MAIN:OFFS?"));
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 	//Result comes back in scientific notation
 	double offsetval;
 	sscanf(reply.c_str(), "%lf", &offsetval);
-	m_triggerOffset = static_cast<int64_t>(round(offsetval * FS_PER_SECOND));
+	auto offset = static_cast<int64_t>(round(offsetval * FS_PER_SECOND));
 
 	//Convert from midpoint to start point
 	int64_t rate = GetSampleRate();
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
-	m_triggerOffset = halfwidth - m_triggerOffset;
 
-	m_triggerOffsetValid = true;
-
-	return m_triggerOffset;	
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_triggerOffset = halfwidth - offset;
+		return *m_triggerOffset;
+	}
 }
 
 bool RigolOscilloscope::HasInterleavingControls()
