@@ -66,6 +66,11 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual float GetChannelOffset(size_t i, size_t stream) override;
 	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual bool IsDigitalThresholdConfigurable() override;
+	virtual float GetDigitalThreshold(size_t channel) override;
+	virtual void SetDigitalThreshold(size_t channel, float level) override;
+	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+	virtual DigitalBank GetDigitalBank(std::size_t channel) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
@@ -131,6 +136,18 @@ protected:
 		// NOTE: If the MATH channel is selected, only the NORMal mode is valid.
 	};
 
+	// Rigol scopes organize digital channels into "PODs" of size 8, we call them banks
+	static constexpr auto DIGITAL_BANK_SIZE = 8;
+
+	bool IsLaEnabled();
+	void LaEnable();
+	void LaDisable();
+
+	// bool IsLaPodEnabled(std::size_t pod);
+	// void LaPodEnable(std::size_t pod);
+	// void LaPodDisable(std::size_t pod);
+
+	std::size_t GetEnabledAnalogChannelCount();
 
 	struct CapturePreamble {
 		CaptureFormat format;
@@ -152,12 +169,19 @@ protected:
 	void AnalyzeDeviceCapabilities();
 	void UpdateDynamicCapabilities(); // capabilities dependent on enabled chanel count
 	std::size_t GetChannelDivisor(); // helper function to get memory depth/sample rate divisor base on current scope state (amount of enabled channels)
+	bool IsChannelAnalog(std::size_t i);
+	bool IsChannelDigital(std::size_t i);
+	std::uint64_t GetPendingWaveformBlockLength(); // extratcs waveform block size from the TMC header at beginnign of each response to :WAV:DATA? command
+	void LogLaNotPresent();
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
 	// hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
+
+	size_t m_digitalChannelCount;
+	std::vector<Oscilloscope::DigitalBank> m_digitalBanks;
 
 	// config cache, values that can be updated whenever needed
 	// all access to these shall be exclusive using `m_cacheMutex`
@@ -166,6 +190,7 @@ protected:
 	std::map<size_t, float> m_channelOffsets;
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, unsigned int> m_channelBandwidthLimits;
+	std::map<size_t, float> m_bankThresholds;
 	std::map<int, bool> m_channelsEnabled;
 	std::vector<std::uint64_t> m_depths;
 	bool m_srateValid;
@@ -174,6 +199,7 @@ protected:
 	uint64_t m_mdepth;
 	int64_t m_triggerOffset;
 	bool m_triggerOffsetValid;
+	std::optional<bool> m_laEnabled;
 
 	// state variables, may alter values during runtime
 	bool m_triggerArmed;

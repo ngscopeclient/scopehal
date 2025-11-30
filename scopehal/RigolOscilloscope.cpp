@@ -123,6 +123,28 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		chan->SetDefaultDisplayName();
 	}
 
+	if (m_digitalChannelCount != 0)
+	{
+		m_digitalBanks.push_back({});
+		for(auto i = 0U; i < m_digitalChannelCount; i++)
+		{
+			//Hardware name of the channel
+			string chname = string("D") + to_string(i);
+	
+			//Color the channels based on Rigol's standard color sequence (yellow-cyan-red-blue)
+			string color = "#66ff00";
+	
+			//Create the channel
+			auto chan = new OscilloscopeChannel(
+				this, chname, color, Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_DIGITAL, m_analogChannelCount + i);
+			m_channels.push_back(chan);
+			if (m_digitalBanks.back().size() == DIGITAL_BANK_SIZE)
+				m_digitalBanks.push_back({});
+			m_digitalBanks.back().push_back(chan);
+			chan->SetDefaultDisplayName();
+		}
+	}
+
 	//Add the external trigger input
 	m_extTrigChannel = new OscilloscopeChannel(
 		this, "EX", "", Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_TRIGGER, m_channels.size());
@@ -296,10 +318,13 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_analogChannelCount = m_modelNew.number % 10;
 			m_bandwidth = m_modelNew.number % 1000 - m_analogChannelCount;
 
+			m_digitalChannelCount = m_modelNew.prefix == "MSO" ? 16 : 0;
+
 			{
 				// Probe 24M memory depth option.
 				// Hacky workaround since DS1000Z does not have a way how to query installed options
 				// Only enable chan 1
+				// TODO: what about LA channels on MSOs?
 				m_transport->SendCommandQueued("CHAN1:DISP 1");
 				m_transport->SendCommandQueued("CHAN2:DISP 0");
 				if(m_analogChannelCount > 2)
@@ -329,6 +354,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 		case Series::MSO5000:
 		{
 			m_analogChannelCount = m_modelNew.number % 10;
+			m_digitalChannelCount = 16;
 			
 			// Hacky workaround since :SYST:OPT:STAT doesn't work properly on some scopes
 			// Only enable chan 1
@@ -390,6 +416,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 		{
 			// - DHO802 (70MHz), DHO804 (70Mhz), DHO812 (100MHz),DHO814 (100MHz)
 			m_analogChannelCount = m_modelNew.number % 10;
+			m_digitalChannelCount = 0;
 			m_bandwidth = m_modelNew.number % 100 / 10 * 100; // 814 -> 14 -> 1 -> 100
 			if(m_bandwidth == 0) m_bandwidth = 70; // Fallback for DHO80x models
 
@@ -406,6 +433,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 		{
 			// - DHO914/DHO914S (125MHz), DHO924/DHO924S (250MHz)
 			m_analogChannelCount = m_modelNew.number % 10;
+			m_digitalChannelCount = 16;
 			m_bandwidth = m_modelNew.number % 100 / 10 * 125; // 914 -> 24 -> 2 -> 250
 
 			m_highDefinition = true;
@@ -421,6 +449,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 		{
 			// - DHO1072 (70MHz), DHO1074 (70MHz), DHO1102 (100MHz), DHO1104 (100MHz), DHO1202 (200MHz), DHO1204 (200MHz)
 			m_analogChannelCount = m_modelNew.number % 10;
+			m_digitalChannelCount = 0;
 			m_bandwidth = m_modelNew.number % 1000 / 10 * 10;
 
 			m_highDefinition = true;
@@ -455,6 +484,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 		{
 			// - DHO1072 (70MHz), DHO1074 (70MHz), DHO1102 (100MHz), DHO1104 (100MHz), DHO1202 (200MHz), DHO1204 (200MHz)
 			m_analogChannelCount = m_modelNew.number % 10;
+			m_digitalChannelCount = 0;
 			m_bandwidth = m_modelNew.number % 1000 / 10 * 10;
 
 			m_highDefinition = true;
@@ -599,12 +629,43 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 }
 
 std::size_t RigolOscilloscope::GetChannelDivisor() {
-	auto divisor = GetEnabledChannelCount();
+	auto divisor = GetEnabledAnalogChannelCount();
+
+	// MSO1000Z:
+	// any active D0 ~  D7 (POD 1) disables CHAN3 and takes the resources
+	// any active D8 ~ D15 (POD 2) disables CHAN4 and takes the resources
+	for (auto d = 0U; d < 8; ++d)
+	{
+		if (IsChannelEnabled(m_analogChannelCount + d))
+		{
+			++divisor;
+			break;
+		}
+	}
+	for (auto d = 0U; d < 8; ++d)
+	{
+		if (IsChannelEnabled(m_analogChannelCount + d + 8))
+		{
+			++divisor;
+			break;
+		}
+	}
+
 	if (divisor <= 0)
 		divisor = 1;
 	else if (divisor >= 3)
 		divisor = 4;
 	return divisor;
+}
+
+bool RigolOscilloscope::IsChannelAnalog(std::size_t i)
+{
+	return i < m_analogChannelCount;
+}
+
+bool RigolOscilloscope::IsChannelDigital(std::size_t i)
+{
+	return m_analogChannelCount <= i and i < m_analogChannelCount + m_digitalChannelCount;
 }
 
 std::optional<RigolOscilloscope::CapturePreamble> RigolOscilloscope::GetCapturePreamble() {
@@ -670,13 +731,180 @@ void RigolOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelsEnabled.clear();
 	m_channelBandwidthLimits.clear();
+	m_bankThresholds.clear();
 
 	m_srateValid = false;
 	m_mdepthValid = false;
 	m_triggerOffsetValid = false;
+	m_laEnabled.reset();
 
 	delete m_trigger;
 	m_trigger = NULL;
+}
+
+std::vector<Oscilloscope::DigitalBank> RigolOscilloscope::GetDigitalBanks()
+{
+	return m_digitalBanks;
+}
+
+Oscilloscope::DigitalBank RigolOscilloscope::GetDigitalBank(std::size_t channel)
+{
+	for (auto &bank : m_digitalBanks)
+		for (auto &bankChannel : bank)
+			if (bankChannel->GetIndex() == channel)
+				return bank;
+	return {};
+}
+
+bool RigolOscilloscope::IsDigitalThresholdConfigurable()
+{
+	return m_digitalChannelCount > 0;
+}
+
+float RigolOscilloscope::GetDigitalThreshold(size_t channel)
+{
+	if (not IsChannelDigital(channel))
+		return 0; //// should we rathger return NaN?
+
+	auto const bankIdx = (channel - m_analogChannelCount) / DIGITAL_BANK_SIZE;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_bankThresholds.find(bankIdx) != m_bankThresholds.end())
+			return m_bankThresholds[bankIdx];
+	}
+	
+	// pods index values start at 1
+	auto const level = parseDouble(m_transport->SendCommandQueuedWithReply(string(":LA:POD") + to_string(bankIdx + 1) + ":THR?"));
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_bankThresholds[bankIdx] = level;
+	}
+
+	return level;
+}
+
+
+void RigolOscilloscope::SetDigitalThreshold(size_t channel, float level)
+{
+	auto const bankIdx = (channel - m_analogChannelCount) / DIGITAL_BANK_SIZE;
+
+	// pods index values start at 1
+	m_transport->SendCommandQueued(string(":LA:POD") + to_string(bankIdx + 1) + ":THR " +  to_string(level));
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_bankThresholds[bankIdx] = level;
+	}
+}
+
+
+size_t RigolOscilloscope::GetEnabledAnalogChannelCount()
+{
+	auto result = 0U;
+	for(auto i = 0U; i < m_analogChannelCount; i++)
+	{
+		if(IsChannelEnabled(i))
+			result++;
+	}
+	return result;
+}
+
+void RigolOscilloscope::LogLaNotPresent()
+{
+	LogError("RigolOscilloscope: LA is not present or not supported (yet) in this device (%s%d%s)", m_modelNew.prefix.c_str(), m_modelNew.number, m_modelNew.suffix.c_str());
+}
+
+bool RigolOscilloscope::IsLaEnabled() {
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_laEnabled.has_value())
+			return *m_laEnabled;
+	}
+
+	bool enabled {};
+	switch (m_series)
+	{
+		case Series::MSODS1000Z:
+		case Series::MSO5000:
+			enabled = Trim(m_transport->SendCommandQueuedWithReply(":LA:STAT?")) == "1";
+			break;
+		case Series::DHO900:
+			enabled = Trim(m_transport->SendCommandQueuedWithReply(":LA:ENAB?")) == "1";
+			break;
+		case Series::DS1000:
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DHO800:
+		case Series::UNKNOWN:
+			LogLaNotPresent();
+			return false;
+	}
+	
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_laEnabled = enabled;
+	}
+	return enabled;
+}
+
+void RigolOscilloscope::LaEnable()
+{
+	if (IsLaEnabled())
+		return;
+
+	switch (m_series)
+	{
+		case Series::MSODS1000Z:
+		case Series::MSO5000:
+			m_transport->SendCommandQueued(":LA:STAT ON");
+			break;
+		case Series::DHO900:
+			m_transport->SendCommandQueued(":LA:ENAB ON");
+			break;
+		case Series::DS1000:
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DHO800:
+		case Series::UNKNOWN:
+			LogLaNotPresent();
+			break;
+	}
+	
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		// we force the cached value refresh in case something caused our request to be ignored
+		m_laEnabled.reset();
+	}
+}
+void RigolOscilloscope::LaDisable()
+{
+	if (not IsLaEnabled())
+		return;
+
+	switch (m_series)
+	{
+		case Series::MSODS1000Z:
+		case Series::MSO5000:
+			m_transport->SendCommandQueued(":LA:STAT OFF");
+			break;
+		case Series::DHO900:
+			m_transport->SendCommandQueued(":LA:ENAB OFF");
+			break;
+		case Series::DS1000:
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DHO800:
+		case Series::UNKNOWN:
+			LogLaNotPresent();
+			break;
+	}
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		// we force the cached value refresh in case something caused our request to be ignored
+		m_laEnabled.reset();
+	}
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
@@ -685,36 +913,119 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//TODO: handle digital channels, for now just claim they're off
-	if(i >= m_analogChannelCount)
-		return false;
-
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
 	}
 
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":DISP?"));
-
+	if (IsChannelAnalog(i))
 	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(reply == "0")
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":DISP?"));
+	
 		{
-			m_channelsEnabled[i] = false;
-			return false;
-		}
-		else
-		{
-			m_channelsEnabled[i] = true;
-			return true;
+			lock_guard<recursive_mutex> lock(m_cacheMutex);
+			if(reply == "0")
+			{
+				m_channelsEnabled[i] = false;
+				return false;
+			}
+			else
+			{
+				m_channelsEnabled[i] = true;
+				return true;
+			}
 		}
 	}
+	else if (IsChannelDigital(i))
+	{
+		if (not IsLaEnabled())
+			return false;
+		
+		bool enabled {};
+		switch (m_series)
+		{
+			case Series::MSODS1000Z:
+			case Series::MSO5000:
+				enabled = Trim(m_transport->SendCommandQueuedWithReply(string(":LA:DISP? ") + m_channels[i]->GetHwname())) == "1";
+				break;
+			case Series::DHO900:
+				enabled = Trim(m_transport->SendCommandQueuedWithReply(string(":LA:DIG:ENAB? ") + m_channels[i]->GetHwname())) == "1";
+				break;
+			case Series::DS1000:
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO800:
+			case Series::UNKNOWN:
+				LogLaNotPresent();
+				return false;
+		}
+	
+		{
+			lock_guard<recursive_mutex> lock(m_cacheMutex);
+			m_channelsEnabled[i] = enabled;
+			return enabled;
+		}
+	}
+	else
+	{
+		return false;
+	}
+	LogError("Channel id %zd is unknown", i);
+	return false;
 }
 
 void RigolOscilloscope::EnableChannel(size_t i)
 {
-	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP ON");
+	//TODO: ignore request when cached value says enabled?
+	if (IsChannelAnalog(i))
+	{
+		if (m_series == Series::MSODS1000Z and m_digitalChannelCount != 0) {
+			// channel 3 can't be enabled when any digital channel from POD1 (D0 ~ D7) is enabled
+			// channel 4 can't be enabled when any digital channel from POD2 (D8 ~ D15) is enabled
+			if (i == 3 or i == 4)
+			{
+				bool bankActive = [&]() -> bool {
+					for (auto idx = m_analogChannelCount + 8 * (i - 3); idx < m_analogChannelCount + 8 * (i - 2); ++idx)
+						if (IsChannelEnabled(idx))
+							return true;
+					return false;
+				}();
+				if (bankActive)
+				{
+					LogWarning("Channel %zd (%s) can't be enabled, because some of colliding digital channels are enabled\n", i, GetChannel(i)->GetDisplayName().c_str());
+					return;
+				}
+			}
+		}
+		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP ON");
+	}
+	else if (IsChannelDigital(i))
+	{
+		LaEnable();
+		switch (m_series)
+		{
+			case Series::MSODS1000Z:
+			case Series::MSO5000:
+				m_transport->SendCommandQueued(":LA:DISP " + m_channels[i]->GetHwname() + ",ON");
+				break;
+			case Series::DHO900:
+				m_transport->SendCommandQueued(":LA:DIG:ENAB " + m_channels[i]->GetHwname() + ",ON");
+				break;
+			case Series::DS1000:
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO800:
+			case Series::UNKNOWN:
+				LogLaNotPresent();
+				return;
+		}
+	}
+	else
+	{
+		LogWarning("Channel with idx %zd not known or does no support enable/disable control\n", i);
+		return;
+	}
 	// invalidate channel enable cache until confirmed on next IsChannelEnabled
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -725,7 +1036,36 @@ void RigolOscilloscope::EnableChannel(size_t i)
 
 void RigolOscilloscope::DisableChannel(size_t i)
 {
-	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP OFF");
+	//TODO: ignore request when cached value says enabled?
+	if (IsChannelAnalog(i))
+		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP OFF");
+	else if (IsChannelDigital(i))
+	{
+		LaEnable();
+		switch (m_series)
+		{
+			case Series::MSODS1000Z:
+			case Series::MSO5000:
+				m_transport->SendCommandQueued(":LA:DISP " + m_channels[i]->GetHwname() + ",OFF");
+				break;
+			case Series::DHO900:
+				m_transport->SendCommandQueued(":LA:DIG:ENAB " + m_channels[i]->GetHwname() + ",OFF");
+				break;
+			case Series::DS1000:
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO800:
+			case Series::UNKNOWN:
+				LogLaNotPresent();
+				return;
+		}
+		
+	}
+	else
+	{
+		LogError("Channel with idx %zd not known or does no support enable/disable control\n", i);
+		return;
+	}
 	// invalidate channel enable cache until confirmed on next IsChannelEnabled
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -747,6 +1087,9 @@ vector<OscilloscopeChannel::CouplingType> RigolOscilloscope::GetAvailableCouplin
 
 OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i)
 {
+	if (not IsChannelAnalog(i))
+		return OscilloscopeChannel::CouplingType::COUPLE_DC_1M; // TODO: what else should we return for DIGITAL non analog channels?
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelCouplings.find(i) != m_channelCouplings.end())
@@ -769,6 +1112,12 @@ OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i
 
 void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
+	if (not IsChannelAnalog(i))
+	{
+		LogError("Channel with idx %zd is not analog channel, only those suport coupling configuration", i);
+		return;
+	}
+
 	bool valid = true;
 	switch(type)
 	{
@@ -785,7 +1134,7 @@ void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupli
 			break;
 
 		default:
-			LogError("Invalid coupling for channel\n");
+			LogError("Invalid coupling %d for channel %zd (%s)\n", type, i, GetChannel(i)->GetDisplayName().c_str());
 			valid = false;
 	}
 
@@ -798,6 +1147,9 @@ void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupli
 
 double RigolOscilloscope::GetChannelAttenuation(size_t i)
 {
+	if (not IsChannelAnalog(i))
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelAttenuations.find(i) != m_channelAttenuations.end())
@@ -819,10 +1171,16 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 
 void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
+	if (not IsChannelAnalog(i))
+	{
+		LogError("Channel with idx %zd is not analog channel, only those suport attenuation configuration", i);
+		return;
+	}
+
+	// TODO: refactor attenuation config to only check value presence in container and then use single command to push the value
 	bool valid = true;
-	switch((
-		int)(atten * 10000 +
-			 0.1))	  //+ 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
+	//+ 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
+	switch((int)(atten * 10000 + 0.1))
 	{
 		case 1:
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PROB 0.0001");
@@ -906,7 +1264,7 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PROB 50000");
 			break;
 		default:
-			LogError("Invalid attenuation for channel\n");
+			LogError("Invalid attenuation %lf for channel %zd (%s)\n", atten, i, GetChannel(i)->GetDisplayName().c_str());
 			valid = false;
 	}
 
@@ -918,8 +1276,11 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 }
 
 // Our requirements: has to be ordered, zero (full BW) position is not important
-vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
+vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t i)
 {
+	if (not IsChannelAnalog(i)) // we assume, only analog channels support BW limmitters
+		return {0};
+
 	switch(m_series)
 	{
 		case Series::MSO5000:
@@ -972,6 +1333,9 @@ vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/
 
 unsigned int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
+	if (not IsChannelAnalog(i))
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
@@ -994,6 +1358,9 @@ unsigned int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	if (not IsChannelAnalog(i))
+		return;
+
 	auto const available_limits = GetChannelBandwidthLimiters(i);
 
 	// `available_limits` is vector of increasing limits (with 0 at the end representing full BW)
@@ -1033,7 +1400,11 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 }
 
 float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
-{
+{	
+	// TODO: what should be the range of digital channel?
+	if (not IsChannelAnalog(i))
+		return 1;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
@@ -1089,6 +1460,10 @@ float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 void RigolOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
+	// only analog channels have adjustable offset
+	if (not IsChannelAnalog(i))
+		return;
+
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_channelVoltageRanges[i] = range;
@@ -1122,6 +1497,9 @@ OscilloscopeChannel* RigolOscilloscope::GetExternalTrigger()
 
 float RigolOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
+	if (not IsChannelAnalog(i))
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -1144,6 +1522,9 @@ float RigolOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 
 void RigolOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
+	if (not IsChannelAnalog(i))
+		return;
+
 	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFFS " + to_string(offset));
 
 	{
@@ -1252,6 +1633,40 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 	}
 }
 
+uint64_t RigolOscilloscope::GetPendingWaveformBlockLength()
+{
+	unsigned char header_size;
+	{
+		array<char, 3> header_size_raw {};
+		m_transport->ReadRawData(2, reinterpret_cast<unsigned char*>(header_size_raw.data()));
+		//LogWarning("Time %f\n", (GetTime() - start));
+
+		if (sscanf(header_size_raw.data(), "#%c", &header_size) != 1)
+			return 0;
+
+		header_size = header_size - '0';
+
+		if(header_size > 12)
+		{
+			header_size = 12;
+		}
+		
+	}
+	
+	array<char,12> header {0};
+	m_transport->ReadRawData(header_size, reinterpret_cast<unsigned char*>(header.data()));
+
+	//Look up the block size
+	//size_t blocksize = end - npoints;
+	//LogDebug("Block size = %zu\n", blocksize);
+	// Block size is provided in bytes, not in points
+	uint64_t header_blocksize_bytes;
+	sscanf(header.data(), "%" PRIu64, &header_blocksize_bytes);
+	LogTrace("Parsed waveform block length %" PRIu64 "\n", header_blocksize_bytes);
+
+	return header_blocksize_bytes;
+}
+
 bool RigolOscilloscope::AcquireData()
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
@@ -1302,7 +1717,11 @@ bool RigolOscilloscope::AcquireData()
 	}
 	vector<unsigned char> temp_buf;
 	temp_buf.resize((m_highDefinition ? (maxpoints * 2) : maxpoints) + 1);
-	map<int, vector<unique_ptr<UniformAnalogWaveform>>> pending_waveforms;
+	map<int, deque<WaveformBase*>> pending_waveforms;
+
+	auto ts_download_start = chrono::steady_clock::now();
+
+	LogTrace("Downloading analog waveforms\n");
 	for(auto channelIdx = 0U; channelIdx < m_analogChannelCount; channelIdx++)
 	{
 		if(!IsChannelEnabled(channelIdx))
@@ -1380,7 +1799,7 @@ bool RigolOscilloscope::AcquireData()
 			continue;
 
 		//Set up the capture we're going to store our data into
-		std::unique_ptr<UniformAnalogWaveform> cap {AllocateAnalogWaveform(m_nickname + "." + GetChannel(channelIdx)->GetHwname())};
+		auto cap {AllocateAnalogWaveform(m_nickname + "." + GetChannel(channelIdx)->GetHwname())};
 		cap->clear();
 		cap->Reserve(npoints);
 		cap->m_timescale = fs_per_sample;
@@ -1388,10 +1807,19 @@ bool RigolOscilloscope::AcquireData()
 		cap->m_startTimestamp = floor(now);
 		cap->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
 
+		// when waveforms is not transferred to pending_waveforms, move it back to the pool to prevent memory leak
+		auto waveformCleanup = CallOnEOC([&](){
+			if (cap)
+			{
+				AddWaveformToAnalogPool(cap);
+				cap = nullptr;
+			}
+		});
+
 		ChannelsDownloadStatusUpdate(channelIdx, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
 
-		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time! (Unless you have a MSO5)
-		auto ts_start = chrono::steady_clock::now();
+		// Downloading the waveform is a pain in the butt, because most series can download only limitted amount of points at a time! (Unless you have a MSO5)
+		auto ts_channel_download_start = chrono::steady_clock::now();
 		for(size_t npoint = 0; npoint < npoints;)
 		{
 
@@ -1445,46 +1873,13 @@ bool RigolOscilloscope::AcquireData()
 
 			//Read block header, should be maximally 11 long on MSO5 scope with >= 100 MPoints
 			
-			unsigned char header_size;
-			{
-				array<char, 3> header_size_raw {};
-				m_transport->ReadRawData(2, reinterpret_cast<unsigned char*>(header_size_raw.data()));
-				//LogWarning("Time %f\n", (GetTime() - start));
-	
-				sscanf(header_size_raw.data(), "#%c", &header_size);
-				//TODO: check sscanf return value for parsing errors
-				header_size = header_size - '0';
-	
-				if(header_size > 12)
-				{
-					header_size = 12;
-				}
-				
-			}
-			
-			array<char,12> header {0};
-			m_transport->ReadRawData(header_size, reinterpret_cast<unsigned char*>(header.data()));
-
-			//Look up the block size
-			//size_t blocksize = end - npoints;
-			//LogDebug("Block size = %zu\n", blocksize);
-			// Block size is provided in bytes, not in points
-			size_t header_blocksize_bytes;
-			sscanf(header.data(), "%zu", &header_blocksize_bytes);
-			//TODO: check sscanf return value for parsing errors
-			//LogDebug("Header block size = %zu\n", header_blocksize);
+			auto header_blocksize_bytes = GetPendingWaveformBlockLength();
 
 			if(header_blocksize_bytes == 0)
 			{
 				LogWarning("Ran out of data after %zu points\n", npoint);
 				unsigned char sink;
 				m_transport->ReadRawData(1, &sink); //discard the trailing newline
-
-				// If this happened after zero samples, free the waveform so it doesn't leak
-				if(npoint == 0)
-				{
-					AddWaveformToAnalogPool(cap.release());
-				}
 				break;
 			}
 
@@ -1513,7 +1908,7 @@ bool RigolOscilloscope::AcquireData()
 
 
 			double ydelta = yorigin + yreference;
-			cap->Resize(cap->m_samples.size() + header_blocksize);
+			cap->Resize(cap->size() + header_blocksize);
 			cap->PrepareForCpuAccess();
 
 			for(size_t j = 0; j < header_blocksize; j++)
@@ -1534,6 +1929,7 @@ bool RigolOscilloscope::AcquireData()
 					
 					default:
 						sample = (static_cast<float>(raw_sample) - ydelta) * yincrement;
+						// DS/MSO1000Z manual says (0x8E - YORigin - YREFerence) x YINCrement
 				}
 				//LogDebug("V = %.3f, raw=%d, delta=%f, inc=%f\n", v, raw_sample, ydelta, yincrement);
 			}
@@ -1542,16 +1938,283 @@ bool RigolOscilloscope::AcquireData()
 			npoint += header_blocksize;
 		}
 
-		auto ts_end = chrono::steady_clock::now();
-		LogTrace("download took %ld ms\n", chrono::duration_cast<chrono::milliseconds>(ts_end - ts_start).count());
+		auto ts_channel_download_end = chrono::steady_clock::now();
+		LogTrace("Channel %s download took %ld ms\n", GetChannel(channelIdx)->GetDisplayName().c_str(), chrono::duration_cast<chrono::milliseconds>(ts_channel_download_end - ts_channel_download_start).count());
 
 		// Notify about end of download for this channel
 		ChannelsDownloadStatusUpdate(channelIdx, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 
-		//Done, update the data
-		if(cap)
-			pending_waveforms[channelIdx].push_back(std::move(cap));
+		pending_waveforms[channelIdx].push_back(cap);
+		cap = nullptr; // we have to clean the ptr, otherwise the waveformCleanup will move it back to the pool
 	}
+
+	// download digital channel data (if any)
+	LogTrace("Downloading digital waveforms\n");
+	
+	// put active channels into their pods, makes the extration easier
+	struct DigitalChannelCapture {
+		InstrumentChannel* metadata;
+		SparseDigitalWaveform* capture;
+
+		DigitalChannelCapture(InstrumentChannel* channel_, SparseDigitalWaveform *capture_) :
+			metadata(channel_),
+			capture{capture_} {}
+		};
+	map<size_t, vector<DigitalChannelCapture>> banksToDownload;
+	
+	for(auto channelIdx = 0U; channelIdx < m_digitalChannelCount; channelIdx++)
+	{
+		if(!IsChannelEnabled(m_analogChannelCount + channelIdx))
+			continue;
+		auto const bankIdx = channelIdx / DIGITAL_BANK_SIZE;
+		auto capture {AllocateDigitalWaveform(m_nickname + "." + GetChannel(channelIdx)->GetHwname())};
+		capture->clear();
+		// capture->Reserve(npoints); // as we don't know the necessary size, the ubffer will grow on demand (still in blocks)
+		// capture->m_timescale = // will be udapted later
+		capture->m_triggerPhase = 0;
+		capture->m_startTimestamp = floor(now);
+		capture->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
+
+		if (auto bank = banksToDownload.find(bankIdx); bank != banksToDownload.end())
+			bank->second.emplace_back(GetChannel(channelIdx + m_analogChannelCount), capture);
+		else
+			banksToDownload[bankIdx] = {{GetChannel(channelIdx + m_analogChannelCount), capture}};
+	}
+
+	// download data for each bank
+
+	m_srateValid = false;
+	int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate(); // MSO1000Z returns invalid increment value for digital channels, so we take it from here
+	for(auto bank = banksToDownload.begin(); bank != banksToDownload.end(); ++bank)
+	{
+		auto const bankIdx = bank->first;
+		auto & bankChannels = bank->second;
+
+		// when some waveforms are not transferred to pending_waveforms, move them back to the pool to prevent memory leak
+		auto waveformCleanup = CallOnEOC([&](){
+			for (auto& channel : bankChannels)
+				if (channel.capture)
+				{
+					AddWaveformToAnalogPool(channel.capture);
+					channel.capture = nullptr;
+				}
+		});
+
+		struct ReleaseWaveforms {
+			vector<DigitalChannelCapture> &bankChannels;
+			~ReleaseWaveforms() {
+				
+			}
+		};
+
+		// we set the source to the lowest channel in the POD(bank), could be any
+		m_transport->SendCommandQueued(string("WAV:SOUR ") + m_channels[m_analogChannelCount + (bankIdx * DIGITAL_BANK_SIZE)]->GetHwname()); 
+
+		auto preamble = GetCapturePreamble();
+		if (not preamble.has_value())
+			continue;
+
+		npoints = preamble->npoints;
+		//If we have zero points in the reply, skip reading data from this bank
+		if(npoints == 0)
+			continue;
+
+		switch (m_series) {
+			case Series::MSODS1000Z:
+			 	// MSO1000Z return weirdly scaled xincrement values for digital channels (25 or 50 times higher)
+				break;
+			case Series::MSO5000:
+			case Series::DHO900:
+			{
+				//TODO: check that these series respond with meaningfule data in digital chanel preamble
+				if(preamble->sec_per_sample == 0)
+				{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+					LogWarning("Got null preamble:sec_per_sample value from the scope, ignoring this waveform.\n");
+					continue;
+				}
+				fs_per_sample = preamble->sec_per_sample; // prefer value from preamble rather than one obtained from GetSamplerate()
+				break;
+			}
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO800:
+			case Series::DS1000:
+			case Series::UNKNOWN:
+				LogLaNotPresent();
+				return false;
+		}
+
+		for (auto& channel : bankChannels)
+		{
+			channel.capture->m_timescale = fs_per_sample;
+			LogTrace("%s m_timescale %" PRIi64 "\n", channel.metadata->GetDisplayName().c_str(), channel.capture->m_timescale);
+			ChannelsDownloadStatusUpdate(channel.metadata->GetIndex(), InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
+		}
+
+		// Downloading the waveform is a pain in the butt, because most series can download only limitted amount of points at a time! (Unless you have a MSO5)
+		auto ts_bank_download_start = chrono::steady_clock::now();
+		for(size_t npoint = 0; npoint < npoints;)
+		{
+			switch (m_series) {
+				break;
+				
+				case Series::MSODS1000Z:
+				{
+					// specify block sample range
+					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint+1));	//ONE based indexing WTF
+					m_transport->SendCommandQueued(string("WAV:STOP ") + to_string(min(npoint + maxpoints, npoints)));	//Here it is zero based, so it gets from 1-1000
+					// m_transport->SendCommandQueued("*WAI"); // looks unnecessary
+
+					//Ask for the data block
+					m_transport->SendCommandQueued("WAV:DATA?");
+				} break;
+
+				
+				case Series::MSO5000:
+					//Ask for the data block
+					m_transport->SendCommandQueued("*WAI");
+					m_transport->SendCommandQueued("WAV:DATA?");
+					break;
+					
+				case Series::DHO900:
+				{
+					//Ask for the data
+					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint + 1));	//ONE based indexing WTF
+					size_t end = npoint + maxpoints;
+					if(end > npoints)
+						end = npoints;
+					m_transport->SendCommandQueued(
+						string("WAV:STOP ") + to_string(end));	  //Here it is zero based, so it gets from 1-1000
+						
+					//Ask for the data block
+					m_transport->SendCommandQueued("WAV:DATA?");
+					break;
+				}
+				
+				case Series::DHO1000:
+				case Series::DHO4000:
+				case Series::DHO800:
+				case Series::DS1000:
+				case Series::UNKNOWN:
+					LogError("RigolOscilloscope: unknown model, invalid state!\n");
+					return false;
+			}
+
+			m_transport->FlushCommandQueue();
+
+			//Read block header, should be maximally 11 long on MSO5 scope with >= 100 MPoints
+			
+			auto header_blocksize_bytes = GetPendingWaveformBlockLength();
+
+			if(header_blocksize_bytes == 0)
+			{
+				LogWarning("Ran out of data after %zu points\n", npoint);
+				unsigned char sink;
+				m_transport->ReadRawData(1, &sink); //discard the trailing newline
+
+				// If this happened after zero samples, free the waveform so it doesn't leak
+				if(npoint == 0)
+					for (auto& channel : bankChannels)
+					{
+						AddWaveformToAnalogPool(channel.capture);
+						channel.capture = nullptr;
+					}
+				break;
+			}
+
+			auto header_blocksize = header_blocksize_bytes;
+
+			size_t bytesToRead = header_blocksize_bytes + 1; //trailing newline after data block
+			auto downloadCallback = [&bankChannels, this, npoint, npoints, bytesToRead] (float progress) {
+				/* we get the percentage of this particular download; convert this into linear percentage across all chunks */
+				// TODO: check taht DHO9000 also packs groups of 8 digital channels (pods) into bytes
+				float bytes_progress = npoint + progress * bytesToRead;
+				float bytes_total = npoints;
+				// LogTrace("download progress %5.3f\n", bytes_progress / bytes_total);
+				// Update all active channels in this bank
+				auto totalProgress = bytes_progress / bytes_total;
+				LogDebug("Updating digital channels download progress to %5.3f\n", totalProgress);
+				for (auto const& channel : bankChannels)
+					ChannelsDownloadStatusUpdate(channel.metadata->GetIndex(), InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, totalProgress);
+			};
+			m_transport->ReadRawData(bytesToRead, temp_buf.data(), downloadCallback);
+			downloadCallback(1);
+			// in case the transport did not call the progress callback (e.g. ScpiLxi), call it manually al least once after the transport finishes
+
+			// extract individual channels from the downloaded data
+			// raw data are samples with constant samplerate, but we use Sparse waveform for digital channels (to save resources)
+			// thus while extzracting the data, we only record level changes
+			for (auto const& channel : bankChannels)
+			{
+				auto& cap = channel.capture;
+				auto samplesStored = cap->size();
+				cap->Resize(samplesStored + header_blocksize); // in case we have alternating 010101... sequence, otehrwise we will use less samples and shrink afterwards
+				cap->PrepareForCpuAccess();
+
+				uint8_t const mask = 1 << ((channel.metadata->GetIndex() - m_analogChannelCount) % DIGITAL_BANK_SIZE);
+
+				if (samplesStored == 0) {
+					// not a single sample in the capture buffer yet
+					// we push the first one unconditionally, and we need to have there at leqst one for following deduplication process
+					cap->m_samples[samplesStored] = temp_buf[0] & mask;
+					cap->m_durations[samplesStored] = 1;
+					cap->m_offsets[samplesStored] = 0;
+					++samplesStored;
+				}
+
+				auto lastValue = cap->m_samples[samplesStored - 1];
+				auto *lastDuration = &cap->m_durations[samplesStored - 1];
+	
+				for(size_t j = 1U; j < header_blocksize; j++)
+				{
+					bool currentValue = temp_buf[j] & mask;
+					if (currentValue == lastValue)
+						++(*lastDuration); // bit values stayed the same
+					else
+					{	// bit value changed, create new samples with current value
+						cap->m_samples[samplesStored] = currentValue;
+						// lastOffset = cap->m_offsets[samplesStored] = lastOffset + *lastDuration;
+						cap->m_offsets[samplesStored] = npoint + j;
+						cap->m_durations[samplesStored] = 1;
+						lastDuration = &cap->m_durations[samplesStored];
+						lastValue = currentValue;
+						++samplesStored;
+					}
+	
+				}
+				cap->Resize(samplesStored);
+				cap->MarkSamplesModifiedFromCpu();
+			}
+
+			npoint += header_blocksize;
+		}
+
+		auto ts_bank_download_end = chrono::steady_clock::now();
+		LogTrace("Digital bank %zd download took %ld ms\n", bankIdx, chrono::duration_cast<chrono::milliseconds>(ts_bank_download_end - ts_bank_download_start).count());
+
+		// download finished
+		for (auto& channel : bankChannels)
+		{
+			ChannelsDownloadStatusUpdate(channel.metadata->GetIndex(), InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+			{	// workaround for https://github.com/ngscopeclient/scopehal-apps/issues/919
+				auto samples = channel.capture->size();
+				// add out dummy sample
+				channel.capture->Resize(++samples);
+				channel.capture->m_samples[samples - 1] = channel.capture->m_samples[samples - 2];
+				channel.capture->m_offsets[samples - 1] = channel.capture->m_offsets[samples - 2] + channel.capture->m_durations[samples - 2];
+				channel.capture->m_durations[samples - 1] = 0;
+			}
+			channel.capture->m_samples.shrink_to_fit();
+			channel.capture->m_offsets.shrink_to_fit();
+			channel.capture->m_durations.shrink_to_fit();
+			channel.capture->MarkModifiedFromCpu();
+			pending_waveforms[channel.metadata->GetIndex()].push_back(channel.capture);
+			channel.capture = nullptr; // we have to clean the ptr, otherwise the waveformCleanup will move it back to the pool
+		}
+	}
+
+	auto ts_download_end = chrono::steady_clock::now();
+	LogTrace("Whole download took %ld ms\n", chrono::duration_cast<chrono::milliseconds>(ts_download_end - ts_download_start).count());
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	{
@@ -1560,13 +2223,21 @@ bool RigolOscilloscope::AcquireData()
 		for(size_t i = 0; i < num_pending; i++)
 		{
 			SequenceSet s;
-			for(size_t j = 0; j < m_analogChannelCount; j++)
+			// move all captures to the set
+			for(size_t j = 0; j < m_analogChannelCount + m_digitalChannelCount; j++)
 			{
-				if(pending_waveforms.count(j) > 0)
-					s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i].release();
+				if(auto waveform = pending_waveforms.find(j); waveform != pending_waveforms.end())
+				{
+					s[GetOscilloscopeChannel(j)] = waveform->second.front();
+					waveform->second.pop_front();
+					if (waveform->second.empty())
+						pending_waveforms.erase(waveform);
+				}
 			}
 			m_pendingWaveforms.push_back(s);
 		}
+		if (not pending_waveforms.empty())
+			LogError("pending_waveforms resource management errorl, pending_waveforms should have been amepty now!\n");
 	}
 
 	//Clean up
