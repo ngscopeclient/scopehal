@@ -32,9 +32,6 @@
 #include "EdgeTrigger.h"
 
 #include <cinttypes>
-#include <cstdint>
-#include <memory>
-#include <string>
 
 #ifdef _WIN32
 #include <chrono>
