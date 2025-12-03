@@ -2037,7 +2037,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	bool analogEnabled[MAX_ANALOG] = {false};
 	bool digitalEnabled[MAX_DIGITAL] = {false};
 	bool anyDigitalEnabled = false;
-	bool anyAnalogEnabled = true;
+	bool anyAnalogEnabled = false;
 	double* pwtime = NULL;
 	char tmp[128];
 
