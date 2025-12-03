@@ -1,0 +1,3349 @@
+/***********************************************************************************************************************
+*                                                                                                                      *
+* libscopehal                                                                                                          *
+*                                                                                                                      *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* All rights reserved.                                                                                                 *
+*                                                                                                                      *
+* Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
+* following conditions are met:                                                                                        *
+*                                                                                                                      *
+*    * Redistributions of source code must retain the above copyright notice, this list of conditions, and the         *
+*      following disclaimer.                                                                                           *
+*                                                                                                                      *
+*    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the       *
+*      following disclaimer in the documentation and/or other materials provided with the distribution.                *
+*                                                                                                                      *
+*    * Neither the name of the author nor the names of any contributors may be used to endorse or promote products     *
+*      derived from this software without specific prior written permission.                                           *
+*                                                                                                                      *
+* THIS SOFTWARE IS PROVIDED BY THE AUTHORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED   *
+* TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL *
+* THE AUTHORS BE HELD LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES        *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR       *
+* BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE       *
+* POSSIBILITY OF SUCH DAMAGE.                                                                                          *
+*                                                                                                                      *
+***********************************************************************************************************************/
+
+/*
+ * Generic Magnova scope driver. Currently supports Batronix BMO models.
+ */
+
+#include "scopehal.h"
+#include "MagnovaOscilloscope.h"
+#include "base64.h"
+
+#include "DropoutTrigger.h"
+#include "EdgeTrigger.h"
+#include "PulseWidthTrigger.h"
+#include "RuntTrigger.h"
+#include "SlewRateTrigger.h"
+#include "UartTrigger.h"
+#include "WindowTrigger.h"
+
+#include <locale>
+#include <stdarg.h>
+#include <omp.h>
+#include <thread>
+#include <chrono>
+#include <cinttypes>
+
+using namespace std;
+
+static const struct
+{
+	const char* name;
+	float val;
+} c_sds2000xp_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
+
+static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
+static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
+static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+MagnovaOscilloscope::MagnovaOscilloscope(SCPITransport* transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
+	, m_digitalChannelCount(0)
+	, m_hasLA(false)
+	, m_hasDVM(false)
+	, m_hasFunctionGen(false)
+	, m_hasFastSampleRate(false)
+	, m_memoryDepthOption(0)
+	, m_hasI2cTrigger(false)
+	, m_hasSpiTrigger(false)
+	, m_hasUartTrigger(false)
+	, m_maxBandwidth(10000)
+	, m_triggerArmed(false)
+	, m_triggerOneShot(false)
+	, m_sampleRateValid(false)
+	, m_sampleRate(1)
+	, m_memoryDepthValid(false)
+	, m_memoryDepth(1)
+	, m_triggerOffsetValid(false)
+	, m_triggerOffset(0)
+{
+	//standard initialization
+	FlushConfigCache();
+	IdentifyHardware();
+	DetectBandwidth();
+	DetectAnalogChannels();
+	DetectOptions();
+	SharedCtorInit();
+
+	//Figure out if scope is in low or high bit depth mode so we can download waveforms with the correct format
+	GetADCMode(0);
+}
+
+string MagnovaOscilloscope::converse(const char* fmt, ...)
+{
+	string ret;
+	char opString[128];
+	va_list va;
+	va_start(va, fmt);
+	vsnprintf(opString, sizeof(opString), fmt, va);
+	va_end(va);
+
+	ret = m_transport->SendCommandQueuedWithReply(opString, false);
+	if(ret.length() == 0)
+		ret = m_transport->ReadReply(); // Sometimes the Magnova returns en empty string and then the actual reply
+	return ret;
+}
+
+void MagnovaOscilloscope::sendOnly(const char* fmt, ...)
+{
+	char opString[128];
+	va_list va;
+
+	va_start(va, fmt);
+	vsnprintf(opString, sizeof(opString), fmt, va);
+	va_end(va);
+
+	m_transport->SendCommandQueued(opString);
+}
+
+void MagnovaOscilloscope::flush()
+{
+	m_transport->ReadReply();
+}
+
+void MagnovaOscilloscope::flushWaveformData()
+{	// Read any pending waveform data until we get the double 0x0a end marker
+	uint8_t tmp;
+	while(true)
+	{
+		size_t avaiable = m_transport->ReadRawData(1, &tmp);
+		if(!avaiable) break;
+		if(tmp == 0x0a)
+		{
+			avaiable = m_transport->ReadRawData(1, &tmp);
+			if(!avaiable) break;
+			if(tmp == 0x0a) break;
+		}
+	}
+	m_transport->FlushRXBuffer();
+}
+
+void MagnovaOscilloscope::SharedCtorInit()
+{
+	//Add the external trigger input
+	m_extTrigChannel =
+		new OscilloscopeChannel(
+			this,
+			"EX",
+			"",
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_TRIGGER,
+			m_channels.size());
+	m_channels.push_back(m_extTrigChannel);
+
+	//Add the function generator output
+	if(m_hasFunctionGen)
+	{
+		//TODO: this is stupid, it shares the same name as our scope input!
+		//Is this going to break anything??
+		m_awgChannel = new FunctionGeneratorChannel(this, "C1", "#808080", m_channels.size());
+		m_channels.push_back(m_awgChannel);
+		m_awgChannel->SetDisplayName("AWG");
+	}
+	else
+		m_awgChannel = nullptr;
+
+	//Clear the state-change register to we get rid of any history we don't care about
+	PollTrigger();
+
+	//Enable deduplication for vertical axis commands once we know what we're dealing with
+	m_transport->DeduplicateCommand("OFFSET");
+	m_transport->DeduplicateCommand("SCALE");
+}
+
+void MagnovaOscilloscope::ParseFirmwareVersion()
+{
+	//Check if version requires size workaround (1.3.9R6 and older)
+	m_fwMajorVersion = 0;
+	m_fwMinorVersion = 0;
+	m_fwPatchVersion = 0;
+
+	sscanf(m_fwVersion.c_str(), "%d.%d.%d",
+		&m_fwMajorVersion,
+		&m_fwMinorVersion,
+		&m_fwPatchVersion);
+	LogDebug("Found version %d.%d.%d\n",m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion);
+}
+
+void MagnovaOscilloscope::IdentifyHardware()
+{
+	//Ask for the ID
+	string reply = converse("*IDN?");
+	char vendor[128] = "";
+	char model[128] = "";
+	char serial[128] = "";
+	char version[128] = "";
+	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+	{
+		LogError("Bad IDN response %s\n", reply.c_str());
+		return;
+	}
+	m_vendor = vendor;
+	m_model = model;
+	m_serial = serial;
+	m_fwVersion = version;
+
+	//Look up model info
+	m_modelid = MODEL_UNKNOWN;
+
+	if(m_vendor.compare("Batronix") == 0)
+	{
+		if(m_model.compare("Magnova") == 0)
+		{
+			m_modelid = MODEL_MAGNOVA_BMO;
+			ParseFirmwareVersion();
+		}
+		else
+		{
+			LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
+				m_model.c_str());
+		}
+		// TODO
+		// Only 5 ms for newer models
+		//	m_transport->EnableRateLimiting(chrono::milliseconds(5));
+	}
+	else
+	{
+		LogWarning("Vendor \"%s\" is unknown\n", m_vendor.c_str());
+	}
+}
+
+void MagnovaOscilloscope::DetectBandwidth()
+{
+	m_maxBandwidth = 0;
+	switch(m_modelid)
+	{
+		case MODEL_MAGNOVA_BMO:
+			m_maxBandwidth = 350;
+			break;
+		default:
+			LogWarning("No bandwidth detected for model \"%s\".\n", m_vendor.c_str());
+			break;
+	}
+}
+
+void MagnovaOscilloscope::DetectOptions()
+{	// No OPT command for now on Magnova
+	// string options = converse("*OPT?");
+	m_hasFunctionGen = true;
+	m_hasLA = true;
+}
+
+/**
+	@brief Creates digital channels for the oscilloscope
+ */
+
+void MagnovaOscilloscope::AddDigitalChannels(unsigned int count)
+{
+	m_digitalChannelCount = count;
+	m_analogAndDigitalChannelCount = m_analogChannelCount + m_digitalChannelCount;
+	m_digitalChannelBase = m_channels.size();
+
+	char chn[32];
+	for(unsigned int i = 0; i < count; i++)
+	{
+		snprintf(chn, sizeof(chn), "D%u", i);
+		auto chan = new OscilloscopeChannel(
+			this,
+			chn,
+			GetDefaultChannelColor(m_channels.size()),
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			m_channels.size());
+		m_channels.push_back(chan);
+		m_digitalChannels.push_back(chan);
+	}
+}
+
+/**
+	@brief Figures out how many analog channels we have, and add them to the device
+
+ */
+void MagnovaOscilloscope::DetectAnalogChannels()
+{	// 4 Channels on Magnova scopes
+	int nchans = 4;
+	for(int i = 0; i < nchans; i++)
+	{
+		//Hardware name of the channel
+		string chname = string("CH") + to_string(i+1);
+
+		//Color the channels based on Magnova standard color sequence
+		//yellow-pink-cyan-green-lightgreen
+		string color = "#ffffff";
+		switch(i % 4)
+		{
+			case 0:
+				color = "#fbff00ff";
+				break;
+
+			case 1:
+				color = "#f33404ff";
+				break;
+
+			case 2:
+				color = "#0077ffff";
+				break;
+
+			case 3:
+				color = "#04f810ff";
+				break;
+		}
+
+		//Create the channel
+		m_channels.push_back(
+			new OscilloscopeChannel(
+				this,
+				chname,
+				color,
+				Unit(Unit::UNIT_FS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_ANALOG,
+				i));
+	}
+	m_analogChannelCount = nchans;
+	m_analogAndDigitalChannelCount = m_analogChannelCount + m_digitalChannelCount;
+}
+
+MagnovaOscilloscope::~MagnovaOscilloscope()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Device information
+
+string MagnovaOscilloscope::GetDriverNameInternal()
+{
+	return "magnova";
+}
+
+OscilloscopeChannel* MagnovaOscilloscope::GetExternalTrigger()
+{
+	return m_extTrigChannel;
+}
+
+void MagnovaOscilloscope::FlushConfigCache()
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	if(m_trigger)
+		delete m_trigger;
+	m_trigger = NULL;
+
+	m_channelVoltageRanges.clear();
+	m_channelOffsets.clear();
+	m_channelsEnabled.clear();
+	m_channelDeskew.clear();
+	m_channelDigitalThresholds.clear();
+	m_probeIsActive.clear();
+	m_sampleRateValid = false;
+	m_memoryDepthValid = false;
+	m_triggerOffsetValid = false;
+	m_meterModeValid = false;
+	m_awgEnabled.clear();
+	m_awgDutyCycle.clear();
+	m_awgRange.clear();
+	m_awgOffset.clear();
+	m_awgFrequency.clear();
+	m_awgShape.clear();
+	m_awgImpedance.clear();
+	m_adcModeValid = false;
+
+	//Clear cached display name of all channels
+	for(auto c : m_channels)
+	{
+		if(GetInstrumentTypesForChannel(c->GetIndex()) & Instrument::INST_OSCILLOSCOPE)
+			c->ClearCachedDisplayName();
+	}
+}
+
+/**
+	@brief See what measurement capabilities we have
+ */
+unsigned int MagnovaOscilloscope::GetMeasurementTypes()
+{
+	unsigned int type = 0;
+	return type;
+}
+
+/**
+	@brief See what features we have
+ */
+unsigned int MagnovaOscilloscope::GetInstrumentTypes() const
+{
+	unsigned int type = INST_OSCILLOSCOPE;
+	if(m_hasFunctionGen)
+		type |= INST_FUNCTION;
+	return type;
+}
+
+uint32_t MagnovaOscilloscope::GetInstrumentTypesForChannel(size_t i) const
+{
+	if(m_awgChannel && (m_awgChannel->GetIndex() == i) )
+		return Instrument::INST_FUNCTION;
+
+	//If we get here, it's an oscilloscope channel
+	return Instrument::INST_OSCILLOSCOPE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Channel configuration
+
+bool MagnovaOscilloscope::IsChannelEnabled(size_t i)
+{
+	//ext trigger should never be displayed
+	if(i == m_extTrigChannel->GetIndex())
+		return false;
+
+	//Early-out if status is in cache
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+			return m_channelsEnabled[i];
+	}
+
+	//Analog
+	if(i < m_analogChannelCount)
+	{
+		//See if the channel is enabled, hide it if not
+		string reply;
+
+		reply = converse(":CHAN%zu:STAT?", i + 1);
+		{
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
+		}
+	}
+	else if(i < m_analogAndDigitalChannelCount)
+	{
+		//Digital
+
+		//See if the channel is on (digital channel numbers are 0 based)
+		size_t nchan = i - m_analogChannelCount;
+		string str = converse(":DIG%zu:STAT?", nchan);
+
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		// OFF can bee "SUPPORT_OFF" if all digital channels are off
+		m_channelsEnabled[i] = (str == "ON") ? true : false;
+	}
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	return m_channelsEnabled[i];
+}
+
+void MagnovaOscilloscope::EnableChannel(size_t i)
+{
+	bool wasInterleaving = IsInterleaving();
+
+	//No need to lock the main mutex since sendOnly now pushes to the queue
+
+	//If this is an analog channel, just toggle it
+	if(i < m_analogChannelCount)
+	{
+		sendOnly(":CHAN%zu:STAT ON", i + 1);
+	}
+	else if(i < m_analogAndDigitalChannelCount)
+	{
+		//Digital channel (digital channel numbers are 0 based)
+		sendOnly(":DIG%d:STAT ON", i - m_analogChannelCount);
+	}
+	else if(i == m_extTrigChannel->GetIndex())
+	{
+		//Trigger can't be enabled
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelsEnabled[i] = true;
+
+	//Sample rate and memory depth can change if interleaving state changed
+	if(IsInterleaving() != wasInterleaving)
+	{
+		m_memoryDepthValid = false;
+		m_sampleRateValid = false;
+	}
+}
+
+bool MagnovaOscilloscope::CanEnableChannel(size_t i)
+{
+	// Can enable all channels except trigger
+	return !(i == m_extTrigChannel->GetIndex());
+}
+
+void MagnovaOscilloscope::DisableChannel(size_t i)
+{
+	bool wasInterleaving = IsInterleaving();
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelsEnabled[i] = false;
+	}
+
+	if(i < m_analogChannelCount)
+	{
+		sendOnly(":CHAN%zu:STAT OFF", i + 1);
+	}
+	else if(i < m_analogAndDigitalChannelCount)
+	{
+		//Digital channel
+
+		//Disable this channel (digital channel numbers are 0 based)
+		sendOnly(":DIG%zu:STAT OFF", i - m_analogChannelCount);
+	}
+	else if(i == m_extTrigChannel->GetIndex())
+	{
+		//Trigger can't be enabled
+	}
+
+	//Sample rate and memory depth can change if interleaving state changed
+	if(IsInterleaving() != wasInterleaving)
+	{
+		m_memoryDepthValid = false;
+		m_sampleRateValid = false;
+	}
+}
+
+vector<OscilloscopeChannel::CouplingType> MagnovaOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_MAGNOVA_BMO:
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
+			ret.push_back(OscilloscopeChannel::COUPLE_GND);
+			break;
+
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+	return ret;
+}
+
+OscilloscopeChannel::CouplingType MagnovaOscilloscope::GetChannelCoupling(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+
+	string replyType;
+	string replyImp;
+
+	m_probeIsActive[i] = false;
+
+	replyType = Trim(converse(":CHAN%zu:COUP?", i + 1).substr(0, 2));
+	replyImp = Trim(converse(":CHAN%zu:TERM?", i + 1).substr(0, 2));
+
+	if(replyType == "AC")
+		return (replyImp.find("ON") == 0) ? OscilloscopeChannel::COUPLE_AC_50 : OscilloscopeChannel::COUPLE_AC_1M;
+	else if(replyType == "DC")
+		return (replyImp.find("ON") == 0) ? OscilloscopeChannel::COUPLE_DC_50 : OscilloscopeChannel::COUPLE_DC_1M;
+	else if(replyType == "GN")
+		return OscilloscopeChannel::COUPLE_GND;
+
+	//invalid
+	LogWarning("MagnovaOscilloscope::GetChannelCoupling got invalid coupling [%s] [%s]\n",
+		replyType.c_str(),
+		replyImp.c_str());
+	return OscilloscopeChannel::COUPLE_SYNTHETIC;
+}
+
+void MagnovaOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
+{
+	if(i >= m_analogChannelCount)
+		return;
+
+	//Get the old coupling value first.
+	//This ensures that m_probeIsActive[i] is valid
+	GetChannelCoupling(i);
+
+	//If we have an active probe, don't touch the hardware config
+	if(m_probeIsActive[i])
+		return;
+
+	switch(type)
+	{
+		case OscilloscopeChannel::COUPLE_AC_1M:
+			sendOnly(":CHAN%zu:COUP AC", i + 1);
+			sendOnly(":CHAN%zu:TERM OFF", i + 1);
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_1M:
+			sendOnly(":CHAN%zu:COUP DC", i + 1);
+			sendOnly(":CHAN%zu:TERM OFF", i + 1);
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_50:
+			sendOnly(":CHAN%zu:COUP DC", i + 1);
+			sendOnly(":CHAN%zu:TERM ON", i + 1);
+			break;
+
+		case OscilloscopeChannel::COUPLE_AC_50:
+			sendOnly(":CHAN%zu:COUP AC", i + 1);
+			sendOnly(":CHAN%zu:TERM ON", i + 1);
+			break;
+
+		//treat unrecognized as ground
+		case OscilloscopeChannel::COUPLE_GND:
+		default:
+			sendOnly(":CHAN%zu:COUP GND", i + 1);
+			break;
+	}
+}
+
+double MagnovaOscilloscope::GetChannelAttenuation(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return 1;
+
+	//TODO: support ext/10
+	if(i == m_extTrigChannel->GetIndex())
+		return 1;
+
+	string reply;
+
+	reply = converse(":CHAN%zu:DIV?", i + 1);
+
+	int d;
+	sscanf(reply.c_str(), "%d", &d);
+	return 1/d;
+}
+
+void MagnovaOscilloscope::SetChannelAttenuation(size_t i, double atten)
+{
+	if(i >= m_analogChannelCount)
+		return;
+
+	if(atten <= 0)
+		return;
+
+	//Get the old coupling value first.
+	//This ensures that m_probeIsActive[i] is valid
+	GetChannelCoupling(i);
+
+	//Don't allow changing attenuation on active probes
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_probeIsActive[i])
+			return;
+	}
+
+	sendOnly(":CHAN%zu:DIV %d", i + 1, (int)(atten));
+}
+
+vector<unsigned int> MagnovaOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
+{
+	vector<unsigned int> ret;
+
+	switch(m_modelid)
+	{
+		case MODEL_MAGNOVA_BMO:
+			ret.push_back(0);
+			ret.push_back(20);
+			ret.push_back(50);
+			ret.push_back(100);
+			ret.push_back(200);
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+
+	return ret;
+}
+
+unsigned int MagnovaOscilloscope::GetChannelBandwidthLimit(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return 0;
+
+	string reply;
+
+	reply = converse(":CHAN%zu:FILT?", i + 1);
+	if(reply == "NONe")
+		return 0;
+	else if(reply == "AMPLitude")
+		return 0;
+	else if(reply == "20000000")
+		return 20;
+	else if(reply == "50000000")
+		return 50;
+	else if(reply == "100000000")
+		return 100;
+	else if(reply == "200000000")
+		return 200;
+
+	LogWarning("MagnovaOscilloscope::GetChannelBandwidthLimit got invalid bwlimit %s\n", reply.c_str());
+	return 0;
+}
+
+void MagnovaOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+{
+	switch(limit_mhz)
+	{
+		case 0:
+			sendOnly(":CHAN%zu:FILT NONe", i + 1);
+			break;
+
+		case 20:
+			sendOnly(":CHAN%zu:FILT 20000000", i + 1);
+			break;
+
+		case 50:
+			sendOnly(":CHAN%zu:FILT 50000000", i + 1);
+			break;
+
+		case 100:
+			sendOnly(":CHAN%zu:FILT 100000000", i + 1);
+			break;
+
+		case 200:
+			sendOnly(":CHAN%zu:FILT 200000000", i + 1);
+			break;
+
+		default:
+			LogWarning("MagnovaOscilloscope::invalid bwlimit set request (%dMhz)\n", limit_mhz);
+	}
+}
+
+bool MagnovaOscilloscope::CanInvert(size_t i)
+{
+	//All analog channels, and only analog channels, can be inverted
+	return (i < m_analogChannelCount);
+}
+
+void MagnovaOscilloscope::Invert(size_t i, bool invert)
+{
+	if(i >= m_analogChannelCount)
+		return;
+
+	sendOnly(":CHAN%zu:INV %s", i + 1, invert ? "ON" : "OFF");
+}
+
+bool MagnovaOscilloscope::IsInverted(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return false;
+
+	string reply;
+
+	reply = Trim(converse(":CHAN%zu:INV?", i + 1));
+	return (reply == "ON");
+}
+
+void MagnovaOscilloscope::SetChannelDisplayName(size_t /* i */, string /* name */)
+{
+	// Not supported
+	return;
+}
+
+string MagnovaOscilloscope::GetChannelDisplayName(size_t i)
+{
+	auto chan = GetOscilloscopeChannel(i);
+	if(!chan)
+		return "";
+	// Not supported
+	return chan->GetHwname();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Triggering
+
+bool MagnovaOscilloscope::IsTriggerArmed()
+{
+	return m_triggerArmed;
+}
+
+Oscilloscope::TriggerMode MagnovaOscilloscope::PollTrigger()
+{
+	//Read the Internal State Change Register
+	string sinr = "";
+
+	if(m_triggerForced)
+	{
+		// The force trigger completed, return the sample set
+		m_triggerForced = false;
+		m_triggerArmed = false;
+		return TRIGGER_MODE_TRIGGERED;
+	}
+
+	sinr = converse(":STAT?");
+
+	//No waveform, but ready for one?
+	if((sinr == "WAITing")||(sinr == "RUNNing"))
+	{
+		m_triggerArmed = true;
+		return TRIGGER_MODE_RUN;
+	}
+
+	if((sinr == "TRIGgered"))
+	{
+		return TRIGGER_MODE_TRIGGERED;
+	}
+
+	//Stopped, no data available
+	if(sinr == "STOPped")
+	{
+		if(m_triggerArmed)
+		{
+			//Only mark the trigger as disarmed if this was a one-shot trigger.
+			//If this is a repeating trigger, we're still armed from the client's perspective,
+			//since AcquireData() will reset the trigger for the next acquisition.
+			if(m_triggerOneShot)
+				m_triggerArmed = false;
+
+			return TRIGGER_MODE_TRIGGERED;
+		}
+		else
+			return TRIGGER_MODE_STOP;
+	}
+	return TRIGGER_MODE_RUN;
+}
+
+std::optional<MagnovaOscilloscope::Metadata> MagnovaOscilloscope::parseMetadata(
+    const std::vector<uint8_t>& data) {
+    
+    try {
+        Metadata metadata;
+
+        // Helper function to read little-endian float
+        auto readFloat = [](const uint8_t* ptr) -> float {
+            uint32_t value = static_cast<uint32_t>(ptr[0]) |
+                           (static_cast<uint32_t>(ptr[1]) << 8) |
+                           (static_cast<uint32_t>(ptr[2]) << 16) |
+                           (static_cast<uint32_t>(ptr[3]) << 24);
+            float result;
+            std::memcpy(&result, &value, sizeof(float));
+            return result;
+        };
+
+        // Helper function to read little-endian uint32
+        auto readUint32 = [](const uint8_t* ptr) -> uint32_t {
+            return static_cast<uint32_t>(ptr[0]) |
+                   (static_cast<uint32_t>(ptr[1]) << 8) |
+                   (static_cast<uint32_t>(ptr[2]) << 16) |
+                   (static_cast<uint32_t>(ptr[3]) << 24);
+        };
+
+        // Read metadata in the correct order
+        const uint8_t* ptr = data.data();
+
+		// First three floats
+		float time_delta = readFloat(ptr);
+		ptr += sizeof(float);
+		float start_time = readFloat(ptr);
+		ptr += sizeof(float);
+		float end_time = readFloat(ptr);
+		ptr += sizeof(float);
+
+		// Next two uint32s
+		uint32_t sample_start = readUint32(ptr);
+		ptr += sizeof(uint32_t);
+		uint32_t sample_length = readUint32(ptr);
+		ptr += sizeof(uint32_t);
+
+		// Next two floats
+		float vertical_start = readFloat(ptr);
+		ptr += sizeof(float);
+		float vertical_step = readFloat(ptr);
+		ptr += sizeof(float);
+
+		// Final uint32
+		uint32_t sample_count = readUint32(ptr);
+
+		// Assign all values
+		metadata.timeDelta = time_delta;
+		metadata.startTime = start_time;
+		metadata.endTime = end_time;
+		metadata.sampleStart = sample_start;
+		metadata.sampleLength = sample_length;
+		metadata.verticalStart = vertical_start;
+		metadata.verticalStep = vertical_step;
+		metadata.sampleCount = sample_count;
+
+		return metadata;
+    }
+    catch (const std::exception& e) {
+		LogError("Error parsing metadata: %s.\n", e.what());
+    }
+}
+
+size_t MagnovaOscilloscope::ReadWaveformBlock(std::vector<uint8_t>* data, std::function<void(float)> progress)
+{
+	//Read and discard data until we see the '#'
+	uint8_t tmp;
+	for(int i=0; i<20; i++)
+	{
+		m_transport->ReadRawData(1, &tmp);
+		if(tmp == '#')
+			break;
+
+		//shouldn't ever get here
+		if(i == 19)
+		{
+			LogError("ReadWaveformBlock: threw away 20 bytes of data and never saw a '#'\n");
+			// This is a protocol error, flush pending rx data
+			flush();
+			// Stop aqcuisition after this protocol error
+			Stop();
+			return 0;
+		}
+	}
+
+	//Read length of the length field
+	m_transport->ReadRawData(1, &tmp);
+	int lengthOfLength = tmp - '0';
+
+	//Read the actual length field
+	char textlen[10] = {0};
+	m_transport->ReadRawData(lengthOfLength, (unsigned char*)textlen);
+	uint32_t len = atoi(textlen);
+
+	size_t readBytes = 0;
+	data->resize(len);
+	uint8_t* resultData = data->data();
+	while(readBytes < len)
+	{
+		size_t newBytes = m_transport->ReadRawData(len-readBytes,resultData+readBytes,progress);
+		if(newBytes == 0) break;
+		readBytes += newBytes;
+	}
+	LogDebug("Got length %zu from scope, expected bytes = %" PRIu32 ".\n",readBytes, len);
+
+	return readBytes;
+}
+
+/**
+	@brief Optimized function for checking channel enable status en masse with less round trips to the scope
+ */
+void MagnovaOscilloscope::BulkCheckChannelEnableState()
+{
+	vector<unsigned int> uncached;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		//Check enable state in the cache.
+		for(unsigned int i = 0; i < m_analogAndDigitalChannelCount; i++)
+		{
+			if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
+				uncached.push_back(i);
+		}
+	}
+
+	for(auto i : uncached)
+	{
+		string reply = (i < m_analogChannelCount) ? converse(":CHANNEL%d:SWITCH?", i + 1) : converse(":DIGITAL:D%d?", (i - m_analogChannelCount));
+		// OFF can bee "SUPPORT_OFF" if all digital channels are off
+		m_channelsEnabled[i] = (reply == "ON") ? true : false;
+	}
+}
+
+time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& /* timeString */, double& basetime)
+{
+	/*
+                TIMESTAMP is shown as Reserved In Siglent data format.
+                This information is from LeCroy which uses the same wavedesc header.
+		Timestamp is a somewhat complex format that needs some shuffling around.
+		Timestamp starts at offset 296 bytes in the wavedesc
+		(296-303)	double seconds
+		(304)		byte minutes
+		(305)		byte hours
+		(306)		byte days
+		(307)		byte months
+		(308-309)	uint16 year
+
+		TODO: during startup, query instrument for its current time zone
+		since the wavedesc reports instment local time
+	 */
+	//Yes, this cast is intentional.
+	//It assumes you're on a little endian system using IEEE754 64-bit float, but that applies to everything we support.
+	//cppcheck-suppress invalidPointerCast
+	// TODO
+	double fseconds = 0; /**reinterpret_cast<const double*>(wavedesc + 296);*/
+	uint8_t seconds = floor(fseconds);
+	basetime = fseconds - seconds;
+	time_t tnow = time(NULL);
+	struct tm tstruc;
+
+#ifdef _WIN32
+	localtime_s(&tstruc, &tnow);
+#else
+	localtime_r(&tnow, &tstruc);
+#endif
+/*
+	//Convert the instrument time to a string, then back to a tm
+	//Is there a better way to do this???
+	//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
+	//Maybe because tm_yday is inconsistent?
+	char tblock[64] = {0};
+	snprintf(tblock,
+		sizeof(tblock),
+		"%d-%d-%d %d:%02d:%02d",
+		*reinterpret_cast<uint16_t*>(wavedesc + 308),
+		wavedesc[307],
+		wavedesc[306],
+		wavedesc[305],
+		wavedesc[304],
+		seconds);
+	locale cur_locale;
+	auto& tget = use_facet<time_get<char>>(cur_locale);
+	istringstream stream(tblock);
+	ios::iostate state;
+	char format[] = "%F %T";
+	tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format + strlen(format));*/
+	return mktime(&tstruc);
+}
+
+/**
+	@brief Converts 16-bit ADC samples to floating point
+ */
+void MagnovaOscilloscope::Convert16BitSamples(float* pout, const uint16_t* pin, float gain, float offset, size_t count)
+{
+	//Divide large waveforms (>1M points) into blocks and multithread them
+	//TODO: tune split
+	if(count > 1000000)
+	{
+		//Round blocks to multiples of 64 samples for clean vectorization
+		size_t numblocks = omp_get_max_threads();
+		size_t lastblock = numblocks - 1;
+		size_t blocksize = count / numblocks;
+		blocksize = blocksize - (blocksize % 64);
+
+		#pragma omp parallel for
+		for(size_t i=0; i<numblocks; i++)
+		{
+			//Last block gets any extra that didn't divide evenly
+			size_t nsamp = blocksize;
+			if(i == lastblock)
+				nsamp = count - i*blocksize;
+
+			size_t off = i*blocksize;
+			Convert16BitSamplesGeneric(
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp);
+		}
+	}
+
+	//Small waveforms get done single threaded to avoid overhead
+	else
+	{
+		Convert16BitSamplesGeneric(pout, pin, gain, offset, count);
+	}
+}
+
+/**
+	@brief Converts raw ADC samples to floating point
+ */
+void MagnovaOscilloscope::Convert16BitSamplesGeneric(float* pout, const uint16_t* pin, float gain, float offset, size_t count)
+{
+	for(size_t j=0; j<count; j++)
+		pout[j] = gain*pin[j] - offset;
+}
+
+
+vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
+	const std::vector<uint8_t>& data,
+	size_t datalen,
+	uint32_t num_sequences,
+	time_t ttime,
+	double basetime,
+	double* wavetime,
+	int ch)
+{
+	vector<WaveformBase*> ret;
+
+	auto metadata = parseMetadata(data);
+	if(!metadata)
+	{
+		LogError("Could not parse metadta");
+		return ret;
+	}
+
+	// Get gain from vertical step
+	float v_gain = metadata->verticalStep/0xFFFF;
+
+	// Get offset from vertical start + add channel offset
+	float v_off = (0 - metadata->verticalStart - GetChannelOffset(ch,0));
+
+	// Get interval from timedelta
+	float interval = metadata->timeDelta * FS_PER_SECOND;
+
+	// Offset is null
+	double h_off = 0;
+	double h_off_frac = 0;
+
+
+	//Raw waveform data
+	size_t num_samples = metadata->sampleCount;
+
+	size_t num_per_segment = num_samples / num_sequences;
+
+	// Skip metadata
+    const uint8_t* ptr = data.data() + 32;
+	const uint16_t* wdata = reinterpret_cast<const uint16_t*>(ptr);
+
+	// float codes_per_div;
+
+	LogDebug("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%zu\n",
+		v_gain,
+		v_off,
+		interval,
+		h_off,
+		h_off_frac,
+		datalen);
+
+	for(size_t j = 0; j < num_sequences; j++)
+	{
+		//Set up the capture we're going to store our data into
+		auto cap = new UniformAnalogWaveform;
+		cap->m_timescale = round(interval);
+
+		cap->m_triggerPhase = h_off_frac;
+		cap->m_startTimestamp = ttime;
+
+		//Parse the time
+		if(num_sequences > 1)
+			cap->m_startFemtoseconds = static_cast<int64_t>((basetime + wavetime[j * 2]) * FS_PER_SECOND);
+		else
+			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
+
+		cap->Resize(num_per_segment);
+		cap->PrepareForCpuAccess();
+
+		//Convert raw ADC samples to volts
+		Convert16BitSamples(
+			cap->m_samples.GetCpuPointer(),
+			(wdata + j * num_per_segment),
+			v_gain,
+			v_off,
+			num_per_segment);
+
+		cap->MarkSamplesModifiedFromCpu();
+		ret.push_back(cap);
+	}
+
+	return ret;
+}
+
+vector<SparseDigitalWaveform*> MagnovaOscilloscope::ProcessDigitalWaveform(
+	const std::vector<uint8_t>& data,
+	size_t datalen,
+	uint32_t num_sequences,
+	time_t ttime,
+	double basetime,
+	double* wavetime,
+	int /*ch*/)
+{
+	vector<SparseDigitalWaveform*> ret;
+
+	auto metadata = parseMetadata(data);
+	if(!metadata)
+	{
+		LogError("Could not parse metadta");
+		return ret;
+	}
+
+
+	//cppcheck-suppress invalidPointerCast
+	float interval = metadata->timeDelta * FS_PER_SECOND;
+
+	//Raw waveform data
+	size_t numSamples = datalen*8;
+
+	//LogTrace("\nDigital, interval=%f, datalen=%zu\n", interval,	datalen);
+
+	//Get the client's local time.
+	//All we need from this is to know whether DST is active
+	tm now;
+	time_t tnow;
+	time(&tnow);
+	localtime_r(&tnow, &now);
+
+	// Sample ratio between digital and analog
+	// TODO
+	int64_t digitalToAnalogSampleRatio = 1; //m_acqPoints / m_digitalAcqPoints;
+
+	//We have each channel's data from start to finish before the next (no interleaving).
+	for(size_t numSeq = 0; numSeq < num_sequences; numSeq++)
+	{
+		SparseDigitalWaveform* cap = new SparseDigitalWaveform;
+		// Since the LA sample rate is a fraction of the sample rate of the analog channels, timescale needs to be updated accordingly
+		cap->m_timescale = round(interval)*digitalToAnalogSampleRatio;
+		cap->PrepareForCpuAccess();
+
+		//Capture timestamp
+		cap->m_startTimestamp = ttime;
+		//Parse the time
+		if(num_sequences > 1)
+			cap->m_startFemtoseconds = static_cast<int64_t>((basetime + wavetime[numSeq * 2]) * FS_PER_SECOND);
+		else
+			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
+
+		//Preallocate memory assuming no deduplication possible
+		cap->Resize(numSamples);
+
+		size_t k = 0;
+		size_t sampleIndex = 0;
+		bool sampleValue = false;
+		bool lastSampleValue = false;
+
+
+		// Skip metadata
+		const uint8_t* ptr = data.data() + 32;
+		//Read and de-duplicate the other samples
+		const uint8_t* rawData = ptr;
+		for (size_t curByteIndex = 0; curByteIndex < datalen; curByteIndex++)
+		{
+			char samples = rawData[curByteIndex];
+			for (int ii = 0; ii < 8; ii++, samples >>= 1)
+			{	// Check if the current scope sample bit is set.
+				sampleValue = (samples & 0x1);
+				if((sampleIndex > 0) && (lastSampleValue == sampleValue) && ((sampleIndex + 3) < numSamples))
+				{	//Deduplicate consecutive samples with same value
+					cap->m_durations[k]++;
+				}
+				else
+				{	//Nope, it toggled - store the new value
+					cap->m_offsets[k] = sampleIndex;
+					cap->m_durations[k] = 1;
+					cap->m_samples[k] = sampleValue;
+					lastSampleValue = sampleValue;
+					k++;
+				}
+				sampleIndex++;
+			}
+		}
+
+		//Done, shrink any unused space
+		cap->Resize(k);
+		cap->m_offsets.shrink_to_fit();
+		cap->m_durations.shrink_to_fit();
+		cap->m_samples.shrink_to_fit();
+		cap->MarkSamplesModifiedFromCpu();
+		cap->MarkTimestampsModifiedFromCpu();
+
+		//See how much space we saved
+		//LogDebug("%zu samples deduplicated to %zu (%.1f %%)\n",	numSamples,	k, (k * 100.0f) / (numSamples));
+
+		//Done, save data and go on to next
+		ret.push_back(cap);
+	}
+	return ret;
+}
+
+bool MagnovaOscilloscope::AcquireData()
+{
+	// Transfer buffers
+	std::vector<uint8_t>* analogWaveformData[MAX_ANALOG] {nullptr};
+	int analogWaveformDataSize[MAX_ANALOG] {0};
+	std::vector<uint8_t>* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
+	int digitalWaveformDataSize[MAX_DIGITAL] {0};
+	std::string digitalWaveformData;
+
+	//State for this acquisition (may be more than one waveform)
+	uint32_t num_sequences = 1;
+	map<int, vector<WaveformBase*>> pending_waveforms;
+	double start = GetTime();
+	time_t ttime = 0;
+	double basetime = 0;
+	vector<vector<WaveformBase*>> waveforms;
+	vector<vector<SparseDigitalWaveform*>> digitalWaveforms;
+	bool analogEnabled[MAX_ANALOG] = {false};
+	bool digitalEnabled[MAX_DIGITAL] = {false};
+	bool anyDigitalEnabled = false;
+	bool anyAnalogEnabled = true;
+	double* pwtime = NULL;
+
+	//Acquire the data (but don't parse it)
+
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+	start = GetTime();
+
+	// Get instrument time : format "23,35,11.280010"
+	string isntrumentTime = converse(":SYST:TIME?");
+
+	// Detect active channels
+	BulkCheckChannelEnableState();
+	for(unsigned int i = 0; i <  m_analogChannelCount; i++)
+	{	// Check all analog channels
+		analogEnabled[i] = IsChannelEnabled(i);
+		anyAnalogEnabled |= analogEnabled[i];
+	}
+
+	for(unsigned int i = 0; i <  m_digitalChannelCount; i++)
+	{	// Check digital channels
+		// Not supported for now by Magnova firmware
+		/*digitalEnabled[i] = IsChannelEnabled(i+m_analogChannelCount);
+		anyDigitalEnabled |= digitalEnabled[i];*/
+		digitalEnabled[i] = false;
+	}
+
+	// Notify about download operation start
+	ChannelsDownloadStarted();
+
+	// Get time from instrument
+	ttime = ExtractTimestamp(isntrumentTime, basetime);
+
+	//Read the data from each analog waveform
+	for(unsigned int i = 0; i < m_analogChannelCount; i++)
+	{
+		if(analogEnabled[i])
+		{	// Allocate buffer
+			analogWaveformData[i] = new std::vector<uint8_t>;
+			// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
+			m_transport->SendCommand(":CHAN" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
+			size_t readBytes = ReadWaveformBlock(analogWaveformData[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+			analogWaveformDataSize[i] = readBytes;
+			LogDebug("Parsing metadata...\n");
+			auto metadata = parseMetadata(*analogWaveformData[i]);
+			if(metadata)
+			{
+				LogDebug("Metadata parsed, starTime = %f\n",metadata->startTime);
+			}
+			ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+		}
+	}
+	if(anyDigitalEnabled)
+	{
+		// uint64_t digitalAcqPoints = GetDigitalAcqPoints();
+		// uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
+		// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
+		//Read the data from each digital waveform
+		for(size_t i = 0; i < m_digitalChannelCount; i++)
+		{
+			if(digitalEnabled[i])
+			{	// Allocate buffer
+				digitalWaveformDataBytes[i] = new std::vector<uint8_t>;
+				m_transport->SendCommand(":DIG" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
+				size_t readBytes = ReadWaveformBlock(digitalWaveformDataBytes[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+				digitalWaveformDataSize[i] = readBytes;
+				ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+			}
+		}
+	}
+
+	//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
+	//Re-arm the trigger if not in one-shot mode
+	if(!m_triggerOneShot)
+	{
+		sendOnly(":SINGLE");
+		m_triggerArmed = true;
+	}
+
+	//Process analog waveforms
+	waveforms.resize(m_analogChannelCount);
+	for(unsigned int i = 0; i < m_analogChannelCount; i++)
+	{
+		if(analogEnabled[i])
+		{
+			waveforms[i] = ProcessAnalogWaveform(
+				*analogWaveformData[i],
+				analogWaveformDataSize[i],
+				num_sequences,
+				ttime,
+				basetime,
+				pwtime,
+				i);
+		}
+	}
+
+	//Save analog waveform data
+	for(unsigned int i = 0; i < m_analogChannelCount; i++)
+	{
+		if(!analogEnabled[i])
+			continue;
+
+		//Done, update the data
+		for(size_t j = 0; j < num_sequences; j++)
+			pending_waveforms[i].push_back(waveforms[i][j]);
+	}
+
+	//Process digital waveforms
+	digitalWaveforms.resize(m_digitalChannelCount);
+	for(unsigned int i = 0; i < m_digitalChannelCount; i++)
+	{
+		if(digitalEnabled[i])
+		{
+			digitalWaveforms[i] = ProcessDigitalWaveform(
+				*digitalWaveformDataBytes[i],
+				digitalWaveformDataSize[i],
+				num_sequences,
+				ttime,
+				basetime,
+				pwtime,
+				i);
+		}
+	}
+
+	//Save digital waveform data
+	for(unsigned int i = 0; i < m_digitalChannelCount; i++)
+	{
+		if(!digitalEnabled[i])
+			continue;
+
+		//Done, update the data
+		for(size_t j = 0; j < num_sequences; j++)
+			pending_waveforms[i+m_analogChannelCount].push_back(digitalWaveforms[i][j]);
+	}
+
+	// Tell the download monitor that waveform download has finished
+	ChannelsDownloadFinished();
+
+	//Now that we have all of the pending waveforms, save them in sets across all channels
+	m_pendingWaveformsMutex.lock();
+	for(size_t i = 0; i < num_sequences; i++)
+	{
+		SequenceSet s;
+		for(size_t j = 0; j < m_analogAndDigitalChannelCount; j++)
+		{
+			if(pending_waveforms.find(j) != pending_waveforms.end())
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
+		}
+		m_pendingWaveforms.push_back(s);
+	}
+	m_pendingWaveformsMutex.unlock();
+
+	//Clean up
+	for(int i = 0; i < MAX_ANALOG; i++)
+	{
+		if(analogWaveformData[i] != nullptr)
+			delete analogWaveformData[i];
+	}
+	for(int i = 0; i < MAX_DIGITAL; i++)
+	{
+		if(digitalWaveformDataBytes[i] != nullptr)
+			delete digitalWaveformDataBytes[i];
+	}
+
+	double dt = GetTime() - start;
+	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
+	return true;
+}
+
+void MagnovaOscilloscope::PrepareAcquisition()
+{
+	m_triggerOffsetValid = false;
+	m_channelOffsets.clear();
+	// m_transport->SendCommand(":WAVEFORM:START 0");
+}
+
+void MagnovaOscilloscope::Start()
+{
+	PrepareAcquisition();
+	sendOnly(":STOP");
+	sendOnly(":SINGLE");	 //always do single captures, just re-trigger
+
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+}
+
+void MagnovaOscilloscope::StartSingleTrigger()
+{
+	//LogDebug("Start single trigger\n");
+
+	PrepareAcquisition();
+	sendOnly(":STOP");
+	sendOnly(":SINGLE");
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+}
+
+void MagnovaOscilloscope::Stop()
+{
+	if(!m_triggerArmed)
+		return;
+
+	m_transport->SendCommandImmediate(":STOP");
+
+	m_triggerArmed = false;
+	m_triggerOneShot = true;
+
+	//Clear out any pending data (the user doesn't want it, and we don't want stale stuff hanging around)
+	ClearPendingWaveforms();
+}
+
+void MagnovaOscilloscope::ForceTrigger()
+{
+	// Don't allow more than one force at a time
+	if(m_triggerForced)
+		return;
+
+	m_triggerForced = true;
+
+	PrepareAcquisition();
+	sendOnly(":SINGLE");
+	if(!m_triggerArmed)
+		sendOnly(":SINGLE");
+
+	m_triggerArmed = true;
+	this_thread::sleep_for(c_trigger_delay);
+}
+
+float MagnovaOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
+{
+	//not meaningful for trigger or digital channels
+	if(i >= m_analogChannelCount)
+		return 0;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelOffsets.find(i) != m_channelOffsets.end())
+			return m_channelOffsets[i];
+	}
+
+	string reply;
+
+	reply = converse(":CHANNEL%zu:OFFSET?", i + 1);
+
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelOffsets[i] = offset;
+	return offset;
+}
+
+void MagnovaOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
+{
+	//not meaningful for trigger or digital channels
+	if(i >= m_analogChannelCount)
+		return;
+
+	sendOnly(":CHANNEL%zu:OFFSET %1.2E", i + 1, offset);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelOffsets[i] = offset;
+}
+
+float MagnovaOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
+{
+	//not meaningful for trigger or digital channels
+	if(i >= m_analogChannelCount)
+		return 1;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
+			return m_channelVoltageRanges[i];
+	}
+
+	string reply;
+
+	reply = converse(":CHANNEL%zu:SCALE?", i + 1);
+
+	float volts_per_div;
+	sscanf(reply.c_str(), "%f", &volts_per_div);
+
+	float v = volts_per_div * 8;	//plot is 8 divisions high
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelVoltageRanges[i] = v;
+	return v;
+}
+
+void MagnovaOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
+{
+	// Only for analog channels
+	if(i >= m_analogChannelCount)
+		return;
+
+	float vdiv = range / 8;
+	m_channelVoltageRanges[i] = range;
+
+	sendOnly(":CHANNEL%zu:SCALE %.4f", i + 1, vdiv);
+}
+
+vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
+{	// Changing srate is not supported by Magnova scope
+	vector<uint64_t> ret;
+	return ret;
+}
+
+vector<uint64_t> MagnovaOscilloscope::GetSampleRatesInterleaved()
+{
+	return GetSampleRatesNonInterleaved();
+}
+
+vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsNonInterleaved()
+{
+	vector<uint64_t> ret;
+	// TODO
+	ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000, 200 * 1000 * 1000};
+	return ret;
+}
+
+vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsInterleaved()
+{
+	return GetSampleDepthsNonInterleaved();
+}
+
+set<MagnovaOscilloscope::InterleaveConflict> MagnovaOscilloscope::GetInterleaveConflicts()
+{
+	set<InterleaveConflict> ret;
+
+	//All scopes normally interleave channels 1/2 and 3/4.
+	//If both channels in either pair is in use, that's a problem.
+	ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(1)));
+	if(m_analogChannelCount > 2)
+		ret.emplace(InterleaveConflict(GetOscilloscopeChannel(2), GetOscilloscopeChannel(3)));
+
+	return ret;
+}
+
+uint64_t MagnovaOscilloscope::GetSampleRate()
+{
+	double f;
+	if(!m_sampleRateValid)
+	{
+		string reply;
+		reply = converse(":ACQUIRE:SRATE?");
+
+		if(sscanf(reply.c_str(), "%lf", &f) != EOF)
+		{
+			m_sampleRate = static_cast<int64_t>(f);
+			m_sampleRateValid = true;
+		}
+		else
+		{
+			
+		}
+	}
+	return m_sampleRate;
+}
+
+uint64_t MagnovaOscilloscope::GetSampleDepth()
+{
+	double f;
+	if(!m_memoryDepthValid)
+	{	// Possible values are : AUTo, AFASt, Integer in pts
+		string reply = converse(":ACQUIRE:MDEPTH?");
+		if(reply == "AUTo" || reply == "AFASt")
+		{
+			m_memoryDepth = 0;
+			m_memoryDepthValid = true;
+		}
+		else
+		{
+			f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+			m_memoryDepth = static_cast<int64_t>(f);
+			m_memoryDepthValid = true;
+		}
+	}
+	return m_memoryDepth;
+}
+
+void MagnovaOscilloscope::SetSampleDepth(uint64_t depth)
+{
+	//Need to lock the mutex when setting depth because of the quirks around needing to change trigger mode too
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	//Save original sample rate (scope often changes sample rate when adjusting memory depth)
+	// uint64_t rate = GetSampleRate();
+	// Get Trigger State to restore it after setting changing memory detph
+	// TriggerMode triggerMode = PollTrigger();
+
+	// we can not change memory size in Run/Stop mode
+	// sendOnly(":AUTO");
+	switch(m_modelid)
+	{
+		case MODEL_MAGNOVA_BMO:
+			sendOnly("ACQUIRE:MDEPTH %" PRIu64 "",depth);
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+	/*if(IsTriggerArmed())
+	{	// restart trigger
+		sendOnly(":SINGLE");
+	}
+	else
+	{	// Restore previous trigger mode
+		sendOnly(":%s", ((triggerMode == TRIGGER_MODE_STOP) ? "STOP" : "AUTO"));
+	}*/
+
+	m_memoryDepthValid = false;
+
+	//restore old sample rate
+	//SetSampleRate(rate);
+}
+
+void MagnovaOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{	// Not supported by Magnova
+	return;
+}
+
+void MagnovaOscilloscope::EnableTriggerOutput()
+{
+	sendOnly(":TRIG:AOUT ON");
+}
+
+void MagnovaOscilloscope::SetUseExternalRefclk(bool external)
+{
+	switch(m_modelid)
+	{
+		case MODEL_MAGNOVA_BMO:
+			sendOnly(":ACQuire:RCLock %s", external ? "EXT" : "INT");
+			break;
+
+		default:
+			LogError("Unknown scope type\n");
+			break;
+	}
+
+}
+
+void MagnovaOscilloscope::SetTriggerOffset(int64_t offset)
+{
+	//Magnova's standard has the offset being from the midpoint of the capture.
+	//Scopehal has offset from the start.
+	int64_t rate = GetSampleRate();
+	int64_t halfdepth = GetSampleDepth() / 2;
+	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
+
+	sendOnly(":TIMebase:OFFSet %1.2E", (offset - halfwidth) * SECONDS_PER_FS);
+
+	//Don't update the cache because the scope is likely to round the offset we ask for.
+	//If we query the instrument later, the cache will be updated then.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_triggerOffsetValid = false;
+}
+
+int64_t MagnovaOscilloscope::GetTriggerOffset()
+{
+	//Early out if the value is in cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_triggerOffsetValid)
+			return m_triggerOffset;
+	}
+	string reply;
+	reply = converse(":TIMebase:OFFSet?");
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	//Result comes back in scientific notation
+	double sec;
+	sscanf(reply.c_str(), "%le", &sec);
+	m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
+
+	//Convert from midpoint to start point
+	int64_t rate = GetSampleRate();
+	int64_t halfdepth = GetSampleDepth() / 2;
+	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
+	m_triggerOffset += halfwidth;
+
+	m_triggerOffsetValid = true;
+
+	return m_triggerOffset;
+}
+
+void MagnovaOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
+{
+	//Cannot deskew trigger channel
+	if(channel >= m_analogAndDigitalChannelCount)
+		return;
+	if(channel < m_analogChannelCount)
+	{
+		sendOnly(":CHAN%zu:DESK %1.2E", channel, skew * SECONDS_PER_FS);
+	}
+	else
+	{	// Digital channels
+		sendOnly(":DIG:DESK%s %1.2E", ((channel - m_digitalChannelBase) < 8) ? "0to7" : "8to15", skew * SECONDS_PER_FS);
+	}
+
+	//Update cache
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelDeskew[channel] = skew;
+}
+
+int64_t MagnovaOscilloscope::GetDeskewForChannel(size_t channel)
+{
+	//Cannot deskew trigger channel
+	if(channel >= m_analogAndDigitalChannelCount)
+		return 0;
+
+	//Early out if the value is in cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelDeskew.find(channel) != m_channelDeskew.end())
+			return m_channelDeskew[channel];
+	}
+
+	//Read the deskew
+	string reply;
+	if(channel < m_analogChannelCount)
+	{
+		reply = converse(":CHAN%zu:DESK?", channel + 1);
+	}
+	else
+	{	// Digital channels
+		reply = converse(":DIG:DESK%s?", ((channel - m_digitalChannelBase) < 8) ? "0to7" : "8to15");
+	}
+
+	//Value comes back as floating point ps
+	float skew;
+	sscanf(reply.c_str(), "%f", &skew);
+	int64_t skew_ps = round(skew * FS_PER_SECOND);
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelDeskew[channel] = skew_ps;
+
+	return skew_ps;
+}
+
+bool MagnovaOscilloscope::IsInterleaving()
+{
+	switch(m_modelid)
+	{
+		case MODEL_MAGNOVA_BMO:
+			if((m_channelsEnabled[2] == true) || (m_channelsEnabled[3] == true))
+			{	// Interleaving if Channel 3 or 4 are active
+				return true;
+			}
+			return false;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			return false;
+			// --------------------------------------------------
+	}
+}
+
+bool MagnovaOscilloscope::SetInterleaving(bool /* combine*/)
+{
+	//Setting interleaving is not supported, it's always hardware managed
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Analog bank configuration
+
+bool MagnovaOscilloscope::IsADCModeConfigurable()
+{
+	return false;
+}
+
+vector<string> MagnovaOscilloscope::GetADCModeNames(size_t /*channel*/)
+{
+	vector<string> v;
+	return v;
+}
+
+size_t MagnovaOscilloscope::GetADCMode(size_t /*channel*/)
+{
+	return 0;
+}
+
+void MagnovaOscilloscope::SetADCMode(size_t /*channel*/, size_t /* mode */)
+{
+	return;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Logic analyzer configuration
+
+vector<Oscilloscope::DigitalBank> MagnovaOscilloscope::GetDigitalBanks()
+{
+	vector<DigitalBank> banks;
+
+	if(m_hasLA)
+	{
+		for(size_t n = 0; n < 2; n++)
+		{
+			DigitalBank bank;
+
+			for(size_t i = 0; i < 8; i++)
+				bank.push_back(m_digitalChannels[i + n * 8]);
+
+			banks.push_back(bank);
+		}
+	}
+
+	return banks;
+}
+
+Oscilloscope::DigitalBank MagnovaOscilloscope::GetDigitalBank(size_t channel)
+{
+	DigitalBank ret;
+	if(m_hasLA)
+	{
+		if(channel <= m_digitalChannels[7]->GetIndex())
+		{
+			for(size_t i = 0; i < 8; i++)
+				ret.push_back(m_digitalChannels[i]);
+		}
+		else
+		{
+			for(size_t i = 0; i < 8; i++)
+				ret.push_back(m_digitalChannels[i + 8]);
+		}
+	}
+	return ret;
+}
+
+bool MagnovaOscilloscope::IsDigitalHysteresisConfigurable()
+{
+	return false;
+}
+
+bool MagnovaOscilloscope::IsDigitalThresholdConfigurable()
+{
+	return true;
+}
+
+float MagnovaOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
+{
+	return 0;
+}
+
+float MagnovaOscilloscope::GetDigitalThreshold(size_t channel)
+{
+	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
+		return 0;
+
+	channel -= m_analogChannelCount;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[channel];
+	}
+
+	float result = 0.0f;
+
+	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
+
+	// Look through the threshold table to see if theres a string match, return it if so
+	uint32_t i = 0;
+	while((c_sds2000xp_threshold_table[i].name) &&
+		  (strncmp(c_sds2000xp_threshold_table[i].name, r.c_str(), strlen(c_sds2000xp_threshold_table[i].name))))
+		i++;
+
+	if(c_sds2000xp_threshold_table[i].name)
+	{
+		result =  c_sds2000xp_threshold_table[i].val;
+	}
+	else if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
+	{	// Didn't match a standard, check for custom
+		result =  strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
+	}
+	else
+	{
+		LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDigitalThresholds[channel] = result;
+	return result;
+}
+
+void MagnovaOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
+{
+	LogWarning("SetDigitalHysteresis is not implemented\n");
+}
+
+void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
+{
+	channel -= m_analogChannelCount;
+
+	// Search through standard thresholds to see if one matches
+	uint32_t i = 0;
+	while((
+		(c_sds2000xp_threshold_table[i].name) && (fabsf(level - c_sds2000xp_threshold_table[i].val)) > c_thresh_thresh))
+		i++;
+
+	if(c_sds2000xp_threshold_table[i].name)
+		sendOnly(":DIGITAL:THRESHOLD%zu %s", (channel / 8) + 1, (c_sds2000xp_threshold_table[i].name));
+	else
+	{
+		do
+		{
+			sendOnly(":DIGITAL:THRESHOLD%zu CUSTOM,%1.2E", (channel / 8) + 1, level);
+
+		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount) - level)) > 0.1f);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Triggering
+
+void MagnovaOscilloscope::PullTrigger()
+{
+	std::string reply;
+
+	bool isUart = false;
+	//Figure out what kind of trigger is active.
+	reply = Trim(converse(":TRIGGER:TYPE?"));
+	if(reply == "DROPout")
+		PullDropoutTrigger();
+	else if(reply == "EDGe")
+		PullEdgeTrigger();
+	else if(reply == "RUNT")
+		PullRuntTrigger();
+	else if(reply == "SLOPe")
+		PullSlewRateTrigger();
+	else if(reply == "DECode")
+	{
+		PullUartTrigger();
+		isUart = true;
+	}
+	else if(reply == "INTerval")
+		PullPulseWidthTrigger();
+	else if(reply == "WINDow")
+		PullWindowTrigger();
+	// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
+	//Unrecognized trigger type
+	else
+	{
+		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
+		m_trigger = NULL;
+		return;
+	}
+
+	//Pull the source (same for all types of trigger)
+	PullTriggerSource(m_trigger, reply,isUart);
+}
+
+/**
+	@brief Reads the source of a trigger from the instrument
+ */
+void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
+{
+	string reply = Trim(isUart ? converse(":TRIGGER:UART:RXS?") : converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
+	// Returns CHANnel1 or DIGital1
+
+	// Get channel number
+    int i = reply.size() - 1;
+    while (i >= 0 && std::isdigit(reply[i])) {
+        i--;
+    }
+    std::string number = reply.substr(i + 1);
+	bool isAnalog = (reply[0] == 'C');
+
+	auto chan = GetOscilloscopeChannelByHwName((isAnalog ? "CH" :  "D") + number);
+	trig->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+}
+
+/**
+	@brief Reads settings for a dropout trigger from the instrument
+ */
+void MagnovaOscilloscope::PullDropoutTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<DropoutTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new DropoutTrigger(this);
+	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
+
+	Unit fs(Unit::UNIT_FS);
+
+	//Level
+	dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
+
+	//Dropout time
+	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
+
+	//Edge type
+	if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
+		dt->SetType(DropoutTrigger::EDGE_RISING);
+	else
+		dt->SetType(DropoutTrigger::EDGE_FALLING);
+
+	//Reset type
+	if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
+		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+	else
+		dt->SetResetType(DropoutTrigger::RESET_NONE);
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void MagnovaOscilloscope::PullEdgeTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	//Level
+	et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
+
+	//TODO: OptimizeForHF (changes hysteresis for fast signals)
+
+	//Slope
+	GetTriggerSlope(et, Trim(converse(":TRIGGER:EDGE:SLOPE?")));
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void MagnovaOscilloscope::PullPulseWidthTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<PulseWidthTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new PulseWidthTrigger(this);
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	Unit fs(Unit::UNIT_FS);
+
+	//Level
+	pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
+
+	//Condition
+	pt->SetCondition(GetCondition(converse(":TRIGGER:INTERVAL:LIMIT?")));
+
+	//Min range
+	pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TLOWER?")));
+
+	//Max range
+	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TUPPER?")));
+
+	//Slope
+	GetTriggerSlope(pt, Trim(converse(":TRIGGER:INTERVAL:SLOPE?")));
+}
+
+/**
+	@brief Reads settings for a runt-pulse trigger from the instrument
+ */
+void MagnovaOscilloscope::PullRuntTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<RuntTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new RuntTrigger(this);
+	RuntTrigger* rt = dynamic_cast<RuntTrigger*>(m_trigger);
+
+	Unit v(Unit::UNIT_VOLTS);
+	Unit fs(Unit::UNIT_FS);
+	string reply;
+
+	//Lower bound
+	rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LLEVEL?")));
+
+	//Upper bound
+	rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:HLEVEL?")));
+
+	//Lower bound
+	rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:TLOWER?")));
+
+	//Upper interval
+	rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:TUPPER?")));
+
+	//Slope
+	reply = Trim(converse(":TRIGGER:RUNT:POLARITY?"));
+	if(reply == "POSitive")
+		rt->SetSlope(RuntTrigger::EDGE_RISING);
+	else if(reply == "NEGative")
+		rt->SetSlope(RuntTrigger::EDGE_FALLING);
+
+	//Condition
+	rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:LIMIT?")));
+}
+
+/**
+	@brief Reads settings for a slew rate trigger from the instrument
+ */
+void MagnovaOscilloscope::PullSlewRateTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<SlewRateTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new SlewRateTrigger(this);
+	SlewRateTrigger* st = dynamic_cast<SlewRateTrigger*>(m_trigger);
+
+	Unit v(Unit::UNIT_VOLTS);
+	Unit fs(Unit::UNIT_FS);
+	string reply ;
+
+	//Lower bound
+	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:LLEVEL?")));
+
+	//Upper bound
+	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPE:HLEVEL?")));
+
+	//Lower interval
+	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TLOWER?")));
+
+	//Upper interval
+	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TUPPER?")));
+
+	//Slope
+	reply = Trim(converse("TRIGGER:SLOPE:SLOPE?"));
+	if(reply == "RISing")
+		st->SetSlope(SlewRateTrigger::EDGE_RISING);
+	else if(reply == "FALLing")
+		st->SetSlope(SlewRateTrigger::EDGE_FALLING);
+	else if(reply == "ALTernate")
+		st->SetSlope(SlewRateTrigger::EDGE_ANY);
+
+	//Condition
+	st->SetCondition(GetCondition(converse("TRIGGER:SLOPE:LIMIT?")));
+}
+
+/**
+	@brief Reads settings for a UART trigger from the instrument
+ */
+void MagnovaOscilloscope::PullUartTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<UartTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new UartTrigger(this);
+	UartTrigger* ut = dynamic_cast<UartTrigger*>(m_trigger);
+
+    string reply;
+	string p1;
+
+
+	//Bit rate
+	ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
+
+	//Level
+	ut->SetLevel(stof(converse(":TRIGGER:UART:RXT?")));
+
+	//Parity
+	reply = Trim(converse(":TRIGGER:UART:PARITY?"));
+	if(reply == "NONE")
+		ut->SetParityType(UartTrigger::PARITY_NONE);
+	else if(reply == "EVEN")
+		ut->SetParityType(UartTrigger::PARITY_EVEN);
+	else if(reply == "ODD")
+		ut->SetParityType(UartTrigger::PARITY_ODD);
+	else if(reply == "MARK")
+		ut->SetParityType(UartTrigger::PARITY_MARK);
+	else if(reply == "SPACe")
+		ut->SetParityType(UartTrigger::PARITY_SPACE);
+
+	//Operator
+	//bool ignore_p2 = true;
+
+	// It seems this scope only copes with equivalence
+	ut->SetCondition(Trigger::CONDITION_EQUAL);
+
+	//Idle polarity
+	reply = Trim(converse(":TRIGGER:UART:IDLE?"));
+	if(reply == "HIGH")
+		ut->SetPolarity(UartTrigger::IDLE_HIGH);
+	else if(reply == "LOW")
+		ut->SetPolarity(UartTrigger::IDLE_LOW);
+
+	//Stop bits
+	ut->SetStopBits(stof(Trim(converse(":TRIGGER:UART:STOP?"))));
+
+	//Trigger type
+	reply = Trim(converse(":TRIGGER:UART:CONDITION?"));
+	if(reply == "STARt")
+		ut->SetMatchType(UartTrigger::TYPE_START);
+	else if(reply == "STOP")
+		ut->SetMatchType(UartTrigger::TYPE_STOP);
+	else if(reply == "ERRor")
+		ut->SetMatchType(UartTrigger::TYPE_PARITY_ERR);
+	else
+		ut->SetMatchType(UartTrigger::TYPE_DATA);
+
+	// Data to match (there is no pattern2 on sds)
+	p1 = Trim(converse(":TRIGGER:UART:DATA?"));
+	ut->SetPatterns(p1, "", true);
+}
+
+/**
+	@brief Reads settings for a window trigger from the instrument
+ */
+void MagnovaOscilloscope::PullWindowTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<WindowTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new WindowTrigger(this);
+	WindowTrigger* wt = dynamic_cast<WindowTrigger*>(m_trigger);
+
+	Unit v(Unit::UNIT_VOLTS);
+
+	//Lower bound
+	wt->SetLowerBound(v.ParseString(converse(":TRIGGER:WINDOW:LLEVEL?")));
+
+	//Upper bound
+	wt->SetUpperBound(v.ParseString(converse(":TRIGGER:WINDOW:HLEVEL?")));
+}
+
+/**
+	@brief Processes the slope for an edge or edge-derived trigger
+ */
+void MagnovaOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+
+{
+	reply = Trim(reply);
+
+	if(reply == "RISing")
+		trig->SetType(EdgeTrigger::EDGE_RISING);
+	else if(reply == "FALLing")
+		trig->SetType(EdgeTrigger::EDGE_FALLING);
+	else if(reply == "ALTernate")
+		trig->SetType(EdgeTrigger::EDGE_ALTERNATING);
+	else if(reply == "BOTH")
+		trig->SetType(EdgeTrigger::EDGE_ANY);
+	else
+		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+}
+
+/**
+	@brief Parses a trigger condition
+ */
+Trigger::Condition MagnovaOscilloscope::GetCondition(string reply)
+{
+	reply = Trim(reply);
+
+	if(reply == "LESSthan")
+		return Trigger::CONDITION_LESS;
+	else if(reply == "GREATerthan")
+		return Trigger::CONDITION_GREATER;
+	else if(reply == "INNer")
+		return Trigger::CONDITION_BETWEEN;
+	else if(reply == "OUTer")
+		return Trigger::CONDITION_NOT_BETWEEN;
+
+	//unknown
+	LogWarning("Unknown trigger condition [%s]\n", reply.c_str());
+	return Trigger::CONDITION_LESS;
+}
+
+void MagnovaOscilloscope::PushTrigger()
+{
+	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
+	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
+	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
+	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
+
+	if(dt)
+	{
+		sendOnly(":TRIGGER:TYPE DROPOUT");
+		sendOnly(":TRIGGER:DROPOUT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		PushDropoutTrigger(dt);
+	}
+	else if(pt)
+	{
+		sendOnly(":TRIGGER:TYPE INTERVAL");
+		sendOnly(":TRIGGER:INTERVAL:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		PushPulseWidthTrigger(pt);
+	}
+	else if(rt)
+	{
+		sendOnly(":TRIGGER:TYPE RUNT");
+		sendOnly(":TRIGGER:RUNT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		PushRuntTrigger(rt);
+	}
+	else if(st)
+	{
+		sendOnly(":TRIGGER:TYPE SLOPE");
+		sendOnly(":TRIGGER:SLOPE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		PushSlewRateTrigger(st);
+	}
+	else if(ut)
+	{
+		sendOnly(":TRIGGER:TYPE UART");
+		// TODO: Validate these trigger allocations
+		sendOnly(":TRIGGER:UART:RXSOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:UART:TXSOURCE %s", m_trigger->GetInput(1).m_channel->GetHwname().c_str());
+		PushUartTrigger(ut);
+	}
+	else if(wt)
+	{
+		sendOnly(":TRIGGER:TYPE WINDOW");
+		sendOnly(":TRIGGER:WINDOW:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		PushWindowTrigger(wt);
+	}
+
+	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+
+	else if(et)	   //must be last
+	{
+		sendOnly(":TRIGGER:TYPE EDGE");
+		sendOnly(":TRIGGER:EDGE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		PushEdgeTrigger(et, "EDGE");
+	}
+
+	else
+		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for a dropout trigger to the instrument
+ */
+void MagnovaOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
+{
+
+	PushFloat(":TRIGGER:DROPOUT:LEVEL", trig->GetLevel());
+	PushFloat(":TRIGGER:DROPOUT:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
+	sendOnly(":TRIGGER:DROPOUT:SLOPE %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISING" : "FALLING");
+	sendOnly(":TRIGGER:DROPOUT:TYPE %s", (trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE) ? "EDGE" : "STATE");
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void MagnovaOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
+{
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			sendOnly(":TRIGGER:%s:SLOPE RISING", trigType.c_str());
+			break;
+
+		case EdgeTrigger::EDGE_FALLING:
+			sendOnly(":TRIGGER:%s:SLOPE FALLING", trigType.c_str());
+			break;
+
+		case EdgeTrigger::EDGE_ANY:
+			sendOnly(":TRIGGER:%s:SLOPE ALTERNATE", trigType.c_str());
+			break;
+
+		default:
+			LogWarning("Invalid trigger type %d\n", trig->GetType());
+			break;
+	}
+	//Level
+	sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
+}
+
+/**
+	@brief Pushes settings for a pulse width trigger to the instrument
+ */
+void MagnovaOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
+{
+	PushEdgeTrigger(trig, "INTERVAL");
+	PushCondition(":TRIGGER:INTERVAL", trig->GetCondition());
+	PushFloat(":TRIGGER:INTERVAL:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:INTERVAL:TLOWER", trig->GetLowerBound() * SECONDS_PER_FS);
+}
+
+/**
+	@brief Pushes settings for a runt trigger to the instrument
+ */
+void MagnovaOscilloscope::PushRuntTrigger(RuntTrigger* trig)
+{
+	PushCondition(":TRIGGER:RUNT", trig->GetCondition());
+	PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetLowerBound());
+	PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetUpperBound());
+
+	sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
+}
+
+/**
+	@brief Pushes settings for a slew rate trigger to the instrument
+ */
+void MagnovaOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
+{
+	PushCondition(":TRIGGER:SLOPE", trig->GetCondition());
+	PushFloat(":TRIGGER:SLOPE:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:SLOPE:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:SLOPE:HLEVEL", trig->GetUpperBound());
+	PushFloat(":TRIGGER:SLOPE:LLEVEL", trig->GetLowerBound());
+
+	sendOnly(":TRIGGER:SLOPE:SLOPE %s",
+		(trig->GetSlope() == SlewRateTrigger::EDGE_RISING)	? "RISING" :
+		(trig->GetSlope() == SlewRateTrigger::EDGE_FALLING) ? "FALLING" :
+																"ALTERNATE");
+}
+
+/**
+	@brief Pushes settings for a UART trigger to the instrument
+ */
+void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
+{
+    float nstop;
+	string pattern1;
+	//Special parameter for trigger level
+	PushFloat(":TRIGGER:UART:LIMIT", trig->GetLevel());
+
+	//AtPosition
+	//Bit9State
+	PushFloat(":TRIGGER:UART:BAUD", trig->GetBitRate());
+	sendOnly(":TRIGGER:UART:BITORDER LSB");
+	//DataBytesLenValue1
+	//DataBytesLenValue2
+	//DataCondition
+	//FrameDelimiter
+	//InterframeMinBits
+	//NeedDualLevels
+	//NeededSources
+	sendOnly(":TRIGGER:UART:DLENGTH 8");
+
+	switch(trig->GetParityType())
+	{
+		case UartTrigger::PARITY_NONE:
+			sendOnly(":TRIGGER:UART:PARITY NONE");
+			break;
+
+		case UartTrigger::PARITY_ODD:
+			sendOnly(":TRIGGER:UART:PARITY ODD");
+			break;
+
+		case UartTrigger::PARITY_EVEN:
+			sendOnly(":TRIGGER:UART:PARITY EVEN");
+			break;
+
+		case UartTrigger::PARITY_MARK:
+			sendOnly(":TRIGGER:UART:PARITY MARK");
+			break;
+		case UartTrigger::PARITY_SPACE:
+			sendOnly(":TRIGGER:UART:PARITY SPACE");
+			break;
+	}
+
+	//Pattern length depends on the current format.
+	//Note that the pattern length is in bytes, not bits, even though patterns are in binary.
+	pattern1 = trig->GetPattern1();
+	sendOnly(":TRIGGER:UART:DLENGTH \"%d\"", (int)pattern1.length() / 8);
+
+	PushCondition(":TRIGGER:UART", trig->GetCondition());
+
+	//Polarity
+	sendOnly(":TRIGGER:UART:IDLE %s", (trig->GetPolarity() == UartTrigger::IDLE_HIGH) ? "HIGH" : "LOW");
+
+	nstop = trig->GetStopBits();
+	if(nstop == 1)
+		sendOnly(":TRIGGER:UART:STOP 1");
+	else if(nstop == 2)
+		sendOnly(":TRIGGER:UART:STOP 2");
+	else
+		sendOnly(":TRIGGER:UART:STOP 1.5");
+
+	//Match type
+	switch(trig->GetMatchType())
+	{
+		case UartTrigger::TYPE_START:
+			sendOnly(":TRIGGER:UART:CONDITION START");
+			break;
+		case UartTrigger::TYPE_STOP:
+			sendOnly(":TRIGGER:UART:CONDITION STOP");
+			break;
+		case UartTrigger::TYPE_PARITY_ERR:
+			sendOnly(":TRIGGER:UART:CONDITION ERROR");
+			break;
+		default:
+		case UartTrigger::TYPE_DATA:
+			sendOnly(":TRIGGER:UART:CONDITION DATA");
+			break;
+	}
+}
+
+/**
+	@brief Pushes settings for a window trigger to the instrument
+ */
+void MagnovaOscilloscope::PushWindowTrigger(WindowTrigger* trig)
+{
+	PushFloat(":TRIGGER:WINDOW:LLEVEL", trig->GetLowerBound());
+	PushFloat(":TRIGGER:WINDOW:HLEVEL", trig->GetUpperBound());
+}
+
+/**
+	@brief Pushes settings for a trigger condition under a .Condition field
+ */
+void MagnovaOscilloscope::PushCondition(const string& path, Trigger::Condition cond)
+{
+	switch(cond)
+	{
+		case Trigger::CONDITION_LESS:
+			sendOnly("%s:LIMIT LESSTHAN", path.c_str());
+			break;
+
+		case Trigger::CONDITION_GREATER:
+			sendOnly("%s:LIMIT GREATERTHAN", path.c_str());
+			break;
+
+		case Trigger::CONDITION_BETWEEN:
+			sendOnly("%s:LIMIT INNER", path.c_str());
+			break;
+
+		case Trigger::CONDITION_NOT_BETWEEN:
+			sendOnly("%s:LIMIT OUTER", path.c_str());
+			break;
+
+		//Other values are not legal here, it seems
+		default:
+			break;
+	}
+}
+
+void MagnovaOscilloscope::PushFloat(string path, float f)
+{
+	sendOnly("%s %1.2E", path.c_str(), f);
+}
+
+vector<string> MagnovaOscilloscope::GetTriggerTypes()
+{
+	vector<string> ret;
+	ret.push_back(DropoutTrigger::GetTriggerName());
+	ret.push_back(EdgeTrigger::GetTriggerName());
+	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(RuntTrigger::GetTriggerName());
+	ret.push_back(SlewRateTrigger::GetTriggerName());
+	if(m_hasUartTrigger)
+		ret.push_back(UartTrigger::GetTriggerName());
+	ret.push_back(WindowTrigger::GetTriggerName());
+	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+	return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator mode
+
+//Per docs, this is almost the same API as the SDG series generators.
+//But the SAG102I and integrated generator have only a single output.
+//This code can likely be ported to work with SDG* fairly easily, though.
+
+vector<FunctionGenerator::WaveShape> MagnovaOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
+{
+	vector<WaveShape> ret;
+	ret.push_back(SHAPE_SINE);
+	ret.push_back(SHAPE_SQUARE);
+	ret.push_back(SHAPE_NOISE);
+
+	//Docs say this is supported, but doesn't seem to work on SDS2104X+
+	//Might be SDG only?
+	//ret.push_back(SHAPE_PRBS_NONSTANDARD);
+
+	ret.push_back(SHAPE_DC);
+	ret.push_back(SHAPE_STAIRCASE_UP);
+	ret.push_back(SHAPE_STAIRCASE_DOWN);
+	ret.push_back(SHAPE_STAIRCASE_UP_DOWN);
+	ret.push_back(SHAPE_PULSE);
+
+	//Docs say this is supported, but doesn't seem to work on SDS2104X+
+	//Might be SDG only?
+	//ret.push_back(SHAPE_NEGATIVE_PULSE);
+
+	//what's "trapezia"?
+	ret.push_back(SHAPE_SAWTOOTH_UP);
+	ret.push_back(SHAPE_SAWTOOTH_DOWN);
+	ret.push_back(SHAPE_EXPONENTIAL_DECAY);
+	ret.push_back(SHAPE_EXPONENTIAL_RISE);
+	ret.push_back(SHAPE_LOG_DECAY);
+	ret.push_back(SHAPE_LOG_RISE);
+	ret.push_back(SHAPE_SQUARE_ROOT);
+	ret.push_back(SHAPE_CUBE_ROOT);
+	ret.push_back(SHAPE_QUADRATIC);
+	ret.push_back(SHAPE_CUBIC);
+	ret.push_back(SHAPE_SINC);
+	ret.push_back(SHAPE_GAUSSIAN);
+	ret.push_back(SHAPE_DLORENTZ);
+	ret.push_back(SHAPE_HAVERSINE);
+	ret.push_back(SHAPE_LORENTZ);
+	ret.push_back(SHAPE_GAUSSIAN_PULSE);
+	//What's Gmonopuls?
+	//What's Tripuls?
+	ret.push_back(SHAPE_CARDIAC);
+	//What's quake?
+	//What's chirp?
+	//What's twotone?
+	//What's snr?
+	ret.push_back(SHAPE_HAMMING);
+	ret.push_back(SHAPE_HANNING);
+	ret.push_back(SHAPE_KAISER);
+	ret.push_back(SHAPE_BLACKMAN);
+	ret.push_back(SHAPE_GAUSSIAN_WINDOW);
+	ret.push_back(SHAPE_TRIANGLE);
+	ret.push_back(SHAPE_HARRIS);
+	ret.push_back(SHAPE_BARTLETT);
+	ret.push_back(SHAPE_TAN);
+	ret.push_back(SHAPE_COT);
+	ret.push_back(SHAPE_SEC);
+	ret.push_back(SHAPE_CSC);
+	ret.push_back(SHAPE_ASIN);
+	ret.push_back(SHAPE_ACOS);
+	ret.push_back(SHAPE_ATAN);
+	ret.push_back(SHAPE_ACOT);
+
+	return ret;
+}
+
+bool MagnovaOscilloscope::GetFunctionChannelActive(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgEnabled.find(chan) != m_awgEnabled.end())
+			return m_awgEnabled[chan];
+	}
+
+	auto reply = m_transport->SendCommandQueuedWithReply(":FGEN:STAT?", false);
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(reply.find("OFF") != string::npos)
+			m_awgEnabled[chan] = false;
+		else
+			m_awgEnabled[chan] = true;
+
+		return m_awgEnabled[chan];
+	}
+
+}
+
+void MagnovaOscilloscope::SetFunctionChannelActive(int chan, bool on)
+{
+	string state;
+	if(on)
+		state = "ON";
+	else
+		state = "OFF";
+
+	//Have to do this first, since it touches m_awgEnabled too
+	string imp;
+	if(GetFunctionChannelOutputImpedance(chan) == IMPEDANCE_50_OHM)
+		imp = "50";
+	else
+		imp = "HZ";
+
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgEnabled[chan] = on;
+}
+
+float MagnovaOscilloscope::GetFunctionChannelDutyCycle(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgDutyCycle.find(chan) != m_awgDutyCycle.end())
+			return m_awgDutyCycle[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgDutyCycle[chan];
+}
+
+void MagnovaOscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
+{
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV DUTY," + to_string(round(duty * 100)));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgDutyCycle[chan] = duty;
+}
+
+float MagnovaOscilloscope::GetFunctionChannelAmplitude(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgRange.find(chan) != m_awgRange.end())
+			return m_awgRange[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgRange[chan];
+}
+
+void MagnovaOscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
+{
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV AMP," + to_string(amplitude));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgRange[chan] = amplitude;
+}
+
+float MagnovaOscilloscope::GetFunctionChannelOffset(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgOffset.find(chan) != m_awgOffset.end())
+			return m_awgOffset[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgOffset[chan];
+}
+
+void MagnovaOscilloscope::SetFunctionChannelOffset(int chan, float offset)
+{
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV OFST," + to_string(offset));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgOffset[chan] = offset;
+}
+
+float MagnovaOscilloscope::GetFunctionChannelFrequency(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgFrequency.find(chan) != m_awgFrequency.end())
+			return m_awgFrequency[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgFrequency[chan];
+}
+
+void MagnovaOscilloscope::SetFunctionChannelFrequency(int chan, float hz)
+{
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgFrequency[chan] = hz;
+}
+
+/**
+	@brief Parses a name-value set expressed as pairs of comma separated values
+
+	Expected format: COMMAND? Name1, Value1, Name2, Value2
+
+	If forwardMap is true, returns name -> value. If false, returns value -> name.
+ */
+map<string, string> MagnovaOscilloscope::ParseCommaSeparatedNameValueList(string str, bool forwardMap)
+{
+	str += ',';
+	size_t ispace = str.find(' ');
+	string tmpName;
+	string tmpVal;
+	bool firstHalf = true;
+	map<string, string> ret;
+	for(size_t i=ispace+1; i<str.length(); i++)
+	{
+		if(str[i] == ',')
+		{
+			//Done with name
+			if(firstHalf)
+				firstHalf = false;
+
+			//Done with value
+			else
+			{
+				firstHalf = true;
+
+				if(forwardMap)
+					ret[tmpName] = tmpVal;
+				else
+					ret[tmpVal] = tmpName;
+
+				tmpName = "";
+				tmpVal = "";
+			}
+		}
+
+		//ignore spaces, some commands have them and others don't - doesn't seem to matter
+		else if(isspace(str[i]))
+			continue;
+
+		else if(firstHalf)
+			tmpName += str[i];
+		else
+			tmpVal += str[i];
+	}
+	return ret;
+}
+
+FunctionGenerator::WaveShape MagnovaOscilloscope::GetFunctionChannelShape(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgShape.find(chan) != m_awgShape.end())
+			return m_awgShape[chan];
+	}
+
+	//Query the basic wave parameters
+	auto shape = m_transport->SendCommandQueuedWithReply(":FGEN:WAV:SHAP?", false);
+	// auto areply = m_transport->SendCommandQueuedWithReply(":FGEN:WAV:ASHAP?", false);
+
+	//Crack the replies
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(shape == "SINe")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_SINE;
+		else if(shape == "SQUare")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_SQUARE;
+		else if(shape == "RAMP")
+		{
+			LogWarning("wave type RAMP unimplemented\n");
+		}
+		else if(shape == "PULSe")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_PULSE;
+		else if(shape == "NOISe")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_NOISE;
+		else if(shape == "DC")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_DC;
+		else if(shape == "PRBS")
+		{
+			//TODO: LENGTH if type is PRBS?
+			//Might only be supported on SDGs
+			m_awgShape[chan] = FunctionGenerator::SHAPE_PRBS_NONSTANDARD;
+		}
+		else if(shape == "ARBitrary")
+		{
+			m_awgShape[chan] = FunctionGenerator::SHAPE_CARDIAC;
+			/*string name = areply.substr(areply.find("NAME,") + 5);
+
+			if(name == "ExpFal")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_EXPONENTIAL_DECAY;
+			else if(name == "ExpRise")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_EXPONENTIAL_RISE;
+			else if(name == "LogFall")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_LOG_DECAY;
+			else if(name == "LogRise")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_LOG_RISE;
+			else if(name == "Sqrt")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SQUARE_ROOT;
+			else if(name == "Root3")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CUBE_ROOT;
+			else if(name == "X^2")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SQUARE;
+			else if(name == "X^3")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CUBIC;
+			else if(name == "Sinc")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SINC;
+			else if(name == "Gaussian")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_GAUSSIAN;
+			else if(name == "StairUp")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_STAIRCASE_UP;
+			//DLorentz
+			else if(name == "Haversine")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_HAVERSINE;
+			else if(name == "Lorentz")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_LORENTZ;
+			else if(name == "Gauspuls")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_GAUSSIAN_PULSE;
+			//TODO: Gmonopuls
+			//TODO: Tripuls
+			else if(name == "Cardiac")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CARDIAC;
+			//TODO: Quake
+			//TODO: Chirp
+			//TODO: Twotone
+			else if(name == "StairDn")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_STAIRCASE_DOWN;
+			//TODO: SNR
+			else if(name == "Hamming")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_HAMMING;
+			else if(name == "Hanning")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_HANNING;
+			else if(name == "kaiser")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_KAISER;
+			else if(name == "Blackman")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_BLACKMAN;
+			else if(name == "Gausswin")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_GAUSSIAN_WINDOW;
+			else if(name == "Triangle")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_TRIANGLE;
+			else if(name == "BlackmanH")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_BLACKMAN;
+			else if(name == "Bartlett-Hann")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_BARTLETT;
+			else if(name == "Tan")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_TAN;
+			else if(name == "StairUD")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_STAIRCASE_UP_DOWN;
+			else if(name == "Cot")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_COT;
+			else if(name == "Sec")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SEC;
+			else if(name == "Csc")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CSC;
+			else if(name == "Asin")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ASIN;
+			else if(name == "Acos")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ACOS;
+			else if(name == "Atan")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ATAN;
+			else if(name == "Acot")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ACOT;
+			//TODO: Trapezia
+			else if(name == "Upramp")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SAWTOOTH_UP;
+			else if(name == "Dnramp")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SAWTOOTH_DOWN;
+			else
+				LogWarning("Arb shape %s unimplemented\n", name.c_str());*/
+		}
+		else
+			LogWarning("wave type %s unimplemented\n", shape.c_str());
+
+		return m_awgShape[chan];
+	}
+}
+
+void MagnovaOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::WaveShape shape)
+{
+	string basicType;
+	string arbType;
+
+	switch(shape)
+	{
+		//Basic wave types
+		case SHAPE_SINE:
+			basicType = "SINE";
+			break;
+
+		case SHAPE_SQUARE:
+			basicType = "SQUARE";
+			break;
+
+		//TODO: "ramp"
+
+		case SHAPE_PULSE:
+			basicType = "PULSE";
+			break;
+
+		case SHAPE_NOISE:
+			basicType = "NOISE";
+			break;
+
+		case SHAPE_PRBS_NONSTANDARD:
+			basicType = "PRBS";
+			break;
+
+		case SHAPE_DC:
+			basicType = "DC";
+			break;
+
+		//Arb wave types
+		case SHAPE_STAIRCASE_UP:
+			basicType = "ARB";
+			arbType = "StairUp";
+			break;
+
+		case SHAPE_STAIRCASE_DOWN:
+			basicType = "ARB";
+			arbType = "StairDn";
+			break;
+
+		case SHAPE_STAIRCASE_UP_DOWN:
+			basicType = "ARB";
+			arbType = "StairUD";
+			break;
+
+		case SHAPE_SAWTOOTH_UP:
+			basicType = "ARB";
+			arbType = "Upramp";
+			break;
+
+		case SHAPE_SAWTOOTH_DOWN:
+			basicType = "ARB";
+			arbType = "Dnramp";
+			break;
+
+		case SHAPE_EXPONENTIAL_DECAY:
+			basicType = "ARB";
+			arbType = "ExpFal";
+			break;
+
+		case SHAPE_EXPONENTIAL_RISE:
+			basicType = "ARB";
+			arbType = "ExpRise";
+			break;
+
+		case SHAPE_LOG_DECAY:
+			basicType = "ARB";
+			arbType = "LogFall";
+			break;
+
+		case SHAPE_LOG_RISE:
+			basicType = "ARB";
+			arbType = "LogRise";
+			break;
+
+		case SHAPE_SQUARE_ROOT:
+			basicType = "ARB";
+			arbType = "Sqrt";
+			break;
+
+		case SHAPE_CUBE_ROOT:
+			basicType = "ARB";
+			arbType = "Root3";
+			break;
+
+		case SHAPE_QUADRATIC:
+			basicType = "ARB";
+			arbType = "X^2";
+			break;
+
+		case SHAPE_CUBIC:
+			basicType = "ARB";
+			arbType = "X^3";
+			break;
+
+		case SHAPE_SINC:
+			basicType = "ARB";
+			arbType = "Sinc";
+			break;
+
+		case SHAPE_GAUSSIAN:
+			basicType = "ARB";
+			arbType = "Gaussian";
+			break;
+
+		case SHAPE_DLORENTZ:
+			basicType = "ARB";
+			arbType = "DLorentz";
+			break;
+
+		case SHAPE_HAVERSINE:
+			basicType = "ARB";
+			arbType = "Haversine";
+			break;
+
+		case SHAPE_LORENTZ:
+			basicType = "ARB";
+			arbType = "Lorentz";
+			break;
+
+		case SHAPE_GAUSSIAN_PULSE:
+			basicType = "ARB";
+			arbType = "Gauspuls";
+			break;
+
+		case SHAPE_CARDIAC:
+			basicType = "ARB";
+			arbType = "Cardiac";
+			break;
+
+		case SHAPE_HAMMING:
+			basicType = "ARB";
+			arbType = "Hamming";
+			break;
+
+		case SHAPE_HANNING:
+			basicType = "ARB";
+			arbType = "Hanning";
+			break;
+
+		case SHAPE_KAISER:
+			basicType = "ARB";
+			arbType = "kaiser";	//yes, lowercase is intentional
+			break;
+
+		case SHAPE_BLACKMAN:
+			basicType = "ARB";
+			arbType = "Blackman";
+			break;
+
+		case SHAPE_GAUSSIAN_WINDOW:
+			basicType = "ARB";
+			arbType = "Gausswin";
+			break;
+
+		case SHAPE_TRIANGLE:
+			basicType = "ARB";
+			arbType = "Triangle";
+			break;
+
+		case SHAPE_HARRIS:
+			basicType = "ARB";
+			arbType = "BlackmanH";
+			break;
+
+		case SHAPE_BARTLETT:
+			basicType = "ARB";
+			arbType = "Bartlett-Hann";
+			break;
+
+		case SHAPE_TAN:
+			basicType = "ARB";
+			arbType = "Tan";
+			break;
+
+		case SHAPE_COT:
+			basicType = "ARB";
+			arbType = "Cot";
+			break;
+
+		case SHAPE_SEC:
+			basicType = "ARB";
+			arbType = "Sec";
+			break;
+
+		case SHAPE_CSC:
+			basicType = "ARB";
+			arbType = "Csc";
+			break;
+
+		case SHAPE_ASIN:
+			basicType = "ARB";
+			arbType = "Asin";
+			break;
+
+		case SHAPE_ACOS:
+			basicType = "ARB";
+			arbType = "Acos";
+			break;
+
+		case SHAPE_ATAN:
+			basicType = "ARB";
+			arbType = "Atan";
+			break;
+
+		case SHAPE_ACOT:
+			basicType = "ARB";
+			arbType = "Acot";
+			break;
+
+		//unsupported, ignore
+		default:
+			return;
+	}
+
+	//Select type
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP," + basicType);
+	if(basicType == "ARB")
+	{
+		//Returns map of memory slots ("M10") to waveform names
+		//Mapping is explicitly not stable, so we have to check for each instrument
+		//(but can be cached for a given session)
+		auto stl = m_transport->SendCommandQueuedWithReply("STL?");
+		auto arbmap = ParseCommaSeparatedNameValueList(stl, false);
+
+		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":ARWV INDEX," + arbmap[arbType].substr(1));
+	}
+
+	//Update cache
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgShape[chan] = shape;
+}
+
+bool MagnovaOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
+{
+	return false;
+}
+
+FunctionGenerator::OutputImpedance MagnovaOscilloscope::GetFunctionChannelOutputImpedance(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgImpedance.find(chan) != m_awgImpedance.end())
+			return m_awgImpedance[chan];
+	}
+
+	//Get output enable status and impedance from the hardware, then return newly updated cache entry
+	GetFunctionChannelActive(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgImpedance[chan];
+}
+
+void MagnovaOscilloscope::SetFunctionChannelOutputImpedance(int chan, FunctionGenerator::OutputImpedance z)
+{
+	//Have to do this first, since it touches m_awgImpedance
+	string state;
+	if(GetFunctionChannelActive(chan))
+		state = "ON";
+	else
+		state = "OFF";
+
+	string imp;
+	if(z == IMPEDANCE_50_OHM)
+		imp = "50";
+	else
+		imp = "HZ";
+
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgImpedance[chan] = z;
+}

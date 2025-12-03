@@ -166,6 +166,7 @@ set(SCOPEHAL_SOURCES
 	KeysightDCA.cpp
 	LeCroyOscilloscope.cpp
 	LeCroyFWPOscilloscope.cpp
+	MagnovaOscilloscope.cpp
 	MockOscilloscope.cpp
 	MultiLaneBERT.cpp
 	NanoVNA.cpp
