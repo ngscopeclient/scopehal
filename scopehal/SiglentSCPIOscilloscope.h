@@ -72,6 +72,9 @@ public:
 private:
 	std::string converse(const char* fmt, ...);
 	void sendOnly(const char* fmt, ...);
+	void flush();
+	void flushWaveformData();
+	void protocolError(std::string message = "");
 
 protected:
 	void IdentifyHardware();
@@ -286,7 +289,6 @@ protected:
 	bool ReadWavedescs(
 		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 
-	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 
 	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
@@ -319,6 +321,7 @@ protected:
 	// Firmware version
 	int m_ubootMajorVersion;
 	int m_ubootMinorVersion;
+	int m_ubootPatchVersion;
 	int m_fwMajorVersion;
 	int m_fwMinorVersion;
 	int m_fwPatchVersion;
@@ -343,6 +346,9 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 	bool m_triggerForced;
+
+	// Pagination state
+	bool m_paginated;
 
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
