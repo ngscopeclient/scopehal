@@ -197,6 +197,13 @@ void SiglentSCPIOscilloscope::flushWaveformData()
 	m_maxPointsValid = false;
 }
 
+void SiglentSCPIOscilloscope::protocolError(std::string message)
+{
+	LogError("Protocol error, flushing read stream%s\n", message != "" ? ((": "+message).c_str()) : ".");
+	m_transport->ReadReply();
+}
+
+
 void SiglentSCPIOscilloscope::SharedCtorInit()
 {
 	//Add the external trigger input
@@ -1190,7 +1197,10 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 	}
 
 	double d;
-	sscanf(reply.c_str(), "%lf", &d);
+	if(sscanf(reply.c_str(), "%lf", &d) <= 0)
+	{
+		protocolError("error when parsing channe attenuation");
+	}
 	return d;
 }
 
@@ -1571,7 +1581,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	}
 
 	//Stopped, no data available
-	if(sinr == "Stop")
+	if(sinr == "Stop" || sinr == "FStop")
 	{
 		if(m_triggerArmed)
 		{
@@ -1585,6 +1595,15 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 		}
 		else
 			return TRIGGER_MODE_STOP;
+	}
+
+	// Check for protocol errors
+	if(m_protocolId == PROTOCOL_E11)
+	{	// Possible trigger values are Arm|Ready|Auto|Trig'd|Stop|Roll}
+		if((sinr != "Auto") && (sinr != "Trig'd") && (sinr != "Roll"))
+		{
+			protocolError("Invalid trigger value '"+sinr+"'");
+		}
 	}
 	return TRIGGER_MODE_RUN;
 }
@@ -2207,7 +2226,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								{
 									LogError("Protocol error, aborting acquisition.");
 									ChannelsDownloadFinished();
-									return false;
+									analogWaveformDataSize[i] = 0;
+									break;
 								}
 								analogWaveformDataSize[i] += readBytes;
 							}
@@ -2224,7 +2244,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								{
 									LogError("Protocol error, aborting acquisition.");
 									ChannelsDownloadFinished();
-									return false;
+									analogWaveformDataSize[i] = 0;
+									break;
 								}
 								analogWaveformDataSize[i] = readBytes;
 							}
@@ -2242,7 +2263,11 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							// This is the 0x0a0a at the end
 							m_transport->ReadRawData(2, (unsigned char*)tmp);
 							// Detect prtocol error and consume the rest of the stream
-							//if(tmp[0] != 0x0a || tmp[1] != 0x0a) flushWaveformData();
+							if(tmp[0] != 0x0a || tmp[1] != 0x0a)
+							{
+								LogError("Error while reading waveform data, flushing read buffer...");
+								flushWaveformData();
+							}
 						}
 						// Safe-check data size
 						if(analogWaveformDataSize[i] > ((int)acqBytes)) analogWaveformDataSize[i] = acqBytes;
@@ -2288,7 +2313,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									{
 										LogError("Protocol error, aborting acquisition.");
 										ChannelsDownloadFinished();
-										return false;
+										digitalWaveformDataSize[i] = 0;
+										break;
 									}
 									digitalWaveformDataSize[i] += readBytes;
 								}
@@ -2300,7 +2326,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									{
 										LogError("Protocol error, aborting acquisition.");
 										ChannelsDownloadFinished();
-										return false;
+										digitalWaveformDataSize[i] = 0;
+										break;
 									}
 									digitalWaveformDataSize[i] = readBytes;
 								}
@@ -2315,6 +2342,12 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								}
 								// This is the 0x0a0a at the end
 								m_transport->ReadRawData(2, (unsigned char*)tmp);
+								// Detect prtocol error and consume the rest of the stream
+								if(tmp[0] != 0x0a || tmp[1] != 0x0a)
+								{
+									LogError("Error while reading waveform data, flushing read buffer...");
+									flushWaveformData();
+								}
 							}
 							ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 						}
@@ -2599,7 +2632,11 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 	}
 
 	float offset;
-	sscanf(reply.c_str(), "%f", &offset);
+	if(sscanf(reply.c_str(), "%f", &offset) <= 0)
+	{
+		protocolError("Error while parsing channel offset");
+		return offset;
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
@@ -2669,7 +2706,11 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 	}
 
 	float volts_per_div;
-	sscanf(reply.c_str(), "%f", &volts_per_div);
+	if(sscanf(reply.c_str(), "%f", &volts_per_div)<=0)
+	{
+		protocolError("Error while parsing channel voltage range");
+		return m_channelVoltageRanges[i];
+	}
 
 	float v = volts_per_div * 8;	//plot is 8 divisions high
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -2909,9 +2950,15 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 				// --------------------------------------------------
 		}
 
-		sscanf(reply.c_str(), "%lf", &f);
-		m_sampleRate = static_cast<int64_t>(f);
-		m_sampleRateValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f) > 0)
+		{
+			m_sampleRate = static_cast<int64_t>(f);
+			m_sampleRateValid = true;
+		}
+		else
+		{
+			protocolError("Error while parsing sample rate");
+		}
 	}
 	return m_sampleRate;
 }
@@ -2931,9 +2978,15 @@ uint64_t SiglentSCPIOscilloscope::GetMaxPoints()
 				LogError("Max points only supported by E11 protocol\n");
 				break;
 		}
-		sscanf(reply.c_str(), "%lf", &f);
-		m_maxPoints = static_cast<int64_t>(f);
-		m_maxPointsValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f)>0)
+		{
+			m_maxPoints = static_cast<int64_t>(f);
+			m_maxPointsValid = true;
+		}
+		else
+		{
+			protocolError("Error whil parsin max points");
+		}
 		//LogWarning("Got max point %s => %d\n",reply.c_str(),(int)m_maxPoints);
 	}
 	return m_maxPoints;
@@ -2954,9 +3007,15 @@ uint64_t SiglentSCPIOscilloscope::GetAcqPoints()
 				LogError("Acq points only supported by E11 protocol\n");
 				break;
 		}
-		sscanf(reply.c_str(), "%lf", &f);
-		m_acqPoints = static_cast<int64_t>(f);
-		m_acqPointsValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f)>0)
+		{
+			m_acqPoints = static_cast<int64_t>(f);
+			m_acqPointsValid = true;
+		}
+		else
+		{
+			protocolError("Error whil parsing acs points");
+		}
 		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
 	}
 	return m_acqPoints;
@@ -2977,9 +3036,15 @@ uint64_t SiglentSCPIOscilloscope::GetDigitalAcqPoints()
 				LogError("Digital Acq points only supported by E11 protocol\n");
 				break;
 		}
-		sscanf(reply.c_str(), "%lf", &f);
-		m_digitalAcqPoints = static_cast<int64_t>(f);
-		m_digitalAcqPointsValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f)>0)
+		{
+			m_digitalAcqPoints = static_cast<int64_t>(f);
+			m_digitalAcqPointsValid = true;
+		}
+		else
+		{
+			protocolError("Error while parsing digital acq points");
+		}
 		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
 	}
 	return m_digitalAcqPoints;
@@ -3027,6 +3092,8 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 
 	//Save original sample rate (scope often changes sample rate when adjusting memory depth)
 	uint64_t rate = GetSampleRate();
+	bool sampleRateSet = false;
+	bool tiggerWasArmed = m_triggerArmed;
 	// Get Trigger State to restore it after setting changing memory detph
 	TriggerMode triggerMode = PollTrigger();
 
@@ -3309,8 +3376,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 						sendOnly("ACQUIRE:MDEPTH 500M");
 						break;
 				}
-				//Force sample rate to be correct, adjusting time/div if needed
-				SetSampleRate(GetSampleRate());
 				break;
 			case MODEL_SIGLENT_SDS7000A:
 				switch(depth)
@@ -3355,8 +3420,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 						sendOnly("ACQUIRE:MDEPTH 1G");
 						break;
 				}
-				//Force sample rate to be correct, adjusting time/div if needed
-				SetSampleRate(GetSampleRate());
 				break;
 			// --------------------------------------------------
 			default:
@@ -3364,9 +3427,13 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				break;
 				// --------------------------------------------------
 		}
-		if(IsTriggerArmed())
+		//Force sample rate to be correct, adjusting time/div if needed
+		SetSampleRate(GetSampleRate());
+		sampleRateSet = true;
+		if(tiggerWasArmed)
 		{	// restart trigger
 			sendOnly("TRIG_MODE SINGLE");
+			m_triggerArmed = true;
 		}
 		else
 		{	// Restore previous trigger mode
@@ -3376,12 +3443,17 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 
 	m_memoryDepthValid = false;
 
-	//restore old sample rate
-	SetSampleRate(rate);
+	if(!sampleRateSet)
+	{	//restore old sample rate
+		SetSampleRate(rate);
+	}
 }
 
 void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 {
+	//Need to lock the mutex when setting rate because of the quirks around needing to change trigger mode too
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	m_sampleRate = rate;
 	m_sampleRateValid = false;
 	
@@ -3409,7 +3481,8 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 			{
 			// We cannot change srate when in Stop mode
 			// Get Trigger State to restore it after setting changing memory detph
-			TriggerMode triggerMode = PollTrigger();
+			bool wasArmed = m_triggerArmed;
+			bool wasStopped = !wasArmed && (converse(":TRIGGER:STATUS?") == "Stop");
 			sendOnly(":TRIGGER:MODE AUTO");
 			// Time scale and srate need to both be set for the scope to consistantly update sample rate
 			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
@@ -3430,11 +3503,16 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 				}
 			}
 			//LogDebug("Rate = %" PRIu64 ", newRate = %" PRIu64 "\n",rate,newRate);
-			if (triggerMode == TRIGGER_MODE_STOP)
+			if(wasArmed)
+			{
+				m_triggerArmed = true;
+				sendOnly("TRIG_MODE SINGLE");
+			}
+			else if (wasStopped)
 			{	// Restore previous trigger mode
 				sendOnly(":TRIGGER:MODE STOP");
 				m_triggerArmed = false;
-				m_triggerOneShot = true;
+				m_triggerOneShot = false;
 			}
 
 			}
@@ -3563,7 +3641,11 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 
 	//Result comes back in scientific notation
 	double sec;
-	sscanf(reply.c_str(), "%le", &sec);
+	if(sscanf(reply.c_str(), "%le", &sec)<=0)
+	{
+		protocolError("Error while parsing trigger offset");
+		return m_triggerOffset;
+	}
 	m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
 
 	//Convert from midpoint to start point
@@ -3642,7 +3724,11 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 
 	//Value comes back as floating point ps
 	float skew;
-	sscanf(reply.c_str(), "%f", &skew);
+	if(sscanf(reply.c_str(), "%f", &skew)<=0)
+	{
+		protocolError("Error while parsing channel deskew");
+		return 0;
+	}
 	int64_t skew_ps = round(skew * FS_PER_SECOND);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);

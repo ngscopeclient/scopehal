@@ -74,6 +74,7 @@ private:
 	void sendOnly(const char* fmt, ...);
 	void flush();
 	void flushWaveformData();
+	void protocolError(std::string message = "");
 
 protected:
 	void IdentifyHardware();
@@ -288,7 +289,6 @@ protected:
 	bool ReadWavedescs(
 		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 
-	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 
 	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
