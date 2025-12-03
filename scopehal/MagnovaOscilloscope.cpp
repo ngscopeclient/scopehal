@@ -1537,7 +1537,7 @@ float MagnovaOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 
 	string reply;
 
-	reply = converse(":CHANNEL%zu:OFFSET?", i + 1);
+	reply = converse(":CHAN%zu:OFFSET?", i + 1);
 
 	float offset;
 	sscanf(reply.c_str(), "%f", &offset);
@@ -1553,7 +1553,7 @@ void MagnovaOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float of
 	if(i >= m_analogChannelCount)
 		return;
 
-	sendOnly(":CHANNEL%zu:OFFSET %1.2E", i + 1, offset);
+	sendOnly(":CHAN%zu:OFFSET %1.2E", i + 1, offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
@@ -1573,7 +1573,7 @@ float MagnovaOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 	string reply;
 
-	reply = converse(":CHANNEL%zu:SCALE?", i + 1);
+	reply = converse(":CHAN%zu:SCALE?", i + 1);
 
 	float volts_per_div;
 	sscanf(reply.c_str(), "%f", &volts_per_div);
@@ -1593,12 +1593,28 @@ void MagnovaOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, fl
 	float vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
-	sendOnly(":CHANNEL%zu:SCALE %.4f", i + 1, vdiv);
+	sendOnly(":CHAN%zu:SCALE %.4f", i + 1, vdiv);
 }
 
 vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
-{	// Changing srate is not supported by Magnova scope
+{
+	const uint64_t k = 1000;
+	const uint64_t m = k*k;
+
 	vector<uint64_t> ret;
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_MAGNOVA_BMO:
+			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 100*m, 200*m, 400*m, 800*m, 1600*m };
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+
 	return ret;
 }
 
@@ -1611,7 +1627,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
 	// TODO
-	ret = {20 * 1000, 200 * 1000, 2000 * 1000, 20 * 1000 * 1000, 200 * 1000 * 1000};
+	ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
 	return ret;
 }
 
@@ -1677,16 +1693,9 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 
 void MagnovaOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//Need to lock the mutex when setting depth because of the quirks around needing to change trigger mode too
+	//Need to lock the transport mutex when setting depth to prevent changing depth during an acquisition
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	//Save original sample rate (scope often changes sample rate when adjusting memory depth)
-	// uint64_t rate = GetSampleRate();
-	// Get Trigger State to restore it after setting changing memory detph
-	// TriggerMode triggerMode = PollTrigger();
-
-	// we can not change memory size in Run/Stop mode
-	// sendOnly(":AUTO");
 	switch(m_modelid)
 	{
 		case MODEL_MAGNOVA_BMO:
@@ -1698,24 +1707,38 @@ void MagnovaOscilloscope::SetSampleDepth(uint64_t depth)
 			break;
 			// --------------------------------------------------
 	}
-	/*if(IsTriggerArmed())
-	{	// restart trigger
-		sendOnly(":SINGLE");
-	}
-	else
-	{	// Restore previous trigger mode
-		sendOnly(":%s", ((triggerMode == TRIGGER_MODE_STOP) ? "STOP" : "AUTO"));
-	}*/
-
 	m_memoryDepthValid = false;
-
-	//restore old sample rate
-	//SetSampleRate(rate);
+	m_sampleRateValid = false;
 }
 
-void MagnovaOscilloscope::SetSampleRate(uint64_t /*rate*/)
-{	// Not supported by Magnova
-	return;
+void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
+{
+	//Need to lock the transport mutex when setting rate to prevent changing rate during an acquisition
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	double sampletime = GetSampleDepth() / (double)rate;
+	double scale = sampletime / 25;
+
+	switch(m_modelid)
+	{
+		case MODEL_MAGNOVA_BMO:
+			{
+				char tmp[128];
+				snprintf(tmp, sizeof(tmp), "%1.0E", scale);
+				if(tmp[0] == '3')
+					tmp[0] = '2';
+				sendOnly(":TIMEBASE:SCALE %s", tmp);
+			}
+			break;
+
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+	m_sampleRateValid = false;
+	m_memoryDepthValid = false;
 }
 
 void MagnovaOscilloscope::EnableTriggerOutput()
