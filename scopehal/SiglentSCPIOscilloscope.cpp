@@ -1199,7 +1199,7 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 	double d;
 	if(sscanf(reply.c_str(), "%lf", &d) <= 0)
 	{
-		protocolError("error when parsing channe attenuation");
+		protocolError("Error when parsing channel attenuation");
 	}
 	return d;
 }
