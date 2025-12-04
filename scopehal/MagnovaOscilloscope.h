@@ -262,6 +262,9 @@ protected:
 
 	void PrepareAcquisition();
 
+	std::string GetDigitalChannelBankName(size_t channel);
+
+
 	std::string GetPossiblyEmptyString(const std::string& property);
 
 	size_t ReadWaveformBlock(std::vector<uint8_t>* data, std::function<void(float)> progress = nullptr);

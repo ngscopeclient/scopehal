@@ -52,15 +52,7 @@
 
 using namespace std;
 
-static const struct
-{
-	const char* name;
-	float val;
-} c_sds2000xp_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
-
 static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
-static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
-static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -1817,7 +1809,7 @@ void MagnovaOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	}
 	else
 	{	// Digital channels
-		sendOnly(":DIG:DESK%s %1.2E", ((channel - m_digitalChannelBase) < 8) ? "0to7" : "8to15", skew * SECONDS_PER_FS);
+		sendOnly(":DIG:DESK%s %1.2E", GetDigitalChannelBankName(channel), skew * SECONDS_PER_FS);
 	}
 
 	//Update cache
@@ -1846,7 +1838,7 @@ int64_t MagnovaOscilloscope::GetDeskewForChannel(size_t channel)
 	}
 	else
 	{	// Digital channels
-		reply = converse(":DIG:DESK%s?", ((channel - m_digitalChannelBase) < 8) ? "0to7" : "8to15");
+		reply = converse(":DIG:DESK%s?", GetDigitalChannelBankName(channel));
 	}
 
 	//Value comes back as floating point ps
@@ -1910,6 +1902,12 @@ void MagnovaOscilloscope::SetADCMode(size_t /*channel*/, size_t /* mode */)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Logic analyzer configuration
+
+std::string MagnovaOscilloscope::GetDigitalChannelBankName(size_t channel)
+{
+ 	return ((channel - m_digitalChannelBase) < 8) ? "0to7" : "8to15";
+}
+
 
 vector<Oscilloscope::DigitalBank> MagnovaOscilloscope::GetDigitalBanks()
 {
@@ -1978,28 +1976,10 @@ float MagnovaOscilloscope::GetDigitalThreshold(size_t channel)
 			return m_channelDigitalThresholds[channel];
 	}
 
-	float result = 0.0f;
+	float result;
 
-	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
-
-	// Look through the threshold table to see if theres a string match, return it if so
-	uint32_t i = 0;
-	while((c_sds2000xp_threshold_table[i].name) &&
-		  (strncmp(c_sds2000xp_threshold_table[i].name, r.c_str(), strlen(c_sds2000xp_threshold_table[i].name))))
-		i++;
-
-	if(c_sds2000xp_threshold_table[i].name)
-	{
-		result =  c_sds2000xp_threshold_table[i].val;
-	}
-	else if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
-	{	// Didn't match a standard, check for custom
-		result =  strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
-	}
-	else
-	{
-		LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
-	}
+	string reply = converse(":DIG:THRESHOLD%s?", GetDigitalChannelBankName(channel));
+	sscanf(reply.c_str(), "%f", &result);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelDigitalThresholds[channel] = result;
@@ -2015,22 +1995,7 @@ void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
 	channel -= m_analogChannelCount;
 
-	// Search through standard thresholds to see if one matches
-	uint32_t i = 0;
-	while((
-		(c_sds2000xp_threshold_table[i].name) && (fabsf(level - c_sds2000xp_threshold_table[i].val)) > c_thresh_thresh))
-		i++;
-
-	if(c_sds2000xp_threshold_table[i].name)
-		sendOnly(":DIGITAL:THRESHOLD%zu %s", (channel / 8) + 1, (c_sds2000xp_threshold_table[i].name));
-	else
-	{
-		do
-		{
-			sendOnly(":DIGITAL:THRESHOLD%zu CUSTOM,%1.2E", (channel / 8) + 1, level);
-
-		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount) - level)) > 0.1f);
-	}
+	sendOnly(":DIG:THRESHOLD%s %1.2E", GetDigitalChannelBankName(channel), level);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
