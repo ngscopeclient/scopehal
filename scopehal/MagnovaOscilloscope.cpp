@@ -1195,7 +1195,7 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 	for(size_t j = 0; j < num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
-		auto cap = new UniformAnalogWaveform;
+		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(ch)->GetHwname());
 		cap->m_timescale = round(interval);
 
 		cap->m_triggerPhase = h_off_frac;
@@ -1338,7 +1338,6 @@ bool MagnovaOscilloscope::AcquireData()
 	int analogWaveformDataSize[MAX_ANALOG] {0};
 	std::vector<uint8_t> digitalWaveformDataBytes[MAX_DIGITAL];
 	int digitalWaveformDataSize[MAX_DIGITAL] {0};
-	std::string digitalWaveformData;
 
 	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
@@ -1393,12 +1392,6 @@ bool MagnovaOscilloscope::AcquireData()
 			m_transport->SendCommand(":CHAN" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
 			size_t readBytes = ReadWaveformBlock(&analogWaveformData[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 			analogWaveformDataSize[i] = readBytes;
-			LogDebug("Parsing metadata...\n");
-			auto metadata = parseMetadata(analogWaveformData[i]);
-			if(metadata)
-			{
-				LogDebug("Metadata parsed, starTime = %f\n",metadata->startTime);
-			}
 			ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 		}
 	}
@@ -1492,6 +1485,15 @@ bool MagnovaOscilloscope::AcquireData()
 
 	// Tell the download monitor that waveform download has finished
 	ChannelsDownloadFinished();
+
+	for(int i=0; i<MAX_ANALOG; i++)
+	{	// Free memory
+		analogWaveformData[i] = {};
+	}
+	for(int i=0; i<MAX_DIGITAL; i++)
+	{	// Free memory
+		digitalWaveformDataBytes[i] = {};
+	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
