@@ -919,6 +919,7 @@ std::optional<MagnovaOscilloscope::Metadata> MagnovaOscilloscope::parseMetadata(
     }
     catch (const std::exception& e) {
 		LogError("Error parsing metadata: %s.\n", e.what());
+		return std::nullopt;
     }
 }
 
@@ -1350,7 +1351,6 @@ bool MagnovaOscilloscope::AcquireData()
 	bool analogEnabled[MAX_ANALOG] = {false};
 	bool digitalEnabled[MAX_DIGITAL] = {false};
 	bool anyDigitalEnabled = false;
-	bool anyAnalogEnabled = false;
 	double* pwtime = NULL;
 
 	//Acquire the data (but don't parse it)
@@ -1363,11 +1363,6 @@ bool MagnovaOscilloscope::AcquireData()
 
 	// Detect active channels
 	BulkCheckChannelEnableState();
-	for(unsigned int i = 0; i <  m_analogChannelCount; i++)
-	{	// Check all analog channels
-		analogEnabled[i] = IsChannelEnabled(i);
-		anyAnalogEnabled |= analogEnabled[i];
-	}
 
 	for(unsigned int i = 0; i <  m_digitalChannelCount; i++)
 	{	// Check digital channels
