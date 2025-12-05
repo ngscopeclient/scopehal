@@ -316,6 +316,7 @@ void SiglentSCPIOscilloscope::ParseFirmwareVersion()
 			&m_fwMinorVersion,
 			&m_fwPatchVersion,
 			&m_fwPatchRevision);
+		LogDebug("Found version %d.%d.%d.%d.%d.%d.%d\n",m_ubootMajorVersion,m_ubootMinorVersion,m_ubootPatchVersion,m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion,m_fwPatchRevision);
 	}
 	else
 	{	//Version format for 1.5.2R3 and older
@@ -326,8 +327,8 @@ void SiglentSCPIOscilloscope::ParseFirmwareVersion()
 			&m_fwMinorVersion,
 			&m_fwPatchVersion,
 			&m_fwPatchRevision);
+		LogDebug("Found version %d.%d.%d.%d.%d.%d\n",m_ubootMajorVersion,m_ubootMinorVersion,m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion,m_fwPatchRevision);
 	}
-	//LogDebug("Found version %d.%d.%d.%d.%d.%d.%d\n",m_ubootMajorVersion,m_ubootMinorVersion,m_ubootPatchVersion,m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion,m_fwPatchRevision);
 }
 
 void SiglentSCPIOscilloscope::IdentifyHardware()
@@ -472,7 +473,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 		{	// Only 5 ms for newer models
 			m_transport->EnableRateLimiting(chrono::milliseconds(5));
 		}
-
+		LogDebug("Found model %s with m_requireSizeWorkaround = %s\n",GetModelString().c_str(),m_requireSizeWorkaround ? "true" : "false");
 	}
 	else
 	{
@@ -1608,8 +1609,9 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	return TRIGGER_MODE_RUN;
 }
 
-int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround, std::function<void(float)> progress)
+int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, size_t& readBytes, char* data, bool hdSizeWorkaround, std::function<void(float)> progress)
 {
+	readBytes = 0;
 	//Read and discard data until we see the '#'
 	uint8_t tmp;
 	for(int i=0; i<20; i++)
@@ -1643,10 +1645,13 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 	if(hdSizeWorkaround)
 		len *= 2;
 
-	//LogDebug("Got length %" PRIu32 " from scope, hdSizeWorkaround = %s, expected bytes = %" PRIu32 ", maxsize = %" PRIu32 " => reading %" PRIu32 " bytes.\n",getLength, hdSizeWorkaround ? "true" : "false", len, maxsize, min(len, maxsize));
-	len = min(len, maxsize);
+	LogTrace("Got length %" PRIu32 " ('%s') from scope, hdSizeWorkaround = %s, expected bytes = %" PRIu32 ", maxsize = %" PRIu32 " => reading %" PRIu32 " bytes.\n",getLength, textlen, hdSizeWorkaround ? "true" : "false", len, maxsize, min(len, maxsize));
+	if(len > maxsize)
+	{
+		len = maxsize;
+		LogError("Invalid waveform block length %" PRIu32 " : max size = %" PRIu32 "\n",len,maxsize);
+	}
 
-	size_t readBytes = 0;
 	while(readBytes < len)
 	{
 		size_t newBytes = m_transport->ReadRawData(len-readBytes, (unsigned char*)(data+readBytes), progress);
@@ -1706,9 +1711,9 @@ bool SiglentSCPIOscilloscope::ReadWavedescs(
 		if(analogEnabled[i] || (!anyAnalogEnabled && i == 0))
 		{
 			m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:PREAMBLE?");
-
-			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE, wavedescs[i]))
-				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
+			size_t readBytes;
+			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE,readBytes,wavedescs[i]))
+				LogError("ReadWaveformBlock for wavedesc %u failed, readBytes = %zu\n", i, readBytes);
 
 			// Read 0x0A 0x0A trailer
 			m_transport->ReadReply();
@@ -2017,10 +2022,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 {
 	// Transfer buffers
 	char* analogWaveformData[MAX_ANALOG] {nullptr};
-	int analogWaveformDataSize[MAX_ANALOG] {0};
+	size_t analogWaveformDataSize[MAX_ANALOG] {0};
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
 	char* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
-	int digitalWaveformDataSize[MAX_DIGITAL] {0};
+	size_t digitalWaveformDataSize[MAX_DIGITAL] {0};
 	std::string digitalWaveformData;
 
 	//State for this acquisition (may be more than one waveform)
@@ -2040,6 +2045,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	bool anyAnalogEnabled = false;
 	double* pwtime = NULL;
 	char tmp[128];
+	size_t readBytes;
 
 	//Acquire the data (but don't parse it)
 
@@ -2072,7 +2078,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					analogWaveformData[i] = new char[WAVEFORM_SIZE];
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
-					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE,readBytes,analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 					// This is the 0x0a0a at the end
 					m_transport->ReadRawData(2, (unsigned char*)tmp);
 				}
@@ -2198,10 +2204,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				uint64_t pages = ceil(acqPoints/pageSize);
 				if(pages < 1) pages = 1;
 				uint64_t pageSizeBytes = m_highDefinition ? (pageSize*2) : pageSize;
-				uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
+				size_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
 				bool paginated = (pages > 1);
-				uint64_t readBytes;
-				//LogDebug("Acqu points = %" PRIu64 ", Acqu bytes = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",acqPoints,acqBytes,pages,pageSize,pageSizeBytes);
+				LogTrace("Acqu points = %" PRIu64 ", Acqu bytes = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",acqPoints,acqBytes,pages,pageSize,pageSizeBytes);
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
@@ -2221,7 +2226,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 									ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 								};
-								readBytes = (uint64_t)ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
+								ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], readBytes, analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
 								if(readBytes == 0)
 								{
 									LogError("Protocol error, aborting acquisition.");
@@ -2239,7 +2244,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									m_paginated = false;
 								}
 								m_transport->SendCommand(":WAVEFORM:DATA?");
-								readBytes = (uint64_t)ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+								ReadWaveformBlock(acqBytes, readBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 								if(readBytes == 0)
 								{
 									LogError("Protocol error, aborting acquisition.");
@@ -2270,7 +2275,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							}
 						}
 						// Safe-check data size
-						if(analogWaveformDataSize[i] > ((int)acqBytes)) analogWaveformDataSize[i] = acqBytes;
+						if(analogWaveformDataSize[i] > acqBytes) analogWaveformDataSize[i] = acqBytes;
 						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 					}
 				}
@@ -2284,7 +2289,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					if(pages < 1) pages = 1;
 					paginated = (pages > 1);
 					//LogDebug("Digital acq => Acq points = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",digitalAcqPoints,pages,pageSize,pageSizeBytes);
-					uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
+					size_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
 					// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
 					if(wasPaginated && !paginated)
 					{	// Reset page start
@@ -2308,7 +2313,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 										float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 									};
-									readBytes = (uint64_t)ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
+									ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], readBytes, digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
 									if(readBytes == 0)
 									{
 										LogError("Protocol error, aborting acquisition.");
@@ -2321,7 +2326,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								else
 								{	// All data fits one page
 									m_transport->SendCommand(":WAVEFORM:DATA?");
-									readBytes = (uint64_t)ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+									ReadWaveformBlock(acqDigitalBytes, readBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 									if(readBytes == 0)
 									{
 										LogError("Protocol error, aborting acquisition.");
@@ -2349,6 +2354,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 									flushWaveformData();
 								}
 							}
+							// Safe-check data size
+							if(digitalWaveformDataSize[i] > acqDigitalBytes) digitalWaveformDataSize[i] = acqDigitalBytes;
 							ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 						}
 					}
