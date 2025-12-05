@@ -1350,7 +1350,7 @@ bool MagnovaOscilloscope::AcquireData()
 	bool analogEnabled[MAX_ANALOG] = {false};
 	bool digitalEnabled[MAX_DIGITAL] = {false};
 	bool anyDigitalEnabled = false;
-	bool anyAnalogEnabled = true;
+	bool anyAnalogEnabled = false;
 	double* pwtime = NULL;
 
 	//Acquire the data (but don't parse it)
@@ -1910,7 +1910,7 @@ void MagnovaOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	}
 	else
 	{	// Digital channels
-		sendOnly(":DIG:DESK%s %1.2E", GetDigitalChannelBankName(channel), skew * SECONDS_PER_FS);
+		sendOnly(":DIG:DESK%s %1.2E", GetDigitalChannelBankName(channel).c_str(), skew * SECONDS_PER_FS);
 	}
 
 	//Update cache
@@ -1939,7 +1939,7 @@ int64_t MagnovaOscilloscope::GetDeskewForChannel(size_t channel)
 	}
 	else
 	{	// Digital channels
-		reply = converse(":DIG:DESK%s?", GetDigitalChannelBankName(channel));
+		reply = converse(":DIG:DESK%s?", GetDigitalChannelBankName(channel).c_str());
 	}
 
 	//Value comes back as floating point ps
@@ -2079,7 +2079,7 @@ float MagnovaOscilloscope::GetDigitalThreshold(size_t channel)
 
 	float result;
 
-	string reply = converse(":DIG:THRESHOLD%s?", GetDigitalChannelBankName(channel));
+	string reply = converse(":DIG:THRESHOLD%s?", GetDigitalChannelBankName(channel).c_str());
 	sscanf(reply.c_str(), "%f", &result);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -2096,7 +2096,7 @@ void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
 	channel -= m_analogChannelCount;
 
-	sendWithAck(":DIG:THRESHOLD%s %1.2E", GetDigitalChannelBankName(channel), level);
+	sendWithAck(":DIG:THRESHOLD%s %1.2E", GetDigitalChannelBankName(channel).c_str(), level);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
