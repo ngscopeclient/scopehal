@@ -66,6 +66,7 @@ public:
 private:
 	std::string converse(const char* fmt, ...);
 	void sendOnly(const char* fmt, ...);
+	bool sendWithAck(const char* fmt, ...);
 	void flush();
 	void flushWaveformData();
 
@@ -259,6 +260,8 @@ protected:
 	void PushWindowTrigger(WindowTrigger* trig);
 
 	void BulkCheckChannelEnableState();
+
+	unsigned int GetActiveChannelsCount();
 
 	void PrepareAcquisition();
 

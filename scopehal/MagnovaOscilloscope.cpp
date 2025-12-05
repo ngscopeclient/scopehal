@@ -118,6 +118,24 @@ void MagnovaOscilloscope::sendOnly(const char* fmt, ...)
 	m_transport->SendCommandQueued(opString);
 }
 
+bool MagnovaOscilloscope::sendWithAck(const char* fmt, ...)
+{
+	string ret;
+	char opString[128];
+	va_list va;
+	va_start(va, fmt);
+	vsnprintf(opString, sizeof(opString), fmt, va);
+	va_end(va);
+
+    std::string result(opString);
+    result += ";*OPC?";
+
+	ret = m_transport->SendCommandQueuedWithReply(result.c_str(), false);
+	if(ret.length() == 0)
+		ret = m_transport->ReadReply(); // Sometimes the Magnova returns en empty string and then the actual reply
+	return (ret == "1");
+}
+
 void MagnovaOscilloscope::flush()
 {
 	m_transport->ReadReply();
@@ -250,6 +268,7 @@ void MagnovaOscilloscope::DetectOptions()
 	// string options = converse("*OPT?");
 	m_hasFunctionGen = true;
 	m_hasLA = true;
+	AddDigitalChannels(16);
 }
 
 /**
@@ -439,15 +458,20 @@ bool MagnovaOscilloscope::IsChannelEnabled(size_t i)
 	}
 	else if(i < m_analogAndDigitalChannelCount)
 	{
-		//Digital
+		//Digital => first check digital module is ON
+		string module = converse(":DIG:STAT?");
+		bool isOn = false;
 
-		//See if the channel is on (digital channel numbers are 0 based)
-		size_t nchan = i - m_analogChannelCount;
-		string str = converse(":DIG%zu:STAT?", nchan);
+		if(module == "ON")
+		{	//See if the channel is on (digital channel numbers are 0 based)
+			size_t nchan = i - m_analogChannelCount;
+			string channel = converse(":DIG%zu:STAT?", nchan);
+			isOn = (channel == "ON");
+		}
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		// OFF can bee "SUPPORT_OFF" if all digital channels are off
-		m_channelsEnabled[i] = (str == "ON") ? true : false;
+		m_channelsEnabled[i] = isOn;
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -463,12 +487,12 @@ void MagnovaOscilloscope::EnableChannel(size_t i)
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
 	{
-		sendOnly(":CHAN%zu:STAT ON", i + 1);
+		sendWithAck(":CHAN%zu:STAT ON", i + 1);
 	}
 	else if(i < m_analogAndDigitalChannelCount)
 	{
 		//Digital channel (digital channel numbers are 0 based)
-		sendOnly(":DIG%d:STAT ON", i - m_analogChannelCount);
+		sendWithAck(":DIG%d:STAT ON", i - m_analogChannelCount);
 	}
 	else if(i == m_extTrigChannel->GetIndex())
 	{
@@ -503,14 +527,13 @@ void MagnovaOscilloscope::DisableChannel(size_t i)
 
 	if(i < m_analogChannelCount)
 	{
-		sendOnly(":CHAN%zu:STAT OFF", i + 1);
+		sendWithAck(":CHAN%zu:STAT OFF", i + 1);
 	}
 	else if(i < m_analogAndDigitalChannelCount)
 	{
 		//Digital channel
-
 		//Disable this channel (digital channel numbers are 0 based)
-		sendOnly(":DIG%zu:STAT OFF", i - m_analogChannelCount);
+		sendWithAck(":DIG%zu:STAT OFF", i - m_analogChannelCount);
 	}
 	else if(i == m_extTrigChannel->GetIndex())
 	{
@@ -520,6 +543,7 @@ void MagnovaOscilloscope::DisableChannel(size_t i)
 	//Sample rate and memory depth can change if interleaving state changed
 	if(IsInterleaving() != wasInterleaving)
 	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_memoryDepthValid = false;
 		m_sampleRateValid = false;
 	}
@@ -950,24 +974,66 @@ void MagnovaOscilloscope::BulkCheckChannelEnableState()
 {
 	vector<unsigned int> uncached;
 
+	bool hasUncachedDigital = false;
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-
 		//Check enable state in the cache.
 		for(unsigned int i = 0; i < m_analogAndDigitalChannelCount; i++)
 		{
 			if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
+			{
 				uncached.push_back(i);
+				if(i >= m_analogChannelCount) hasUncachedDigital = true;
+			}
 		}
 	}
 
+	bool digitalModuleOn = false;
+	if(hasUncachedDigital)
+	{	//Digital => first check digital module is ON
+		string module = converse(":DIG:STAT?");
+		digitalModuleOn = (module == "ON");
+	}
 	for(auto i : uncached)
 	{
-		string reply = (i < m_analogChannelCount) ? converse(":CHANNEL%d:SWITCH?", i + 1) : converse(":DIGITAL:D%d?", (i - m_analogChannelCount));
-		// OFF can bee "SUPPORT_OFF" if all digital channels are off
-		m_channelsEnabled[i] = (reply == "ON") ? true : false;
+		if((i < m_analogChannelCount))
+		{	// Analog
+			m_channelsEnabled[i] = (converse(":CHAN%zu:STAT?", i + 1) == "ON");
+		}
+		else
+		{	// Digital
+			m_channelsEnabled[i] = digitalModuleOn && (converse(":DIG%zu:STAT?", (i - m_analogChannelCount)) == "ON");
+		}
 	}
 }
+
+/**
+	@brief Returns the number of active analog channels and digital probes to determine Memory Depth available per channel
+ */
+unsigned int MagnovaOscilloscope::GetActiveChannelsCount()
+{
+	BulkCheckChannelEnableState();
+	unsigned int result = 0;
+	for(unsigned int i = 0; i <  m_analogChannelCount; i++)
+	{	// Check all analog channels
+		if(IsChannelEnabled(i)) result++;
+	}
+	bool probe0to7Active = false;
+	bool probe8to15Active = false;
+	unsigned int halfDigitalChannels = m_digitalChannelCount/2;
+	for(unsigned int i = 0; i <  halfDigitalChannels; i++)
+	{	// Check digital channels for bank1
+		if(IsChannelEnabled(i+m_analogChannelCount)) probe0to7Active = true;
+	}
+	for(unsigned int i = halfDigitalChannels; i <  m_digitalChannelCount; i++)
+	{	// Check digital channels for bank2
+		if(IsChannelEnabled(i+m_analogChannelCount)) probe8to15Active = true;
+	}
+	if(probe0to7Active) result++;
+	if(probe8to15Active) result++;
+	return result;
+}
+
 
 time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& /* timeString */, double& basetime)
 {
@@ -1268,9 +1334,9 @@ vector<SparseDigitalWaveform*> MagnovaOscilloscope::ProcessDigitalWaveform(
 bool MagnovaOscilloscope::AcquireData()
 {
 	// Transfer buffers
-	std::vector<uint8_t>* analogWaveformData[MAX_ANALOG] {nullptr};
+	std::vector<uint8_t> analogWaveformData[MAX_ANALOG];
 	int analogWaveformDataSize[MAX_ANALOG] {0};
-	std::vector<uint8_t>* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
+	std::vector<uint8_t> digitalWaveformDataBytes[MAX_DIGITAL];
 	int digitalWaveformDataSize[MAX_DIGITAL] {0};
 	std::string digitalWaveformData;
 
@@ -1323,13 +1389,12 @@ bool MagnovaOscilloscope::AcquireData()
 	{
 		if(analogEnabled[i])
 		{	// Allocate buffer
-			analogWaveformData[i] = new std::vector<uint8_t>;
 			// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
 			m_transport->SendCommand(":CHAN" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
-			size_t readBytes = ReadWaveformBlock(analogWaveformData[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+			size_t readBytes = ReadWaveformBlock(&analogWaveformData[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 			analogWaveformDataSize[i] = readBytes;
 			LogDebug("Parsing metadata...\n");
-			auto metadata = parseMetadata(*analogWaveformData[i]);
+			auto metadata = parseMetadata(analogWaveformData[i]);
 			if(metadata)
 			{
 				LogDebug("Metadata parsed, starTime = %f\n",metadata->startTime);
@@ -1347,9 +1412,8 @@ bool MagnovaOscilloscope::AcquireData()
 		{
 			if(digitalEnabled[i])
 			{	// Allocate buffer
-				digitalWaveformDataBytes[i] = new std::vector<uint8_t>;
 				m_transport->SendCommand(":DIG" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
-				size_t readBytes = ReadWaveformBlock(digitalWaveformDataBytes[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+				size_t readBytes = ReadWaveformBlock(&digitalWaveformDataBytes[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 				digitalWaveformDataSize[i] = readBytes;
 				ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 			}
@@ -1363,6 +1427,12 @@ bool MagnovaOscilloscope::AcquireData()
 		sendOnly(":SINGLE");
 		m_triggerArmed = true;
 	}
+	// TODO => is this needed ?
+	/*
+	else
+	{	// It was one shot acquisition, disarm trigger
+		m_triggerArmed = false;
+	}*/
 
 	//Process analog waveforms
 	waveforms.resize(m_analogChannelCount);
@@ -1371,7 +1441,7 @@ bool MagnovaOscilloscope::AcquireData()
 		if(analogEnabled[i])
 		{
 			waveforms[i] = ProcessAnalogWaveform(
-				*analogWaveformData[i],
+				analogWaveformData[i],
 				analogWaveformDataSize[i],
 				num_sequences,
 				ttime,
@@ -1399,7 +1469,7 @@ bool MagnovaOscilloscope::AcquireData()
 		if(digitalEnabled[i])
 		{
 			digitalWaveforms[i] = ProcessDigitalWaveform(
-				*digitalWaveformDataBytes[i],
+				digitalWaveformDataBytes[i],
 				digitalWaveformDataSize[i],
 				num_sequences,
 				ttime,
@@ -1436,18 +1506,6 @@ bool MagnovaOscilloscope::AcquireData()
 		m_pendingWaveforms.push_back(s);
 	}
 	m_pendingWaveformsMutex.unlock();
-
-	//Clean up
-	for(int i = 0; i < MAX_ANALOG; i++)
-	{
-		if(analogWaveformData[i] != nullptr)
-			delete analogWaveformData[i];
-	}
-	for(int i = 0; i < MAX_DIGITAL; i++)
-	{
-		if(digitalWaveformDataBytes[i] != nullptr)
-			delete digitalWaveformDataBytes[i];
-	}
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
@@ -1545,7 +1603,7 @@ void MagnovaOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float of
 	if(i >= m_analogChannelCount)
 		return;
 
-	sendOnly(":CHAN%zu:OFFSET %1.2E", i + 1, offset);
+	sendWithAck(":CHAN%zu:OFFSET %1.2E", i + 1, offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
@@ -1583,9 +1641,13 @@ void MagnovaOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, fl
 		return;
 
 	float vdiv = range / 8;
-	m_channelVoltageRanges[i] = range;
 
-	sendOnly(":CHAN%zu:SCALE %.4f", i + 1, vdiv);
+	sendWithAck(":CHAN%zu:SCALE %.4f", i + 1, vdiv);
+
+	//Don't update the cache because the scope is likely to round the value
+	//If we query the instrument later, the cache will be updated then.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelVoltageRanges.erase(i);
 }
 
 vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
@@ -1598,7 +1660,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_MAGNOVA_BMO:
-			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 100*m, 200*m, 400*m, 800*m, 1600*m };
+			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 100*m, 200*m, 400*m, 500*m, 800*m, 1600*m };
 			break;
 		// --------------------------------------------------
 		default:
@@ -1618,8 +1680,28 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesInterleaved()
 vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
-	// TODO
-	ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
+	// Sample depths depend on the number of active analog channels and digital probes :
+	// 1 analog channel or digital probe: 327.2 Mpts
+	// 2 analog channels / digital probes: 163.6 Mpts per channel
+	// 3-4 analog channels / digital probes: 81.8 Mpts per channel
+	// ≥ 5 analog channels / digital probes: 40.9 Mpts per channel
+	unsigned int activeChannels = GetActiveChannelsCount();
+	if(activeChannels <= 1)
+	{
+		ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
+	}
+	else if(activeChannels == 2)
+	{
+		ret = {10 * 1000, 25 * 1000, 50 * 1000, 100 * 1000, 250 * 1000, 500 * 1000, 1000 * 1000, 2500 * 1000, 5 * 1000 * 1000, 10 * 1000 * 1000, 25 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 163575808};
+	}
+	else if(activeChannels == 3 || activeChannels == 4)
+	{
+		ret = {5 * 1000, 12500 , 25 * 1000, 50 * 1000, 125 * 1000, 250 * 1000, 500 * 1000, 1250 * 1000, 2500 * 1000, 5 * 1000 * 1000, 12500 * 1000, 25 * 1000 * 1000, 50 * 1000 * 1000, 81787904};
+	}
+	else
+	{
+		ret = {2500, 6250 , 12500, 25 * 1000, 62500, 125 * 1000, 250 * 1000, 625 * 1000, 1250 * 1000, 2500 * 1000, 6250 * 1000, 12500 * 1000, 25 * 1000 * 1000, 40893952};
+	}
 	return ret;
 }
 
@@ -1632,11 +1714,21 @@ set<MagnovaOscilloscope::InterleaveConflict> MagnovaOscilloscope::GetInterleaveC
 {
 	set<InterleaveConflict> ret;
 
-	//All scopes normally interleave channels 1/2 and 3/4.
-	//If both channels in either pair is in use, that's a problem.
-	ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(1)));
-	if(m_analogChannelCount > 2)
-		ret.emplace(InterleaveConflict(GetOscilloscopeChannel(2), GetOscilloscopeChannel(3)));
+	switch(m_modelid)
+	{
+		// Magnova BMO interleaves if any of channel 3 or 4 is active
+		case MODEL_MAGNOVA_BMO:
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(2)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(3)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(1), GetOscilloscopeChannel(2)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(1), GetOscilloscopeChannel(3)));
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 
 	return ret;
 }
@@ -1656,7 +1748,7 @@ uint64_t MagnovaOscilloscope::GetSampleRate()
 		}
 		else
 		{
-			
+			// TODO protocole error
 		}
 	}
 	return m_sampleRate;
@@ -1669,66 +1761,73 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 	{	// Possible values are : AUTo, AFASt, Integer in pts
 		string reply = converse(":ACQUIRE:MDEPTH?");
 		if(reply == "AUTo" || reply == "AFASt")
-		{
-			m_memoryDepth = 0;
-			m_memoryDepthValid = true;
+		{	// Default to 10Ms
+			m_memoryDepth = 10000000;
 		}
 		else
 		{
 			f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
 			m_memoryDepth = static_cast<int64_t>(f);
-			m_memoryDepthValid = true;
 		}
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_memoryDepthValid = true;
 	}
 	return m_memoryDepth;
 }
 
 void MagnovaOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//Need to lock the transport mutex when setting depth to prevent changing depth during an acquisition
-	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
-
-	switch(m_modelid)
-	{
-		case MODEL_MAGNOVA_BMO:
-			sendOnly("ACQUIRE:MDEPTH %" PRIu64 "",depth);
-			break;
-		// --------------------------------------------------
-		default:
-			LogError("Unknown scope type\n");
-			break;
+	{	//Need to lock the transport mutex when setting depth to prevent changing depth during an acquisition
+		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+		switch(m_modelid)
+		{
+			case MODEL_MAGNOVA_BMO:
+				sendWithAck("ACQUIRE:MDEPTH %" PRIu64 "",depth);
+				break;
 			// --------------------------------------------------
+			default:
+				LogError("Unknown scope type\n");
+				break;
+				// --------------------------------------------------
+		}
 	}
+	//Don't update the cache because the scope is likely to round the value
+	//If we query the instrument later, the cache will be updated then.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_memoryDepthValid = false;
 	m_sampleRateValid = false;
 }
 
 void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//Need to lock the transport mutex when setting rate to prevent changing rate during an acquisition
-	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+	{ 	//Need to lock the transport mutex when setting rate to prevent changing rate during an acquisition
+		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	double sampletime = GetSampleDepth() / (double)rate;
-	double scale = sampletime / 25;
+		double sampletime = GetSampleDepth() / (double)rate;
+		double scale = sampletime / 25;
 
-	switch(m_modelid)
-	{
-		case MODEL_MAGNOVA_BMO:
-			{
-				char tmp[128];
-				snprintf(tmp, sizeof(tmp), "%1.0E", scale);
-				if(tmp[0] == '3')
-					tmp[0] = '2';
-				sendOnly(":TIMEBASE:SCALE %s", tmp);
-			}
-			break;
+		switch(m_modelid)
+		{
+			case MODEL_MAGNOVA_BMO:
+				{
+					char tmp[128];
+					snprintf(tmp, sizeof(tmp), "%1.0E", scale);
+					if(tmp[0] == '3')
+						tmp[0] = '2';
+					sendWithAck(":TIMEBASE:SCALE %s", tmp);
+				}
+				break;
 
-		// --------------------------------------------------
-		default:
-			LogError("Unknown scope type\n");
-			break;
 			// --------------------------------------------------
+			default:
+				LogError("Unknown scope type\n");
+				break;
+				// --------------------------------------------------
+		}
 	}
+	//Don't update the cache because the scope is likely to round the value
+	//If we query the instrument later, the cache will be updated then.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 }
@@ -1761,7 +1860,7 @@ void MagnovaOscilloscope::SetTriggerOffset(int64_t offset)
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 
-	sendOnly(":TIMebase:OFFSet %1.2E", (offset - halfwidth) * SECONDS_PER_FS);
+	sendWithAck(":TIMebase:OFFSet %1.2E", (offset - halfwidth) * SECONDS_PER_FS);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
@@ -1995,7 +2094,13 @@ void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
 	channel -= m_analogChannelCount;
 
-	sendOnly(":DIG:THRESHOLD%s %1.2E", GetDigitalChannelBankName(channel), level);
+	sendWithAck(":DIG:THRESHOLD%s %1.2E", GetDigitalChannelBankName(channel), level);
+
+	//Don't update the cache because the scope is likely to round the offset we ask for.
+	//If we query the instrument later, the cache will be updated then.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	// TODO handel bank cache rather than channel
+	m_channelDigitalThresholds.erase(channel);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2780,7 +2885,7 @@ void MagnovaOscilloscope::SetFunctionChannelActive(int chan, bool on)
 	else
 		imp = "HZ";
 
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp);
+	sendWithAck((m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp).c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgEnabled[chan] = on;
@@ -2803,7 +2908,7 @@ float MagnovaOscilloscope::GetFunctionChannelDutyCycle(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
 {
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV DUTY," + to_string(round(duty * 100)));
+	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV DUTY," + to_string(round(duty * 100))).c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgDutyCycle[chan] = duty;
@@ -2826,7 +2931,7 @@ float MagnovaOscilloscope::GetFunctionChannelAmplitude(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
 {
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV AMP," + to_string(amplitude));
+	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV AMP," + to_string(amplitude)).c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgRange[chan] = amplitude;
@@ -2849,7 +2954,7 @@ float MagnovaOscilloscope::GetFunctionChannelOffset(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelOffset(int chan, float offset)
 {
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV OFST," + to_string(offset));
+	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV OFST," + to_string(offset)).c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgOffset[chan] = offset;
@@ -2872,7 +2977,7 @@ float MagnovaOscilloscope::GetFunctionChannelFrequency(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelFrequency(int chan, float hz)
 {
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz));
+	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz)).c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgFrequency[chan] = hz;
@@ -3278,7 +3383,7 @@ void MagnovaOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::W
 	}
 
 	//Select type
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP," + basicType);
+	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV WVTP," + basicType).c_str());
 	if(basicType == "ARB")
 	{
 		//Returns map of memory slots ("M10") to waveform names
@@ -3287,7 +3392,7 @@ void MagnovaOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::W
 		auto stl = m_transport->SendCommandQueuedWithReply("STL?");
 		auto arbmap = ParseCommaSeparatedNameValueList(stl, false);
 
-		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":ARWV INDEX," + arbmap[arbType].substr(1));
+		sendWithAck((m_channels[chan]->GetHwname() + ":ARWV INDEX," + arbmap[arbType].substr(1)).c_str());
 	}
 
 	//Update cache
@@ -3330,7 +3435,7 @@ void MagnovaOscilloscope::SetFunctionChannelOutputImpedance(int chan, FunctionGe
 	else
 		imp = "HZ";
 
-	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp);
+	sendWithAck((m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp).c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgImpedance[chan] = z;
