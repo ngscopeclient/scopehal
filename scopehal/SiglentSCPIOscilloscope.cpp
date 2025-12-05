@@ -2206,7 +2206,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				uint64_t pageSizeBytes = m_highDefinition ? (pageSize*2) : pageSize;
 				size_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
 				bool paginated = (pages > 1);
-				LogTrace("Acqu points = %" PRIu64 ", Acqu bytes = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",acqPoints,acqBytes,pages,pageSize,pageSizeBytes);
+				LogTrace("Acqu points = %" PRIu64 ", Acqu bytes = %zu, num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",acqPoints,acqBytes,pages,pageSize,pageSizeBytes);
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
