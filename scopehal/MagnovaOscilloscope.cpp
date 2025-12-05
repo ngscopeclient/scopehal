@@ -1363,6 +1363,10 @@ bool MagnovaOscilloscope::AcquireData()
 
 	// Detect active channels
 	BulkCheckChannelEnableState();
+	for(unsigned int i = 0; i <  m_analogChannelCount; i++)
+	{	// Check all analog channels
+		analogEnabled[i] = IsChannelEnabled(i);
+	}
 
 	for(unsigned int i = 0; i <  m_digitalChannelCount; i++)
 	{	// Check digital channels
