@@ -145,11 +145,25 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		}
 	}
 
-	//Add the external trigger input
-	m_extTrigChannel = new OscilloscopeChannel(
-		this, "EX", "", Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_TRIGGER, m_channels.size());
-	m_channels.push_back(m_extTrigChannel);
-	m_extTrigChannel->SetDefaultDisplayName();
+	// Add the external trigger input
+	switch (m_series)
+	{
+		case Series::DS1000:
+		case Series::MSODS1000Z:
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DHO800:
+		case Series::DHO900:
+			m_extTrigChannel = new OscilloscopeChannel(
+				this, "External", "#FFFFFF", Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_TRIGGER, m_channels.size());
+			m_channels.push_back(m_extTrigChannel);
+			m_extTrigChannel->SetDefaultDisplayName();
+			break;
+
+		case Series::MSO5000:
+		case Series::UNKNOWN:
+			break;
+	}
 
 	//Configure acquisition modes
 	switch (m_series) {
@@ -936,7 +950,7 @@ std::size_t RigolOscilloscope::IdxToDigitalBankIdx(std::size_t i)
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	if(i == m_extTrigChannel->GetIndex())
+	if(m_extTrigChannel and i == m_extTrigChannel->GetIndex())
 		return false;
 
 	{

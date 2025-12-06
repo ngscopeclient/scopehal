@@ -181,7 +181,7 @@ protected:
 	std::size_t IdxToDigitalBankIdx(std::size_t i); // does not check for validity!
 
 protected:
-	OscilloscopeChannel* m_extTrigChannel;
+	OscilloscopeChannel* m_extTrigChannel {};
 
 	// hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
