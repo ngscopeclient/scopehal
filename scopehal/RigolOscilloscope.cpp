@@ -1195,6 +1195,7 @@ void RigolOscilloscope::EnableChannel(size_t i)
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelsEnabled.erase(i);
+		m_srate.reset();
 	}
 	UpdateDynamicCapabilities();
 }
@@ -1235,6 +1236,7 @@ void RigolOscilloscope::DisableChannel(size_t i)
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelsEnabled.erase(i);
+		m_srate.reset();
 	}
 	UpdateDynamicCapabilities();
 }
