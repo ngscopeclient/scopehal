@@ -51,6 +51,7 @@ public:
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i) override;
+	virtual bool CanEnableChannel(size_t i) override;
 	virtual void EnableChannel(size_t i) override;
 	virtual void DisableChannel(size_t i) override;
 	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
@@ -173,6 +174,11 @@ protected:
 	bool IsChannelDigital(std::size_t i);
 	std::uint64_t GetPendingWaveformBlockLength(); // extratcs waveform block size from the TMC header at beginnign of each response to :WAV:DATA? command
 	void LogLaNotPresent();
+	std::size_t IdxToAnalogChannelNumber(std::size_t i); // does not check for validity!
+	std::size_t AnalogChannelNumberToIdx(std::size_t i); // does not check for validity!
+	std::size_t IdxToDigitalChannelNumber(std::size_t i); // does not check for validity!
+	std::size_t DigitalChannelNumberToIdx(std::size_t i); // does not check for validity!
+	std::size_t IdxToDigitalBankIdx(std::size_t i); // does not check for validity!
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;

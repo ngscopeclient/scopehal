@@ -907,6 +907,32 @@ void RigolOscilloscope::LaDisable()
 	}
 }
 
+std::size_t RigolOscilloscope::IdxToAnalogChannelNumber(std::size_t i)
+{
+	return i;
+}
+
+std::size_t RigolOscilloscope::AnalogChannelNumberToIdx(std::size_t i)
+{
+	return i;
+}
+
+std::size_t RigolOscilloscope::IdxToDigitalChannelNumber(std::size_t i)
+{
+	return i - m_analogChannelCount;
+}
+
+std::size_t RigolOscilloscope::DigitalChannelNumberToIdx(std::size_t i)
+{
+	return i + m_analogChannelCount;
+}
+
+std::size_t RigolOscilloscope::IdxToDigitalBankIdx(std::size_t i)
+{
+	return (i - m_analogChannelCount) / DIGITAL_BANK_SIZE;
+}
+
+
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
@@ -975,30 +1001,132 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 	return false;
 }
 
+bool RigolOscilloscope::CanEnableChannel(size_t i)
+{
+	auto* channel = GetChannel(i);
+	if (channel == nullptr)
+		return false;
+
+	switch (m_series)
+	{
+		case Series::MSODS1000Z:
+			// CHAN3 collides with bank0 (D8 ~ D15)
+			// CHAN4 collides with bank1 (D0 ~ D7), yeah, feels swapped, but that's the reality
+			if (IsChannelAnalog(i))
+			{
+				if (m_digitalBanks.empty())
+					return true;
+
+				auto const analogChannelNumber = IdxToAnalogChannelNumber(i);
+				switch (analogChannelNumber)
+				{
+					case 2: // attempting to enable CHAN3
+						for (auto& dChannel : m_digitalBanks[1])
+							if (IsChannelEnabled(dChannel->GetIndex()))
+							{
+								LogTrace("channel %zd (%s) can't be enabled, collision with (at least) channel %zd (%s) from bank %d\n",
+									i, GetChannel(i)->GetDisplayName().c_str(),
+									dChannel->GetIndex(), dChannel->GetDisplayName().c_str(),
+									1U
+								);
+								return false;
+							}
+						break;
+					case 3: // attempting to enable CHAN4
+						for (auto& dChannel : m_digitalBanks[0])
+							if (IsChannelEnabled(dChannel->GetIndex()))
+							{
+								LogTrace("channel %zd (%s) can't be enabled, collision with (at least) channel %zd (%s) from bank %d\n",
+									i, GetChannel(i)->GetDisplayName().c_str(),
+									dChannel->GetIndex(), dChannel->GetDisplayName().c_str(),
+									0U
+								);
+								return false;
+							}
+						break;
+					default: break;
+				}
+				return true;
+			}
+
+			if (IsChannelDigital(i)) {
+				if (m_digitalBanks.empty())
+					return true;
+
+				auto const bankIdx = IdxToDigitalBankIdx(i);
+				switch (bankIdx)
+				{
+					case 0: // bank 0
+						if (IsChannelEnabled(AnalogChannelNumberToIdx(2))) // CHAN3
+						{
+							auto collidingCHannel = GetChannel(AnalogChannelNumberToIdx(2));
+							LogTrace("channel %zd (%s) from bank %zd, can't be enabled, collision with analog channel %zd (%s)\n",
+									i, GetChannel(i)->GetDisplayName().c_str(), bankIdx,
+									collidingCHannel->GetIndex(), collidingCHannel->GetDisplayName().c_str()
+							);
+							return false;
+						}
+						break;
+					case 1: // bank 1
+						if (IsChannelEnabled(AnalogChannelNumberToIdx(3))) // CHAN4
+						{
+							auto collidingCHannel = GetChannel(AnalogChannelNumberToIdx(3));
+							LogTrace("channel %zd (%s) from bank %zd, can't be enabled, collision with analog channel %zd (%s)\n",
+									i, GetChannel(i)->GetDisplayName().c_str(), bankIdx,
+									collidingCHannel->GetIndex(), collidingCHannel->GetDisplayName().c_str()
+							);
+							return false;
+						}
+						break;
+					default : return false;
+				}
+				return true;
+			}
+			break;
+
+		case Series::DS1000:
+		case Series::MSO5000:
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DHO800:
+		case Series::DHO900:
+			if (IsChannelAnalog(i)) return true;
+			if (IsChannelDigital(i)) return true;
+			break;
+		case Series::UNKNOWN:
+			break;
+	}
+	return false;
+}
+
 void RigolOscilloscope::EnableChannel(size_t i)
 {
+	if (not CanEnableChannel(i))
+	{
+		LogWarning("can't enable channel %zd\n", i);
+		return;
+	}
 	//TODO: ignore request when cached value says enabled?
 	if (IsChannelAnalog(i))
 	{
-		if (m_series == Series::MSODS1000Z and m_digitalChannelCount != 0) {
-			// channel 3 can't be enabled when any digital channel from POD1 (D0 ~ D7) is enabled
-			// channel 4 can't be enabled when any digital channel from POD2 (D8 ~ D15) is enabled
-			if (i == 3 or i == 4)
-			{
-				bool bankActive = [&]() -> bool {
-					for (auto idx = m_analogChannelCount + 8 * (i - 3); idx < m_analogChannelCount + 8 * (i - 2); ++idx)
-						if (IsChannelEnabled(idx))
-							return true;
-					return false;
-				}();
-				if (bankActive)
-				{
-					LogWarning("Channel %zd (%s) can't be enabled, because some of colliding digital channels are enabled\n", i, GetChannel(i)->GetDisplayName().c_str());
-					return;
-				}
-			}
-		}
 		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP ON");
+		switch (m_series)
+		{
+			case Series::MSODS1000Z:
+				// impact of enabling analog channel takes effect (change of mem depth,...) only in RUN state
+				m_transport->SendCommandQueued(":SING");
+				m_transport->SendCommandQueued(":TFOR");
+				break;
+			//TODO: check of other scopes require this too
+			case Series::UNKNOWN:
+			case Series::DS1000:
+			case Series::MSO5000:
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO800:
+			case Series::DHO900:
+				break;
+		}
 	}
 	else if (IsChannelDigital(i))
 	{
