@@ -165,6 +165,27 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			break;
 	}
 
+	// Add AC line external trigger input
+	switch (m_series)
+	{
+		case Series::MSODS1000Z:
+		case Series::MSO5000:
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DS1000:
+			m_aclTrigChannel = new OscilloscopeChannel(
+			this, "ACL", "#FF0000", Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_TRIGGER, m_channels.size());
+			m_channels.push_back(m_aclTrigChannel);
+			m_aclTrigChannel->SetDisplayName("ACLine");
+			m_aclTrigChannel->SetDefaultDisplayName();
+			break;
+			
+		case Series::DHO800:
+		case Series::DHO900:
+		case Series::UNKNOWN:
+			break;
+	}
+
 	//Configure acquisition modes
 	switch (m_series) {
 		case Series::DS1000:
@@ -951,6 +972,9 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
 	if(m_extTrigChannel and i == m_extTrigChannel->GetIndex())
+		return false;
+
+	if(m_aclTrigChannel and i == m_aclTrigChannel->GetIndex())
 		return false;
 
 	{

@@ -182,6 +182,7 @@ protected:
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel {};
+	OscilloscopeChannel* m_aclTrigChannel {}; // TODO: scopehal does not handle AC "external triggers" ATM
 
 	// hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
