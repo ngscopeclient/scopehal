@@ -1150,15 +1150,14 @@ void RigolOscilloscope::EnableChannel(size_t i)
 		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":DISP ON");
 		switch (m_series)
 		{
-			case Series::MSODS1000Z:
-				// impact of enabling analog channel takes effect (change of mem depth,...) only in RUN state
-				m_transport->SendCommandQueued(":SING");
-				m_transport->SendCommandQueued(":TFOR");
+			// this is a quirk that changes to take effect immediately
+			case Series::MSODS1000Z: // applies the configuration
+			case Series::MSO5000: // ensures the srate readout reads correct value
+				SetSampleDepth(GetSampleDepth());
 				break;
-			//TODO: check of other scopes require this too
+				//TODO: check of other scopes require this too
 			case Series::UNKNOWN:
 			case Series::DS1000:
-			case Series::MSO5000:
 			case Series::DHO1000:
 			case Series::DHO4000:
 			case Series::DHO800:
