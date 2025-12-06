@@ -169,7 +169,7 @@ protected:
 	void DecodeDeviceSeries();
 	void AnalyzeDeviceCapabilities();
 	void UpdateDynamicCapabilities(); // capabilities dependent on enabled chanel count
-	std::size_t GetChannelDivisor(); // helper function to get memory depth/sample rate divisor base on current scope state (amount of enabled channels)
+	std::size_t GetMsods1000ZChannelDivisor(); // helper function to get memory depth/sample rate divisor base on current scope state (amount of enabled channels)
 	bool IsChannelAnalog(std::size_t i);
 	bool IsChannelDigital(std::size_t i);
 	std::uint64_t GetPendingWaveformBlockLength(); // extratcs waveform block size from the TMC header at beginnign of each response to :WAV:DATA? command

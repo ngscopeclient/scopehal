@@ -606,7 +606,7 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 			// ― 2 CH:    6000| 60000| 600000| 6000000|12000000
 			// ― 3/4 CH:  3000| 30000| 300000| 3000000| 6000000
 			// -> 1 CH values appropriately divided
-			auto divisor = GetChannelDivisor();
+			auto divisor = GetMsods1000ZChannelDivisor();
 			vector<std::uint64_t> depths;
 			for (auto &depth : ds1000zSampleDepths)
 			{
@@ -628,7 +628,7 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 	}
 }
 
-std::size_t RigolOscilloscope::GetChannelDivisor() {
+std::size_t RigolOscilloscope::GetMsods1000ZChannelDivisor() {
 	auto divisor = GetEnabledAnalogChannelCount();
 
 	// MSO1000Z:
@@ -1829,7 +1829,7 @@ bool RigolOscilloscope::AcquireData()
 			// 250kB limits applies when all channels are enabled.
 			// It is possible to use larger chunks with less channels.
 			// With single channel and 1 MB block, around ~20% speed-up is observable.
-			maxpoints = 1000 * 1000 / GetChannelDivisor();
+			maxpoints = 1000 * 1000 / GetMsods1000ZChannelDivisor();
 			break;
 		case Series::MSO5000:
 			maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
@@ -2691,7 +2691,7 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 		case Series::MSODS1000Z:
 		{
 			vector<uint64_t> rates {};
-			auto divisor = GetChannelDivisor();
+			auto divisor = GetMsods1000ZChannelDivisor();
 			auto mdepth = GetSampleDepth();
 			for (const auto& rate : ds1000zSampleRates)
 				if (rate.supportsMdepth(mdepth, divisor))
@@ -3062,7 +3062,7 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 			//     Mdepth = Srate * wlength
 			//     Mdepth = Srate * Tscale * 12
 			//     Mdepth / (Srate * 12) =  * Tscale
-			auto const divisor = GetChannelDivisor();
+			auto const divisor = GetMsods1000ZChannelDivisor();
 			LogTrace("setting target samplerate %lu, divisor %zu\n", rate, divisor);
 			auto const timescale = [&]() -> float {
 				if (divisor != 4 and (rate / divisor) >= 25'000'000)
