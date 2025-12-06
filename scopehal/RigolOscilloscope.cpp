@@ -2987,8 +2987,8 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			}
 			// memory depth is configurable only when scope is not stopped
 			{
-				string original_trigger_status = m_transport->SendCommandQueuedWithReply(":TRIG:STAT?");
 				lock_guard<recursive_mutex> lock(m_transport->GetMutex()); // this sequence may not be interrupted by others
+				string original_trigger_status = m_transport->SendCommandQueuedWithReply(":TRIG:STAT?");
 				m_transport->SendCommandQueued(":RUN");
 				m_transport->SendCommandQueued("ACQ:MDEP " + to_string(depth));
 				//TODO: whould we also use switch to accept only valid values?
