@@ -1036,30 +1036,22 @@ unsigned int MagnovaOscilloscope::GetActiveChannelsCount()
 }
 
 
-time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& /* timeString */, double& basetime)
+time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& timeString, double& basetime)
 {
-	/*
-                TIMESTAMP is shown as Reserved In Siglent data format.
-                This information is from LeCroy which uses the same wavedesc header.
-		Timestamp is a somewhat complex format that needs some shuffling around.
-		Timestamp starts at offset 296 bytes in the wavedesc
-		(296-303)	double seconds
-		(304)		byte minutes
-		(305)		byte hours
-		(306)		byte days
-		(307)		byte months
-		(308-309)	uint16 year
+	//Timestamp returned by Magnova has the form 'hh,mm,ss.ssssss'
+    int hh, mm;
+    double ss;
 
-		TODO: during startup, query instrument for its current time zone
-		since the wavedesc reports instment local time
-	 */
-	//Yes, this cast is intentional.
-	//It assumes you're on a little endian system using IEEE754 64-bit float, but that applies to everything we support.
-	//cppcheck-suppress invalidPointerCast
-	// TODO
-	double fseconds = 0; /**reinterpret_cast<const double*>(wavedesc + 296);*/
-	uint8_t seconds = floor(fseconds);
-	basetime = fseconds - seconds;
+	string input = timeString;
+    for (char &c : input) {
+        if (c == ',') c = ' ';
+    }
+
+    std::stringstream ssin(input);
+    ssin >> hh >> mm >> ss;
+
+	uint8_t seconds = floor(ss);
+	basetime = ss - seconds;
 	time_t tnow = time(NULL);
 	struct tm tstruc;
 
@@ -1068,27 +1060,13 @@ time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& /* timeString */
 #else
 	localtime_r(&tnow, &tstruc);
 #endif
-/*
-	//Convert the instrument time to a string, then back to a tm
-	//Is there a better way to do this???
-	//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
-	//Maybe because tm_yday is inconsistent?
-	char tblock[64] = {0};
-	snprintf(tblock,
-		sizeof(tblock),
-		"%d-%d-%d %d:%02d:%02d",
-		*reinterpret_cast<uint16_t*>(wavedesc + 308),
-		wavedesc[307],
-		wavedesc[306],
-		wavedesc[305],
-		wavedesc[304],
-		seconds);
-	locale cur_locale;
-	auto& tget = use_facet<time_get<char>>(cur_locale);
-	istringstream stream(tblock);
-	ios::iostate state;
-	char format[] = "%F %T";
-	tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format + strlen(format));*/
+	tstruc.tm_hour = hh;
+	tstruc.tm_min = mm;
+	tstruc.tm_sec = seconds;
+
+    /* char buffer[64];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tstruc);
+	LogDebug("Found time : %s\n",buffer);*/
 	return mktime(&tstruc);
 }
 
@@ -1185,13 +1163,14 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 
 	// float codes_per_div;
 
-	LogDebug("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%zu\n",
+	LogDebug("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%zu, basetime=%f\n",
 		v_gain,
 		v_off,
 		interval,
 		h_off,
 		h_off_frac,
-		datalen);
+		datalen,
+		basetime);
 
 	for(size_t j = 0; j < num_sequences; j++)
 	{
