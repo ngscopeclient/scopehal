@@ -2093,7 +2093,7 @@ void MagnovaOscilloscope::PullTrigger()
 	bool isUart = false;
 	//Figure out what kind of trigger is active.
 	reply = Trim(converse(":TRIGGER:TYPE?"));
-	if(reply == "DROPout")
+	if(reply == "TIMeout")
 		PullDropoutTrigger();
 	else if(reply == "EDGe")
 		PullEdgeTrigger();
@@ -2128,7 +2128,12 @@ void MagnovaOscilloscope::PullTrigger()
  */
 void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
 {
-	string reply = Trim(isUart ? converse(":TRIGGER:UART:RXS?") : converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
+	if(isUart)
+	{	// No SCPI command on Magnova to get Trigget Group information for Decode Trigger
+		return;
+	} 
+
+	string reply = converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str());
 	// Returns CHANnel1 or DIGital1
 
 	// Get channel number
@@ -2165,22 +2170,23 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 	Unit fs(Unit::UNIT_FS);
 
 	//Level
-	dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
+	dt->SetLevel(stof(converse(":TRIGGER:TIMeout:LEVEL?")));
 
 	//Dropout time
-	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
+	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:TIMeout:TIME?")));
 
 	//Edge type
-	if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
+	if(Trim(converse(":TRIGGER:TIMeout:SLOPE?")) == "RISING")
 		dt->SetType(DropoutTrigger::EDGE_RISING);
 	else
 		dt->SetType(DropoutTrigger::EDGE_FALLING);
 
 	//Reset type
-	if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
-		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
-	else
-		dt->SetResetType(DropoutTrigger::RESET_NONE);
+	dt->SetResetType(DropoutTrigger::RESET_NONE);
+
+	// TODO => parse time
+	//if(Trim(converse(":TRIGGER:TIMeout:TIME?")) == "EDGE")
+		
 }
 
 /**
@@ -2769,19 +2775,11 @@ vector<FunctionGenerator::WaveShape> MagnovaOscilloscope::GetAvailableWaveformSh
 	ret.push_back(SHAPE_SQUARE);
 	ret.push_back(SHAPE_NOISE);
 
-	//Docs say this is supported, but doesn't seem to work on SDS2104X+
-	//Might be SDG only?
-	//ret.push_back(SHAPE_PRBS_NONSTANDARD);
-
 	ret.push_back(SHAPE_DC);
 	ret.push_back(SHAPE_STAIRCASE_UP);
 	ret.push_back(SHAPE_STAIRCASE_DOWN);
 	ret.push_back(SHAPE_STAIRCASE_UP_DOWN);
 	ret.push_back(SHAPE_PULSE);
-
-	//Docs say this is supported, but doesn't seem to work on SDS2104X+
-	//Might be SDG only?
-	//ret.push_back(SHAPE_NEGATIVE_PULSE);
 
 	//what's "trapezia"?
 	ret.push_back(SHAPE_SAWTOOTH_UP);
@@ -2852,20 +2850,7 @@ bool MagnovaOscilloscope::GetFunctionChannelActive(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelActive(int chan, bool on)
 {
-	string state;
-	if(on)
-		state = "ON";
-	else
-		state = "OFF";
-
-	//Have to do this first, since it touches m_awgEnabled too
-	string imp;
-	if(GetFunctionChannelOutputImpedance(chan) == IMPEDANCE_50_OHM)
-		imp = "50";
-	else
-		imp = "HZ";
-
-	sendWithAck((m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp).c_str());
+	sendWithAck(":FGEN:STAT %s",(on ? "ON" : "OFF"));
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgEnabled[chan] = on;
@@ -2879,19 +2864,25 @@ float MagnovaOscilloscope::GetFunctionChannelDutyCycle(int chan)
 			return m_awgDutyCycle[chan];
 	}
 
-	//Get lots of config settings from the hardware, then return newly updated cache entry
-	GetFunctionChannelShape(chan);
+	string type = GetFunctionChannelShape(chan) == SHAPE_SQUARE ? "SQU" : "PULS";
+	
+	string duty = converse(":FGEN:WAV:%s:DUTY ?",type.c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	float dutyf;
+	sscanf(duty.c_str(), "%f", &dutyf);
+	m_awgDutyCycle[chan] = (dutyf/100);
 	return m_awgDutyCycle[chan];
 }
 
 void MagnovaOscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
 {
-	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV DUTY," + to_string(round(duty * 100))).c_str());
+	string type = GetFunctionChannelShape(chan) == SHAPE_SQUARE ? "SQU" : "PULS";
+	sendWithAck(":FGEN:WAV:%s:DUTY %.4f",type.c_str(),round(duty * 100));
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_awgDutyCycle[chan] = duty;
+	m_awgDutyCycle.erase(chan);
 }
 
 float MagnovaOscilloscope::GetFunctionChannelAmplitude(int chan)
@@ -2902,19 +2893,23 @@ float MagnovaOscilloscope::GetFunctionChannelAmplitude(int chan)
 			return m_awgRange[chan];
 	}
 
-	//Get lots of config settings from the hardware, then return newly updated cache entry
-	GetFunctionChannelShape(chan);
+	string amp = converse(":FGEN:WAV:AMPL ?");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	float ampf;
+	sscanf(amp.c_str(), "%f", &ampf);
+	m_awgRange[chan] = ampf;
+
 	return m_awgRange[chan];
 }
 
 void MagnovaOscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
 {
-	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV AMP," + to_string(amplitude)).c_str());
+	sendWithAck(":FGEN:WAV:AMPL %.4f",amplitude);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_awgRange[chan] = amplitude;
+	m_awgRange.erase(chan);
 }
 
 float MagnovaOscilloscope::GetFunctionChannelOffset(int chan)
@@ -2925,19 +2920,21 @@ float MagnovaOscilloscope::GetFunctionChannelOffset(int chan)
 			return m_awgOffset[chan];
 	}
 
-	//Get lots of config settings from the hardware, then return newly updated cache entry
-	GetFunctionChannelShape(chan);
+	string offset = converse(":FGEN:WAV:OFFS ?");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	float offsetf;
+	sscanf(offset.c_str(), "%f", &offsetf);
+	m_awgOffset[chan] = offsetf;
 	return m_awgOffset[chan];
 }
 
 void MagnovaOscilloscope::SetFunctionChannelOffset(int chan, float offset)
 {
-	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV OFST," + to_string(offset)).c_str());
+	sendWithAck(":FGEN:WAV:OFFS %.4f",offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_awgOffset[chan] = offset;
+	m_awgOffset.erase(chan);
 }
 
 float MagnovaOscilloscope::GetFunctionChannelFrequency(int chan)
@@ -2948,69 +2945,21 @@ float MagnovaOscilloscope::GetFunctionChannelFrequency(int chan)
 			return m_awgFrequency[chan];
 	}
 
-	//Get lots of config settings from the hardware, then return newly updated cache entry
-	GetFunctionChannelShape(chan);
+	string freq = converse(":FGEN:WAV:FREQ ?");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	float freqf;
+	sscanf(freq.c_str(), "%f", &freqf);
+	m_awgFrequency[chan] = freqf;
 	return m_awgFrequency[chan];
 }
 
 void MagnovaOscilloscope::SetFunctionChannelFrequency(int chan, float hz)
 {
-	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz)).c_str());
+	sendWithAck(":FGEN:WAV:FREQ %.4f",hz);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_awgFrequency[chan] = hz;
-}
-
-/**
-	@brief Parses a name-value set expressed as pairs of comma separated values
-
-	Expected format: COMMAND? Name1, Value1, Name2, Value2
-
-	If forwardMap is true, returns name -> value. If false, returns value -> name.
- */
-map<string, string> MagnovaOscilloscope::ParseCommaSeparatedNameValueList(string str, bool forwardMap)
-{
-	str += ',';
-	size_t ispace = str.find(' ');
-	string tmpName;
-	string tmpVal;
-	bool firstHalf = true;
-	map<string, string> ret;
-	for(size_t i=ispace+1; i<str.length(); i++)
-	{
-		if(str[i] == ',')
-		{
-			//Done with name
-			if(firstHalf)
-				firstHalf = false;
-
-			//Done with value
-			else
-			{
-				firstHalf = true;
-
-				if(forwardMap)
-					ret[tmpName] = tmpVal;
-				else
-					ret[tmpVal] = tmpName;
-
-				tmpName = "";
-				tmpVal = "";
-			}
-		}
-
-		//ignore spaces, some commands have them and others don't - doesn't seem to matter
-		else if(isspace(str[i]))
-			continue;
-
-		else if(firstHalf)
-			tmpName += str[i];
-		else
-			tmpVal += str[i];
-	}
-	return ret;
+	m_awgFrequency.erase(chan);
 }
 
 FunctionGenerator::WaveShape MagnovaOscilloscope::GetFunctionChannelShape(int chan)
@@ -3023,6 +2972,7 @@ FunctionGenerator::WaveShape MagnovaOscilloscope::GetFunctionChannelShape(int ch
 
 	//Query the basic wave parameters
 	auto shape = m_transport->SendCommandQueuedWithReply(":FGEN:WAV:SHAP?", false);
+	// TODO Arb not available yet in SCPI commands
 	// auto areply = m_transport->SendCommandQueuedWithReply(":FGEN:WAV:ASHAP?", false);
 
 	//Crack the replies
@@ -3363,26 +3313,22 @@ void MagnovaOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::W
 	}
 
 	//Select type
-	sendWithAck((m_channels[chan]->GetHwname() + ":BSWV WVTP," + basicType).c_str());
+	sendWithAck(":FGEN:WAV:SHAP %s", basicType.c_str());
 	if(basicType == "ARB")
-	{
-		//Returns map of memory slots ("M10") to waveform names
-		//Mapping is explicitly not stable, so we have to check for each instrument
-		//(but can be cached for a given session)
-		auto stl = m_transport->SendCommandQueuedWithReply("STL?");
-		auto arbmap = ParseCommaSeparatedNameValueList(stl, false);
-
-		sendWithAck((m_channels[chan]->GetHwname() + ":ARWV INDEX," + arbmap[arbType].substr(1)).c_str());
+	{	// TODO when  available in Magnova firmware
+		//sendWithAck(":FGEN:WAV:SHAP %s", (arbmap[arbType].substr(1)).c_str());
 	}
 
 	//Update cache
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	// Duty cycle  is reset when changing shape
+	m_awgDutyCycle.erase(chan);
 	m_awgShape[chan] = shape;
 }
 
 bool MagnovaOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
 {
-	return false;
+	return true;
 }
 
 FunctionGenerator::OutputImpedance MagnovaOscilloscope::GetFunctionChannelOutputImpedance(int chan)
@@ -3393,30 +3339,43 @@ FunctionGenerator::OutputImpedance MagnovaOscilloscope::GetFunctionChannelOutput
 			return m_awgImpedance[chan];
 	}
 
-	//Get output enable status and impedance from the hardware, then return newly updated cache entry
-	GetFunctionChannelActive(chan);
+	string load = converse(":FGEN:LOAD ?");
+
+	FunctionGenerator::OutputImpedance imp = (load == "50") ? IMPEDANCE_50_OHM : IMPEDANCE_HIGH_Z;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgImpedance[chan] = imp;
 	return m_awgImpedance[chan];
 }
 
 void MagnovaOscilloscope::SetFunctionChannelOutputImpedance(int chan, FunctionGenerator::OutputImpedance z)
 {
-	//Have to do this first, since it touches m_awgImpedance
-	string state;
-	if(GetFunctionChannelActive(chan))
-		state = "ON";
-	else
-		state = "OFF";
-
 	string imp;
 	if(z == IMPEDANCE_50_OHM)
-		imp = "50";
+		imp = "50OHM";
 	else
-		imp = "HZ";
+		imp = "HIZ";
 
-	sendWithAck((m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp).c_str());
+	sendWithAck(":FGEN:LOAD %s",imp.c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_awgImpedance[chan] = z;
+	m_awgImpedance.erase(chan);
+}
+
+float MagnovaOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{	// TODO
+	return 0;
+}
+
+void MagnovaOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*fs*/)
+{	// TODO
+}
+
+float MagnovaOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{	// TODO
+	return 0;
+}
+
+void MagnovaOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*fs*/)
+{	// TODO
 }

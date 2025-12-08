@@ -52,8 +52,7 @@ class WindowTrigger;
 
 #define c_digiChannelsPerBus 8
 
-class MagnovaOscilloscope 	: public virtual SCPIOscilloscope
-								, public virtual SCPIFunctionGenerator
+class MagnovaOscilloscope 	: public virtual SCPIOscilloscope, public virtual SCPIFunctionGenerator
 {
 public:
 	MagnovaOscilloscope(SCPITransport* transport);
@@ -185,6 +184,14 @@ public:
 
 	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
 	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
+
+	virtual float GetFunctionChannelRiseTime(int) override;
+
+	virtual void SetFunctionChannelRiseTime(int, float) override;
+
+	virtual void SetFunctionChannelFallTime(int, float) override;
+
+	virtual float GetFunctionChannelFallTime(int chan) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
@@ -346,8 +353,6 @@ protected:
 	std::map<size_t, FunctionGenerator::OutputImpedance> m_awgImpedance;
 	ADCMode m_adcMode;
 	bool m_adcModeValid;
-
-	std::map<std::string, std::string> ParseCommaSeparatedNameValueList(std::string str, bool forwardMap = true);
 
 	int64_t m_timeDiv;
 
