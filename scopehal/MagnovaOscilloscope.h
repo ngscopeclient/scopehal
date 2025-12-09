@@ -274,6 +274,7 @@ protected:
 
 	std::string GetDigitalChannelBankName(size_t channel);
 
+	std::string GetChannelName(size_t channel);
 
 	std::string GetPossiblyEmptyString(const std::string& property);
 

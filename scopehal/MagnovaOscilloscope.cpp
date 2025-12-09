@@ -1973,6 +1973,19 @@ void MagnovaOscilloscope::SetADCMode(size_t /*channel*/, size_t /* mode */)
 	return;
 }
 
+std::string MagnovaOscilloscope::GetChannelName(size_t channel)
+{
+	if(channel < m_digitalChannelBase)
+	{
+	 	return "CHAN" + (channel + 1);
+	}
+	else
+	{
+	 	return "DIG" + (channel - m_digitalChannelBase);
+	}
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Logic analyzer configuration
 
@@ -2483,39 +2496,39 @@ void MagnovaOscilloscope::PushTrigger()
 	if(dt)
 	{
 		sendOnly(":TRIGGER:TYPE DROPOUT");
-		sendOnly(":TRIGGER:DROPOUT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:DROPOUT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushDropoutTrigger(dt);
 	}
 	else if(pt)
 	{
 		sendOnly(":TRIGGER:TYPE INTERVAL");
-		sendOnly(":TRIGGER:INTERVAL:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:INTERVAL:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushPulseWidthTrigger(pt);
 	}
 	else if(rt)
 	{
 		sendOnly(":TRIGGER:TYPE RUNT");
-		sendOnly(":TRIGGER:RUNT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:RUNT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushRuntTrigger(rt);
 	}
 	else if(st)
 	{
 		sendOnly(":TRIGGER:TYPE SLOPE");
-		sendOnly(":TRIGGER:SLOPE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:SLOPE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushSlewRateTrigger(st);
 	}
 	else if(ut)
 	{
 		sendOnly(":TRIGGER:TYPE UART");
 		// TODO: Validate these trigger allocations
-		sendOnly(":TRIGGER:UART:RXSOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
-		sendOnly(":TRIGGER:UART:TXSOURCE %s", m_trigger->GetInput(1).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:UART:RXSOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		sendOnly(":TRIGGER:UART:TXSOURCE %s", GetChannelName(m_trigger->GetInput(1).m_channel->GetIndex()).c_str());
 		PushUartTrigger(ut);
 	}
 	else if(wt)
 	{
 		sendOnly(":TRIGGER:TYPE WINDOW");
-		sendOnly(":TRIGGER:WINDOW:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:WINDOW:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushWindowTrigger(wt);
 	}
 
@@ -2524,7 +2537,7 @@ void MagnovaOscilloscope::PushTrigger()
 	else if(et)	   //must be last
 	{
 		sendOnly(":TRIGGER:TYPE EDGE");
-		sendOnly(":TRIGGER:EDGE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+		sendOnly(":TRIGGER:EDGE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushEdgeTrigger(et, "EDGE");
 	}
 
@@ -3374,7 +3387,7 @@ float MagnovaOscilloscope::GetFunctionChannelRiseTime(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelRiseTime(int chan, float fs)
 {
-	sendWithAck(":FGEN:WAV:PULS:RTIME %.4f",fs * SECONDS_PER_FS);
+	sendWithAck(":FGEN:WAV:PULS:RTIME %.10f",fs * SECONDS_PER_FS);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgRiseTime.erase(chan);
@@ -3399,7 +3412,7 @@ float MagnovaOscilloscope::GetFunctionChannelFallTime(int chan)
 
 void MagnovaOscilloscope::SetFunctionChannelFallTime(int chan, float fs)
 {
-	sendWithAck(":FGEN:WAV:PULS:FTIME %.4f",fs * SECONDS_PER_FS);
+	sendWithAck(":FGEN:WAV:PULS:FTIME %.10f",fs * SECONDS_PER_FS);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgFallTime.erase(chan);
