@@ -825,11 +825,11 @@ Oscilloscope::TriggerMode MagnovaOscilloscope::PollTrigger()
 	sinr = converse(":STAT?");
 
 	//No waveform, but ready for one?
-	if((sinr == "WAITing")||(sinr == "RUNNing"))
+	/*if((sinr == "WAITing")||(sinr == "RUNNing"))
 	{
 		m_triggerArmed = true;
 		return TRIGGER_MODE_RUN;
-	}
+	}*/
 
 	if((sinr == "TRIGgered"))
 	{
@@ -1977,11 +1977,11 @@ std::string MagnovaOscilloscope::GetChannelName(size_t channel)
 {
 	if(channel < m_digitalChannelBase)
 	{
-	 	return "CHAN" + (channel + 1);
+	 	return string("CHAN") + to_string(channel + 1);
 	}
 	else
 	{
-	 	return "DIG" + (channel - m_digitalChannelBase);
+	 	return string("DIG") + to_string(channel - m_digitalChannelBase);
 	}
 }
 
@@ -2174,8 +2174,12 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 
 	Unit fs(Unit::UNIT_FS);
 
-	//Level
-	dt->SetLevel(stof(converse(":TRIGGER:TIMeout:LEVEL?")));
+	// Check for digital source
+	string reply = converse(":TRIGGER:TIMeout:SOURCE?");
+	if(reply[0] == 'C')
+	{	// Level only for analog source
+		dt->SetLevel(stof(converse(":TRIGGER:TIMeout:LEVEL?")));
+	}
 
 	//Dropout time
 	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:TIMeout:TIME?")));
@@ -2211,8 +2215,12 @@ void MagnovaOscilloscope::PullEdgeTrigger()
 		m_trigger = new EdgeTrigger(this);
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
-	//Level
-	et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
+	// Check for digital source
+	string reply = converse(":TRIGGER:EDGE:SOURCE?");
+	if(reply[0] == 'C')
+	{	// Level only for analog source
+		et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
+	}
 
 	//TODO: OptimizeForHF (changes hysteresis for fast signals)
 
@@ -2238,8 +2246,12 @@ void MagnovaOscilloscope::PullPulseWidthTrigger()
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	Unit fs(Unit::UNIT_FS);
 
-	//Level
-	pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
+	// Check for digital source
+	string reply = converse(":TRIGGER:INTERVAL:SOURCE?");
+	if(reply[0] == 'C')
+	{	// Level only for analog source
+		pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
+	}
 
 	//Condition
 	pt->SetCondition(GetCondition(converse(":TRIGGER:INTERVAL:LIMIT?")));
