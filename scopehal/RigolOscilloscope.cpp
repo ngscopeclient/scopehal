@@ -590,8 +590,8 @@ static std::vector<uint64_t> mso5000SampleDepths {
 	 10 * 1000 * 1000,
 	 25 * 1000 * 1000,
 	 50 * 1000 * 1000,
-	100 * 1000 * 1000, // only for <= 2 CH
-	200 * 1000 * 1000  // only for == 1 CH
+	100 * 1000 * 1000, // see GetMso5000AnalogBankUsage
+	200 * 1000 * 1000  // see GetMso5000AnalogBankUsage
 };
 
 void RigolOscilloscope::UpdateDynamicCapabilities() {
@@ -625,11 +625,14 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 			// all-channel is 50 M.
 			// -> remove N highest
 			auto depths = mso5000SampleDepths;
-			auto channelsEnabled = GetEnabledChannelCount();
-			if (channelsEnabled > 1)
-				depths.pop_back();
-			if (channelsEnabled > 2)
-				depths.pop_back();
+			auto const bankUsage = GetMso5000AnalogBankUsage();
+			if (bankUsage[0] == 2 or bankUsage[1] == 2)
+			{
+				depths.pop_back(); // 200M
+				depths.pop_back(); // 100M
+			}
+			else if (not m_opt200M or (bankUsage[0] and bankUsage[1]))
+				depths.pop_back(); // 200M
 			m_depths = std::move(depths);
 			return;
 		}
@@ -691,6 +694,46 @@ std::size_t RigolOscilloscope::GetMsods1000ZChannelDivisor() {
 	else if (divisor >= 3)
 		divisor = 4;
 	return divisor;
+}
+
+// MSO5000 has it's own specific behavior of how enabled channels affect samplerate
+// - (in this fcn) channel is considered enabled if it is enabled or if is trigger source
+// - bank 0 are channels 1 dnd 2
+// - bank 1 are channels 3 dnd 4
+// if any bank has more than 1 channel enabled -> 4 and 8 Gsps rates are not available
+// else if at one channel from each bank is enabled -> 8 Gsps are not available
+// thus if e.g.: ch1 and ch2 are enabled (2 channels from single bank), only 2 Gsps max rate is available
+// Sample applies for memory depth, but the highest depth is also only an option
+std::array<std::size_t, 2> RigolOscilloscope::GetMso5000AnalogBankUsage() {
+	std::array<std::size_t, 2> bankUsage {};
+
+	for (auto idx = 0U; idx < m_analogChannelCount; ++idx)
+	{
+		bool enabled {};
+		enabled |= IsChannelEnabled(idx);
+
+		{
+			auto trigger = GetTrigger();
+			auto input = trigger->GetInput(0);
+			enabled |= input.m_channel and input.m_channel->GetIndex() == idx;
+		}
+		if (not enabled)
+			continue;
+		switch (idx)
+		{
+			case 0:
+			case 1:
+				++bankUsage[0];
+				break;
+			case 2:
+			case 3:
+				++bankUsage[1];
+				break;
+			default:
+				break;
+		}
+	}
+	return bankUsage;
 }
 
 bool RigolOscilloscope::IsChannelAnalog(std::size_t i)
@@ -2720,6 +2763,34 @@ static std::vector<Ds1000zSrate> ds1000zSampleRates {
 	{1000 * 1000 * 1000, 1 | 2 | 4 | 8 | 16}  // 12k 120k 1M2 12M 24M        500M     250M         Y
 };
 
+static std::vector<uint64_t> mso5000SampleRates {
+	                   100UL,
+	                   200UL,
+	                   500UL,
+	                  1000UL,
+	                  2000UL,
+	                  5000UL,
+	             10 * 1000UL,
+	             20 * 1000UL,
+	             50 * 1000UL,
+	            100 * 1000UL,
+	            200 * 1000UL,
+	            500 * 1000UL,
+	       1 * 1000 * 1000UL,
+	       2 * 1000 * 1000UL,
+	       5 * 1000 * 1000UL,
+	      10 * 1000 * 1000UL,
+	      20 * 1000 * 1000UL,
+	      50 * 1000 * 1000UL,
+	     100 * 1000 * 1000UL,
+	     200 * 1000 * 1000UL,
+	     500 * 1000 * 1000UL,
+	1 * 1000 * 1000 * 1000UL,
+	2 * 1000 * 1000 * 1000UL,
+	4 * 1000 * 1000 * 1000UL, // see GetMso5000AnalogBankUsage
+	8 * 1000 * 1000 * 1000UL  // see GetMso5000AnalogBankUsage
+};
+
 vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 {
 	LogTrace("GetSampleRatesNonInterleaved called");
@@ -2752,33 +2823,18 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 
 
 		case Series::MSO5000:
-			return {
-				100,
-				200,
-				500,
-				1000,
-				2000,
-				5000,
-				10 * 1000,
-				20 * 1000,
-				50 * 1000,
-				100 * 1000,
-				200 * 1000,
-				500 * 1000,
-				1 * 1000 * 1000,
-				2 * 1000 * 1000,
-				5 * 1000 * 1000,
-				10 * 1000 * 1000,
-				20 * 1000 * 1000,
-				50 * 1000 * 1000,
-				100 * 1000 * 1000,
-				200 * 1000 * 1000,
-				500 * 1000 * 1000,
-				1 * 1000 * 1000 * 1000,
-				2 * 1000 * 1000 * 1000,
-			};
-			break;
-
+		{
+			auto rates = mso5000SampleRates;
+			auto const bankUsage = GetMso5000AnalogBankUsage();
+			if (bankUsage[0] == 2 or bankUsage[1] == 2)
+			{
+				rates.pop_back();
+				rates.pop_back();
+			}
+			else if (bankUsage[0] and bankUsage[1])
+				rates.pop_back();
+			return rates;
+		}
 		case Series::DHO1000:
 		case Series::DHO4000:
 		case Series::DHO800:
@@ -3087,6 +3143,31 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 				timeScaleFactor = d->second;
 			}
 			m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(sampletime / timeScaleFactor));
+			break;
+		}
+
+		case Series::MSO5000:
+		{
+			//TODO: consoder defining available time scales and do lookup of closes one (equal or lower) then we get from formula
+			LogTrace("setting target samplerate %lu\n", rate);
+			switch (rate)
+			{
+				// 4 Gpss result in 25 us, but the scope's native step is 20 us, anything above results in 
+				case 4'000'000'000UL:
+					m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(2e-5));
+					break;
+				
+				// 8 Gpss result in 12.5 us, but the scope's native step is 10 us, anything above results in 
+				case 8'000'000'000UL:
+					m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(1e-5));
+					break;
+
+				default:
+					m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(sampletime / 10));
+					break;
+				
+			}
+			SetSampleDepth(GetSampleDepth()); // see note at MSODO1000Z
 			break;
 		}
 
