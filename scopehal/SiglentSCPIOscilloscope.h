@@ -72,6 +72,9 @@ public:
 private:
 	std::string converse(const char* fmt, ...);
 	void sendOnly(const char* fmt, ...);
+	void flush();
+	void flushWaveformData();
+	void protocolError(std::string message = "");
 
 protected:
 	void IdentifyHardware();
@@ -171,6 +174,27 @@ public:
 	};
 
 	Model GetModelID() { return m_modelid; }
+
+   	std::string GetModelString() const
+    {
+        switch(m_modelid)
+        {
+            case MODEL_SIGLENT_SDS800X_HD:   return "SIGLENT_SDS800X_HD";
+            case MODEL_SIGLENT_SDS1000:      return "SIGLENT_SDS1000";
+            case MODEL_SIGLENT_SDS1000X_HD:  return "SIGLENT_SDS1000X_HD";
+            case MODEL_SIGLENT_SDS2000XE:    return "SIGLENT_SDS2000XE";
+            case MODEL_SIGLENT_SDS2000XP:    return "SIGLENT_SDS2000XP";
+            case MODEL_SIGLENT_SDS2000X_HD:  return "SIGLENT_SDS2000X_HD";
+            case MODEL_SIGLENT_SDS3000X_HD:  return "SIGLENT_SDS3000X_HD";
+            case MODEL_SIGLENT_SDS5000X:     return "SIGLENT_SDS5000X";
+            case MODEL_SIGLENT_SDS6000L:     return "SIGLENT_SDS6000L";
+            case MODEL_SIGLENT_SDS6000A:     return "SIGLENT_SDS6000A";
+            case MODEL_SIGLENT_SDS6000PRO:   return "SIGLENT_SDS6000PRO";
+            case MODEL_SIGLENT_SDS7000A:     return "SIGLENT_SDS7000A";
+            default:
+			case MODEL_UNKNOWN:              return "UNKNOWN";
+        }
+    }
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
@@ -282,11 +306,10 @@ protected:
 
 	std::string GetPossiblyEmptyString(const std::string& property);
 
-	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false, std::function<void(float)> progress = nullptr);
+	int ReadWaveformBlock(uint32_t maxsize, size_t& readBytes, char* data, bool hdSizeWorkaround = false, std::function<void(float)> progress = nullptr);
 	bool ReadWavedescs(
 		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* analogEnabled, bool* digitalEnabled, bool& anyAnalogEnabled, bool& anyDigitalEnabled);
 
-	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 
 	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
@@ -319,6 +342,7 @@ protected:
 	// Firmware version
 	int m_ubootMajorVersion;
 	int m_ubootMinorVersion;
+	int m_ubootPatchVersion;
 	int m_fwMajorVersion;
 	int m_fwMinorVersion;
 	int m_fwPatchVersion;
@@ -343,6 +367,9 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 	bool m_triggerForced;
+
+	// Pagination state
+	bool m_paginated;
 
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;

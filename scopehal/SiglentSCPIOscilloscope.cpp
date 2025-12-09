@@ -123,6 +123,7 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_paginated(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
@@ -170,6 +171,38 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 
 	m_transport->SendCommandQueued(opString);
 }
+
+void SiglentSCPIOscilloscope::flush()
+{
+	m_transport->ReadReply();
+}
+
+void SiglentSCPIOscilloscope::flushWaveformData()
+{	// Read any pending waveform data until we get the double 0x0a end marker
+	uint8_t tmp;
+	while(true)
+	{
+		size_t avaiable = m_transport->ReadRawData(1, &tmp);
+		if(!avaiable) break;
+		if(tmp == 0x0a)
+		{
+			avaiable = m_transport->ReadRawData(1, &tmp);
+			if(!avaiable) break;
+			if(tmp == 0x0a) break;
+		}
+	}
+	m_transport->FlushRXBuffer();
+	// Protocol error might be caused by invalid acq points or max points => clear cache
+	m_acqPointsValid = false;
+	m_maxPointsValid = false;
+}
+
+void SiglentSCPIOscilloscope::protocolError(std::string message)
+{
+	LogError("Protocol error, flushing read stream%s\n", message != "" ? ((": "+message).c_str()) : ".");
+	m_transport->ReadReply();
+}
+
 
 void SiglentSCPIOscilloscope::SharedCtorInit()
 {
@@ -266,19 +299,36 @@ void SiglentSCPIOscilloscope::ParseFirmwareVersion()
 	//Check if version requires size workaround (1.3.9R6 and older)
 	m_ubootMajorVersion = 0;
 	m_ubootMinorVersion = 0;
+	m_ubootPatchVersion = 0;
 	m_fwMajorVersion = 0;
 	m_fwMinorVersion = 0;
 	m_fwPatchVersion = 0;
 	m_fwPatchRevision = 0;
 
-	//Version format for 1.5.2R3 and older
-	sscanf(m_fwVersion.c_str(), (m_fwVersion.find('R') != std::string::npos) ? "%d.%d.%d.%d.%dR%d" : "%d.%d.%d.%d.%d.%d",
-		&m_ubootMajorVersion,
-		&m_ubootMinorVersion,
-		&m_fwMajorVersion,
-		&m_fwMinorVersion,
-		&m_fwPatchVersion,
-		&m_fwPatchRevision);
+	int dotCount = std::count(m_fwVersion.begin(), m_fwVersion.end(),'.');
+	if(dotCount == 6)
+	{	// Latest firmware versions have a patch uboot number
+		sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%d.%d.%d",
+			&m_ubootMajorVersion,
+			&m_ubootMinorVersion,
+			&m_ubootPatchVersion,
+			&m_fwMajorVersion,
+			&m_fwMinorVersion,
+			&m_fwPatchVersion,
+			&m_fwPatchRevision);
+		LogDebug("Found version %d.%d.%d.%d.%d.%d.%d\n",m_ubootMajorVersion,m_ubootMinorVersion,m_ubootPatchVersion,m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion,m_fwPatchRevision);
+	}
+	else
+	{	//Version format for 1.5.2R3 and older
+		sscanf(m_fwVersion.c_str(), (m_fwVersion.find('R') != std::string::npos) ? "%d.%d.%d.%d.%dR%d" : "%d.%d.%d.%d.%d.%d",
+			&m_ubootMajorVersion,
+			&m_ubootMinorVersion,
+			&m_fwMajorVersion,
+			&m_fwMinorVersion,
+			&m_fwPatchVersion,
+			&m_fwPatchRevision);
+		LogDebug("Found version %d.%d.%d.%d.%d.%d\n",m_ubootMajorVersion,m_ubootMinorVersion,m_fwMajorVersion,m_fwMinorVersion,m_fwPatchVersion,m_fwPatchRevision);
+	}
 }
 
 void SiglentSCPIOscilloscope::IdentifyHardware()
@@ -364,8 +414,9 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			m_protocolId = PROTOCOL_E11;
 
 			ParseFirmwareVersion();
-			if(m_fwMajorVersion>=1 && m_fwMinorVersion >= 2)
+			if(m_fwMajorVersion==1 && m_fwMinorVersion == 2 && m_fwPatchVersion < 3)
 			{	// Only pre-production firmware version (e.g. 1.1.7) uses SCPI standard size reporting
+				// Fix has been made in firmware 1.2.3+
 				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
 				m_requireSizeWorkaround = true;
 			}
@@ -377,7 +428,8 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			// Native 12 bit resolution but supports 8 bit data transfer with higher refresh rate
 			// This can be overriden by driver 16bits setting
 			m_highDefinition = true;
-			m_requireSizeWorkaround = true;
+			// No need for size workaround on SDS3000X HD, at least with fimware versions 1.0.4.2+
+			m_requireSizeWorkaround = false;
 		}
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
@@ -421,7 +473,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 		{	// Only 5 ms for newer models
 			m_transport->EnableRateLimiting(chrono::milliseconds(5));
 		}
-
+		LogDebug("Found model %s with m_requireSizeWorkaround = %s\n",GetModelString().c_str(),m_requireSizeWorkaround ? "true" : "false");
 	}
 	else
 	{
@@ -1146,7 +1198,10 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 	}
 
 	double d;
-	sscanf(reply.c_str(), "%lf", &d);
+	if(sscanf(reply.c_str(), "%lf", &d) <= 0)
+	{
+		protocolError("Error when parsing channel attenuation");
+	}
 	return d;
 }
 
@@ -1527,7 +1582,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	}
 
 	//Stopped, no data available
-	if(sinr == "Stop")
+	if(sinr == "Stop" || sinr == "FStop")
 	{
 		if(m_triggerArmed)
 		{
@@ -1542,11 +1597,21 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 		else
 			return TRIGGER_MODE_STOP;
 	}
+
+	// Check for protocol errors
+	if(m_protocolId == PROTOCOL_E11)
+	{	// Possible trigger values are Arm|Ready|Auto|Trig'd|Stop|Roll}
+		if((sinr != "Auto") && (sinr != "Trig'd") && (sinr != "Roll"))
+		{
+			protocolError("Invalid trigger value '"+sinr+"'");
+		}
+	}
 	return TRIGGER_MODE_RUN;
 }
 
-int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround, std::function<void(float)> progress)
+int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, size_t& readBytes, char* data, bool hdSizeWorkaround, std::function<void(float)> progress)
 {
+	readBytes = 0;
 	//Read and discard data until we see the '#'
 	uint8_t tmp;
 	for(int i=0; i<20; i++)
@@ -1559,6 +1624,10 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 		if(i == 19)
 		{
 			LogError("ReadWaveformBlock: threw away 20 bytes of data and never saw a '#'\n");
+			// This is a protocol error, flush pending rx data
+			flush();
+			// Stop aqcuisition after this protocol error
+			Stop();
 			return 0;
 		}
 	}
@@ -1575,9 +1644,20 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, boo
 	uint32_t len = getLength;
 	if(hdSizeWorkaround)
 		len *= 2;
-	len = min(len, maxsize);
 
-	m_transport->ReadRawData(len, (unsigned char*)data, progress);
+	LogTrace("Got length %" PRIu32 " ('%s') from scope, hdSizeWorkaround = %s, expected bytes = %" PRIu32 ", maxsize = %" PRIu32 " => reading %" PRIu32 " bytes.\n",getLength, textlen, hdSizeWorkaround ? "true" : "false", len, maxsize, min(len, maxsize));
+	if(len > maxsize)
+	{
+		len = maxsize;
+		LogError("Invalid waveform block length %" PRIu32 " : max size = %" PRIu32 "\n",len,maxsize);
+	}
+
+	while(readBytes < len)
+	{
+		size_t newBytes = m_transport->ReadRawData(len-readBytes, (unsigned char*)(data+readBytes), progress);
+		if(newBytes == 0) break;
+		readBytes += newBytes;
+	}
 
 	if(hdSizeWorkaround)
 		return getLength*2;
@@ -1631,9 +1711,9 @@ bool SiglentSCPIOscilloscope::ReadWavedescs(
 		if(analogEnabled[i] || (!anyAnalogEnabled && i == 0))
 		{
 			m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:PREAMBLE?");
-
-			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE, wavedescs[i]))
-				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
+			size_t readBytes;
+			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE,readBytes,wavedescs[i]))
+				LogError("ReadWaveformBlock for wavedesc %u failed, readBytes = %zu\n", i, readBytes);
 
 			// Read 0x0A 0x0A trailer
 			m_transport->ReadReply();
@@ -1942,10 +2022,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 {
 	// Transfer buffers
 	char* analogWaveformData[MAX_ANALOG] {nullptr};
-	int analogWaveformDataSize[MAX_ANALOG] {0};
+	size_t analogWaveformDataSize[MAX_ANALOG] {0};
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
 	char* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
-	int digitalWaveformDataSize[MAX_DIGITAL] {0};
+	size_t digitalWaveformDataSize[MAX_DIGITAL] {0};
 	std::string digitalWaveformData;
 
 	//State for this acquisition (may be more than one waveform)
@@ -1962,9 +2042,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	bool analogEnabled[MAX_ANALOG] = {false};
 	bool digitalEnabled[MAX_DIGITAL] = {false};
 	bool anyDigitalEnabled = false;
-	bool anyAnalogEnabled = true;
+	bool anyAnalogEnabled = false;
 	double* pwtime = NULL;
 	char tmp[128];
+	size_t readBytes;
 
 	//Acquire the data (but don't parse it)
 
@@ -1997,7 +2078,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					analogWaveformData[i] = new char[WAVEFORM_SIZE];
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
-					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE,readBytes,analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 					// This is the 0x0a0a at the end
 					m_transport->ReadRawData(2, (unsigned char*)tmp);
 				}
@@ -2121,38 +2202,80 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				uint64_t acqPoints = GetAcqPoints();
 				uint64_t pageSize = GetMaxPoints();
 				uint64_t pages = ceil(acqPoints/pageSize);
-				uint64_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
+				if(pages < 1) pages = 1;
+				uint64_t pageSizeBytes = m_highDefinition ? (pageSize*2) : pageSize;
+				size_t acqBytes = m_highDefinition ? (acqPoints*2) : acqPoints;
 				bool paginated = (pages > 1);
+				LogTrace("Acqu points = %" PRIu64 ", Acqu bytes = %zu, num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",acqPoints,acqBytes,pages,pageSize,pageSizeBytes);
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
 					if(analogEnabled[i])
 					{	// Allocate buffer
 						analogWaveformData[i] = new char[acqBytes];
-						if(!paginated)
-						{	// All data fits one page
-							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
-							m_transport->SendCommand(":WAVEFORM:DATA?");
-							analogWaveformDataSize[i] = ReadWaveformBlock(acqBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
-							// This is the 0x0a0a at the end
-							m_transport->ReadRawData(2, (unsigned char*)tmp);
-						}
-						else
-						{	// We need pagination
-							m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
-							for(uint64_t page = 0; page < pages; page++)
-							{
+						// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
+						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
+						for(uint64_t page = 0; page < pages; page++)
+						{
+							if(paginated)
+							{	// Remember current mode for next acquisitions
+								m_paginated = true;
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
 								auto progress = [i, this, page, pages] (float fprogress) {
 									float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 									ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 								};
-								analogWaveformDataSize[i] += ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
-								// This is the 0x0a0a at the end
-								m_transport->ReadRawData(2, (unsigned char*)tmp);
+								ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], readBytes, analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
+								if(readBytes == 0)
+								{
+									LogError("Protocol error, aborting acquisition.");
+									ChannelsDownloadFinished();
+									analogWaveformDataSize[i] = 0;
+									break;
+								}
+								analogWaveformDataSize[i] += readBytes;
+							}
+							else
+							{	// See if we here prviously paginated
+								if(m_paginated)
+								{	// Previous acquisition was paginated => reset start value
+									m_transport->SendCommand(":WAVEFORM:START 0");
+									m_paginated = false;
+								}
+								m_transport->SendCommand(":WAVEFORM:DATA?");
+								ReadWaveformBlock(acqBytes, readBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+								if(readBytes == 0)
+								{
+									LogError("Protocol error, aborting acquisition.");
+									ChannelsDownloadFinished();
+									analogWaveformDataSize[i] = 0;
+									break;
+								}
+								analogWaveformDataSize[i] = readBytes;
+							}
+							// SDS2000X HD driver 1.2.3.1 does not always honor the returned GetMaxPoints()
+							// When this is happening, the actual page size is smaller than GetMaxPoints()
+							// To handle this, we need to dynamically adapt pagination to this actual page size
+							if((readBytes != 0) && (readBytes < acqBytes) && (readBytes != pageSizeBytes))
+							{	// Actual page size is different from the one reported by GetMaxPoints() => update pagination
+								pageSizeBytes = readBytes;
+								pageSize = m_highDefinition ? (pageSizeBytes / 2) : pageSizeBytes;
+								pages = ceil(acqPoints/pageSize);
+								paginated = (pages > 1);
+								LogDebug("Repaginating ! Num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",pages,pageSize,pageSizeBytes);
+							}
+							// This is the 0x0a0a at the end
+							m_transport->ReadRawData(2, (unsigned char*)tmp);
+							// Detect prtocol error and consume the rest of the stream
+							if(tmp[0] != 0x0a || tmp[1] != 0x0a)
+							{
+								LogError("Error while reading waveform data, flushing read buffer...");
+								flushWaveformData();
 							}
 						}
+						// Safe-check data size
+						if(analogWaveformDataSize[i] > acqBytes) analogWaveformDataSize[i] = acqBytes;
 						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 					}
 				}
@@ -2163,8 +2286,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					// For digital channels, page size is half the size of analog channels (as per empirical determination...)
 					pageSize /= 2;
 					pages = ceil(digitalAcqPoints/pageSize);
+					if(pages < 1) pages = 1;
 					paginated = (pages > 1);
-					uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
+					//LogDebug("Digital acq => Acq points = %" PRIu64 ", num pages = %" PRIu64 ", pageSize = %" PRIu64 ", pageSizeBytes = %" PRIu64 "\n",digitalAcqPoints,pages,pageSize,pageSizeBytes);
+					size_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
 					// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
 					if(wasPaginated && !paginated)
 					{	// Reset page start
@@ -2176,31 +2301,61 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						if(digitalEnabled[i])
 						{	// Allocate buffer
 							digitalWaveformDataBytes[i] = new char[acqDigitalBytes];
-							if(!paginated)
-							{	// All data fits one page
-								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
-								m_transport->SendCommand(":WAVEFORM:DATA?");
-								digitalWaveformDataSize[i] = ReadWaveformBlock(acqDigitalBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
-								// This is the 0x0a0a at the end
-								m_transport->ReadRawData(2, (unsigned char*)tmp);
-							}
-							else
-							{	// We need pagination
-								m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
-								for(uint64_t page = 0; page < pages; page++)
+							m_transport->SendCommand(":WAVEFORM:SOURCE D" + to_string(i));
+							for(uint64_t page = 0; page < pages; page++)
+							{
+								// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
+								if(paginated)
 								{
-									// LogDebug("Requesting %lld bytes from byte count to %d.\n",acqDigitalBytes-digitalWaveformDataSize[i],digitalWaveformDataSize[i]);
 									m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 									m_transport->SendCommand(":WAVEFORM:DATA?");
 									auto progress = [i, this, page, pages] (float fprogress) {
 										float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
 										ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
 									};
-									digitalWaveformDataSize[i] += ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
-									// This is the 0x0a0a at the end
-									m_transport->ReadRawData(2, (unsigned char*)tmp);
+									ReadWaveformBlock(acqDigitalBytes-digitalWaveformDataSize[i], readBytes, digitalWaveformDataBytes[i]+digitalWaveformDataSize[i], false, progress);
+									if(readBytes == 0)
+									{
+										LogError("Protocol error, aborting acquisition.");
+										ChannelsDownloadFinished();
+										digitalWaveformDataSize[i] = 0;
+										break;
+									}
+									digitalWaveformDataSize[i] += readBytes;
+								}
+								else
+								{	// All data fits one page
+									m_transport->SendCommand(":WAVEFORM:DATA?");
+									ReadWaveformBlock(acqDigitalBytes, readBytes, digitalWaveformDataBytes[i], false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+									if(readBytes == 0)
+									{
+										LogError("Protocol error, aborting acquisition.");
+										ChannelsDownloadFinished();
+										digitalWaveformDataSize[i] = 0;
+										break;
+									}
+									digitalWaveformDataSize[i] = readBytes;
+								}
+								// 8 points per byte in digital mode
+								uint64_t readPoints = readBytes*8;
+								if((readPoints != 0) &&(readPoints < digitalAcqPoints) && (readPoints != pageSize))
+								{	// Actual page size is different from the one reported by GetMaxPoints() => update pagination
+									pageSize = readPoints;
+									pages = ceil(digitalAcqPoints/pageSize);
+									paginated = (pages > 1);
+									LogDebug("Repaginating ! => Num pages = %" PRIu64 ", pageSize = %" PRIu64 "\n",pages,pageSize);
+								}
+								// This is the 0x0a0a at the end
+								m_transport->ReadRawData(2, (unsigned char*)tmp);
+								// Detect prtocol error and consume the rest of the stream
+								if(tmp[0] != 0x0a || tmp[1] != 0x0a)
+								{
+									LogError("Error while reading waveform data, flushing read buffer...");
+									flushWaveformData();
 								}
 							}
+							// Safe-check data size
+							if(digitalWaveformDataSize[i] > acqDigitalBytes) digitalWaveformDataSize[i] = acqDigitalBytes;
 							ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 						}
 					}
@@ -2484,7 +2639,11 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 	}
 
 	float offset;
-	sscanf(reply.c_str(), "%f", &offset);
+	if(sscanf(reply.c_str(), "%f", &offset) <= 0)
+	{
+		protocolError("Error while parsing channel offset");
+		return offset;
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
@@ -2554,7 +2713,11 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 	}
 
 	float volts_per_div;
-	sscanf(reply.c_str(), "%f", &volts_per_div);
+	if(sscanf(reply.c_str(), "%f", &volts_per_div)<=0)
+	{
+		protocolError("Error while parsing channel voltage range");
+		return m_channelVoltageRanges[i];
+	}
 
 	float v = volts_per_div * 8;	//plot is 8 divisions high
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -2794,9 +2957,15 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 				// --------------------------------------------------
 		}
 
-		sscanf(reply.c_str(), "%lf", &f);
-		m_sampleRate = static_cast<int64_t>(f);
-		m_sampleRateValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f) > 0)
+		{
+			m_sampleRate = static_cast<int64_t>(f);
+			m_sampleRateValid = true;
+		}
+		else
+		{
+			protocolError("Error while parsing sample rate");
+		}
 	}
 	return m_sampleRate;
 }
@@ -2816,9 +2985,15 @@ uint64_t SiglentSCPIOscilloscope::GetMaxPoints()
 				LogError("Max points only supported by E11 protocol\n");
 				break;
 		}
-		sscanf(reply.c_str(), "%lf", &f);
-		m_maxPoints = static_cast<int64_t>(f);
-		m_maxPointsValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f)>0)
+		{
+			m_maxPoints = static_cast<int64_t>(f);
+			m_maxPointsValid = true;
+		}
+		else
+		{
+			protocolError("Error whil parsin max points");
+		}
 		//LogWarning("Got max point %s => %d\n",reply.c_str(),(int)m_maxPoints);
 	}
 	return m_maxPoints;
@@ -2839,9 +3014,15 @@ uint64_t SiglentSCPIOscilloscope::GetAcqPoints()
 				LogError("Acq points only supported by E11 protocol\n");
 				break;
 		}
-		sscanf(reply.c_str(), "%lf", &f);
-		m_acqPoints = static_cast<int64_t>(f);
-		m_acqPointsValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f)>0)
+		{
+			m_acqPoints = static_cast<int64_t>(f);
+			m_acqPointsValid = true;
+		}
+		else
+		{
+			protocolError("Error whil parsing acs points");
+		}
 		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
 	}
 	return m_acqPoints;
@@ -2862,9 +3043,15 @@ uint64_t SiglentSCPIOscilloscope::GetDigitalAcqPoints()
 				LogError("Digital Acq points only supported by E11 protocol\n");
 				break;
 		}
-		sscanf(reply.c_str(), "%lf", &f);
-		m_digitalAcqPoints = static_cast<int64_t>(f);
-		m_digitalAcqPointsValid = true;
+		if(sscanf(reply.c_str(), "%lf", &f)>0)
+		{
+			m_digitalAcqPoints = static_cast<int64_t>(f);
+			m_digitalAcqPointsValid = true;
+		}
+		else
+		{
+			protocolError("Error while parsing digital acq points");
+		}
 		//LogWarning("Got acq point %s => %d\n",reply.c_str(),(int)m_acqPoints);
 	}
 	return m_digitalAcqPoints;
@@ -2912,6 +3099,8 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 
 	//Save original sample rate (scope often changes sample rate when adjusting memory depth)
 	uint64_t rate = GetSampleRate();
+	bool sampleRateSet = false;
+	bool tiggerWasArmed = m_triggerArmed;
 	// Get Trigger State to restore it after setting changing memory detph
 	TriggerMode triggerMode = PollTrigger();
 
@@ -3194,8 +3383,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 						sendOnly("ACQUIRE:MDEPTH 500M");
 						break;
 				}
-				//Force sample rate to be correct, adjusting time/div if needed
-				SetSampleRate(GetSampleRate());
 				break;
 			case MODEL_SIGLENT_SDS7000A:
 				switch(depth)
@@ -3240,8 +3427,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 						sendOnly("ACQUIRE:MDEPTH 1G");
 						break;
 				}
-				//Force sample rate to be correct, adjusting time/div if needed
-				SetSampleRate(GetSampleRate());
 				break;
 			// --------------------------------------------------
 			default:
@@ -3249,9 +3434,13 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				break;
 				// --------------------------------------------------
 		}
-		if(IsTriggerArmed())
+		//Force sample rate to be correct, adjusting time/div if needed
+		SetSampleRate(GetSampleRate());
+		sampleRateSet = true;
+		if(tiggerWasArmed)
 		{	// restart trigger
 			sendOnly("TRIG_MODE SINGLE");
+			m_triggerArmed = true;
 		}
 		else
 		{	// Restore previous trigger mode
@@ -3261,18 +3450,28 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 
 	m_memoryDepthValid = false;
 
-	//restore old sample rate
-	SetSampleRate(rate);
+	if(!sampleRateSet)
+	{	//restore old sample rate
+		SetSampleRate(rate);
+	}
 }
 
 void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 {
+	//Need to lock the mutex when setting rate because of the quirks around needing to change trigger mode too
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	m_sampleRate = rate;
 	m_sampleRateValid = false;
-
+	
 	m_memoryDepthValid = false;
+	// Acq Points and max points will have to be updated too
+	m_acqPointsValid = false;
+	m_maxPointsValid = false;
+
 	double sampletime = GetSampleDepth() / (double)rate;
 	double scale = sampletime / 10;
+	//LogDebug("Set Sample Rate depth = %" PRIu64 ", rate = %" PRIu64 ", time = %f, scale = %f\n",GetSampleDepth(),rate,sampletime,scale);
 
 	switch(m_modelid)
 	{
@@ -3286,7 +3485,44 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		case MODEL_SIGLENT_SDS1000X_HD:
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS3000X_HD:
+			{
+			// We cannot change srate when in Stop mode
+			// Get Trigger State to restore it after setting changing memory detph
+			bool wasArmed = m_triggerArmed;
+			bool wasStopped = !wasArmed && (converse(":TRIGGER:STATUS?") == "Stop");
+			sendOnly(":TRIGGER:MODE AUTO");
+			// Time scale and srate need to both be set for the scope to consistantly update sample rate
 			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
+			sendOnly(":ACQUIRE:SRATE %1.2E", (double)rate);
+			// Wait for srate to be updated on the scope
+			uint64_t newRate;
+			uint8_t attempt = 0;
+			while(true)
+			{
+				m_sampleRateValid = false;
+				newRate = GetSampleRate();
+				if(newRate == rate) break;
+				attempt++;
+				if(attempt > 10)
+				{
+					m_sampleRateValid = false;
+					break;
+				}
+			}
+			//LogDebug("Rate = %" PRIu64 ", newRate = %" PRIu64 "\n",rate,newRate);
+			if(wasArmed)
+			{
+				m_triggerArmed = true;
+				sendOnly("TRIG_MODE SINGLE");
+			}
+			else if (wasStopped)
+			{	// Restore previous trigger mode
+				sendOnly(":TRIGGER:MODE STOP");
+				m_triggerArmed = false;
+				m_triggerOneShot = false;
+			}
+
+			}
 			break;
 
 		//Timebase must be multiples of 1-2-5 so truncate any fractional component
@@ -3412,7 +3648,11 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 
 	//Result comes back in scientific notation
 	double sec;
-	sscanf(reply.c_str(), "%le", &sec);
+	if(sscanf(reply.c_str(), "%le", &sec)<=0)
+	{
+		protocolError("Error while parsing trigger offset");
+		return m_triggerOffset;
+	}
 	m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
 
 	//Convert from midpoint to start point
@@ -3491,7 +3731,11 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 
 	//Value comes back as floating point ps
 	float skew;
-	sscanf(reply.c_str(), "%f", &skew);
+	if(sscanf(reply.c_str(), "%f", &skew)<=0)
+	{
+		protocolError("Error while parsing channel deskew");
+		return 0;
+	}
 	int64_t skew_ps = round(skew * FS_PER_SECOND);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
