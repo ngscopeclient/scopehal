@@ -2253,11 +2253,9 @@ bool RigolOscilloscope::AcquireData()
 			{
 				//TODO: check that these series respond with meaningfule data in digital chanel preamble
 				if(preamble->sec_per_sample == 0)
-				{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
-					LogWarning("Got null preamble:sec_per_sample value from the scope, ignoring this waveform.\n");
-					continue;
-				}
-				fs_per_sample = preamble->sec_per_sample; // prefer value from preamble rather than one obtained from GetSamplerate()
+					break; // Sometimes the scope might return a null value for xincrement => do not update `fs_per_sample`
+				
+				fs_per_sample = preamble->sec_per_sample * FS_PER_SECOND; // prefer value from preamble rather than one obtained from GetSamplerate()
 				break;
 			}
 			case Series::DHO1000:
@@ -2268,6 +2266,13 @@ bool RigolOscilloscope::AcquireData()
 				LogLaNotPresent();
 				return false;
 		}
+
+		if (fs_per_sample == 0)
+		{
+			LogWarning("Invalid fs_per_sample, ignoring waveform.\n");
+			continue;
+		}
+
 		LogTrace("Bank %zd samplerate %s\n", bankIdx, Unit(Unit::UNIT_SAMPLERATE).PrettyPrint(FS_PER_SECOND/fs_per_sample).c_str());
 
 		for (auto& channel : bankChannels)
