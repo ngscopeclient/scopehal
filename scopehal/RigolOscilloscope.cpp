@@ -3139,6 +3139,20 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_mdepth.reset();
+
+		bool requestedValueisValid {};
+		auto rates = GetSampleRatesNonInterleaved();
+		for (auto const& depth : rates)
+			if (depth == rate)
+			{
+				requestedValueisValid = true;
+				break;
+			}
+		if (not requestedValueisValid)
+		{
+			LogWarning("requested sample rate %" PRIu64 " is not any of %zd of suported by this device\n", rate, rates.size());
+			return;
+		}
 	}
 	double sampletime = GetSampleDepth() / (double)rate;
 	// locally cache current value before we change the timebase,
