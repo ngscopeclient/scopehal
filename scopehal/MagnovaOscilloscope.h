@@ -332,7 +332,7 @@ protected:
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;
-	std::map<size_t, float> m_channelDigitalThresholds;
+	std::map<std::string, float> m_channelDigitalThresholds;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
 	int64_t m_sampleRate;
@@ -349,6 +349,8 @@ protected:
 	std::map<size_t, float> m_awgRange;
 	std::map<size_t, float> m_awgOffset;
 	std::map<size_t, float> m_awgFrequency;
+	std::map<size_t, float> m_awgRiseTime;
+	std::map<size_t, float> m_awgFallTime;
 	std::map<size_t, FunctionGenerator::WaveShape> m_awgShape;
 	std::map<size_t, FunctionGenerator::OutputImpedance> m_awgImpedance;
 	ADCMode m_adcMode;

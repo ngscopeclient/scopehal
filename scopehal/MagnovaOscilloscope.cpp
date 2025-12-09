@@ -387,6 +387,8 @@ void MagnovaOscilloscope::FlushConfigCache()
 	m_awgRange.clear();
 	m_awgOffset.clear();
 	m_awgFrequency.clear();
+	m_awgRiseTime.clear();
+	m_awgFallTime.clear();
 	m_awgShape.clear();
 	m_awgImpedance.clear();
 	m_adcModeValid = false;
@@ -648,7 +650,6 @@ double MagnovaOscilloscope::GetChannelAttenuation(size_t i)
 	if(i >= m_analogChannelCount)
 		return 1;
 
-	//TODO: support ext/10
 	if(i == m_extTrigChannel->GetIndex())
 		return 1;
 
@@ -1076,7 +1077,6 @@ time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& timeString, doub
 void MagnovaOscilloscope::Convert16BitSamples(float* pout, const uint16_t* pin, float gain, float offset, size_t count)
 {
 	//Divide large waveforms (>1M points) into blocks and multithread them
-	//TODO: tune split
 	if(count > 1000000)
 	{
 		//Round blocks to multiples of 64 samples for clean vectorization
@@ -1398,12 +1398,6 @@ bool MagnovaOscilloscope::AcquireData()
 		sendOnly(":SINGLE");
 		m_triggerArmed = true;
 	}
-	// TODO => is this needed ?
-	/*
-	else
-	{	// It was one shot acquisition, disarm trigger
-		m_triggerArmed = false;
-	}*/
 
 	//Process analog waveforms
 	waveforms.resize(m_analogChannelCount);
@@ -2047,21 +2041,20 @@ float MagnovaOscilloscope::GetDigitalThreshold(size_t channel)
 	if( (channel < m_digitalChannelBase) || (m_digitalChannelCount == 0) )
 		return 0;
 
-	channel -= m_analogChannelCount;
+	string bank = GetDigitalChannelBankName(channel);
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-
-		if(m_channelDigitalThresholds.find(channel) != m_channelDigitalThresholds.end())
-			return m_channelDigitalThresholds[channel];
+		if(m_channelDigitalThresholds.find(bank) != m_channelDigitalThresholds.end())
+			return m_channelDigitalThresholds[bank];
 	}
 
 	float result;
 
-	string reply = converse(":DIG:THRESHOLD%s?", GetDigitalChannelBankName(channel).c_str());
+	string reply = converse(":DIG:THRESHOLD%s?", bank.c_str());
 	sscanf(reply.c_str(), "%f", &result);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelDigitalThresholds[channel] = result;
+	m_channelDigitalThresholds[bank] = result;
 	return result;
 }
 
@@ -2072,15 +2065,14 @@ void MagnovaOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level
 
 void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
-	channel -= m_analogChannelCount;
-
-	sendWithAck(":DIG:THRESHOLD%s %1.2E", GetDigitalChannelBankName(channel).c_str(), level);
+	string bank = GetDigitalChannelBankName(channel);
+	
+	sendWithAck(":DIG:THRESHOLD%s %1.2E", bank.c_str(), level);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	// TODO handel bank cache rather than channel
-	m_channelDigitalThresholds.erase(channel);
+	m_channelDigitalThresholds.erase(bank);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3326,11 +3318,6 @@ void MagnovaOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::W
 	m_awgShape[chan] = shape;
 }
 
-bool MagnovaOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
-{
-	return true;
-}
-
 FunctionGenerator::OutputImpedance MagnovaOscilloscope::GetFunctionChannelOutputImpedance(int chan)
 {
 	{
@@ -3362,20 +3349,58 @@ void MagnovaOscilloscope::SetFunctionChannelOutputImpedance(int chan, FunctionGe
 	m_awgImpedance.erase(chan);
 }
 
-float MagnovaOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
-{	// TODO
-	return 0;
+bool MagnovaOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
+{
+	return true;
 }
 
-void MagnovaOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*fs*/)
-{	// TODO
+
+float MagnovaOscilloscope::GetFunctionChannelRiseTime(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgRiseTime.find(chan) != m_awgRiseTime.end())
+			return m_awgRiseTime[chan];
+	}
+
+	string time = converse(":FGEN:WAV:PULS:RTIME ?");
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	float timef;
+	sscanf(time.c_str(), "%f", &timef);
+	m_awgRiseTime[chan] = timef * FS_PER_SECOND;
+	return m_awgRiseTime[chan];
 }
 
-float MagnovaOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
-{	// TODO
-	return 0;
+void MagnovaOscilloscope::SetFunctionChannelRiseTime(int chan, float fs)
+{
+	sendWithAck(":FGEN:WAV:PULS:RTIME %.4f",fs * SECONDS_PER_FS);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgRiseTime.erase(chan);
 }
 
-void MagnovaOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*fs*/)
-{	// TODO
+float MagnovaOscilloscope::GetFunctionChannelFallTime(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgFallTime.find(chan) != m_awgFallTime.end())
+			return m_awgFallTime[chan];
+	}
+
+	string time = converse(":FGEN:WAV:PULS:FTIME ?");
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	float timef;
+	sscanf(time.c_str(), "%f", &timef);
+	m_awgFallTime[chan] = timef * FS_PER_SECOND;
+	return m_awgFallTime[chan];
+}
+
+void MagnovaOscilloscope::SetFunctionChannelFallTime(int chan, float fs)
+{
+	sendWithAck(":FGEN:WAV:PULS:FTIME %.4f",fs * SECONDS_PER_FS);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgFallTime.erase(chan);
 }
