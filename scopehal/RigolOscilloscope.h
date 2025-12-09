@@ -229,6 +229,7 @@ protected:
 	Series m_series;
 
 	//True if we have >8 bit capture depth
+	//TODO: switch to GetADCMode/SetADCMode API instead of having custom attribute switching DHOs to 12 bits
 	bool m_highDefinition;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);

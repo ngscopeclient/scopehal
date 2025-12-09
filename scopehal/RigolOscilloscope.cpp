@@ -661,7 +661,6 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 
 		case Series::DS1000:
 		case Series::UNKNOWN:
-			LogError("RigolOscilloscope::GetSampleDepthsNonInterleaved not implemented for this model\n");
 			break;
 	}
 }
@@ -2008,6 +2007,8 @@ bool RigolOscilloscope::AcquireData()
 		if(npoints == 0)
 			continue;
 
+		LogTrace("Channel %u(%s) samplerate %s\n", channelIdx, GetChannel(channelIdx)->GetDisplayName().c_str(), Unit(Unit::UNIT_SAMPLERATE).PrettyPrint(FS_PER_SECOND/fs_per_sample).c_str());
+
 		//Set up the capture we're going to store our data into
 		auto cap {AllocateAnalogWaveform(m_nickname + "." + GetChannel(channelIdx)->GetHwname())};
 		cap->clear();
@@ -2112,9 +2113,12 @@ bool RigolOscilloscope::AcquireData()
 				// LogTrace("download progress %5.3f\n", bytes_progress / bytes_total);
 				ChannelsDownloadStatusUpdate(channelIdx, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, bytes_progress / bytes_total);
 			};
-			m_transport->ReadRawData(bytesToRead, temp_buf.data(), downloadCallback);
+			auto const bytesRead = m_transport->ReadRawData(bytesToRead, temp_buf.data(), downloadCallback);
 			downloadCallback(1);
 			// in case the transport did not call the progress callback (e.g. ScpiLxi), call it manually al least once after the transport finishes
+
+			if (bytesRead != bytesToRead)
+				LogWarning("requested %zd , got %zd B\n", bytesToRead, bytesRead);
 
 
 			double ydelta = yorigin + yreference;
@@ -2174,7 +2178,7 @@ bool RigolOscilloscope::AcquireData()
 	
 	for(auto channelIdx = 0U; channelIdx < m_digitalChannelCount; channelIdx++)
 	{
-		if(!IsChannelEnabled(m_analogChannelCount + channelIdx))
+		if(!IsChannelEnabled(DigitalChannelNumberToIdx(channelIdx)))
 			continue;
 		auto const bankIdx = channelIdx / DIGITAL_BANK_SIZE;
 		auto capture {AllocateDigitalWaveform(m_nickname + "." + GetChannel(channelIdx)->GetHwname())};
@@ -2186,9 +2190,9 @@ bool RigolOscilloscope::AcquireData()
 		capture->m_startFemtoseconds = (now - floor(now)) * FS_PER_SECOND;
 
 		if (auto bank = banksToDownload.find(bankIdx); bank != banksToDownload.end())
-			bank->second.emplace_back(GetChannel(channelIdx + m_analogChannelCount), capture);
+			bank->second.emplace_back(GetChannel(DigitalChannelNumberToIdx(channelIdx)), capture);
 		else
-			banksToDownload[bankIdx] = {{GetChannel(channelIdx + m_analogChannelCount), capture}};
+			banksToDownload[bankIdx] = {{GetChannel(DigitalChannelNumberToIdx(channelIdx)), capture}};
 	}
 
 	// download data for each bank
@@ -2218,7 +2222,7 @@ bool RigolOscilloscope::AcquireData()
 		};
 
 		// we set the source to the lowest channel in the POD(bank), could be any
-		m_transport->SendCommandQueued(string("WAV:SOUR ") + m_channels[m_analogChannelCount + (bankIdx * DIGITAL_BANK_SIZE)]->GetHwname()); 
+		m_transport->SendCommandQueued(string("WAV:SOUR ") + GetChannel(DigitalChannelNumberToIdx(bankIdx * DIGITAL_BANK_SIZE))->GetHwname()); 
 
 		auto preamble = GetCapturePreamble();
 		if (not preamble.has_value())
@@ -2253,6 +2257,7 @@ bool RigolOscilloscope::AcquireData()
 				LogLaNotPresent();
 				return false;
 		}
+		LogTrace("Bank %zd samplerate %s\n", bankIdx, Unit(Unit::UNIT_SAMPLERATE).PrettyPrint(FS_PER_SECOND/fs_per_sample).c_str());
 
 		for (auto& channel : bankChannels)
 		{
@@ -2343,7 +2348,6 @@ bool RigolOscilloscope::AcquireData()
 				// LogTrace("download progress %5.3f\n", bytes_progress / bytes_total);
 				// Update all active channels in this bank
 				auto totalProgress = bytes_progress / bytes_total;
-				LogDebug("Updating digital channels download progress to %5.3f\n", totalProgress);
 				for (auto const& channel : bankChannels)
 					ChannelsDownloadStatusUpdate(channel.metadata->GetIndex(), InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, totalProgress);
 			};
@@ -2361,7 +2365,7 @@ bool RigolOscilloscope::AcquireData()
 				cap->Resize(samplesStored + header_blocksize); // in case we have alternating 010101... sequence, otehrwise we will use less samples and shrink afterwards
 				cap->PrepareForCpuAccess();
 
-				uint8_t const mask = 1 << ((channel.metadata->GetIndex() - m_analogChannelCount) % DIGITAL_BANK_SIZE);
+				uint8_t const mask = 1 << (IdxToDigitalChannelNumber(channel.metadata->GetIndex()) % DIGITAL_BANK_SIZE);
 
 				if (samplesStored == 0) {
 					// not a single sample in the capture buffer yet
@@ -2536,7 +2540,7 @@ void RigolOscilloscope::StartPost()
 			LogTrace("set m_pointsWhenStarted to %" PRIuLEAST32 "\n", m_pointsWhenStarted);
 		}
 		else
-			LogError("empty preable");
+			LogError("empty preable\n");
 	}
 }
 
@@ -2794,6 +2798,8 @@ static std::vector<uint64_t> mso5000SampleRates {
 vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 {
 	LogTrace("GetSampleRatesNonInterleaved called");
+
+	//TODO: cache samplerates
 
 	//FIXME
 	switch (m_series)
@@ -3199,7 +3205,9 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 			break;
 		}
 
-		default:
+		case Series::UNKNOWN:
+		case Series::DS1000:
+			LogWarning("This scope does nto support samplerate settings (yet)");
 			break;
 	}
 
