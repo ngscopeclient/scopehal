@@ -100,6 +100,8 @@ string MagnovaOscilloscope::converse(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
+	// Lock on transport at this level since magnova sometimes returns an \n before the actual reply
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	ret = m_transport->SendCommandQueuedWithReply(opString, false);
 	if(ret.length() == 0)
 		ret = m_transport->ReadReply(); // Sometimes the Magnova returns en empty string and then the actual reply
@@ -130,6 +132,8 @@ bool MagnovaOscilloscope::sendWithAck(const char* fmt, ...)
     std::string result(opString);
     result += ";*OPC?";
 
+	// Lock on transport at this level since magnova sometimes returns an \n before the actual reply
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	ret = m_transport->SendCommandQueuedWithReply(result.c_str(), false);
 	if(ret.length() == 0)
 		ret = m_transport->ReadReply(); // Sometimes the Magnova returns en empty string and then the actual reply
@@ -1142,7 +1146,7 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 	float v_gain = metadata->verticalStep/0xFFFF;
 
 	// Get offset from vertical start + add channel offset
-	float v_off = (0 - metadata->verticalStart - GetChannelOffset(ch,0));
+	float v_off = (0 - metadata->verticalStart/* - GetChannelOffset(ch,0)*/);
 
 	// Get interval from timedelta
 	float interval = metadata->timeDelta * FS_PER_SECOND;
