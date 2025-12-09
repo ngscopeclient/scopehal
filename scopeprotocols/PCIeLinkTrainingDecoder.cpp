@@ -157,18 +157,19 @@ void PCIeLinkTrainingDecoder::Refresh()
 			numBadSymbols ++;
 			timeSinceBadSymbol = 0;
 
-			//If we see too many invalid symbols, we've lost bit sync. Go back to DETECT state if we're not there already
+			//If we see too many invalid symbols, we've lost bit sync. Go back to Recovery.RcvrLock state if we're not there already
 			if( (numBadSymbols > 5) && (lstate != PCIeLTSSMSymbol::TYPE_DETECT) )
 			{
 				//Extend previous state to start of this symbol
 				size_t nout = scap->m_offsets.size() - 1;
 				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
 
-				//Enter DETECT state
-				lstate = PCIeLTSSMSymbol::TYPE_DETECT;
+				//Trying to lock again
+				lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK;
+
 				scap->m_offsets.push_back(din->m_offsets[i]);
 				scap->m_durations.push_back(din->m_durations[i]);
-				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_DETECT));
+				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK));
 			}
 			continue;
 		}
@@ -191,6 +192,8 @@ void PCIeLinkTrainingDecoder::Refresh()
 				lstate = PCIeLTSSMSymbol::TYPE_L0;
 				scap->m_samples[0].m_type = lstate;
 			}
+
+			//If not, we've recovered
 		}
 
 		//If we see a K28.3 we're entering electrical idle
@@ -237,6 +240,10 @@ void PCIeLinkTrainingDecoder::Refresh()
 				(lstate == PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG) )
 			{
 				lstate = PCIeLTSSMSymbol::TYPE_L0;
+
+				//Extend the previous symbol to the transition point
+				size_t nout = scap->m_offsets.size() - 1;
+				scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
 
 				scap->m_offsets.push_back(din->m_offsets[i]);
 				scap->m_durations.push_back(din->m_durations[i]);
@@ -410,7 +417,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 
 			case PCIeLTSSMSymbol::TYPE_DETECT:
 
-				//Add a Detect symbol from time zero to the first TS1
+				//Add a Detect symbol until the first TS1
 				if(hitTS1 && (din->m_samples[i+1].m_data == 0xf7) )
 				{
 					size_t nout = scap->m_offsets.size() - 1;
