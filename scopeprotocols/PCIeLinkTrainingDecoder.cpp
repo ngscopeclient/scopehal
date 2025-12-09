@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -143,9 +143,59 @@ void PCIeLinkTrainingDecoder::Refresh()
 	scap->m_durations.push_back(0);
 	scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_DETECT));
 
+	//Keep track of how many bad symbols we've seen in L0
+	size_t numBadSymbols		= 0;
+	size_t timeSinceBadSymbol	= 0;
+
 	//Main decode loop
 	for(; i<end; i++)
 	{
+		//If we see an un-decodeable 8b10b character, keep track.
+		if(din->m_samples[i].m_error5 || din->m_samples[i].m_error3 || din->m_samples[i].m_errorDisp)
+		{
+			//We've seen a bad symbol
+			numBadSymbols ++;
+			timeSinceBadSymbol = 0;
+
+			//If we see too many invalid symbols, we've lost bit sync. Go back to Recovery.RcvrLock state if we're not there already
+			if( (numBadSymbols > 5) && (lstate != PCIeLTSSMSymbol::TYPE_DETECT) )
+			{
+				//Extend previous state to start of this symbol
+				size_t nout = scap->m_offsets.size() - 1;
+				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
+
+				//Trying to lock again
+				lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK;
+
+				scap->m_offsets.push_back(din->m_offsets[i]);
+				scap->m_durations.push_back(din->m_durations[i]);
+				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK));
+			}
+			continue;
+		}
+		else
+		{
+			//Forget about errors after a while
+			timeSinceBadSymbol ++;
+			if(timeSinceBadSymbol > 512)
+				numBadSymbols = 0;
+		}
+
+		//If we see a start TLP or start DLLP symbol in DETECT, the link was up and trained before our capture started.
+		if(din->m_samples[i].m_control &&
+			( (din->m_samples[i].m_data == 0xfb) || (din->m_samples[i].m_data == 0x5c) ) &&
+			(lstate == PCIeLTSSMSymbol::TYPE_DETECT) )
+		{
+			//If this is the start of the capture, we were in L0 all the time
+			if(scap->m_samples.size() == 1)
+			{
+				lstate = PCIeLTSSMSymbol::TYPE_L0;
+				scap->m_samples[0].m_type = lstate;
+			}
+
+			//If not, we've recovered
+		}
+
 		//If we see a K28.3 we're entering electrical idle
 		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0x7c) )
 		{
@@ -190,6 +240,10 @@ void PCIeLinkTrainingDecoder::Refresh()
 				(lstate == PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG) )
 			{
 				lstate = PCIeLTSSMSymbol::TYPE_L0;
+
+				//Extend the previous symbol to the transition point
+				size_t nout = scap->m_offsets.size() - 1;
+				scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
 
 				scap->m_offsets.push_back(din->m_offsets[i]);
 				scap->m_durations.push_back(din->m_durations[i]);
@@ -363,7 +417,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 
 			case PCIeLTSSMSymbol::TYPE_DETECT:
 
-				//Add a Detect symbol from time zero to the first TS1
+				//Add a Detect symbol until the first TS1
 				if(hitTS1 && (din->m_samples[i+1].m_data == 0xf7) )
 				{
 					size_t nout = scap->m_offsets.size() - 1;
@@ -383,6 +437,10 @@ void PCIeLinkTrainingDecoder::Refresh()
 				{
 					lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED;
 
+					//Extend previous state to start of this symbol
+					size_t nout = scap->m_offsets.size() - 1;
+					scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
+
 					scap->m_offsets.push_back(din->m_offsets[i]);
 					scap->m_durations.push_back(din->m_durations[i]);
 					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED));
@@ -392,6 +450,10 @@ void PCIeLinkTrainingDecoder::Refresh()
 				else
 				{
 					lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG;
+
+					//Extend previous state to start of this symbol
+					size_t nout = scap->m_offsets.size() - 1;
+					scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
 
 					scap->m_offsets.push_back(din->m_offsets[i]);
 					scap->m_durations.push_back(din->m_durations[i]);
@@ -466,6 +528,11 @@ void PCIeLinkTrainingDecoder::Refresh()
 		//Skip the rest of the set
 		i += 15;
 	}
+
+	//Extend the final state to the end of the capture
+	size_t nlast = din->m_offsets.size() - 1;
+	size_t nout = scap->m_offsets.size() - 1;
+	scap->m_durations[nout] = din->m_offsets[nlast] + din->m_durations[nlast] - scap->m_offsets[nout];
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
