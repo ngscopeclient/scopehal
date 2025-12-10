@@ -513,6 +513,7 @@ void MagnovaOscilloscope::EnableChannel(size_t i)
 	{
 		m_memoryDepthValid = false;
 		m_sampleRateValid = false;
+		m_triggerOffsetValid = false;
 	}
 }
 
@@ -552,6 +553,7 @@ void MagnovaOscilloscope::DisableChannel(size_t i)
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_memoryDepthValid = false;
 		m_sampleRateValid = false;
+		m_triggerOffsetValid = false;
 	}
 }
 
@@ -1491,10 +1493,12 @@ bool MagnovaOscilloscope::AcquireData()
 }
 
 void MagnovaOscilloscope::PrepareAcquisition()
-{
+{	// Make sure everything is up to date
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_sampleRateValid = false;
+	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
 	m_channelOffsets.clear();
-	// m_transport->SendCommand(":WAVEFORM:START 0");
 }
 
 void MagnovaOscilloscope::Start()
@@ -1774,6 +1778,7 @@ void MagnovaOscilloscope::SetSampleDepth(uint64_t depth)
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_memoryDepthValid = false;
 	m_sampleRateValid = false;
+	m_triggerOffsetValid = false;
 }
 
 void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
@@ -1808,6 +1813,7 @@ void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
+	m_triggerOffsetValid = false;
 }
 
 void MagnovaOscilloscope::EnableTriggerOutput()
@@ -1837,6 +1843,8 @@ void MagnovaOscilloscope::SetTriggerOffset(int64_t offset)
 	int64_t rate = GetSampleRate();
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
+
+	//LogDebug("Set trigger offset to %f : rate = %" PRId64 ", depth = %" PRId64 " haldepth = %" PRId64 ", halfwidth = %" PRId64 ".\n",((float)offset)*SECONDS_PER_FS,rate,GetSampleDepth(),halfdepth,halfwidth);
 
 	sendWithAck(":TIMebase:OFFSet %1.2E", (offset - halfwidth) * SECONDS_PER_FS);
 
@@ -1869,6 +1877,8 @@ int64_t MagnovaOscilloscope::GetTriggerOffset()
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 	m_triggerOffset += halfwidth;
+
+	//LogDebug("Get trigger offset to %lf : rate = %" PRId64 ", depth = %" PRId64 " haldepth = %" PRId64 ", halfwidth = %" PRId64 ", result = %" PRId64 ".\n",sec,rate,GetSampleDepth(),halfdepth,halfwidth,m_triggerOffset);
 
 	m_triggerOffsetValid = true;
 
