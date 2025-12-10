@@ -479,6 +479,10 @@ void PCIeLinkTrainingDecoder::Refresh()
 				{
 					lstate = PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION;
 
+					//Extend previous state to start of this symbol
+					size_t nout = scap->m_offsets.size() - 1;
+					scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
+
 					scap->m_offsets.push_back(din->m_offsets[i]);
 					scap->m_durations.push_back(din->m_durations[i]);
 					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION));
