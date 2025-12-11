@@ -836,8 +836,8 @@ Oscilloscope::TriggerMode MagnovaOscilloscope::PollTrigger()
 	}*/
 
 	if((sinr == "TRIGgered"))
-	{
-		return TRIGGER_MODE_TRIGGERED;
+	{	// Magnova returns TRIGgered status during Single acquisition, we need to wait for STOPped
+		return TRIGGER_MODE_RUN;
 	}
 
 	//Stopped, no data available
