@@ -236,7 +236,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 		if(!din->m_samples[i].m_control || (din->m_samples[i].m_data != 0xbc) )
 		{
 			//If in Configuration or RcvrConfig state, this means we're now in L0
-			if( (lstate == PCIeLTSSMSymbol::TYPE_CONFIGURATION) ||
+			if( (lstate == PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT) ||
 				(lstate == PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG) )
 			{
 				lstate = PCIeLTSSMSymbol::TYPE_L0;
@@ -502,11 +502,15 @@ void PCIeLinkTrainingDecoder::Refresh()
 				//If we're sending TS1s we're in Configuration now
 				if(hitTS1)
 				{
-					lstate = PCIeLTSSMSymbol::TYPE_CONFIGURATION;
+					lstate = PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_START;
+
+					//Extend previous state to start of this symbol
+					size_t nout = scap->m_offsets.size() - 1;
+					scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
 
 					scap->m_offsets.push_back(din->m_offsets[i]);
 					scap->m_durations.push_back(din->m_durations[i]);
-					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_CONFIGURATION));
+					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_START));
 				}
 
 				//Still extending
@@ -518,12 +522,38 @@ void PCIeLinkTrainingDecoder::Refresh()
 
 				break;
 
-			case PCIeLTSSMSymbol::TYPE_CONFIGURATION:
+			case PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_START:
 				{
-					//Extend
+					//If the link ID is no longer unassigned we're in linkwidth.accept
+					if(linkid != 0xf7)
+					{
+						//Extend previous state to start of this symbol
+						size_t nout = scap->m_offsets.size() - 1;
+						scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
+
+						lstate = PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT;
+
+						scap->m_offsets.push_back(din->m_offsets[i]);
+						scap->m_durations.push_back(din->m_durations[i]);
+						scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT));
+					}
+
+					//Still extending
+					else
+					{
+						size_t nout = scap->m_offsets.size() - 1;
+						scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
+					}
+				}
+				break;
+
+			case PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT:
+				//Extend
+				{
 					size_t nout = scap->m_offsets.size() - 1;
 					scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
 				}
+				break;
 
 			default:
 				break;
@@ -700,7 +730,8 @@ string PCIeLTSSMWaveform::GetColor(size_t i)
 
 		case PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE:
 		case PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION:
-		case PCIeLTSSMSymbol::TYPE_CONFIGURATION:
+		case PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_START:
+		case PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT:
 		case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK:
 		case PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED:
 		case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG:
@@ -729,8 +760,11 @@ string PCIeLTSSMWaveform::GetText(size_t i)
 		case PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION:
 			return "Polling.Configuration";
 
-		case PCIeLTSSMSymbol::TYPE_CONFIGURATION:
-			return "Configuration";
+		case PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_START:
+			return "Configuration.LinkWidth.Start";
+
+		case PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT:
+			return "Configuration.LinkWidth.Accept";
 
 		case PCIeLTSSMSymbol::TYPE_L0:
 			return "L0";
