@@ -179,9 +179,7 @@ void MagnovaOscilloscope::SharedCtorInit()
 	//Add the function generator output
 	if(m_hasFunctionGen)
 	{
-		//TODO: this is stupid, it shares the same name as our scope input!
-		//Is this going to break anything??
-		m_awgChannel = new FunctionGeneratorChannel(this, "C1", "#808080", m_channels.size());
+		m_awgChannel = new FunctionGeneratorChannel(this, "AWG", "#ff00ffff", m_channels.size());
 		m_channels.push_back(m_awgChannel);
 		m_awgChannel->SetDisplayName("AWG");
 	}
@@ -1401,8 +1399,14 @@ bool MagnovaOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
+		//LogDebug("Arming trigger for next acquisition!\n");
 		sendOnly(":SINGLE");
 		m_triggerArmed = true;
+	}
+	else
+	{
+		sendWithAck(":STOP");
+		m_triggerArmed = false;
 	}
 
 	//Process analog waveforms
@@ -1504,9 +1508,9 @@ void MagnovaOscilloscope::PrepareAcquisition()
 void MagnovaOscilloscope::Start()
 {
 	PrepareAcquisition();
-	sendOnly(":STOP");
-	sendOnly(":SINGLE");	 //always do single captures, just re-trigger
+	sendOnly(":STOP;:SINGLE");	 //always do single captures, just re-trigger
 
+	//LogDebug("Arming trigger for acquisition start!\n");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -1516,9 +1520,9 @@ void MagnovaOscilloscope::StartSingleTrigger()
 	//LogDebug("Start single trigger\n");
 
 	PrepareAcquisition();
-	sendOnly(":STOP");
-	sendOnly(":SINGLE");
+	sendOnly(":STOP;:SINGLE");
 
+	//LogDebug("Arming trigger for single acquisition!\n");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -1550,6 +1554,7 @@ void MagnovaOscilloscope::ForceTrigger()
 	if(!m_triggerArmed)
 		sendOnly(":SINGLE");
 
+	//LogDebug("Arming trigger for forced acquisition!\n");
 	m_triggerArmed = true;
 	this_thread::sleep_for(c_trigger_delay);
 }
@@ -2125,7 +2130,7 @@ void MagnovaOscilloscope::PullTrigger()
 		PullUartTrigger();
 		isUart = true;
 	}
-	else if(reply == "INTerval")
+	else if(reply == "PULSe")
 		PullPulseWidthTrigger();
 	else if(reply == "WINDow")
 		PullWindowTrigger();
@@ -2196,20 +2201,16 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 	}
 
 	//Dropout time
-	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:TIMeout:TIME?")));
+	dt->SetDropoutTime(stof(converse(":TRIGGER:TIMeout:TIME?"))*FS_PER_SECOND);
 
 	//Edge type
-	if(Trim(converse(":TRIGGER:TIMeout:SLOPE?")) == "RISING")
+	if(Trim(converse(":TRIGGER:TIMeout:SLOPE?")) == "RISing")
 		dt->SetType(DropoutTrigger::EDGE_RISING);
 	else
 		dt->SetType(DropoutTrigger::EDGE_FALLING);
 
 	//Reset type
 	dt->SetResetType(DropoutTrigger::RESET_NONE);
-
-	// TODO => parse time
-	//if(Trim(converse(":TRIGGER:TIMeout:TIME?")) == "EDGE")
-		
 }
 
 /**
@@ -2236,8 +2237,6 @@ void MagnovaOscilloscope::PullEdgeTrigger()
 		et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
 	}
 
-	//TODO: OptimizeForHF (changes hysteresis for fast signals)
-
 	//Slope
 	GetTriggerSlope(et, Trim(converse(":TRIGGER:EDGE:SLOPE?")));
 }
@@ -2261,23 +2260,28 @@ void MagnovaOscilloscope::PullPulseWidthTrigger()
 	Unit fs(Unit::UNIT_FS);
 
 	// Check for digital source
-	string reply = converse(":TRIGGER:INTERVAL:SOURCE?");
+	string reply = converse(":TRIGGER:PULSe:SOURCE?");
 	if(reply[0] == 'C')
 	{	// Level only for analog source
-		pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
+		pt->SetLevel(stof(converse(":TRIGGER:PULSe:LEVEL?")));
 	}
 
 	//Condition
-	pt->SetCondition(GetCondition(converse(":TRIGGER:INTERVAL:LIMIT?")));
+	pt->SetCondition(GetCondition(converse(":TRIGGER:PULSe:TIMing?")));
 
 	//Min range
-	pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TLOWER?")));
+	pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
 
 	//Max range
-	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TUPPER?")));
+	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
 
 	//Slope
-	GetTriggerSlope(pt, Trim(converse(":TRIGGER:INTERVAL:SLOPE?")));
+	reply = Trim(converse(":TRIGGER:PULSe:POLarity?"));
+	if(reply == "POSitive")
+		pt->SetType(PulseWidthTrigger::EDGE_RISING);
+	else if(reply == "NEGative")
+		pt->SetType(PulseWidthTrigger::EDGE_FALLING);
+
 }
 
 /**
@@ -2302,16 +2306,16 @@ void MagnovaOscilloscope::PullRuntTrigger()
 	string reply;
 
 	//Lower bound
-	rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LLEVEL?")));
+	rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LEVel1?")));
 
 	//Upper bound
-	rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:HLEVEL?")));
+	rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:LEVel2?")));
 
 	//Lower bound
-	rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:TLOWER?")));
+	rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:DURation:LOWer?")));
 
 	//Upper interval
-	rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:TUPPER?")));
+	rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:DURation:UPPer?")));
 
 	//Slope
 	reply = Trim(converse(":TRIGGER:RUNT:POLARITY?"));
@@ -2321,7 +2325,7 @@ void MagnovaOscilloscope::PullRuntTrigger()
 		rt->SetSlope(RuntTrigger::EDGE_FALLING);
 
 	//Condition
-	rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:LIMIT?")));
+	rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:TIMing?")));
 }
 
 /**
@@ -2346,16 +2350,16 @@ void MagnovaOscilloscope::PullSlewRateTrigger()
 	string reply ;
 
 	//Lower bound
-	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:LLEVEL?")));
+	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPe:LEVel1?")));
 
 	//Upper bound
-	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPE:HLEVEL?")));
+	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPe:LEVel2?")));
 
 	//Lower interval
-	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TLOWER?")));
+	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPE:DURation:LOWer?")));
 
 	//Upper interval
-	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TUPPER?")));
+	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPE:DURation:UPPer?")));
 
 	//Slope
 	reply = Trim(converse("TRIGGER:SLOPE:SLOPE?"));
@@ -2367,7 +2371,7 @@ void MagnovaOscilloscope::PullSlewRateTrigger()
 		st->SetSlope(SlewRateTrigger::EDGE_ANY);
 
 	//Condition
-	st->SetCondition(GetCondition(converse("TRIGGER:SLOPE:LIMIT?")));
+	st->SetCondition(GetCondition(converse("TRIGGER:SLOPe:TIMing?")));
 }
 
 /**
@@ -2388,17 +2392,17 @@ void MagnovaOscilloscope::PullUartTrigger()
 	UartTrigger* ut = dynamic_cast<UartTrigger*>(m_trigger);
 
     string reply;
-	string p1;
+	string p1,p2;
 
 
-	//Bit rate
-	ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
+	//Bit rate : Not available in Magnova SCPI implemetnation for now
+	//ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
 
-	//Level
-	ut->SetLevel(stof(converse(":TRIGGER:UART:RXT?")));
+	//Level : Not available in Magnova SCPI implemetnation for now
+	//ut->SetLevel(stof(converse(":TRIGGER:UART:RXT?")));
 
-	//Parity
-	reply = Trim(converse(":TRIGGER:UART:PARITY?"));
+	//Parity : Not available in Magnova SCPI implemetnation for now
+	/*reply = Trim(converse(":TRIGGER:UART:PARITY?"));
 	if(reply == "NONE")
 		ut->SetParityType(UartTrigger::PARITY_NONE);
 	else if(reply == "EVEN")
@@ -2408,45 +2412,42 @@ void MagnovaOscilloscope::PullUartTrigger()
 	else if(reply == "MARK")
 		ut->SetParityType(UartTrigger::PARITY_MARK);
 	else if(reply == "SPACe")
-		ut->SetParityType(UartTrigger::PARITY_SPACE);
+		ut->SetParityType(UartTrigger::PARITY_SPACE);*/
 
-	//Operator
-	//bool ignore_p2 = true;
 
-	// It seems this scope only copes with equivalence
-	ut->SetCondition(Trigger::CONDITION_EQUAL);
-
-	//Idle polarity
-	reply = Trim(converse(":TRIGGER:UART:IDLE?"));
+	//Idle polarity : Not available in Magnova SCPI implemetnation for now
+	/*reply = Trim(converse(":TRIGGER:UART:IDLE?"));
 	if(reply == "HIGH")
 		ut->SetPolarity(UartTrigger::IDLE_HIGH);
 	else if(reply == "LOW")
-		ut->SetPolarity(UartTrigger::IDLE_LOW);
+		ut->SetPolarity(UartTrigger::IDLE_LOW);*/
 
-	//Stop bits
-	ut->SetStopBits(stof(Trim(converse(":TRIGGER:UART:STOP?"))));
+	//Stop bits : Not available in Magnova SCPI implemetnation for now
+	//ut->SetStopBits(stof(Trim(converse(":TRIGGER:UART:STOP?"))));
 
 	//Trigger type
-	reply = Trim(converse(":TRIGGER:UART:CONDITION?"));
-	if(reply == "STARt")
+	reply = Trim(converse(":TRIGGER:UART:EVENt?"));
+	if(reply == "FSTart")
 		ut->SetMatchType(UartTrigger::TYPE_START);
-	else if(reply == "STOP")
-		ut->SetMatchType(UartTrigger::TYPE_STOP);
-	else if(reply == "ERRor")
+	else if(reply == "FPCHeck")
 		ut->SetMatchType(UartTrigger::TYPE_PARITY_ERR);
-	else
+	else if(reply == "DATa")
 		ut->SetMatchType(UartTrigger::TYPE_DATA);
+	else // "IFCompletion" (invalid frame completion) / "FPCHeck" (failed parity check) / "IFSTart" (invalid frame start)
+		LogWarning("Unsupported UART trigger condition '%s'", reply.c_str());
 
 	// Data to match (there is no pattern2 on sds)
-	p1 = Trim(converse(":TRIGGER:UART:DATA?"));
-	ut->SetPatterns(p1, "", true);
+	p1 = Trim(converse(":TRIGGER:UART:DATA:WORD0?"));
+	p2 = Trim(converse(":TRIGGER:UART:DATA:WORD1?"));
+	// TODO set ignorep2 according to p2 value
+	ut->SetPatterns(p1, p2, false);
 }
 
 /**
 	@brief Reads settings for a window trigger from the instrument
  */
 void MagnovaOscilloscope::PullWindowTrigger()
-{
+{	// TODO
 	//Clear out any triggers of the wrong type
 	if((m_trigger != NULL) && (dynamic_cast<WindowTrigger*>(m_trigger) != NULL))
 	{
@@ -2495,13 +2496,13 @@ Trigger::Condition MagnovaOscilloscope::GetCondition(string reply)
 {
 	reply = Trim(reply);
 
-	if(reply == "LESSthan")
+	if(reply == "LTHan")
 		return Trigger::CONDITION_LESS;
-	else if(reply == "GREATerthan")
+	else if(reply == "GTHan")
 		return Trigger::CONDITION_GREATER;
-	else if(reply == "INNer")
+	else if(reply == "INSide")
 		return Trigger::CONDITION_BETWEEN;
-	else if(reply == "OUTer")
+	else if(reply == "OUTSide")
 		return Trigger::CONDITION_NOT_BETWEEN;
 
 	//unknown
