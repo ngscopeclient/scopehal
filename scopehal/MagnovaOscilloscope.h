@@ -317,11 +317,8 @@ protected:
 	bool m_hasLA;
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
-	bool m_hasFastSampleRate;	 //-M models
-	int m_memoryDepthOption;	 //0 = base, after that number is max sample count in millions
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
-	bool m_hasUartTrigger;
 
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;

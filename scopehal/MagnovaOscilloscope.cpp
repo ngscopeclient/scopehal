@@ -64,11 +64,8 @@ MagnovaOscilloscope::MagnovaOscilloscope(SCPITransport* transport)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
-	, m_hasFastSampleRate(false)
-	, m_memoryDepthOption(0)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
-	, m_hasUartTrigger(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -2110,6 +2107,96 @@ void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering
 
+
+/**
+	@brief Processes the slope for an edge or edge-derived trigger
+ */
+void MagnovaOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+
+{
+	reply = Trim(reply);
+
+	if(reply == "RISing")
+		trig->SetType(EdgeTrigger::EDGE_RISING);
+	else if(reply == "FALLing")
+		trig->SetType(EdgeTrigger::EDGE_FALLING);
+	else if(reply == "ALTernate")
+		trig->SetType(EdgeTrigger::EDGE_ALTERNATING);
+	else if(reply == "BOTH")
+		trig->SetType(EdgeTrigger::EDGE_ANY);
+	else
+		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+}
+
+/**
+	@brief Parses a trigger condition
+ */
+Trigger::Condition MagnovaOscilloscope::GetCondition(string reply)
+{
+	reply = Trim(reply);
+
+	if(reply == "LTHan")
+		return Trigger::CONDITION_LESS;
+	else if(reply == "GTHan")
+		return Trigger::CONDITION_GREATER;
+	else if(reply == "INSide")
+		return Trigger::CONDITION_BETWEEN;
+	else if(reply == "OUTSide")
+		return Trigger::CONDITION_NOT_BETWEEN;
+
+	//unknown
+	LogWarning("Unknown trigger condition [%s]\n", reply.c_str());
+	return Trigger::CONDITION_LESS;
+}
+
+/**
+	@brief Pushes settings for a trigger condition under a .Condition field
+ */
+void MagnovaOscilloscope::PushCondition(const string& path, Trigger::Condition cond)
+{
+	switch(cond)
+	{
+		case Trigger::CONDITION_LESS:
+			sendOnly("%s LTHan", path.c_str());
+			break;
+
+		case Trigger::CONDITION_GREATER:
+			sendOnly("%s GTHan", path.c_str());
+			break;
+
+		case Trigger::CONDITION_BETWEEN:
+			sendOnly("%s INSide", path.c_str());
+			break;
+
+		case Trigger::CONDITION_NOT_BETWEEN:
+			sendOnly("%s OUTSide", path.c_str());
+			break;
+
+		//Other values are not legal here, it seems
+		default:
+			break;
+	}
+}
+
+void MagnovaOscilloscope::PushFloat(string path, float f)
+{
+	sendOnly("%s %1.2E", path.c_str(), f);
+}
+
+vector<string> MagnovaOscilloscope::GetTriggerTypes()
+{
+	vector<string> ret;
+	ret.push_back(DropoutTrigger::GetTriggerName());
+	ret.push_back(EdgeTrigger::GetTriggerName());
+	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(RuntTrigger::GetTriggerName());
+	ret.push_back(SlewRateTrigger::GetTriggerName());
+	ret.push_back(UartTrigger::GetTriggerName());
+	ret.push_back(WindowTrigger::GetTriggerName());
+	// TODO: Add missing triggers (NEDGe, DELay, INTerval, SHOLd, PATTern + Decode-SPI/I2C/Parallel)
+	return ret;
+}
+
 void MagnovaOscilloscope::PullTrigger()
 {
 	std::string reply;
@@ -2134,7 +2221,7 @@ void MagnovaOscilloscope::PullTrigger()
 		PullPulseWidthTrigger();
 	else if(reply == "WINDow")
 		PullWindowTrigger();
-	// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
+	// Note that NEDGe, DELay, INTerval, SHOLd, PATTern + Decode-SPI/I2C/Parallel are not yet handled
 	//Unrecognized trigger type
 	else
 	{
@@ -2172,6 +2259,68 @@ void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeNam
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+}
+
+void MagnovaOscilloscope::PushTrigger()
+{
+	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
+	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
+	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
+	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
+
+	if(dt)
+	{
+		sendOnly(":TRIGGER:TYPE TIMeout");
+		sendOnly(":TRIGGER:DROPOUT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushDropoutTrigger(dt);
+	}
+	else if(pt)
+	{
+		sendOnly(":TRIGGER:TYPE PULSe");
+		sendOnly(":TRIGGER:INTERVAL:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushPulseWidthTrigger(pt);
+	}
+	else if(rt)
+	{
+		sendOnly(":TRIGGER:TYPE RUNT");
+		sendOnly(":TRIGGER:RUNT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushRuntTrigger(rt);
+	}
+	else if(st)
+	{
+		sendOnly(":TRIGGER:TYPE SLOPe");
+		sendOnly(":TRIGGER:SLOPE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushSlewRateTrigger(st);
+	}
+	else if(ut)
+	{
+		sendOnly(":TRIGGER:TYPE DECode");
+		// Trigger group not accessible for now via SCPI
+		//sendOnly(":TRIGGER:UART:RXSOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		//sendOnly(":TRIGGER:UART:TXSOURCE %s", GetChannelName(m_trigger->GetInput(1).m_channel->GetIndex()).c_str());
+		PushUartTrigger(ut);
+	}
+	else if(wt)
+	{
+		sendOnly(":TRIGGER:TYPE WINDow");
+		sendOnly(":TRIGGER:WINDOW:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushWindowTrigger(wt);
+	}
+
+	// TODO: Add missing triggers
+
+	else if(et)	   //must be last
+	{
+		sendOnly(":TRIGGER:TYPE EDGe");
+		sendOnly(":TRIGGER:EDGE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushEdgeTrigger(et, "EDGe");
+	}
+
+	else
+		LogWarning("PushTrigger on an unimplemented trigger type.\n");
 }
 
 /**
@@ -2214,6 +2363,16 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 }
 
 /**
+	@brief Pushes settings for a dropout trigger to the instrument
+ */
+void MagnovaOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
+{
+	PushFloat(":TRIGGER:TIMeout:LEVEL", trig->GetLevel());
+	PushFloat(":TRIGGER:TIMeout:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
+	sendOnly(":TRIGGER:TIMeout:SLOPe %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISing" : "FALLing");
+}
+
+/**
 	@brief Reads settings for an edge trigger from the instrument
  */
 void MagnovaOscilloscope::PullEdgeTrigger()
@@ -2239,6 +2398,33 @@ void MagnovaOscilloscope::PullEdgeTrigger()
 
 	//Slope
 	GetTriggerSlope(et, Trim(converse(":TRIGGER:EDGE:SLOPE?")));
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void MagnovaOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
+{
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			sendOnly(":TRIGGER:%s:SLOPE RISING", trigType.c_str());
+			break;
+
+		case EdgeTrigger::EDGE_FALLING:
+			sendOnly(":TRIGGER:%s:SLOPE FALLING", trigType.c_str());
+			break;
+
+		case EdgeTrigger::EDGE_ANY:
+			sendOnly(":TRIGGER:%s:SLOPE ALTERNATE", trigType.c_str());
+			break;
+
+		default:
+			LogWarning("Invalid trigger type %d\n", trig->GetType());
+			break;
+	}
+	//Level
+	sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
 }
 
 /**
@@ -2273,7 +2459,7 @@ void MagnovaOscilloscope::PullPulseWidthTrigger()
 	pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
 
 	//Max range
-	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
+	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:UPPer?")));
 
 	//Slope
 	reply = Trim(converse(":TRIGGER:PULSe:POLarity?"));
@@ -2282,6 +2468,18 @@ void MagnovaOscilloscope::PullPulseWidthTrigger()
 	else if(reply == "NEGative")
 		pt->SetType(PulseWidthTrigger::EDGE_FALLING);
 
+}
+
+/**
+	@brief Pushes settings for a pulse width trigger to the instrument
+ */
+void MagnovaOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
+{
+	PushFloat(":TRIGGER:PULSe:LEVEL", trig->GetLevel());
+	PushCondition(":TRIGGER:PULSe:TIMing", trig->GetCondition());
+	PushFloat(":TRIGGER:PULSe:DURation:LOWer", trig->GetUpperBound() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:PULSe:DURation:UPPer", trig->GetLowerBound() * SECONDS_PER_FS);
+	sendOnly(":TRIGGER:PULSe:POLarity %s", trig->GetType() != PulseWidthTrigger::EDGE_FALLING ? "POSitive" : "NEGative");
 }
 
 /**
@@ -2318,7 +2516,7 @@ void MagnovaOscilloscope::PullRuntTrigger()
 	rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:DURation:UPPer?")));
 
 	//Slope
-	reply = Trim(converse(":TRIGGER:RUNT:POLARITY?"));
+	reply = Trim(converse(":TRIGger:RUNT:POLarity?"));
 	if(reply == "POSitive")
 		rt->SetSlope(RuntTrigger::EDGE_RISING);
 	else if(reply == "NEGative")
@@ -2326,6 +2524,20 @@ void MagnovaOscilloscope::PullRuntTrigger()
 
 	//Condition
 	rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:TIMing?")));
+}
+
+/**
+	@brief Pushes settings for a runt trigger to the instrument
+ */
+void MagnovaOscilloscope::PushRuntTrigger(RuntTrigger* trig)
+{
+	PushFloat(":TRIGGER:RUNT:LEVel1", trig->GetLowerBound());
+	PushFloat(":TRIGGER:RUNT:LEVel2", trig->GetUpperBound());
+	PushFloat(":TRIGGER:RUNT:DURation:LOWer", trig->GetLowerInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:RUNT:DURation:UPPer", trig->GetUpperInterval() * SECONDS_PER_FS);
+
+	sendOnly(":TRIGger:RUNT:POLarity %s", (trig->GetSlope() != RuntTrigger::EDGE_FALLING) ? "POSitive" : "NEGative");
+	PushCondition(":TRIGGER:RUNT:TIMing", trig->GetCondition());
 }
 
 /**
@@ -2356,22 +2568,33 @@ void MagnovaOscilloscope::PullSlewRateTrigger()
 	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPe:LEVel2?")));
 
 	//Lower interval
-	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPE:DURation:LOWer?")));
+	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPe:DURation:LOWer?")));
 
 	//Upper interval
-	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPE:DURation:UPPer?")));
+	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPe:DURation:UPPer?")));
 
 	//Slope
-	reply = Trim(converse("TRIGGER:SLOPE:SLOPE?"));
+	reply = Trim(converse(":TRIGger:SLOPe:TYPE?"));
 	if(reply == "RISing")
 		st->SetSlope(SlewRateTrigger::EDGE_RISING);
-	else if(reply == "FALLing")
+	else
 		st->SetSlope(SlewRateTrigger::EDGE_FALLING);
-	else if(reply == "ALTernate")
-		st->SetSlope(SlewRateTrigger::EDGE_ANY);
 
 	//Condition
 	st->SetCondition(GetCondition(converse("TRIGGER:SLOPe:TIMing?")));
+}
+
+/**
+	@brief Pushes settings for a slew rate trigger to the instrument
+ */
+void MagnovaOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
+{
+	PushCondition(":TRIGGER:SLOPE", trig->GetCondition());
+	PushFloat(":TRIGGER:SLOPe:DURation:LOWer", trig->GetLowerInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:SLOPe:DURation:UPPer", trig->GetUpperInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:SLOPe:LEVel1", trig->GetLowerBound());
+	PushFloat(":TRIGGER:SLOPe:LEVel2", trig->GetUpperBound());
+	sendOnly(":TRIGger:SLOPe:TIMing %s", (trig->GetSlope() != SlewRateTrigger::EDGE_FALLING)	? "RISing" : "FALLing");
 }
 
 /**
@@ -2426,7 +2649,7 @@ void MagnovaOscilloscope::PullUartTrigger()
 	//ut->SetStopBits(stof(Trim(converse(":TRIGGER:UART:STOP?"))));
 
 	//Trigger type
-	reply = Trim(converse(":TRIGGER:UART:EVENt?"));
+	reply = Trim(converse(":TRIGger:DECode:UART:EVENt?"));
 	if(reply == "FSTart")
 		ut->SetMatchType(UartTrigger::TYPE_START);
 	else if(reply == "FPCHeck")
@@ -2437,10 +2660,84 @@ void MagnovaOscilloscope::PullUartTrigger()
 		LogWarning("Unsupported UART trigger condition '%s'", reply.c_str());
 
 	// Data to match (there is no pattern2 on sds)
-	p1 = Trim(converse(":TRIGGER:UART:DATA:WORD0?"));
-	p2 = Trim(converse(":TRIGGER:UART:DATA:WORD1?"));
+	p1 = Trim(converse(":TRIGger:DECode:UART:DATA:WORD0?"));
+	p2 = Trim(converse(":TRIGger:DECode:UART:DATA:WORD1?"));
 	// TODO set ignorep2 according to p2 value
 	ut->SetPatterns(p1, p2, false);
+}
+
+/**
+	@brief Pushes settings for a UART trigger to the instrument
+ */
+void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
+{
+	string p1,p2;
+	// Level : Not available in Magnova SCPI implemetnation for now
+	// PushFloat(":TRIGGER:UART:LIMIT", trig->GetLevel());
+
+	//Bit9State : Not available in Magnova SCPI implemetnation for now
+	//PushFloat(":TRIGGER:UART:BAUD", trig->GetBitRate());
+	//sendOnly(":TRIGGER:UART:BITORDER LSB");
+	// Data length : : Not available in Magnova SCPI implemetnation for now
+	// sendOnly(":TRIGGER:UART:DLENGTH 8");
+
+	// Parity : Not available in Magnova SCPI implemetnation for now
+	/*switch(trig->GetParityType())
+	{
+		case UartTrigger::PARITY_NONE:
+			sendOnly(":TRIGGER:UART:PARITY NONE");
+			break;
+
+		case UartTrigger::PARITY_ODD:
+			sendOnly(":TRIGGER:UART:PARITY ODD");
+			break;
+
+		case UartTrigger::PARITY_EVEN:
+			sendOnly(":TRIGGER:UART:PARITY EVEN");
+			break;
+
+		case UartTrigger::PARITY_MARK:
+			sendOnly(":TRIGGER:UART:PARITY MARK");
+			break;
+		case UartTrigger::PARITY_SPACE:
+			sendOnly(":TRIGGER:UART:PARITY SPACE");
+			break;
+	}*/
+
+	//Polarity : Not available in Magnova SCPI implemetnation for now
+	//sendOnly(":TRIGGER:UART:IDLE %s", (trig->GetPolarity() == UartTrigger::IDLE_HIGH) ? "HIGH" : "LOW");
+	// Stops bits : Not available in Magnova SCPI implemetnation for now
+	/*float nstop = trig->GetStopBits();
+	if(nstop == 1)
+		sendOnly(":TRIGGER:UART:STOP 1");
+	else if(nstop == 2)
+		sendOnly(":TRIGGER:UART:STOP 2");
+	else
+		sendOnly(":TRIGGER:UART:STOP 1.5");*/
+
+	//Pattern 
+	p1 = trig->GetPattern1();
+	p2 = trig->GetPattern2();
+
+	//Match type
+	switch(trig->GetMatchType())
+	{
+		case UartTrigger::TYPE_START:
+			sendOnly(":TRIGger:DECode:UART:EVENt FSTart");
+			break;
+		case UartTrigger::TYPE_PARITY_ERR:
+			sendOnly(":TRIGger:DECode:UART:EVENt FPCHeck");
+			break;
+		case UartTrigger::TYPE_DATA:
+			sendOnly(":TRIGger:DECode:UART:EVENt DATA");
+			break;
+		default:
+		case UartTrigger::TYPE_STOP:
+			LogWarning("Unsupported match type: %d\n",trig->GetMatchType());
+			break;
+	}
+	sendOnly(":TRIGger:DECode:UART:DATA:WORD0 %s", p1.c_str());
+	sendOnly(":TRIGger:DECode:UART:DATA:WORD2 %s", p2.c_str());
 }
 
 /**
@@ -2461,278 +2758,17 @@ void MagnovaOscilloscope::PullWindowTrigger()
 	WindowTrigger* wt = dynamic_cast<WindowTrigger*>(m_trigger);
 
 	Unit v(Unit::UNIT_VOLTS);
+	string type = converse(":TRIGger:WINDow:TYPE?");
+	if(type == "ENTer")
+		wt->SetWindowType(WindowTrigger::WINDOW_ENTER);
+	else
+		wt->SetWindowType(WindowTrigger::WINDOW_EXIT);
 
 	//Lower bound
-	wt->SetLowerBound(v.ParseString(converse(":TRIGGER:WINDOW:LLEVEL?")));
+	wt->SetLowerBound(v.ParseString(converse(":TRIGger:WINDow:LEVel1?")));
 
 	//Upper bound
-	wt->SetUpperBound(v.ParseString(converse(":TRIGGER:WINDOW:HLEVEL?")));
-}
-
-/**
-	@brief Processes the slope for an edge or edge-derived trigger
- */
-void MagnovaOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
-
-{
-	reply = Trim(reply);
-
-	if(reply == "RISing")
-		trig->SetType(EdgeTrigger::EDGE_RISING);
-	else if(reply == "FALLing")
-		trig->SetType(EdgeTrigger::EDGE_FALLING);
-	else if(reply == "ALTernate")
-		trig->SetType(EdgeTrigger::EDGE_ALTERNATING);
-	else if(reply == "BOTH")
-		trig->SetType(EdgeTrigger::EDGE_ANY);
-	else
-		LogWarning("Unknown trigger slope %s\n", reply.c_str());
-}
-
-/**
-	@brief Parses a trigger condition
- */
-Trigger::Condition MagnovaOscilloscope::GetCondition(string reply)
-{
-	reply = Trim(reply);
-
-	if(reply == "LTHan")
-		return Trigger::CONDITION_LESS;
-	else if(reply == "GTHan")
-		return Trigger::CONDITION_GREATER;
-	else if(reply == "INSide")
-		return Trigger::CONDITION_BETWEEN;
-	else if(reply == "OUTSide")
-		return Trigger::CONDITION_NOT_BETWEEN;
-
-	//unknown
-	LogWarning("Unknown trigger condition [%s]\n", reply.c_str());
-	return Trigger::CONDITION_LESS;
-}
-
-void MagnovaOscilloscope::PushTrigger()
-{
-	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
-	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
-	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
-	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
-	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
-	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
-
-	if(dt)
-	{
-		sendOnly(":TRIGGER:TYPE DROPOUT");
-		sendOnly(":TRIGGER:DROPOUT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		PushDropoutTrigger(dt);
-	}
-	else if(pt)
-	{
-		sendOnly(":TRIGGER:TYPE INTERVAL");
-		sendOnly(":TRIGGER:INTERVAL:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		PushPulseWidthTrigger(pt);
-	}
-	else if(rt)
-	{
-		sendOnly(":TRIGGER:TYPE RUNT");
-		sendOnly(":TRIGGER:RUNT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		PushRuntTrigger(rt);
-	}
-	else if(st)
-	{
-		sendOnly(":TRIGGER:TYPE SLOPE");
-		sendOnly(":TRIGGER:SLOPE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		PushSlewRateTrigger(st);
-	}
-	else if(ut)
-	{
-		sendOnly(":TRIGGER:TYPE UART");
-		// TODO: Validate these trigger allocations
-		sendOnly(":TRIGGER:UART:RXSOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		sendOnly(":TRIGGER:UART:TXSOURCE %s", GetChannelName(m_trigger->GetInput(1).m_channel->GetIndex()).c_str());
-		PushUartTrigger(ut);
-	}
-	else if(wt)
-	{
-		sendOnly(":TRIGGER:TYPE WINDOW");
-		sendOnly(":TRIGGER:WINDOW:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		PushWindowTrigger(wt);
-	}
-
-	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
-
-	else if(et)	   //must be last
-	{
-		sendOnly(":TRIGGER:TYPE EDGE");
-		sendOnly(":TRIGGER:EDGE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
-		PushEdgeTrigger(et, "EDGE");
-	}
-
-	else
-		LogWarning("Unknown trigger type (not an edge)\n");
-}
-
-/**
-	@brief Pushes settings for a dropout trigger to the instrument
- */
-void MagnovaOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
-{
-
-	PushFloat(":TRIGGER:DROPOUT:LEVEL", trig->GetLevel());
-	PushFloat(":TRIGGER:DROPOUT:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
-	sendOnly(":TRIGGER:DROPOUT:SLOPE %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISING" : "FALLING");
-	sendOnly(":TRIGGER:DROPOUT:TYPE %s", (trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE) ? "EDGE" : "STATE");
-}
-
-/**
-	@brief Pushes settings for an edge trigger to the instrument
- */
-void MagnovaOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
-{
-	switch(trig->GetType())
-	{
-		case EdgeTrigger::EDGE_RISING:
-			sendOnly(":TRIGGER:%s:SLOPE RISING", trigType.c_str());
-			break;
-
-		case EdgeTrigger::EDGE_FALLING:
-			sendOnly(":TRIGGER:%s:SLOPE FALLING", trigType.c_str());
-			break;
-
-		case EdgeTrigger::EDGE_ANY:
-			sendOnly(":TRIGGER:%s:SLOPE ALTERNATE", trigType.c_str());
-			break;
-
-		default:
-			LogWarning("Invalid trigger type %d\n", trig->GetType());
-			break;
-	}
-	//Level
-	sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
-}
-
-/**
-	@brief Pushes settings for a pulse width trigger to the instrument
- */
-void MagnovaOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
-{
-	PushEdgeTrigger(trig, "INTERVAL");
-	PushCondition(":TRIGGER:INTERVAL", trig->GetCondition());
-	PushFloat(":TRIGGER:INTERVAL:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:INTERVAL:TLOWER", trig->GetLowerBound() * SECONDS_PER_FS);
-}
-
-/**
-	@brief Pushes settings for a runt trigger to the instrument
- */
-void MagnovaOscilloscope::PushRuntTrigger(RuntTrigger* trig)
-{
-	PushCondition(":TRIGGER:RUNT", trig->GetCondition());
-	PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetLowerBound());
-	PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetUpperBound());
-
-	sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
-}
-
-/**
-	@brief Pushes settings for a slew rate trigger to the instrument
- */
-void MagnovaOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
-{
-	PushCondition(":TRIGGER:SLOPE", trig->GetCondition());
-	PushFloat(":TRIGGER:SLOPE:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:SLOPE:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:SLOPE:HLEVEL", trig->GetUpperBound());
-	PushFloat(":TRIGGER:SLOPE:LLEVEL", trig->GetLowerBound());
-
-	sendOnly(":TRIGGER:SLOPE:SLOPE %s",
-		(trig->GetSlope() == SlewRateTrigger::EDGE_RISING)	? "RISING" :
-		(trig->GetSlope() == SlewRateTrigger::EDGE_FALLING) ? "FALLING" :
-																"ALTERNATE");
-}
-
-/**
-	@brief Pushes settings for a UART trigger to the instrument
- */
-void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
-{
-    float nstop;
-	string pattern1;
-	//Special parameter for trigger level
-	PushFloat(":TRIGGER:UART:LIMIT", trig->GetLevel());
-
-	//AtPosition
-	//Bit9State
-	PushFloat(":TRIGGER:UART:BAUD", trig->GetBitRate());
-	sendOnly(":TRIGGER:UART:BITORDER LSB");
-	//DataBytesLenValue1
-	//DataBytesLenValue2
-	//DataCondition
-	//FrameDelimiter
-	//InterframeMinBits
-	//NeedDualLevels
-	//NeededSources
-	sendOnly(":TRIGGER:UART:DLENGTH 8");
-
-	switch(trig->GetParityType())
-	{
-		case UartTrigger::PARITY_NONE:
-			sendOnly(":TRIGGER:UART:PARITY NONE");
-			break;
-
-		case UartTrigger::PARITY_ODD:
-			sendOnly(":TRIGGER:UART:PARITY ODD");
-			break;
-
-		case UartTrigger::PARITY_EVEN:
-			sendOnly(":TRIGGER:UART:PARITY EVEN");
-			break;
-
-		case UartTrigger::PARITY_MARK:
-			sendOnly(":TRIGGER:UART:PARITY MARK");
-			break;
-		case UartTrigger::PARITY_SPACE:
-			sendOnly(":TRIGGER:UART:PARITY SPACE");
-			break;
-	}
-
-	//Pattern length depends on the current format.
-	//Note that the pattern length is in bytes, not bits, even though patterns are in binary.
-	pattern1 = trig->GetPattern1();
-	sendOnly(":TRIGGER:UART:DLENGTH \"%d\"", (int)pattern1.length() / 8);
-
-	PushCondition(":TRIGGER:UART", trig->GetCondition());
-
-	//Polarity
-	sendOnly(":TRIGGER:UART:IDLE %s", (trig->GetPolarity() == UartTrigger::IDLE_HIGH) ? "HIGH" : "LOW");
-
-	nstop = trig->GetStopBits();
-	if(nstop == 1)
-		sendOnly(":TRIGGER:UART:STOP 1");
-	else if(nstop == 2)
-		sendOnly(":TRIGGER:UART:STOP 2");
-	else
-		sendOnly(":TRIGGER:UART:STOP 1.5");
-
-	//Match type
-	switch(trig->GetMatchType())
-	{
-		case UartTrigger::TYPE_START:
-			sendOnly(":TRIGGER:UART:CONDITION START");
-			break;
-		case UartTrigger::TYPE_STOP:
-			sendOnly(":TRIGGER:UART:CONDITION STOP");
-			break;
-		case UartTrigger::TYPE_PARITY_ERR:
-			sendOnly(":TRIGGER:UART:CONDITION ERROR");
-			break;
-		default:
-		case UartTrigger::TYPE_DATA:
-			sendOnly(":TRIGGER:UART:CONDITION DATA");
-			break;
-	}
+	wt->SetUpperBound(v.ParseString(converse(":TRIGger:WINDow:LEVel2?")));
 }
 
 /**
@@ -2740,57 +2776,20 @@ void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
  */
 void MagnovaOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {
-	PushFloat(":TRIGGER:WINDOW:LLEVEL", trig->GetLowerBound());
-	PushFloat(":TRIGGER:WINDOW:HLEVEL", trig->GetUpperBound());
-}
-
-/**
-	@brief Pushes settings for a trigger condition under a .Condition field
- */
-void MagnovaOscilloscope::PushCondition(const string& path, Trigger::Condition cond)
-{
-	switch(cond)
+	switch(trig->GetWindowType())
 	{
-		case Trigger::CONDITION_LESS:
-			sendOnly("%s:LIMIT LESSTHAN", path.c_str());
+		case WindowTrigger::WINDOW_ENTER:
+			sendOnly(":TRIGger:WINDow:TYPE ENTer");
 			break;
-
-		case Trigger::CONDITION_GREATER:
-			sendOnly("%s:LIMIT GREATERTHAN", path.c_str());
+		case WindowTrigger::WINDOW_EXIT:
+			sendOnly(":TRIGger:WINDow:TYPE LEAVe");
 			break;
-
-		case Trigger::CONDITION_BETWEEN:
-			sendOnly("%s:LIMIT INNER", path.c_str());
-			break;
-
-		case Trigger::CONDITION_NOT_BETWEEN:
-			sendOnly("%s:LIMIT OUTER", path.c_str());
-			break;
-
-		//Other values are not legal here, it seems
 		default:
+			LogWarning("Unsupported window type: %d\n",trig->GetWindowType());
 			break;
 	}
-}
-
-void MagnovaOscilloscope::PushFloat(string path, float f)
-{
-	sendOnly("%s %1.2E", path.c_str(), f);
-}
-
-vector<string> MagnovaOscilloscope::GetTriggerTypes()
-{
-	vector<string> ret;
-	ret.push_back(DropoutTrigger::GetTriggerName());
-	ret.push_back(EdgeTrigger::GetTriggerName());
-	ret.push_back(PulseWidthTrigger::GetTriggerName());
-	ret.push_back(RuntTrigger::GetTriggerName());
-	ret.push_back(SlewRateTrigger::GetTriggerName());
-	if(m_hasUartTrigger)
-		ret.push_back(UartTrigger::GetTriggerName());
-	ret.push_back(WindowTrigger::GetTriggerName());
-	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
-	return ret;
+	PushFloat(":TRIGger:WINDow:LEVel1", trig->GetLowerBound());
+	PushFloat(":TRIGger:WINDow:LEVel2", trig->GetUpperBound());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
