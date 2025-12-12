@@ -67,7 +67,9 @@ private:
 	void sendOnly(const char* fmt, ...);
 	bool sendWithAck(const char* fmt, ...);
 	void flush();
-	void flushWaveformData();
+	void protocolError(bool flush, const char* fmt, va_list ap);
+	void protocolError(const char* fmt, ...);
+	void protocolErrorWithFlush(const char* fmt, ...);
 
 protected:
 	void IdentifyHardware();

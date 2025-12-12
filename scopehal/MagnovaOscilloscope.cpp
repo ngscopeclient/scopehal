@@ -142,22 +142,30 @@ void MagnovaOscilloscope::flush()
 	m_transport->ReadReply();
 }
 
-void MagnovaOscilloscope::flushWaveformData()
-{	// Read any pending waveform data until we get the double 0x0a end marker
-	uint8_t tmp;
-	while(true)
-	{
-		size_t avaiable = m_transport->ReadRawData(1, &tmp);
-		if(!avaiable) break;
-		if(tmp == 0x0a)
-		{
-			avaiable = m_transport->ReadRawData(1, &tmp);
-			if(!avaiable) break;
-			if(tmp == 0x0a) break;
-		}
-	}
-	m_transport->FlushRXBuffer();
+void MagnovaOscilloscope::protocolError(bool flush, const char* fmt, va_list ap)
+{
+    char opString[128];
+    vsnprintf(opString, sizeof(opString), fmt, ap);
+    LogError("Protocol error%s: %s.\n", flush ? ", flushing read stream" : "", opString);
+    if(flush) m_transport->ReadReply();
 }
+
+void MagnovaOscilloscope::protocolError(const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    protocolError(false, fmt, ap);
+    va_end(ap);
+}
+
+void MagnovaOscilloscope::protocolErrorWithFlush(const char* fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    protocolError(true, fmt, ap);
+    va_end(ap);
+}
+
 
 void MagnovaOscilloscope::SharedCtorInit()
 {
@@ -238,9 +246,6 @@ void MagnovaOscilloscope::IdentifyHardware()
 			LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
 				m_model.c_str());
 		}
-		// TODO
-		// Only 5 ms for newer models
-		//	m_transport->EnableRateLimiting(chrono::milliseconds(5));
 	}
 	else
 	{
@@ -273,7 +278,6 @@ void MagnovaOscilloscope::DetectOptions()
 /**
 	@brief Creates digital channels for the oscilloscope
  */
-
 void MagnovaOscilloscope::AddDigitalChannels(unsigned int count)
 {
 	m_digitalChannelCount = count;
@@ -659,7 +663,10 @@ double MagnovaOscilloscope::GetChannelAttenuation(size_t i)
 	reply = converse(":CHAN%zu:DIV?", i + 1);
 
 	int d;
-	sscanf(reply.c_str(), "%d", &d);
+	if(sscanf(reply.c_str(), "%d", &d) != 1)
+	{
+		protocolError("invalid channel attenuation value '%S'",reply);
+	}
 	return 1/d;
 }
 
@@ -729,7 +736,7 @@ unsigned int MagnovaOscilloscope::GetChannelBandwidthLimit(size_t i)
 	else if(reply == "200000000")
 		return 200;
 
-	LogWarning("MagnovaOscilloscope::GetChannelBandwidthLimit got invalid bwlimit %s\n", reply.c_str());
+	protocolError("MagnovaOscilloscope::GetChannelBandwidthLimit got invalid bwlimit %s\n", reply.c_str());
 	return 0;
 }
 
