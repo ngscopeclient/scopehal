@@ -2502,7 +2502,7 @@ void MagnovaOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 	PushFloat(":TRIGGER:PULSe:LEVEL", trig->GetLevel());
 	PushCondition(":TRIGGER:PULSe:TIMing", trig->GetCondition());
 	// Lower/upper not available on Magnova's pulse, only Threshod is available so let's map it lower bound
-	PushFloat(":TRIGger:PULSe:THReshold", trig->GetUpperBound() * SECONDS_PER_FS);
+	PushFloat(":TRIGger:PULSe:THReshold", trig->GetLowerBound() * SECONDS_PER_FS);
 	//PushFloat(":TRIGGER:PULSe:DURation:LOWer", trig->GetUpperBound() * SECONDS_PER_FS);
 	//PushFloat(":TRIGGER:PULSe:DURation:UPPer", trig->GetLowerBound() * SECONDS_PER_FS);
 	sendOnly(":TRIGGER:PULSe:POLarity %s", trig->GetType() != PulseWidthTrigger::EDGE_FALLING ? "POSitive" : "NEGative");
