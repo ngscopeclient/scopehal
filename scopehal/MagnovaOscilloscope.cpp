@@ -2118,19 +2118,33 @@ void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 /**
 	@brief Processes the slope for an edge or edge-derived trigger
  */
-void MagnovaOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+void MagnovaOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 
 {
+	auto dt = dynamic_cast<DropoutTrigger*>(trig);
+	auto et = dynamic_cast<EdgeTrigger*>(trig);
 	reply = Trim(reply);
 
+
 	if(reply == "RISing")
-		trig->SetType(EdgeTrigger::EDGE_RISING);
+	{
+		if(dt) dt->SetType(DropoutTrigger::EDGE_RISING);
+		if(et) et->SetType(EdgeTrigger::EDGE_RISING);
+	}
 	else if(reply == "FALLing")
-		trig->SetType(EdgeTrigger::EDGE_FALLING);
+	{
+		if(dt) dt->SetType(DropoutTrigger::EDGE_FALLING);
+		if(et) et->SetType(EdgeTrigger::EDGE_FALLING);
+	}
 	else if(reply == "ALTernate")
-		trig->SetType(EdgeTrigger::EDGE_ALTERNATING);
+	{
+		if(et) et->SetType(EdgeTrigger::EDGE_ALTERNATING);
+	}
 	else if(reply == "BOTH")
-		trig->SetType(EdgeTrigger::EDGE_ANY);
+	{
+		if(dt) dt->SetType(DropoutTrigger::EDGE_ANY);
+		if(et) et->SetType(EdgeTrigger::EDGE_ANY);
+	}
 	else
 		LogWarning("Unknown trigger slope %s\n", reply.c_str());
 }
@@ -2187,7 +2201,7 @@ void MagnovaOscilloscope::PushCondition(const string& path, Trigger::Condition c
 
 void MagnovaOscilloscope::PushFloat(string path, float f)
 {
-	sendOnly("%s %1.2E", path.c_str(), f);
+	sendOnly("%s %1.5E", path.c_str(), f);
 }
 
 vector<string> MagnovaOscilloscope::GetTriggerTypes()
@@ -2281,13 +2295,13 @@ void MagnovaOscilloscope::PushTrigger()
 	if(dt)
 	{
 		sendOnly(":TRIGGER:TYPE TIMeout");
-		sendOnly(":TRIGGER:DROPOUT:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		sendOnly(":TRIGGER:TIMeout:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushDropoutTrigger(dt);
 	}
 	else if(pt)
 	{
 		sendOnly(":TRIGGER:TYPE PULSe");
-		sendOnly(":TRIGGER:INTERVAL:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		sendOnly(":TRIGGER:PULSe:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushPulseWidthTrigger(pt);
 	}
 	else if(rt)
@@ -2299,7 +2313,7 @@ void MagnovaOscilloscope::PushTrigger()
 	else if(st)
 	{
 		sendOnly(":TRIGGER:TYPE SLOPe");
-		sendOnly(":TRIGGER:SLOPE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		sendOnly(":TRIGGER:SLOPe:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushSlewRateTrigger(st);
 	}
 	else if(ut)
@@ -2313,7 +2327,7 @@ void MagnovaOscilloscope::PushTrigger()
 	else if(wt)
 	{
 		sendOnly(":TRIGGER:TYPE WINDow");
-		sendOnly(":TRIGGER:WINDOW:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		sendOnly(":TRIGGER:WINDow:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushWindowTrigger(wt);
 	}
 
@@ -2322,7 +2336,7 @@ void MagnovaOscilloscope::PushTrigger()
 	else if(et)	   //must be last
 	{
 		sendOnly(":TRIGGER:TYPE EDGe");
-		sendOnly(":TRIGGER:EDGE:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		sendOnly(":TRIGGER:EDGe:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushEdgeTrigger(et, "EDGe");
 	}
 
@@ -2360,10 +2374,7 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 	dt->SetDropoutTime(stof(converse(":TRIGGER:TIMeout:TIME?"))*FS_PER_SECOND);
 
 	//Edge type
-	if(Trim(converse(":TRIGGER:TIMeout:SLOPE?")) == "RISing")
-		dt->SetType(DropoutTrigger::EDGE_RISING);
-	else
-		dt->SetType(DropoutTrigger::EDGE_FALLING);
+	GetTriggerSlope(dt,converse(":TRIGGER:TIMeout:SLOPE?"));
 
 	//Reset type
 	dt->SetResetType(DropoutTrigger::RESET_NONE);
@@ -2423,7 +2434,11 @@ void MagnovaOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string t
 			break;
 
 		case EdgeTrigger::EDGE_ANY:
-			sendOnly(":TRIGGER:%s:SLOPE ALTERNATE", trigType.c_str());
+			sendOnly(":TRIGGER:%s:SLOPE BOTH", trigType.c_str());
+			break;
+
+		case EdgeTrigger::EDGE_ALTERNATING:
+			sendOnly(":TRIGGER:%s:SLOPE ALTernate", trigType.c_str());
 			break;
 
 		default:
@@ -2462,11 +2477,13 @@ void MagnovaOscilloscope::PullPulseWidthTrigger()
 	//Condition
 	pt->SetCondition(GetCondition(converse(":TRIGGER:PULSe:TIMing?")));
 
+	// Lower/upper not available on Magnova's pulse, only Threshod is available so let's map it lower bound
+	pt->SetLowerBound(stof((converse(":TRIGger:PULSe:THReshold?")))*FS_PER_SECOND);
 	//Min range
-	pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
+	//pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
 
 	//Max range
-	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:UPPer?")));
+	//pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:UPPer?")));
 
 	//Slope
 	reply = Trim(converse(":TRIGGER:PULSe:POLarity?"));
@@ -2484,8 +2501,10 @@ void MagnovaOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
 	PushFloat(":TRIGGER:PULSe:LEVEL", trig->GetLevel());
 	PushCondition(":TRIGGER:PULSe:TIMing", trig->GetCondition());
-	PushFloat(":TRIGGER:PULSe:DURation:LOWer", trig->GetUpperBound() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:PULSe:DURation:UPPer", trig->GetLowerBound() * SECONDS_PER_FS);
+	// Lower/upper not available on Magnova's pulse, only Threshod is available so let's map it lower bound
+	PushFloat(":TRIGger:PULSe:THReshold", trig->GetUpperBound() * SECONDS_PER_FS);
+	//PushFloat(":TRIGGER:PULSe:DURation:LOWer", trig->GetUpperBound() * SECONDS_PER_FS);
+	//PushFloat(":TRIGGER:PULSe:DURation:UPPer", trig->GetLowerBound() * SECONDS_PER_FS);
 	sendOnly(":TRIGGER:PULSe:POLarity %s", trig->GetType() != PulseWidthTrigger::EDGE_FALLING ? "POSitive" : "NEGative");
 }
 

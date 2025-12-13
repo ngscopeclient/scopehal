@@ -253,7 +253,7 @@ protected:
 	void PullWindowTrigger();
 	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
 
-	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
+	void GetTriggerSlope(Trigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushDropoutTrigger(DropoutTrigger* trig);
