@@ -88,7 +88,7 @@ protected:
 
 	//Config cache
 	bool m_cachedFrequencyValid[2];
-	int64_t m_cachedFrequency[2];
+	float m_cachedFrequency[2];
 	bool m_cachedEnableStateValid[2];
 	bool m_cachedOutputEnable[2];
 	bool m_cachedAmplitudeValid[2];
