@@ -243,7 +243,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 
 				//Extend the previous symbol to the transition point
 				size_t nout = scap->m_offsets.size() - 1;
-				scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
+				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
 
 				scap->m_offsets.push_back(din->m_offsets[i]);
 				scap->m_durations.push_back(din->m_durations[i]);
