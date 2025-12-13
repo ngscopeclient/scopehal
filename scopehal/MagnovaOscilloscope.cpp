@@ -2620,7 +2620,8 @@ void MagnovaOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 	PushFloat(":TRIGGER:SLOPe:DURation:UPPer", trig->GetUpperInterval() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:SLOPe:LEVel1", trig->GetLowerBound());
 	PushFloat(":TRIGGER:SLOPe:LEVel2", trig->GetUpperBound());
-	sendOnly(":TRIGger:SLOPe:TIMing %s", (trig->GetSlope() != SlewRateTrigger::EDGE_FALLING)	? "RISing" : "FALLing");
+	sendOnly(":TRIGger:SLOPe:TYPE %s", (trig->GetSlope() != SlewRateTrigger::EDGE_FALLING)	? "RISing" : "FALLing");
+	PushCondition(":TRIGger:SLOPe:TIMing",trig->GetCondition());
 }
 
 /**
