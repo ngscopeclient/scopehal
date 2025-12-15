@@ -107,7 +107,7 @@ void PCIeTransportDecoder::Refresh()
 
 		STATE_MEMORY_0,
 		STATE_MEMORY_1,
-		STATE_MEMORY_3,
+		STATE_MEMORY_2,
 		STATE_BYTE_ENABLES,
 		STATE_ADDRESS_0,
 		STATE_ADDRESS_1,
@@ -120,6 +120,11 @@ void PCIeTransportDecoder::Refresh()
 		STATE_COMPLETION_5,
 		STATE_COMPLETION_6,
 		STATE_COMPLETION_7,
+
+		STATE_MSG_0,
+		STATE_MSG_1,
+		STATE_MSG_2,
+		STATE_MSG_3,
 
 		STATE_DATA,
 
@@ -218,6 +223,7 @@ void PCIeTransportDecoder::Refresh()
 					tlp_format = static_cast<TLPFormat>(sym.m_data >> 5);
 					format_4word = (tlp_format == TLP_FORMAT_4W_NODATA) || (tlp_format == TLP_FORMAT_4W_DATA);
 					has_data = (tlp_format == TLP_FORMAT_3W_DATA) || (tlp_format == TLP_FORMAT_4W_DATA);
+					//TODO: handle TLP prefix (format code 3'b100)
 
 					//Type is a bit complicated, because it depends on both type and format fields
 					//PCIe 2.0 base spec table 2-3
@@ -314,9 +320,26 @@ void PCIeTransportDecoder::Refresh()
 								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							}
 							break;
+
+						default:
+							break;
 					}
 
-					//TODO: support Msg / MSgD
+					//Message Request
+					if( (tlp_format == TLP_FORMAT_4W_NODATA) && (  (sym.m_data & 0x18)  == 0x10 ) )
+					{
+						type = PCIeTransportSymbol::TYPE_MSG;
+						//TODO: save and decode routing mechanism
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+					}
+
+					//Message Request with Data
+					if( (tlp_format == TLP_FORMAT_4W_DATA) && (  (sym.m_data & 0x18)  == 0x10 ) )
+					{
+						type = PCIeTransportSymbol::TYPE_MSG_DATA;
+						//TODO: save and decode routing mechanism
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+					}
 
 					//Add the type symbol
 					cap->m_offsets.push_back(off);
@@ -452,6 +475,14 @@ void PCIeTransportDecoder::Refresh()
 							state = STATE_MEMORY_0;
 							break;
 
+						//Message request
+						//TODO: decode this in a separate block??
+						case PCIeTransportSymbol::TYPE_MSG:
+						case PCIeTransportSymbol::TYPE_MSG_DATA:
+							state = STATE_MSG_0;
+							break;
+
+						//Completion
 						case PCIeTransportSymbol::TYPE_COMPLETION:
 						case PCIeTransportSymbol::TYPE_COMPLETION_DATA:
 						case PCIeTransportSymbol::TYPE_COMPLETION_LOCKED_ERROR:
@@ -465,6 +496,97 @@ void PCIeTransportDecoder::Refresh()
 					}
 				}
 				break;	//end STATE_HEADER_3
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			// Message requests (PCIe 4.0 base spec section 2.2.8)
+
+			case STATE_MSG_0:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+
+				else
+				{
+					requester_id = (sym.m_data << 8);
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_REQUESTER_ID, requester_id));
+
+					state = STATE_MSG_1;
+				}
+				break;	//end STATE_MSG_0
+
+			case STATE_MSG_1:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					requester_id |= sym.m_data;
+
+					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+					cap->m_samples[ilast].m_data = requester_id;
+
+					pack->m_headers["Requester"] = FormatID(requester_id);
+
+					state = STATE_MSG_2;
+				}
+				break;
+
+			case STATE_MSG_2:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					tag = sym.m_data;
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TAG, tag));
+
+					pack->m_headers["Tag"] = to_string(tag);
+
+					state = STATE_MSG_3;
+				}
+				break;
+
+			case STATE_MSG_3:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_MESSAGE_CODE, sym.m_data));
+
+					//pack->m_headers["MsgCode"] = to_string(sym.m_data);
+
+					state = STATE_DATA;
+				}
+				break;
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Memory, I/O, and Configuration requests (PCIe 2.0 base spec section 2.2.7)
@@ -509,11 +631,11 @@ void PCIeTransportDecoder::Refresh()
 
 					pack->m_headers["Requester"] = FormatID(requester_id);
 
-					state = STATE_MEMORY_3;
+					state = STATE_MEMORY_2;
 				}
 				break;	//end STATE_MEMORY_1
 
-			case STATE_MEMORY_3:
+			case STATE_MEMORY_2:
 				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
 				{
 					cap->m_offsets.push_back(off);
@@ -534,7 +656,7 @@ void PCIeTransportDecoder::Refresh()
 
 					state = STATE_BYTE_ENABLES;
 				}
-				break;	//end STATE_MEMORY_3
+				break;	//end STATE_MEMORY_2
 
 			case STATE_BYTE_ENABLES:
 
@@ -942,6 +1064,7 @@ std::string PCIeTransportWaveform::GetColor(size_t i)
 		case PCIeTransportSymbol::TYPE_COMPLETER_ID:
 		case PCIeTransportSymbol::TYPE_ADDRESS_X32:
 		case PCIeTransportSymbol::TYPE_ADDRESS_X64:
+		case PCIeTransportSymbol::TYPE_MESSAGE_CODE:
 			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		case PCIeTransportSymbol::TYPE_DATA:
@@ -1002,6 +1125,10 @@ string PCIeTransportWaveform::GetText(size_t i)
 
 		case PCIeTransportSymbol::TYPE_ADDRESS_X32:
 			snprintf(tmp, sizeof(tmp), "Address: %08" PRIx64, s.m_data);
+			return tmp;
+
+		case PCIeTransportSymbol::TYPE_MESSAGE_CODE:
+			snprintf(tmp, sizeof(tmp), "Message: %02x", (int) s.m_data);
 			return tmp;
 
 		case PCIeTransportSymbol::TYPE_ADDRESS_X64:

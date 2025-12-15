@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,6 +59,7 @@ public:
 		TYPE_COMPLETER_ID,
 		TYPE_COMPLETION_STATUS,
 		TYPE_BYTE_COUNT,
+		TYPE_MESSAGE_CODE,
 		TYPE_ERROR
 	} m_type;
 

@@ -30,12 +30,16 @@ get_target_property(Vulkan_INCLUDE_DIR Vulkan::Headers INTERFACE_INCLUDE_DIRECTO
 
 
 #Set up versioning (with a dummy string for now if Git isn't present)
-if(Git_FOUND)
-	execute_process(
-		COMMAND ${GIT_EXECUTABLE} describe --always --tags
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		OUTPUT_VARIABLE SCOPEHAL_VERSION
-		OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (Git_FOUND OR SCOPEHAL_PACKAGE_VERSION)
+    if(NOT SCOPEHAL_PACKAGE_VERSION)
+        execute_process(
+                    COMMAND ${GIT_EXECUTABLE} describe --always --tags
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    OUTPUT_VARIABLE SCOPEHAL_VERSION
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    else ()
+        set(SCOPEHAL_VERSION "${SCOPEHAL_PACKAGE_VERSION}")
+    endif ()
 else()
 	set(SCOPEHAL_VERSION "unknown")
 endif()
