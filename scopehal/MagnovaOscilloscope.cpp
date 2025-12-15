@@ -2242,7 +2242,7 @@ vector<string> MagnovaOscilloscope::GetTriggerTypes()
 	ret.push_back(WindowTrigger::GetTriggerName());
 	ret.push_back(GlitchTrigger::GetTriggerName());
 	ret.push_back(NthEdgeBurstTrigger::GetTriggerName());
-	// TODO: Add missing triggers (NEDGe, DELay, INTerval, SHOLd, PATTern + Decode-SPI/I2C/Parallel)
+	// TODO: Add missing triggers (DELay, SHOLd, PATTern + Decode-SPI/I2C/Parallel)
 	return ret;
 }
 
@@ -2730,7 +2730,7 @@ void MagnovaOscilloscope::PullUartTrigger()
 	// Check data length
 	int length = stoi(converse(":TRIGger:DECode:UART:DATA:LENGth?"));
 	bool ignoreP2 = true;
-	// Data to match (there is no pattern2 on sds)
+	// Data to match
 	p1 = Trim(converse(":TRIGger:DECode:UART:DATA:WORD0?"));
 	if(length >= 2)
 	{
@@ -2741,7 +2741,6 @@ void MagnovaOscilloscope::PullUartTrigger()
 	{	// SetPatterns() needs an patter of at least the same size as p1
 		p2 = "XXXXXXXX";
 	}
-	// TODO set ignorep2 according to p2 value
 	ut->SetPatterns(p1, p2, ignoreP2);
 }
 
@@ -3230,8 +3229,6 @@ FunctionGenerator::WaveShape MagnovaOscilloscope::GetFunctionChannelShape(int ch
 			m_awgShape[chan] = FunctionGenerator::SHAPE_DC;
 		else if(shape == "PRBS")
 		{
-			//TODO: LENGTH if type is PRBS?
-			//Might only be supported on SDGs
 			m_awgShape[chan] = FunctionGenerator::SHAPE_PRBS_NONSTANDARD;
 		}
 		else if(shape == "ARBitrary")
