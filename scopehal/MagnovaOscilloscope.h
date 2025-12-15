@@ -32,6 +32,7 @@
 
 #include <mutex>
 #include <chrono>
+#include "NthEdgeBurstTrigger.h"
 
 class DropoutTrigger;
 class EdgeTrigger;
@@ -251,6 +252,8 @@ protected:
 	void PullSlewRateTrigger();
 	void PullUartTrigger();
 	void PullWindowTrigger();
+	void PullGlitchTrigger();
+	void PullNthEdgeBurstTrigger();
 	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
 
 	void GetTriggerSlope(Trigger* trig, std::string reply);
@@ -267,6 +270,7 @@ protected:
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PushUartTrigger(UartTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
+	void PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig);
 
 	void BulkCheckChannelEnableState();
 

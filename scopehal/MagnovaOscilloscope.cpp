@@ -42,6 +42,8 @@
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
+#include "GlitchTrigger.h"
+#include "NthEdgeBurstTrigger.h"
 
 #include <locale>
 #include <stdarg.h>
@@ -1161,6 +1163,14 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 	//Raw waveform data
 	size_t num_samples = metadata->sampleCount;
 
+	// Sanity check datalength consistency
+	size_t actual_num_samples = (datalen-32)/2;
+	if(num_samples != actual_num_samples)
+	{
+		protocolError("Invlaid sample count from metadata: found %zu, expected %zu.\n",num_samples,actual_num_samples);
+		num_samples = min(num_samples,actual_num_samples);
+	}
+
 	size_t num_per_segment = num_samples / num_sequences;
 
 	// Skip metadata
@@ -2136,6 +2146,7 @@ void MagnovaOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 {
 	auto dt = dynamic_cast<DropoutTrigger*>(trig);
 	auto et = dynamic_cast<EdgeTrigger*>(trig);
+	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
 	reply = Trim(reply);
 
 
@@ -2143,11 +2154,13 @@ void MagnovaOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 	{
 		if(dt) dt->SetType(DropoutTrigger::EDGE_RISING);
 		if(et) et->SetType(EdgeTrigger::EDGE_RISING);
+		if(bt) bt->SetSlope(NthEdgeBurstTrigger::EDGE_RISING);
 	}
 	else if(reply == "FALLing")
 	{
 		if(dt) dt->SetType(DropoutTrigger::EDGE_FALLING);
 		if(et) et->SetType(EdgeTrigger::EDGE_FALLING);
+		if(bt) bt->SetSlope(NthEdgeBurstTrigger::EDGE_FALLING);
 	}
 	else if(reply == "ALTernate")
 	{
@@ -2227,6 +2240,8 @@ vector<string> MagnovaOscilloscope::GetTriggerTypes()
 	ret.push_back(SlewRateTrigger::GetTriggerName());
 	ret.push_back(UartTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
+	ret.push_back(GlitchTrigger::GetTriggerName());
+	ret.push_back(NthEdgeBurstTrigger::GetTriggerName());
 	// TODO: Add missing triggers (NEDGe, DELay, INTerval, SHOLd, PATTern + Decode-SPI/I2C/Parallel)
 	return ret;
 }
@@ -2255,6 +2270,10 @@ void MagnovaOscilloscope::PullTrigger()
 		PullPulseWidthTrigger();
 	else if(reply == "WINDow")
 		PullWindowTrigger();
+	else if(reply == "INTerval")
+		PullGlitchTrigger();
+	else if(reply == "NEDGe")
+		PullNthEdgeBurstTrigger();
 	// Note that NEDGe, DELay, INTerval, SHOLd, PATTern + Decode-SPI/I2C/Parallel are not yet handled
 	//Unrecognized trigger type
 	else
@@ -2308,6 +2327,8 @@ void MagnovaOscilloscope::PushTrigger()
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
+	auto gt = dynamic_cast<GlitchTrigger*>(m_trigger);
+	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
 
 	if(dt)
 	{
@@ -2347,8 +2368,19 @@ void MagnovaOscilloscope::PushTrigger()
 		sendOnly(":TRIGGER:WINDow:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
 		PushWindowTrigger(wt);
 	}
+	else if(gt)
+	{
+		sendOnly(":TRIGGER:TYPE INTerval");
+		sendOnly(":TRIGGER:INTerval:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushGlitchTrigger(gt);
+	}
+	else if(bt)
+	{
+		sendOnly(":TRIGGER:TYPE NEDGe");
+		sendOnly(":TRIGGER:NEDGe:SOURCE %s", GetChannelName(m_trigger->GetInput(0).m_channel->GetIndex()).c_str());
+		PushNthEdgeBurstTrigger(bt);
+	}
 
-	// TODO: Add missing triggers
 
 	else if(et)	   //must be last
 	{
@@ -2800,7 +2832,7 @@ void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
 	@brief Reads settings for a window trigger from the instrument
  */
 void MagnovaOscilloscope::PullWindowTrigger()
-{	// TODO
+{
 	//Clear out any triggers of the wrong type
 	if((m_trigger != NULL) && (dynamic_cast<WindowTrigger*>(m_trigger) != NULL))
 	{
@@ -2846,6 +2878,111 @@ void MagnovaOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 	PushFloat(":TRIGger:WINDow:LEVel1", trig->GetLowerBound());
 	PushFloat(":TRIGger:WINDow:LEVel2", trig->GetUpperBound());
 }
+
+/**
+	@brief Reads settings for a glitch trigger from the instrument
+ */
+void MagnovaOscilloscope::PullGlitchTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<GlitchTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new GlitchTrigger(this);
+	GlitchTrigger* gt = dynamic_cast<GlitchTrigger*>(m_trigger);
+
+	//Level
+	// Check for digital source
+	string reply = converse(":TRIGGER:INTerval:SOURCE?");
+	if(reply[0] == 'C')
+	{	// Level only for analog source
+		gt->SetLevel(stof(converse(":TRIGGER:INTerval:LEVEL?")));
+	}
+
+	//Slope
+	reply = Trim(converse(":TRIGGER:INTerval:POLarity?"));
+	if(reply == "POSitive")
+		gt->SetType(GlitchTrigger::EDGE_RISING);
+	else if(reply == "NEGative")
+		gt->SetType(GlitchTrigger::EDGE_FALLING);
+
+	//Condition
+	gt->SetCondition(GetCondition(converse(":TRIGGER:INTerval:TIMing?")));
+
+	//Lower bound
+	gt->SetLowerBound(stof(converse(":TRIGger:INTerval:DURation:LOWer?"))*FS_PER_SECOND);
+
+	//Upper interval
+	gt->SetUpperBound(stof(converse(":TRIGger:INTerval:DURation:UPPer?"))*FS_PER_SECOND);
+}
+
+/**
+	@brief Pushes settings for a glitch trigger to the instrument
+ */
+void MagnovaOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
+{
+	PushFloat(":TRIGGER:INTerval:LEVEL", trig->GetLevel());
+	sendOnly(":TRIGger:INTerval:POLarity %s", (trig->GetType() != GlitchTrigger::EDGE_FALLING) ? "POSitive" : "NEGative");
+	PushCondition(":TRIGGER:INTerval:TIMing", trig->GetCondition());
+	PushFloat(":TRIGGER:INTerval:DURation:LOWer", trig->GetLowerBound() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:INTerval:DURation:UPPer", trig->GetUpperBound() * SECONDS_PER_FS);
+}
+
+
+/**
+	@brief Reads settings for an Nth-edge-burst trigger from the instrument
+ */
+void MagnovaOscilloscope::PullNthEdgeBurstTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<NthEdgeBurstTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new NthEdgeBurstTrigger(this);
+	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
+
+	//Level
+	// Check for digital source
+	string reply = converse(":TRIGGER:NEDGe:SOURCE?");
+	if(reply[0] == 'C')
+	{	// Level only for analog source
+		bt->SetLevel(stof(converse(":TRIGGER:NEDGe:LEVEL?")));
+	}
+
+	//Slope
+	GetTriggerSlope(bt,converse(":TRIGger:NEDGe:SLOPe?"));
+
+	//Idle time 
+	bt->SetIdleTime(stof(converse(":TRIGger:NEDGe:IDLE?"))*FS_PER_SECOND);
+
+	//Edge number
+	bt->SetEdgeNumber(stoi(converse(":TRIGger:NEDGe:COUNt?")));
+}
+
+/**
+	@brief Pushes settings for a Nth edge burst trigger to the instrument
+
+	@param trig	The trigger
+ */
+void MagnovaOscilloscope::PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig)
+{
+	PushFloat(":TRIGGER:NEDGe:LEVEL", trig->GetLevel());
+	sendOnly(":TRIGger:NEDGe:SLOPE %s", (trig->GetSlope() != NthEdgeBurstTrigger::EDGE_FALLING) ? "RISing" : "FALLing");
+	PushFloat(":TRIGger:NEDGe:IDLE", trig->GetIdleTime() * SECONDS_PER_FS);
+	sendOnly(":TRIGger:NEDGe:COUNt %" PRIu64 "", trig->GetEdgeNumber());
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function generator mode
