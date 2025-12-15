@@ -601,7 +601,7 @@ OscilloscopeChannel::CouplingType MagnovaOscilloscope::GetChannelCoupling(size_t
 		return OscilloscopeChannel::COUPLE_GND;
 
 	//invalid
-	LogWarning("MagnovaOscilloscope::GetChannelCoupling got invalid coupling [%s] [%s]\n",
+	protocolError("MagnovaOscilloscope::GetChannelCoupling got invalid coupling [%s] [%s]\n",
 		replyType.c_str(),
 		replyImp.c_str());
 	return OscilloscopeChannel::COUPLE_SYNTHETIC;
@@ -665,7 +665,7 @@ double MagnovaOscilloscope::GetChannelAttenuation(size_t i)
 	int d;
 	if(sscanf(reply.c_str(), "%d", &d) != 1)
 	{
-		protocolError("invalid channel attenuation value '%S'",reply);
+		protocolError("invalid channel attenuation value '%s'",reply.c_str());
 	}
 	return 1/d;
 }
@@ -927,7 +927,7 @@ std::optional<MagnovaOscilloscope::Metadata> MagnovaOscilloscope::parseMetadata(
 		return metadata;
     }
     catch (const std::exception& e) {
-		LogError("Error parsing metadata: %s.\n", e.what());
+		protocolError("Error parsing metadata: %s.\n", e.what());
 		return std::nullopt;
     }
 }
@@ -944,10 +944,8 @@ size_t MagnovaOscilloscope::ReadWaveformBlock(std::vector<uint8_t>* data, std::f
 
 		//shouldn't ever get here
 		if(i == 19)
-		{
-			LogError("ReadWaveformBlock: threw away 20 bytes of data and never saw a '#'\n");
-			// This is a protocol error, flush pending rx data
-			flush();
+		{	// This is a protocol error, flush pending rx data
+			protocolErrorWithFlush("ReadWaveformBlock: threw away 20 bytes of data and never saw a '#'\n");
 			// Stop aqcuisition after this protocol error
 			Stop();
 			return 0;
@@ -972,7 +970,7 @@ size_t MagnovaOscilloscope::ReadWaveformBlock(std::vector<uint8_t>* data, std::f
 		if(newBytes == 0) break;
 		readBytes += newBytes;
 	}
-	LogDebug("Got length %zu from scope, expected bytes = %" PRIu32 ".\n",readBytes, len);
+	//LogDebug("Got length %zu from scope, expected bytes = %" PRIu32 ".\n",readBytes, len);
 
 	return readBytes;
 }
@@ -1142,7 +1140,7 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 	auto metadata = parseMetadata(data);
 	if(!metadata)
 	{
-		LogError("Could not parse metadta");
+		LogError("Could not parse metadta.\n");
 		return ret;
 	}
 
@@ -1156,7 +1154,7 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 	float interval = metadata->timeDelta * FS_PER_SECOND;
 
 	// Offset is null
-	double h_off = 0;
+	//double h_off = 0;
 	double h_off_frac = 0;
 
 
@@ -1171,14 +1169,14 @@ vector<WaveformBase*> MagnovaOscilloscope::ProcessAnalogWaveform(
 
 	// float codes_per_div;
 
-	LogDebug("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%zu, basetime=%f\n",
+	/*LogDebug("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%zu, basetime=%f\n",
 		v_gain,
 		v_off,
 		interval,
 		h_off,
 		h_off_frac,
 		datalen,
-		basetime);
+		basetime);*/
 
 	for(size_t j = 0; j < num_sequences; j++)
 	{
@@ -1227,7 +1225,7 @@ vector<SparseDigitalWaveform*> MagnovaOscilloscope::ProcessDigitalWaveform(
 	auto metadata = parseMetadata(data);
 	if(!metadata)
 	{
-		LogError("Could not parse metadta");
+		LogError("Could not parse metadta.\n");
 		return ret;
 	}
 
@@ -1581,7 +1579,10 @@ float MagnovaOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 	reply = converse(":CHAN%zu:OFFSET?", i + 1);
 
 	float offset;
-	sscanf(reply.c_str(), "%f", &offset);
+	if(sscanf(reply.c_str(), "%f", &offset) != 1)
+	{
+		protocolError("invalid channel offset value '%s'",reply.c_str());
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
@@ -1617,7 +1618,10 @@ float MagnovaOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 	reply = converse(":CHAN%zu:SCALE?", i + 1);
 
 	float volts_per_div;
-	sscanf(reply.c_str(), "%f", &volts_per_div);
+	if(sscanf(reply.c_str(), "%f", &volts_per_div)!=1)
+	{
+		protocolError("invalid channel vlotage range value '%s'",reply.c_str());
+	}
 
 	float v = volts_per_div * 8;	//plot is 8 divisions high
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -1732,14 +1736,14 @@ uint64_t MagnovaOscilloscope::GetSampleRate()
 		string reply;
 		reply = converse(":ACQUIRE:SRATE?");
 
-		if(sscanf(reply.c_str(), "%lf", &f) != EOF)
+		if(sscanf(reply.c_str(), "%lf", &f) == 1)
 		{
 			m_sampleRate = static_cast<int64_t>(f);
 			m_sampleRateValid = true;
 		}
 		else
 		{
-			// TODO protocole error
+			protocolError("invalid sample rate value '%s'",reply.c_str());
 		}
 	}
 	return m_sampleRate;
@@ -1878,7 +1882,10 @@ int64_t MagnovaOscilloscope::GetTriggerOffset()
 
 	//Result comes back in scientific notation
 	double sec;
-	sscanf(reply.c_str(), "%le", &sec);
+	if(sscanf(reply.c_str(), "%le", &sec)!=1)
+	{
+		protocolError("invalid trigger offset value '%s'",reply.c_str());
+	}
 	m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
 
 	//Convert from midpoint to start point
@@ -1939,7 +1946,10 @@ int64_t MagnovaOscilloscope::GetDeskewForChannel(size_t channel)
 
 	//Value comes back as floating point ps
 	float skew;
-	sscanf(reply.c_str(), "%f", &skew);
+	if(sscanf(reply.c_str(), "%f", &skew)!=1)
+	{
+		protocolError("invalid channel deskew value '%s'",reply.c_str());
+	}
 	int64_t skew_ps = round(skew * FS_PER_SECOND);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -2087,7 +2097,10 @@ float MagnovaOscilloscope::GetDigitalThreshold(size_t channel)
 	float result;
 
 	string reply = converse(":DIG:THRESHOLD%s?", bank.c_str());
-	sscanf(reply.c_str(), "%f", &result);
+	if(sscanf(reply.c_str(), "%f", &result)!=1)
+	{
+		protocolError("invalid digital threshold offset value '%s'",reply.c_str());
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelDigitalThresholds[bank] = result;
@@ -2146,7 +2159,7 @@ void MagnovaOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 		if(et) et->SetType(EdgeTrigger::EDGE_ANY);
 	}
 	else
-		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+		protocolError("Unknown trigger slope %s\n", reply.c_str());
 }
 
 /**
@@ -2166,7 +2179,7 @@ Trigger::Condition MagnovaOscilloscope::GetCondition(string reply)
 		return Trigger::CONDITION_NOT_BETWEEN;
 
 	//unknown
-	LogWarning("Unknown trigger condition [%s]\n", reply.c_str());
+	protocolError("Unknown trigger condition [%s]\n", reply.c_str());
 	return Trigger::CONDITION_LESS;
 }
 
@@ -2246,9 +2259,10 @@ void MagnovaOscilloscope::PullTrigger()
 	//Unrecognized trigger type
 	else
 	{
-		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
-		m_trigger = NULL;
-		return;
+		LogWarning("Unsupported trigger type \"%s\", defaulting to Edge.\n", reply.c_str());
+		reply = "EDGe";
+		// Default to Edge
+		PullEdgeTrigger();
 	}
 
 	//Pull the source (same for all types of trigger)
@@ -2260,13 +2274,16 @@ void MagnovaOscilloscope::PullTrigger()
  */
 void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
 {
-	if(isUart)
-	{	// No SCPI command on Magnova to get Trigget Group information for Decode Trigger
-		return;
-	} 
-
-	string reply = converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str());
-	// Returns CHANnel1 or DIGital1
+	string reply;
+	if(!isUart)
+	{	
+		reply = converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str());
+	}
+	else
+	{	// No SCPI command on Magnova to get Trigget Group information for Decode Trigger => default to edge trigger source
+		reply = converse(":TRIGGER:EDGe:SOURCE?");
+		// Returns CHANnel1 or DIGital1
+	}
 
 	// Get channel number
     int i = reply.size() - 1;
@@ -2279,7 +2296,7 @@ void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeNam
 	auto chan = GetOscilloscopeChannelByHwName((isAnalog ? "CH" :  "D") + number);
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
-		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+		protocolError("Unknown trigger source \"%s\"\n", reply.c_str());
 }
 
 void MagnovaOscilloscope::PushTrigger()
@@ -2360,8 +2377,6 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 	if(m_trigger == NULL)
 		m_trigger = new DropoutTrigger(this);
 	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
-
-	Unit fs(Unit::UNIT_FS);
 
 	// Check for digital source
 	string reply = converse(":TRIGGER:TIMeout:SOURCE?");
@@ -2525,21 +2540,19 @@ void MagnovaOscilloscope::PullRuntTrigger()
 		m_trigger = new RuntTrigger(this);
 	RuntTrigger* rt = dynamic_cast<RuntTrigger*>(m_trigger);
 
-	Unit v(Unit::UNIT_VOLTS);
-	Unit fs(Unit::UNIT_FS);
 	string reply;
 
 	//Lower bound
-	rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LEVel1?")));
+	rt->SetLowerBound(stof(converse(":TRIGGER:RUNT:LEVel1?")));
 
 	//Upper bound
-	rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:LEVel2?")));
+	rt->SetUpperBound(stof(converse(":TRIGGER:RUNT:LEVel2?")));
 
 	//Lower bound
-	rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:DURation:LOWer?")));
+	rt->SetLowerInterval(stof(converse(":TRIGGER:RUNT:DURation:LOWer?"))*FS_PER_SECOND);
 
 	//Upper interval
-	rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:DURation:UPPer?")));
+	rt->SetUpperInterval(stof(converse(":TRIGGER:RUNT:DURation:UPPer?"))*FS_PER_SECOND);
 
 	//Slope
 	reply = Trim(converse(":TRIGger:RUNT:POLarity?"));
@@ -2583,24 +2596,20 @@ void MagnovaOscilloscope::PullSlewRateTrigger()
 		m_trigger = new SlewRateTrigger(this);
 	SlewRateTrigger* st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 
-	Unit v(Unit::UNIT_VOLTS);
-	Unit fs(Unit::UNIT_FS);
-	string reply ;
-
 	//Lower bound
-	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPe:LEVel1?")));
+	st->SetLowerBound(stof(converse(":TRIGGER:SLOPe:LEVel1?")));
 
 	//Upper bound
-	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPe:LEVel2?")));
+	st->SetUpperBound(stof(converse(":TRIGGER:SLOPe:LEVel2?")));
 
 	//Lower interval
-	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPe:DURation:LOWer?")));
+	st->SetLowerInterval(stof(converse(":TRIGGER:SLOPe:DURation:LOWer?")) * FS_PER_SECOND);
 
 	//Upper interval
-	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPe:DURation:UPPer?")));
+	st->SetUpperInterval(stof(converse(":TRIGGER:SLOPe:DURation:UPPer?")) * FS_PER_SECOND);
 
 	//Slope
-	reply = Trim(converse(":TRIGger:SLOPe:TYPE?"));
+	string reply = Trim(converse(":TRIGger:SLOPe:TYPE?"));
 	if(reply == "RISing")
 		st->SetSlope(SlewRateTrigger::EDGE_RISING);
 	else
@@ -2686,11 +2695,22 @@ void MagnovaOscilloscope::PullUartTrigger()
 	else // "IFCompletion" (invalid frame completion) / "FPCHeck" (failed parity check) / "IFSTart" (invalid frame start)
 		LogWarning("Unsupported UART trigger condition '%s'", reply.c_str());
 
+	// Check data length
+	int length = stoi(converse(":TRIGger:DECode:UART:DATA:LENGth?"));
+	bool ignoreP2 = true;
 	// Data to match (there is no pattern2 on sds)
 	p1 = Trim(converse(":TRIGger:DECode:UART:DATA:WORD0?"));
-	p2 = Trim(converse(":TRIGger:DECode:UART:DATA:WORD1?"));
+	if(length >= 2)
+	{
+		p2 = Trim(converse(":TRIGger:DECode:UART:DATA:WORD1?"));
+		ignoreP2 = false;
+	}
+	else
+	{	// SetPatterns() needs an patter of at least the same size as p1
+		p2 = "XXXXXXXX";
+	}
 	// TODO set ignorep2 according to p2 value
-	ut->SetPatterns(p1, p2, false);
+	ut->SetPatterns(p1, p2, ignoreP2);
 }
 
 /**
@@ -2743,8 +2763,16 @@ void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
 		sendOnly(":TRIGGER:UART:STOP 1.5");*/
 
 	//Pattern 
-	p1 = trig->GetPattern1();
-	p2 = trig->GetPattern2();
+	int dataLength = 1;
+	trig->SetRadix(SerialTrigger::RADIX_ASCII);
+	// No public access to unformated Pattern 1 and 2 => use GetParameter() instread since we want the unformated string value
+	p1 = trig->GetParameter("Pattern").ToString();
+	p2 = trig->GetParameter("Pattern 2").ToString();
+	if((p2 != ""))
+	{
+		dataLength++;
+	}
+	LogDebug("Found pattern1 = '%s' and pattern2 = '%s'.\n",p1.c_str(),p2.c_str());
 
 	//Match type
 	switch(trig->GetMatchType())
@@ -2763,8 +2791,9 @@ void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
 			LogWarning("Unsupported match type: %d\n",trig->GetMatchType());
 			break;
 	}
+	sendOnly(":TRIGger:DECode:UART:DATA:LENGth %d",dataLength);
 	sendOnly(":TRIGger:DECode:UART:DATA:WORD0 %s", p1.c_str());
-	sendOnly(":TRIGger:DECode:UART:DATA:WORD2 %s", p2.c_str());
+	sendOnly(":TRIGger:DECode:UART:DATA:WORD1 %s", p2.c_str());
 }
 
 /**
@@ -2784,7 +2813,6 @@ void MagnovaOscilloscope::PullWindowTrigger()
 		m_trigger = new WindowTrigger(this);
 	WindowTrigger* wt = dynamic_cast<WindowTrigger*>(m_trigger);
 
-	Unit v(Unit::UNIT_VOLTS);
 	string type = converse(":TRIGger:WINDow:TYPE?");
 	if(type == "ENTer")
 		wt->SetWindowType(WindowTrigger::WINDOW_ENTER);
@@ -2792,10 +2820,10 @@ void MagnovaOscilloscope::PullWindowTrigger()
 		wt->SetWindowType(WindowTrigger::WINDOW_EXIT);
 
 	//Lower bound
-	wt->SetLowerBound(v.ParseString(converse(":TRIGger:WINDow:LEVel1?")));
+	wt->SetLowerBound(stof(converse(":TRIGger:WINDow:LEVel1?")));
 
 	//Upper bound
-	wt->SetUpperBound(v.ParseString(converse(":TRIGger:WINDow:LEVel2?")));
+	wt->SetUpperBound(stof(converse(":TRIGger:WINDow:LEVel2?")));
 }
 
 /**
@@ -2929,7 +2957,10 @@ float MagnovaOscilloscope::GetFunctionChannelDutyCycle(int chan)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 	float dutyf;
-	sscanf(duty.c_str(), "%f", &dutyf);
+	if(sscanf(duty.c_str(), "%f", &dutyf)!=1)
+	{
+		protocolError("invalid channel ducy cycle value '%s'",duty.c_str());
+	}
 	m_awgDutyCycle[chan] = (dutyf/100);
 	return m_awgDutyCycle[chan];
 }
@@ -2956,7 +2987,10 @@ float MagnovaOscilloscope::GetFunctionChannelAmplitude(int chan)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 	float ampf;
-	sscanf(amp.c_str(), "%f", &ampf);
+	if(sscanf(amp.c_str(), "%f", &ampf)!=1)
+	{
+		protocolError("invalid channel amplitude value '%s'",amp.c_str());
+	}
 	m_awgRange[chan] = ampf;
 
 	return m_awgRange[chan];
@@ -2982,7 +3016,10 @@ float MagnovaOscilloscope::GetFunctionChannelOffset(int chan)
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	float offsetf;
-	sscanf(offset.c_str(), "%f", &offsetf);
+	if(sscanf(offset.c_str(), "%f", &offsetf)!=1)
+	{
+		protocolError("invalid channel attenuation value '%s'",offset.c_str());
+	}
 	m_awgOffset[chan] = offsetf;
 	return m_awgOffset[chan];
 }
@@ -3007,7 +3044,10 @@ float MagnovaOscilloscope::GetFunctionChannelFrequency(int chan)
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	float freqf;
-	sscanf(freq.c_str(), "%f", &freqf);
+	if(sscanf(freq.c_str(), "%f", &freqf)!=1)
+	{
+		protocolError("invalid channel frequency value '%s'",freq.c_str());
+	}
 	m_awgFrequency[chan] = freqf;
 	return m_awgFrequency[chan];
 }
@@ -3433,7 +3473,10 @@ float MagnovaOscilloscope::GetFunctionChannelRiseTime(int chan)
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	float timef;
-	sscanf(time.c_str(), "%f", &timef);
+	if(sscanf(time.c_str(), "%f", &timef)!=1)
+	{
+		protocolError("invalid channel rise time value '%s'",time.c_str());
+	}
 	m_awgRiseTime[chan] = timef * FS_PER_SECOND;
 	return m_awgRiseTime[chan];
 }
@@ -3458,7 +3501,10 @@ float MagnovaOscilloscope::GetFunctionChannelFallTime(int chan)
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	float timef;
-	sscanf(time.c_str(), "%f", &timef);
+	if(sscanf(time.c_str(), "%f", &timef)!=1)
+	{
+		protocolError("invalid channel fall time value '%s'",time.c_str());
+	}
 	m_awgFallTime[chan] = timef * FS_PER_SECOND;
 	return m_awgFallTime[chan];
 }
