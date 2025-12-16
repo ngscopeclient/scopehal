@@ -151,16 +151,16 @@ protected:
 	std::size_t GetEnabledAnalogChannelCount();
 
 	struct CapturePreamble {
-		CaptureFormat format;
-		CaptureType type;
-		std::uint_least32_t npoints; // an integer between 1 and 12000000.
-		std::uint_least32_t averages; // the number of averages in the average sample mode and 1 in other modes.
-		double sec_per_sample; // the time difference between two neighboring points in the X direction.
-		double xorigin; // the time from the trigger point to the "Reference Time" in the X direction.
-		double xreference; // the reference time of the data point in the X direction.
-		double yincrement; // the waveform increment in the Y direction.
-		double yorigin; // the vertical offset relative to the "Vertical Reference Position" in the Y direction.
-		double yreference; // the vertical reference position in the Y direction.
+		CaptureFormat format {};
+		CaptureType type {};
+		std::uint_least32_t npoints {}; // an integer between 1 and 12000000.
+		std::uint_least32_t averages {}; // the number of averages in the average sample mode and 1 in other modes.
+		double sec_per_sample {}; // the time difference between two neighboring points in the X direction.
+		double xorigin {}; // the time from the trigger point to the "Reference Time" in the X direction.
+		double xreference {}; // the reference time of the data point in the X direction.
+		double yincrement {}; // the waveform increment in the Y direction.
+		double yorigin {}; // the vertical offset relative to the "Vertical Reference Position" in the Y direction.
+		double yreference {}; // the vertical reference position in the Y direction.
 	};
 
 	std::optional<CapturePreamble> GetCapturePreamble();
