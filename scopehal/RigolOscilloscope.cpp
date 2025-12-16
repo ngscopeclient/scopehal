@@ -205,7 +205,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	//Configure acquisition modes
 	switch (m_series) {
 		case Series::DS1000:
-			m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
+			// m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
+			// this command is not listed anywhere in the docs
 			break;
 		
 		case Series::MSODS1000Z:
@@ -362,6 +363,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 		case Series::DS1000:
 			m_analogChannelCount = m_modelNew.number % 10;
 			m_bandwidth = m_modelNew.number % 1000 - m_analogChannelCount;
+			//TODO:  there are DS1000D devices with LA
 			break;
 
 		case Series::MSODS1000Z:
@@ -1052,6 +1054,8 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 	if (IsChannelAnalog(i))
 	{
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(":" + m_channels[i]->GetHwname() + ":DISP?"));
+		// FIXME: DS1000E response times out, not sure why, prog. manual lists this command
+		// could be caused by some malformed command before
 	
 		{
 			lock_guard<recursive_mutex> lock(m_cacheMutex);
