@@ -186,9 +186,9 @@ protected:
 	OscilloscopeChannel* m_aclTrigChannel {}; // TODO: scopehal does not handle AC "external triggers" ATM
 
 	// hardware analog channel count, independent of LA option etc
-	size_t m_analogChannelCount;
+	size_t m_analogChannelCount {};
 
-	size_t m_digitalChannelCount;
+	size_t m_digitalChannelCount {};
 	std::vector<Oscilloscope::DigitalBank> m_digitalBanks;
 
 	// config cache, values that can be updated whenever needed
@@ -207,12 +207,12 @@ protected:
 	std::optional<bool> m_laEnabled;
 
 	// state variables, may alter values during runtime
-	bool m_triggerArmed;
-	bool m_triggerWasLive;
-	bool m_triggerOneShot;
-	std::uint_least32_t m_pointsWhenStarted; // used for some series as a part of trigger state detection workaround, sampled points reported right after arming
+	bool m_triggerArmed {};
+	bool m_triggerWasLive {};
+	bool m_triggerOneShot {};
+	std::uint_least32_t m_pointsWhenStarted {}; // used for some series as a part of trigger state detection workaround, sampled points reported right after arming
 
-	bool m_liveMode;
+	bool m_liveMode {};
 
 	// constants once the ctor finishes
 	struct Model {
@@ -221,7 +221,7 @@ protected:
 		std::string suffix; // e.g.: Z
 	} m_modelNew;
 	
-	unsigned int m_bandwidth;
+	unsigned int m_bandwidth {};
 	bool m_opt200M {}; // 200M memory depth is MSO5000 specific option 
 	bool m_opt24M {};  // 24M memory depth is DS1000Z specific option 
 	uint64_t m_maxMdepth {}; // Maximum Memory depth for DHO models
