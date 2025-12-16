@@ -58,10 +58,10 @@ static auto parseDouble(string const &input, const string &fmt = "%lf")
 	return parseNumeric<double>(input, fmt);
 }
 
-static auto parseU64(string const &input, const string &fmt = "%" PRIu64)
-{
-	return parseNumeric<uint64_t>(input, fmt);
-}
+// static auto parseU64(string const &input, const string &fmt = "%" PRIu64)
+// {
+// 	return parseNumeric<uint64_t>(input, fmt);
+// }
 
 //TODO: this would make sens to move to some utility library
 template<typename T>
@@ -2974,7 +2974,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 			// it may fail in the first loop, but whould get valid value in the second
 			// this way we avoid recursion
 			auto const depth_str = m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?");
-			auto const depth = parseU64(depth_str);
+			auto const depth = parseDouble(depth_str);
 			if (depth)
 				return *depth;
 			LogError("could not parse sampled depth from %s. Falling back to lowest one\n", depth_str.c_str());
