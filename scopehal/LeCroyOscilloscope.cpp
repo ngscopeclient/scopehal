@@ -3710,19 +3710,11 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 
 bool LeCroyOscilloscope::CanAverage(size_t i)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return false;
-
 	return (i < m_analogChannelCount);
 }
 
 size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return 1;
-
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
 		return 1;
@@ -3744,10 +3736,6 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 
 void LeCroyOscilloscope::SetNumAverages(size_t i, size_t navg)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return;
-
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
 		return;
