@@ -1006,14 +1006,17 @@ void MagnovaOscilloscope::BulkCheckChannelEnableState()
 	}
 	for(auto i : uncached)
 	{
+		bool enabled;
 		if((i < m_analogChannelCount))
 		{	// Analog
-			m_channelsEnabled[i] = (converse(":CHAN%zu:STAT?", i + 1) == "ON");
+			enabled = (converse(":CHAN%zu:STAT?", i + 1) == "ON");
 		}
 		else
 		{	// Digital
-			m_channelsEnabled[i] = digitalModuleOn && (converse(":DIG%zu:STAT?", (i - m_analogChannelCount)) == "ON");
+			enabled = digitalModuleOn && (converse(":DIG%zu:STAT?", (i - m_analogChannelCount)) == "ON");
 		}
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelsEnabled[i] = enabled;
 	}
 }
 
@@ -1338,7 +1341,7 @@ bool MagnovaOscilloscope::AcquireData()
 	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*>> pending_waveforms;
-	double start = GetTime();
+	double start = 0;
 	time_t ttime = 0;
 	double basetime = 0;
 	vector<vector<WaveformBase*>> waveforms;
@@ -1350,9 +1353,6 @@ bool MagnovaOscilloscope::AcquireData()
 
 	//Acquire the data (but don't parse it)
 
-	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
-	start = GetTime();
-
 	// Get instrument time : format "23,35,11.280010"
 	string isntrumentTime = converse(":SYST:TIME?");
 
@@ -1362,7 +1362,6 @@ bool MagnovaOscilloscope::AcquireData()
 	{	// Check all analog channels
 		analogEnabled[i] = IsChannelEnabled(i);
 	}
-
 	for(unsigned int i = 0; i <  m_digitalChannelCount; i++)
 	{	// Check digital channels
 		// Not supported for now by Magnova firmware
@@ -1374,51 +1373,57 @@ bool MagnovaOscilloscope::AcquireData()
 	// Notify about download operation start
 	ChannelsDownloadStarted();
 
-	// Get time from instrument
-	ttime = ExtractTimestamp(isntrumentTime, basetime);
+	
+	{	// Lock transport from now during all acquisition phase
+		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+		start = GetTime();
 
-	//Read the data from each analog waveform
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		if(analogEnabled[i])
-		{	// Allocate buffer
-			// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
-			m_transport->SendCommand(":CHAN" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
-			size_t readBytes = ReadWaveformBlock(&analogWaveformData[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
-			analogWaveformDataSize[i] = readBytes;
-			ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
-		}
-	}
-	if(anyDigitalEnabled)
-	{
-		// uint64_t digitalAcqPoints = GetDigitalAcqPoints();
-		// uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
-		// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
-		//Read the data from each digital waveform
-		for(size_t i = 0; i < m_digitalChannelCount; i++)
+		// Get time from instrument
+		ttime = ExtractTimestamp(isntrumentTime, basetime);
+
+		//Read the data from each analog waveform
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
 		{
-			if(digitalEnabled[i])
+			if(analogEnabled[i])
 			{	// Allocate buffer
-				m_transport->SendCommand(":DIG" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
-				size_t readBytes = ReadWaveformBlock(&digitalWaveformDataBytes[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
-				digitalWaveformDataSize[i] = readBytes;
-				ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+				// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
+				m_transport->SendCommand(":CHAN" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
+				size_t readBytes = ReadWaveformBlock(&analogWaveformData[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+				analogWaveformDataSize[i] = readBytes;
+				ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 			}
 		}
-	}
+		if(anyDigitalEnabled)
+		{
+			// uint64_t digitalAcqPoints = GetDigitalAcqPoints();
+			// uint64_t acqDigitalBytes = ceil(digitalAcqPoints/8); // 8 points per byte on digital channels
+			// LogDebug("Digital acq : ratio = %lld, pages = %lld, page size = %lld , dig acq points = %lld, acq dig bytes = %lld.\n",(acqPoints / digitalAcqPoints),pages, pageSize,digitalAcqPoints, acqDigitalBytes);
+			//Read the data from each digital waveform
+			for(size_t i = 0; i < m_digitalChannelCount; i++)
+			{
+				if(digitalEnabled[i])
+				{	// Allocate buffer
+					m_transport->SendCommand(":DIG" + to_string(i + 1) + ":DATA:PACK? ALL,RAW");
+					size_t readBytes = ReadWaveformBlock(&digitalWaveformDataBytes[i], [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+					digitalWaveformDataSize[i] = readBytes;
+					ChannelsDownloadStatusUpdate(i + m_analogChannelCount, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+				}
+			}
+		}
 
-	//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
-	//Re-arm the trigger if not in one-shot mode
-	if(!m_triggerOneShot)
-	{
-		//LogDebug("Arming trigger for next acquisition!\n");
-		sendOnly(":SINGLE");
-		m_triggerArmed = true;
-	}
-	else
-	{
-		sendWithAck(":STOP");
-		m_triggerArmed = false;
+		//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
+		//Re-arm the trigger if not in one-shot mode
+		if(!m_triggerOneShot)
+		{
+			//LogDebug("Arming trigger for next acquisition!\n");
+			sendOnly(":SINGLE");
+			m_triggerArmed = true;
+		}
+		else
+		{
+			sendWithAck(":STOP");
+			m_triggerArmed = false;
+		}
 	}
 
 	//Process analog waveforms
@@ -1489,19 +1494,20 @@ bool MagnovaOscilloscope::AcquireData()
 		digitalWaveformDataBytes[i] = {};
 	}
 
-	//Now that we have all of the pending waveforms, save them in sets across all channels
-	m_pendingWaveformsMutex.lock();
-	for(size_t i = 0; i < num_sequences; i++)
-	{
-		SequenceSet s;
-		for(size_t j = 0; j < m_analogAndDigitalChannelCount; j++)
+	
+	{	//Now that we have all of the pending waveforms, save them in sets across all channels
+		lock_guard<mutex> lock(m_pendingWaveformsMutex);
+		for(size_t i = 0; i < num_sequences; i++)
 		{
-			if(pending_waveforms.find(j) != pending_waveforms.end())
-				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
+			SequenceSet s;
+			for(size_t j = 0; j < m_analogAndDigitalChannelCount; j++)
+			{
+				if(pending_waveforms.find(j) != pending_waveforms.end())
+					s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
+			}
+			m_pendingWaveforms.push_back(s);
 		}
-		m_pendingWaveforms.push_back(s);
 	}
-	m_pendingWaveformsMutex.unlock();
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
@@ -1665,7 +1671,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_MAGNOVA_BMO:
-			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 100*m, 200*m, 400*m, 500*m, 800*m, 1600*m };
+			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 125*m, 100*m, 200*m, 400*m, 500*m, 800*m, 1000*m, 1600*m };
 			break;
 		// --------------------------------------------------
 		default:
@@ -1740,43 +1746,49 @@ set<MagnovaOscilloscope::InterleaveConflict> MagnovaOscilloscope::GetInterleaveC
 
 uint64_t MagnovaOscilloscope::GetSampleRate()
 {
+    {
+        lock_guard<recursive_mutex> lock(m_cacheMutex);
+        if(m_sampleRateValid)
+            return m_sampleRate;
+    }
 	double f;
-	if(!m_sampleRateValid)
-	{
-		string reply;
-		reply = converse(":ACQUIRE:SRATE?");
+	string reply;
+	reply = converse(":ACQUIRE:SRATE?");
 
-		if(sscanf(reply.c_str(), "%lf", &f) == 1)
-		{
-			m_sampleRate = static_cast<int64_t>(f);
-			m_sampleRateValid = true;
-		}
-		else
-		{
-			protocolError("invalid sample rate value '%s'",reply.c_str());
-		}
+    lock_guard<recursive_mutex> lock(m_cacheMutex);
+	if(sscanf(reply.c_str(), "%lf", &f) == 1)
+	{
+		m_sampleRate = static_cast<int64_t>(f);
+		m_sampleRateValid = true;
+	}
+	else
+	{
+		protocolError("invalid sample rate value '%s'",reply.c_str());
 	}
 	return m_sampleRate;
 }
 
 uint64_t MagnovaOscilloscope::GetSampleDepth()
 {
+    {
+        lock_guard<recursive_mutex> lock(m_cacheMutex);
+        if(m_memoryDepthValid)
+            return m_memoryDepth;
+    }
 	double f;
-	if(!m_memoryDepthValid)
-	{	// Possible values are : AUTo, AFASt, Integer in pts
-		string reply = converse(":ACQUIRE:MDEPTH?");
-		if(reply == "AUTo" || reply == "AFASt")
-		{	// Default to 10Ms
-			m_memoryDepth = 10000000;
-		}
-		else
-		{
-			f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
-			m_memoryDepth = static_cast<int64_t>(f);
-		}
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_memoryDepthValid = true;
+	// Possible values are : AUTo, AFASt, Integer in pts
+	string reply = converse(":ACQUIRE:MDEPTH?");
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	if(reply == "AUTo" || reply == "AFASt")
+	{	// Default to 10Ms
+		m_memoryDepth = 10000000;
 	}
+	else
+	{
+		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+		m_memoryDepth = static_cast<int64_t>(f);
+	}
+	m_memoryDepthValid = true;
 	return m_memoryDepth;
 }
 
@@ -1888,20 +1900,23 @@ int64_t MagnovaOscilloscope::GetTriggerOffset()
 	string reply;
 	reply = converse(":TIMebase:OFFSet?");
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-
 	//Result comes back in scientific notation
 	double sec;
 	if(sscanf(reply.c_str(), "%le", &sec)!=1)
 	{
 		protocolError("invalid trigger offset value '%s'",reply.c_str());
 	}
-	m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
+	}
 
 	//Convert from midpoint to start point
 	int64_t rate = GetSampleRate();
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_triggerOffset += halfwidth;
 
 	//LogDebug("Get trigger offset to %lf : rate = %" PRId64 ", depth = %" PRId64 " haldepth = %" PRId64 ", halfwidth = %" PRId64 ", result = %" PRId64 ".\n",sec,rate,GetSampleDepth(),halfdepth,halfwidth,m_triggerOffset);
@@ -2929,6 +2944,7 @@ void MagnovaOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
 	sendOnly(":TRIGger:INTerval:POLarity %s", (trig->GetType() != GlitchTrigger::EDGE_FALLING) ? "POSitive" : "NEGative");
 	PushCondition(":TRIGGER:INTerval:TIMing", trig->GetCondition());
 	PushFloat(":TRIGGER:INTerval:DURation:LOWer", trig->GetLowerBound() * SECONDS_PER_FS);
+	//LogError("Parameter Upper Bound = %s / %lld / %f\n",trig->GetParameter("Upper Bound").ToString().c_str(),trig->GetParameter("Upper Bound").GetIntVal(),trig->GetParameter("Upper Bound").GetIntVal() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:INTerval:DURation:UPPer", trig->GetUpperBound() * SECONDS_PER_FS);
 }
 
