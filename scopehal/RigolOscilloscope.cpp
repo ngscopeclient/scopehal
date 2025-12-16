@@ -46,15 +46,21 @@
 using namespace std;
 
 template<typename T>
-static T parseNumeric(string const &input, const string &fmt, T const &fallback_value = {}) {
-	T output {fallback_value};
-	sscanf(input.c_str(), fmt.c_str(), &output);
+static optional<T> parseNumeric(string const &input, const string &fmt) {
+	T output {};
+	if (sscanf(input.c_str(), fmt.c_str(), &output) < 1)
+		return nullopt;
 	return output;
 }
 
-static auto parseDouble(string const &input, const string &fmt = "%lf", double const &fallback_value = numeric_limits<double>::quiet_NaN())
+static auto parseDouble(string const &input, const string &fmt = "%lf")
 {
-	return parseNumeric<double>(input, fmt, fallback_value);
+	return parseNumeric<double>(input, fmt);
+}
+
+static auto parseU64(string const &input, const string &fmt = "%" PRIu64)
+{
+	return parseNumeric<uint64_t>(input, fmt);
 }
 
 //TODO: this would make sens to move to some utility library
@@ -863,7 +869,14 @@ float RigolOscilloscope::GetDigitalThreshold(size_t channel)
 	}
 	
 	// pods index values start at 1
-	auto const level = parseDouble(m_transport->SendCommandQueuedWithReply(string(":LA:POD") + to_string(bankIdx + 1) + ":THR?"));
+	auto level = [&]() -> double {
+		auto const level_str = m_transport->SendCommandQueuedWithReply(string(":LA:POD") + to_string(bankIdx + 1) + ":THR?");
+		auto const level = parseDouble(level_str);
+		if (level)
+			return *level;
+		LogError("could not parse channel %s threshold from %s\n", GetChannel(channel)->GetDisplayName().c_str(), level_str.c_str());
+		return 0;
+	}();
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
