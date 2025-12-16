@@ -573,6 +573,7 @@ static std::vector<uint64_t> dhoSampleDepths {
 	        10 * 1000,
 	       100 * 1000,
 	  1 * 1000 * 1000,
+	  5 * 1000 * 1000, // only DHO800, since FW v00.01.03.00.04
 	 10 * 1000 * 1000,
 	 25 * 1000 * 1000,
 	 50 * 1000 * 1000,
@@ -616,11 +617,13 @@ void RigolOscilloscope::UpdateDynamicCapabilities() {
 			vector<uint64_t> depths;
 			for (auto curMemDepth : dhoSampleDepths)
 			{
-				if(curMemDepth<=maxMemDepth)
-				{
-					depths.push_back(curMemDepth);
-				}
-				else break;
+				if (curMemDepth>maxMemDepth)
+					break;
+				if (curMemDepth == 5'000'000 and m_series != Series::DHO800)
+					continue;
+					// v00.01.03.00.04  2024/07/11
+					// 3. DHO800 adds 5M storage depth.
+				depths.push_back(curMemDepth);
 			}
 			m_depths = std::move(depths);
 			return;
@@ -3005,6 +3008,22 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
+	{
+		auto depths = GetSampleDepthsNonInterleaved();
+		auto requestedValueisValid = false;
+		for (auto const& depth_item : depths)
+			if (depth == depth_item)
+			{
+				requestedValueisValid = true;
+				break;
+			}
+		if (not requestedValueisValid)
+		{
+			LogWarning("requested sample depth %" PRIu64 " is not any of %zd of supported by this device\n", depth, depths.size());
+			return;
+		}
+	}
+
 	switch (m_series)
 	{
 		case Series::MSO5000:
@@ -3079,6 +3098,9 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 					break;
 				case 1000000:
 					m_transport->SendCommandQueued("ACQ:MDEP 1M");
+					break;
+				case 5000000:
+					m_transport->SendCommandQueued("ACQ:MDEP 5M");
 					break;
 				case 10000000:
 					m_transport->SendCommandQueued("ACQ:MDEP 10M");
