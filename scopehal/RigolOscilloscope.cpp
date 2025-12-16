@@ -1934,19 +1934,16 @@ bool RigolOscilloscope::AcquireData()
 			maxpoints = 1000 * 1000 / GetMsods1000ZChannelDivisor();
 			break;
 		case Series::MSO5000:
-			maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
-			break;
 		case Series::DHO1000:
 		case Series::DHO4000:
 		case Series::DHO800:
 		case Series::DHO900:
-			maxpoints = 250 * 1000;
+			// keeping at 0, so it is updated to maximum from the value in preamble/memory depth
 			break;
 		case Series::UNKNOWN:
 			return false;
 	}
 	vector<unsigned char> temp_buf;
-	temp_buf.resize((m_highDefinition ? (maxpoints * 2) : maxpoints) + 1);
 	map<int, deque<WaveformBase*>> pending_waveforms;
 
 	auto ts_download_start = chrono::steady_clock::now();
@@ -2001,6 +1998,8 @@ bool RigolOscilloscope::AcquireData()
 					continue;
 				}
 
+				maxpoints = preamble->npoints;
+
 				if(preamble->sec_per_sample == 0)
 				{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
 					LogWarning("Got null sec_per_sample value from the scope, ignoring this waveform.\n");
@@ -2023,6 +2022,14 @@ bool RigolOscilloscope::AcquireData()
 			case Series::UNKNOWN:
 				return false;
 		}
+
+		if (maxpoints == 0)
+		{
+			LogError("was not updated, this a bug! Ignoring waveform\n");
+			continue;
+		}
+
+		temp_buf.resize((m_highDefinition ? (maxpoints * 2) : maxpoints) + 1);
 
 		//If we have zero points in the reply, skip reading data from this channel
 		if(npoints == 0)
