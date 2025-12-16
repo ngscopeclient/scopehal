@@ -3725,8 +3725,15 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 			return m_channelNavg[i];
 	}
 
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
-		string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
+	// Averaging on WS3K series is not handled per channel
+	// (https://github.com/ngscopeclient/scopehal/issues/1026)
+	std::string reply;
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.Horizontal.AverageSweeps'")));
+	else
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
 	auto navg = stoi(reply);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -3740,9 +3747,15 @@ void LeCroyOscilloscope::SetNumAverages(size_t i, size_t navg)
 	if(i > m_analogChannelCount)
 		return;
 
-	m_transport->SendCommandQueued(
-		string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps = " +
-		to_string(navg) + "'");
+	// Averaging on WS3K series not handled per channel
+	// (https://github.com/ngscopeclient/scopehal/issues/1026)
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.Horizontal.AverageSweeps = ") + to_string(navg) + "'");
+	else
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() +
+			".AverageSweeps = " + to_string(navg) + "'");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelNavg[i] = navg;
