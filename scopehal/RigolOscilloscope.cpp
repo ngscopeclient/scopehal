@@ -1860,16 +1860,13 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 
 	if(stat == "TD")
 	{
-		if (m_series == Series::MSO5000)
-			// MSO5000Z reports triggered right at the triggering moment,
-			// but that does not imply data availability (returning TRIGGER_MODE_TRIGGERED does).
-			// So we return TRIGGER_MODE_RUN to not indicate data availability
-			// and rely on the `STOP` to arrive afterwards.
-			// This can be easily caused by long sampling times (e.g.: 10 ksps and 100k mem. depth)
-			return TRIGGER_MODE_RUN;
-		else
-			// TODO: check if other families trigger TD state is also affected or not
-			return TRIGGER_MODE_TRIGGERED;
+		// MSO5000Z reports triggered right at the triggering moment,
+		// but that does not imply data availability (returning TRIGGER_MODE_TRIGGERED does).
+		// So we return TRIGGER_MODE_RUN to not indicate data availability
+		// and rely on the `STOP` to arrive afterwards.
+		// This can be easily caused by long sampling times (e.g.: 10 ksps and 100k mem. depth)
+		// DHO800 is also affected, so we mask the TD state for all
+		return TRIGGER_MODE_RUN;
 	}
 	else if(stat == "RUN")
 		return TRIGGER_MODE_RUN;
