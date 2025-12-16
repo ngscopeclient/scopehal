@@ -2066,42 +2066,18 @@ bool RigolOscilloscope::AcquireData()
 				case Series::DS1000:
 					m_transport->SendCommandQueued(string(":WAV:DATA? ") + m_channels[channelIdx]->GetHwname());
 					break;
-				
+					
 				case Series::MSODS1000Z:
-				{
-					// specify block sample range
-					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint+1));	//ONE based indexing WTF
-					m_transport->SendCommandQueued(string("WAV:STOP ") + to_string(min(npoint + maxpoints, npoints)));	//Here it is zero based, so it gets from 1-1000
-					// m_transport->SendCommandQueued("*WAI"); // looks unnecessary
-
-					//Ask for the data block
-					m_transport->SendCommandQueued("WAV:DATA?");
-				} break;
-
-					
 				case Series::MSO5000:
-					//Ask for the data block
-					m_transport->SendCommandQueued("*WAI");
-					m_transport->SendCommandQueued("WAV:DATA?");
-					break;
-					
 				case Series::DHO1000:
 				case Series::DHO4000:
 				case Series::DHO800:
 				case Series::DHO900:
-				{
-					//Ask for the data
-					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint + 1));	//ONE based indexing WTF
-					size_t end = npoint + maxpoints;
-					if(end > npoints)
-						end = npoints;
-					m_transport->SendCommandQueued(
-						string("WAV:STOP ") + to_string(end));	  //Here it is zero based, so it gets from 1-1000
-		
-					//Ask for the data block
+					m_transport->SendCommandQueued("*WAI");
+					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint+1));	//ONE based indexing WTF
+					m_transport->SendCommandQueued(string("WAV:STOP ") + to_string(min(npoint + maxpoints, npoints)));
 					m_transport->SendCommandQueued("WAV:DATA?");
 					break;
-				}
 
 				case Series::UNKNOWN:
 					LogError("RigolOscilloscope: unknown model, invalid state!\n");
@@ -2307,37 +2283,13 @@ bool RigolOscilloscope::AcquireData()
 				break;
 				
 				case Series::MSODS1000Z:
-				{
-					// specify block sample range
-					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint+1));	//ONE based indexing WTF
-					m_transport->SendCommandQueued(string("WAV:STOP ") + to_string(min(npoint + maxpoints, npoints)));	//Here it is zero based, so it gets from 1-1000
-					// m_transport->SendCommandQueued("*WAI"); // looks unnecessary
-
-					//Ask for the data block
-					m_transport->SendCommandQueued("WAV:DATA?");
-				} break;
-
-				
 				case Series::MSO5000:
-					//Ask for the data block
-					m_transport->SendCommandQueued("*WAI");
-					m_transport->SendCommandQueued("WAV:DATA?");
-					break;
-					
 				case Series::DHO900:
-				{
-					//Ask for the data
-					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint + 1));	//ONE based indexing WTF
-					size_t end = npoint + maxpoints;
-					if(end > npoints)
-						end = npoints;
-					m_transport->SendCommandQueued(
-						string("WAV:STOP ") + to_string(end));	  //Here it is zero based, so it gets from 1-1000
-						
-					//Ask for the data block
+					m_transport->SendCommandQueued("*WAI");
+					m_transport->SendCommandQueued(string("WAV:STAR ") + to_string(npoint+1));
+					m_transport->SendCommandQueued(string("WAV:STOP ") + to_string(min(npoint + maxpoints, npoints)));
 					m_transport->SendCommandQueued("WAV:DATA?");
-					break;
-				}
+				break;
 				
 				case Series::DHO1000:
 				case Series::DHO4000:
