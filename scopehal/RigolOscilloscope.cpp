@@ -222,6 +222,23 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		case Series::UNKNOWN:
 			break;
 	}
+
+	// disable auto roll mode on DHOs
+	switch (m_series) {
+		case Series::DHO1000:
+		case Series::DHO4000:
+		case Series::DHO800:
+		case Series::DHO900:
+			m_transport->SendCommandQueued(":TIM:ROLL 0");
+			break;
+
+		case Series::DS1000:
+		case Series::MSODS1000Z:
+		case Series::MSO5000:
+		case Series::UNKNOWN:
+			break;
+	}
+	
 	
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 		m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":VERN ON");
