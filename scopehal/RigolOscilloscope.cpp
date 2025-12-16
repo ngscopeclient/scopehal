@@ -3275,7 +3275,42 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 	auto halfwidth_fs = width_fs /2;
 	if (offset > width_fs)
 		offset = width_fs; // we want to ensure, the trigger is inside the capture range 0~mdepth
+	
+	// DHO800 allows very limited trigger offset range in stop mode
+	// let's assume this is behadior of all DHOs for now...
+	// TODO: check if it is necessary for other DHO series
+
+	auto const resume_into_stop = [&]() -> bool
+	{
+		switch (m_series)
+		{
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO800:
+			case Series::DHO900:
+			{
+				// Set in run mode to be able to set trigger offset in full range
+				if (Trim(m_transport->SendCommandQueuedWithReply(":TRIG:STAT?")) == "STOP")
+				{
+					m_transport->SendCommandQueued("RUN");
+					return true;
+				}
+				return false;
+			}
+
+			case Series::DS1000:
+			case Series::MSODS1000Z:
+			case Series::MSO5000:
+			case Series::UNKNOWN:
+				break;
+		}
+		return false;
+	}();
+
 	m_transport->SendCommandQueued(string(":TIM:MAIN:OFFS ") + to_string((halfwidth_fs - offset) * SECONDS_PER_FS));
+	
+	if (resume_into_stop)
+		m_transport->SendCommandQueued("STOP");
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
