@@ -1998,7 +1998,8 @@ bool RigolOscilloscope::AcquireData()
 					continue;
 				}
 
-				maxpoints = preamble->npoints;
+				if (maxpoints == 0)
+					maxpoints = preamble->npoints;
 
 				if(preamble->sec_per_sample == 0)
 				{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
