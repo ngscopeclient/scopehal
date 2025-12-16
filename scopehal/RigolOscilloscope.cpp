@@ -3167,6 +3167,18 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 				timeScaleFactor = d->second;
 			}
 			m_transport->SendCommandQueued(string(":TIM:SCAL ") + to_string(sampletime / timeScaleFactor));
+			// To ghet back the current samplerate, the scope has to trigger at least once!
+			// RUN mode is not enough and neither is fidlding with memory depth
+			auto singleshot = Trim(m_transport->SendCommandQueuedWithReply(":TRIG:SWE?")) == "SING";
+			auto was_stopped = Trim(m_transport->SendCommandQueuedWithReply(":TRIG:STAT?")) == "STOP";
+			if (was_stopped)
+				m_transport->SendCommandQueued("RUN");
+			m_transport->SendCommandQueued("TFOR");
+			if (was_stopped)
+				m_transport->SendCommandQueued("STOP");
+			else if (singleshot)
+				m_transport->SendCommandQueued(":SING");
+
 			break;
 		}
 
