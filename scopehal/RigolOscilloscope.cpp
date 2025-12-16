@@ -2964,11 +2964,21 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 		LogTrace("mem depth updating\n");
 	}
 
-	auto ret = Trim(m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?"));
-
-	double depth;
-	sscanf(ret.c_str(), "%lf", &depth);
-	//TODO: check sscanf return value for parsing errors
+	auto depth = [&]() -> uint64_t {
+		for(auto i = 2u; i; --i)
+		{
+			// it may fail in the first loop, but whould get valid value in the second
+			// this way we avoid recursion
+			auto const depth_str = m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?");
+			auto const depth = parseU64(depth_str);
+			if (depth)
+				return *depth;
+			LogError("could not sampled depth from %s. Falling back to lowest one\n", depth_str.c_str());
+			
+			SetSampleDepth(GetSampleDepthsNonInterleaved()[0]);
+		}
+		return 0;
+	}();
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
