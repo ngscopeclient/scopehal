@@ -2977,8 +2977,13 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 			auto const depth = parseU64(depth_str);
 			if (depth)
 				return *depth;
-			LogError("could not sampled depth from %s. Falling back to lowest one\n", depth_str.c_str());
-			
+			LogError("could not parse sampled depth from %s. Falling back to lowest one\n", depth_str.c_str());
+			auto depths = GetSampleDepthsNonInterleaved();
+			if (depths.empty())
+			{
+				LogError("no known sampled depths known!\n");
+				return 0;
+			}
 			SetSampleDepth(GetSampleDepthsNonInterleaved()[0]);
 		}
 		return 0;
