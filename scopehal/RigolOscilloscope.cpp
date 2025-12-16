@@ -144,25 +144,35 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			chan->SetDefaultDisplayName();
 		}
 	}
-
 	// Add the external trigger input
-	switch (m_series)
+	auto const has_ext_trigger = [&]() -> bool
 	{
-		case Series::DS1000:
-		case Series::MSODS1000Z:
-		case Series::DHO1000:
-		case Series::DHO4000:
-		case Series::DHO800:
-		case Series::DHO900:
-			m_extTrigChannel = new OscilloscopeChannel(
-				this, "External", "#FFFFFF", Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_TRIGGER, m_channels.size());
-			m_channels.push_back(m_extTrigChannel);
-			m_extTrigChannel->SetDefaultDisplayName();
-			break;
+		switch (m_series)
+		{
+			case Series::DHO800:
+				// from DHO800/900 prog. manual: "EXT is only available for DHO812 and DHO802"
+				// assuming it is based on analog channel count == 2 ...
+				return m_analogChannelCount == 2;
 
-		case Series::MSO5000:
-		case Series::UNKNOWN:
-			break;
+			case Series::DS1000:
+			case Series::MSODS1000Z:
+			case Series::DHO1000:
+			case Series::DHO4000:
+			case Series::DHO900:
+				return true;
+	
+			case Series::MSO5000:
+			case Series::UNKNOWN:
+				return false;
+		}
+		return false;
+	}();
+	if (has_ext_trigger)
+	{
+		m_extTrigChannel = new OscilloscopeChannel(
+			this, "External", "#FFFFFF", Unit(Unit::UNIT_FS), Unit(Unit::UNIT_VOLTS), Stream::STREAM_TYPE_TRIGGER, m_channels.size());
+		m_channels.push_back(m_extTrigChannel);
+		m_extTrigChannel->SetDefaultDisplayName();
 	}
 
 	// Add AC line external trigger input
