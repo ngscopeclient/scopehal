@@ -3167,20 +3167,17 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 {
 	// Rigol scopes do not have samplerate controls. Only timebase can be adjusted :TIMebase:SCALe
 	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_mdepth.reset();
-
 		bool requestedValueisValid {};
 		auto rates = GetSampleRatesNonInterleaved();
-		for (auto const& depth : rates)
-			if (depth == rate)
+		for (auto const& rate_item : rates)
+			if (rate_item == rate)
 			{
 				requestedValueisValid = true;
 				break;
 			}
 		if (not requestedValueisValid)
 		{
-			LogWarning("requested sample rate %" PRIu64 " is not any of %zd of suported by this device\n", rate, rates.size());
+			LogWarning("requested sample rate %" PRIu64 " is not any of %zd of supported by this device\n", rate, rates.size());
 			return;
 		}
 	}
@@ -3233,6 +3230,11 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 					break;
 				
 			}
+			{
+				// TODO: is is really necessary to reset cached sample depth value?
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				m_mdepth.reset();
+			}
 			SetSampleDepth(GetSampleDepth()); // see note at MSODO1000Z
 			break;
 		}
@@ -3261,6 +3263,11 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 			// Another requirement is that this read has to happen after the acquisition finishes which could take a long time on samplerates
 			// (this is visible even when you operate the scope manually)
 			// Workaround to both is to (re-)write memory depth, don't ask me why.
+			{
+				// TODO: is is really necessary to reset cached sample depth value?
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				m_mdepth.reset();
+			}
 			SetSampleDepth(GetSampleDepth());
 			break;
 		}
