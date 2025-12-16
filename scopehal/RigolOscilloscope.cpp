@@ -1587,7 +1587,7 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 		return 0;
 	}();
 
-	// `new_limit` now holds value of limit suported by the device or 0 in case of full BW
+	// `new_limit` now holds value of limit supported by the device or 0 in case of full BW
 
 	if (new_limit > 0)
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL " + to_string(new_limit) + "M");
@@ -2954,7 +2954,7 @@ uint64_t RigolOscilloscope::GetSampleRate()
 		if(m_srate.has_value())
 			return *m_srate;
 	
-		LogTrace("smaplerate updating\n");
+		LogTrace("samplerate updating\n");
 	}
 	// m_transport->SendCommandQueued("*WAI");
 
@@ -2966,7 +2966,7 @@ uint64_t RigolOscilloscope::GetSampleRate()
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_srate = (uint64_t)rate;
-		LogTrace("smaplerate updated, m_srate %" PRIu64 "\n", *m_srate);
+		LogTrace("samplerate updated, m_srate %" PRIu64 "\n", *m_srate);
 		return rate;
 	}
 }
@@ -3091,7 +3091,7 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 					m_transport->SendCommandQueued("ACQ:MDEP 500M");
 					break;
 				default:
-					LogError("Invalid memory depth for channel: %" PRIu64 "\n", depth);
+					LogError("Invalid memory depth %" PRIu64 "\n", depth);
 			}
 			break;
 		}
