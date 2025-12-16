@@ -1711,8 +1711,7 @@ void RigolOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, floa
 
 OscilloscopeChannel* RigolOscilloscope::GetExternalTrigger()
 {
-	//FIXME
-	return nullptr;
+	return m_extTrigChannel;
 }
 
 float RigolOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
