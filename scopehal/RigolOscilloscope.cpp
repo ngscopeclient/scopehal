@@ -466,8 +466,7 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			if(m_bandwidth == 0) m_bandwidth = 70; // Fallback for DHO80x models
 
 			m_highDefinition = true;
-			// DHO800/900 (DHO800 also have 50M memory since firmware v00.01.03.00.04  2024/07/11)
-			m_maxMdepth = 50*1000*1000;
+			m_maxMdepth = 25*1000*1000;
 			m_maxSrate  = 1.25*1000*1000*1000;
 			m_lowSrate = true;
 
@@ -482,7 +481,6 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_bandwidth = m_modelNew.number % 100 / 10 * 125; // 914 -> 24 -> 2 -> 250
 
 			m_highDefinition = true;
-			// DHO800/900 (DHO800 also have 50M memory since firmware v00.01.03.00.04  2024/07/11)
 			m_maxMdepth = 50*1000*1000;
 			m_maxSrate  = 1.25*1000*1000*1000;
 			m_lowSrate = true;
