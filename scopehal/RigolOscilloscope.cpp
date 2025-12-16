@@ -3084,47 +3084,8 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 		case Series::DHO4000:
 		case Series::DHO800:
 		case Series::DHO900:
-		{	// DHO models
-			switch(depth)
-			{
-				case 1000:
-					m_transport->SendCommandQueued("ACQ:MDEP 1k");
-					break;
-				case 10000:
-					m_transport->SendCommandQueued("ACQ:MDEP 10k");
-					break;
-				case 100000:
-					m_transport->SendCommandQueued("ACQ:MDEP 100k");
-					break;
-				case 1000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 1M");
-					break;
-				case 5000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 5M");
-					break;
-				case 10000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 10M");
-					break;
-				case 25000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 25M");
-					break;
-				case 50000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 50M");
-					break;
-				case 100000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 100M");
-					break;
-				case 250000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 250M");
-					break;
-				case 500000000:
-					m_transport->SendCommandQueued("ACQ:MDEP 500M");
-					break;
-				default:
-					LogError("Invalid memory depth %" PRIu64 "\n", depth);
-			}
+			m_transport->SendCommandQueued("ACQ:MDEP " + to_string(depth));
 			break;
-		}
 
 		case Series::MSODS1000Z:
 		{
