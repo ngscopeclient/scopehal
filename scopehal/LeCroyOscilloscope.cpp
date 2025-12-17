@@ -1716,6 +1716,20 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 	if(i >= m_analogChannelCount)
 		return "";
 
+	if(m_modelid == MODEL_WAVESURFER_3K)
+	{
+		// Wavesurfer 3K does not report the lack of mux like other LeCroy scopes:
+		// .ActiveInput and .ProbeName properties do not exist, but .ConnectedProbe does
+		// (Note that there seems to be a .View property that indicates if a channel is visible and thus active,
+		// but it doesn't seem to affect the .ConnectedProbe property so we can ignore it.
+		auto name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".ConnectedProbe'"));
+		if(name == "None")
+			return "";
+		else
+			return name;
+	}
+
 	//Step 1: Determine which input is active.
 	//There's always a mux selector in software, even if only one is present on the physical acquisition board
 	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
@@ -3710,19 +3724,11 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 
 bool LeCroyOscilloscope::CanAverage(size_t i)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return false;
-
 	return (i < m_analogChannelCount);
 }
 
 size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return 1;
-
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
 		return 1;
@@ -3733,8 +3739,15 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 			return m_channelNavg[i];
 	}
 
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
-		string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
+	// Averaging on WS3K series is not handled per channel
+	// (https://github.com/ngscopeclient/scopehal/issues/1026)
+	std::string reply;
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.Horizontal.AverageSweeps'")));
+	else
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
 	auto navg = stoi(reply);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -3744,17 +3757,19 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 
 void LeCroyOscilloscope::SetNumAverages(size_t i, size_t navg)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return;
-
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
 		return;
 
-	m_transport->SendCommandQueued(
-		string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps = " +
-		to_string(navg) + "'");
+	// Averaging on WS3K series not handled per channel
+	// (https://github.com/ngscopeclient/scopehal/issues/1026)
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.Horizontal.AverageSweeps = ") + to_string(navg) + "'");
+	else
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() +
+			".AverageSweeps = " + to_string(navg) + "'");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelNavg[i] = navg;
