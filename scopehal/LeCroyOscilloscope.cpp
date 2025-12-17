@@ -1716,6 +1716,20 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 	if(i >= m_analogChannelCount)
 		return "";
 
+	if(m_modelid == MODEL_WAVESURFER_3K)
+	{
+		// Wavesurfer 3K does not report the lack of mux like other LeCroy scopes:
+		// .ActiveInput and .ProbeName properties do not exist, but .ConnectedProbe does
+		// (Note that there seems to be a .View property that indicates if a channel is visible and thus active,
+		// but it doesn't seem to affect the .ConnectedProbe property so we can ignore it.
+		auto name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".ConnectedProbe'"));
+		if(name == "None")
+			return "";
+		else
+			return name;
+	}
+
 	//Step 1: Determine which input is active.
 	//There's always a mux selector in software, even if only one is present on the physical acquisition board
 	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
