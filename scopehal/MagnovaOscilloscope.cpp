@@ -2944,7 +2944,6 @@ void MagnovaOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
 	sendOnly(":TRIGger:INTerval:POLarity %s", (trig->GetType() != GlitchTrigger::EDGE_FALLING) ? "POSitive" : "NEGative");
 	PushCondition(":TRIGGER:INTerval:TIMing", trig->GetCondition());
 	PushFloat(":TRIGGER:INTerval:DURation:LOWer", trig->GetLowerBound() * SECONDS_PER_FS);
-	//LogError("Parameter Upper Bound = %s / %lld / %f\n",trig->GetParameter("Upper Bound").ToString().c_str(),trig->GetParameter("Upper Bound").GetIntVal(),trig->GetParameter("Upper Bound").GetIntVal() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:INTerval:DURation:UPPer", trig->GetUpperBound() * SECONDS_PER_FS);
 }
 

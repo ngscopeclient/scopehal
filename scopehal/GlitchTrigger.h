@@ -92,13 +92,13 @@ public:
 protected:
 
 	///@brief Condition to look for
-	FilterParameter m_condition;
+	FilterParameter& m_condition;
 
 	///@brief Lower voltage level for glitch detector
-	FilterParameter m_lowerBound;
+	FilterParameter& m_lowerBound;
 
 	///@brief Upper voltage level for glitch detector
-	FilterParameter m_upperBound;
+	FilterParameter& m_upperBound;
 };
 
 #endif
