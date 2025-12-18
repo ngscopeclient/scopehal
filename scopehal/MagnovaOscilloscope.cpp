@@ -1671,7 +1671,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_MAGNOVA_BMO:
-			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 125*m, 100*m, 200*m, 400*m, 500*m, 800*m, 1000*m, 1600*m };
+			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 125*m, 100*m, 125*m, 200*m, 250*m, 400*m, 500*m, 800*m, 1000*m, 1600*m };
 			break;
 		// --------------------------------------------------
 		default:
@@ -1699,7 +1699,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsNonInterleaved()
 	unsigned int activeChannels = GetActiveChannelsCount();
 	if(activeChannels <= 1)
 	{
-		ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
+		ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
 	}
 	else if(activeChannels == 2)
 	{
@@ -1780,8 +1780,17 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 	string reply = converse(":ACQUIRE:MDEPTH?");
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	if(reply == "AUTo" || reply == "AFASt")
-	{	// Default to 10Ms
-		m_memoryDepth = 10000000;
+	{	// TODO :Get Sample depth based on srate and timebase
+		reply = converse(":TIMebase:SCALe?");
+		double scale = stof(reply);
+		if(scale > 0)
+		{
+			m_memoryDepth = scale * 25 * GetSampleRate();
+		}
+		else
+		{
+			m_memoryDepth = 10000000;
+		}
 	}
 	else
 	{
@@ -1822,7 +1831,7 @@ void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 		double sampletime = GetSampleDepth() / (double)rate;
-		double scale = sampletime / 25;
+		double scale = sampletime / 25; // TODO: check that should be 12 or 24 (when in extended capture rate) ?
 
 		switch(m_modelid)
 		{
