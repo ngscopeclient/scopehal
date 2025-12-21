@@ -1080,6 +1080,20 @@ bool MagnovaOscilloscope::IsReducedSampleRate()
 	return false;
 }
 
+/**
+	@brief Returns the memory depth for a given sample rate in auto mode
+ */
+uint64_t MagnovaOscilloscope::GetMemoryDepthForSrate(uint64_t srate)
+{
+
+	const auto map = m_memodyDepthMode == MEMORY_DEPTH_AUTO_FAST ? &memoryDepthFastMap : IsReducedSampleRate() ? &memoryDepthMaxLowSrateMap : &memoryDepthMaxHighSrateMap;
+	const auto it = map->find(srate);
+	if (it != map->end())
+	{
+		return it->second;
+	}
+	return m_memoryDepth; // Use current memory depth if not found
+}
 
 /**
 	@brief Returns the max memory depth for auto mode
@@ -1796,7 +1810,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsNonInterleaved()
 			}
 			else
 			{
-				ret = {40, 46, 56, 77, 192, 384, 768, 1920, 3840, 7680, 19200, 38400, 76800, 192000, 384000, 768000, 1920000, 3840000, 7680000, 12000000, 19200000, 30000000, 38400000, 60000000, 76800000, 120000000, 150000000, 192000000, 240000000, 300000000};
+				ret = {40, 46, 56, 77, 192, 384, 768, 1920, 3840, 7680, 19200, 38400, 76800, 192000, 384000, 768000, 1920000, 3840000, 7680000, 9600000, 12000000, 19200000, 30000000, 38400000, 60000000, 76800000, 120000000, 150000000, 192000000, 240000000, 300000000};
 			}
 			break;
 		case MEMORY_DEPTH_FIXED:
@@ -1985,8 +1999,13 @@ void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 	{ 	//Need to lock the transport mutex when setting rate to prevent changing rate during an acquisition
 		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-		double sampletime = GetSampleDepth() / (double)rate;
-		double scale = sampletime / 24; // TODO: check that should be 12 or 24 (when in extended capture rate) ?
+		uint64_t sampleDepth = GetSampleDepth();
+		if(m_memodyDepthMode == MEMORY_DEPTH_AUTO_MAX || m_memodyDepthMode == MEMORY_DEPTH_AUTO_FAST)
+		{	// Sample depth is determined by the sample rate in auto mode
+			sampleDepth = GetMemoryDepthForSrate(rate);
+		}
+		double sampletime = sampleDepth / (double)rate;
+		double scale = sampletime / 24; // TODO: change 24 to 12 if acquire mode is not extended
 
 		switch(m_modelid)
 		{
