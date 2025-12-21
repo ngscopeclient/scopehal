@@ -138,6 +138,15 @@ public:
 		MODEL_UNKNOWN
 	};
 
+	// Memory depth mode
+	enum MemoryDepthMode
+	{
+		MEMORY_DEPTH_AUTO_FAST,
+		MEMORY_DEPTH_AUTO_MAX,
+		MEMORY_DEPTH_FIXED
+	};
+
+
 	Model GetModelID() { return m_modelid; }
 
 	//Timebase
@@ -276,6 +285,12 @@ protected:
 
 	unsigned int GetActiveChannelsCount();
 
+	double GetTimebaseScale();
+
+	bool IsReducedSampleRate();
+
+	uint64_t GetMaxAutoMemoryDepth();
+
 	void PrepareAcquisition();
 
 	std::string GetDigitalChannelBankName(size_t channel);
@@ -342,6 +357,9 @@ protected:
 	int64_t m_sampleRate;
 	bool m_memoryDepthValid;
 	int64_t m_memoryDepth;
+	bool m_timebaseScaleValid;
+	double m_timebaseScale;
+	MemoryDepthMode m_memodyDepthMode;
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;

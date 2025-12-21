@@ -75,6 +75,8 @@ MagnovaOscilloscope::MagnovaOscilloscope(SCPITransport* transport)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
 	, m_memoryDepth(1)
+	, m_timebaseScaleValid(false)
+	, m_timebaseScale(1)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
 {
@@ -385,6 +387,7 @@ void MagnovaOscilloscope::FlushConfigCache()
 	m_probeIsActive.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
+	m_timebaseScaleValid = false;
 	m_triggerOffsetValid = false;
 	m_meterModeValid = false;
 	m_awgEnabled.clear();
@@ -513,6 +516,7 @@ void MagnovaOscilloscope::EnableChannel(size_t i)
 	if(IsInterleaving() != wasInterleaving)
 	{
 		m_memoryDepthValid = false;
+		m_timebaseScaleValid = false;
 		m_sampleRateValid = false;
 		m_triggerOffsetValid = false;
 	}
@@ -553,6 +557,7 @@ void MagnovaOscilloscope::DisableChannel(size_t i)
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_memoryDepthValid = false;
+		m_timebaseScaleValid = false;
 		m_sampleRateValid = false;
 		m_triggerOffsetValid = false;
 	}
@@ -1047,6 +1052,64 @@ unsigned int MagnovaOscilloscope::GetActiveChannelsCount()
 	return result;
 }
 
+/**
+	@brief Returns true if the scope is in reduced sample rate
+ */
+bool MagnovaOscilloscope::IsReducedSampleRate()
+{
+	// ADC sample rate 1.6 GSa/s if
+	// - only channel 1 and/or 2 are active
+	// - only channel 1 or 2 and one digital probe are active
+	// - only one or two digital probes are active
+	// - only channel 1 and/or 2 are active plus one or two digital probes are active and time scale is ≤ 20 ns/div
+
+	// ADC sample rate 1.0 GSa/s if
+	// - Channel 3 and/or 4 are active
+	// - The number of analog channels plus digital probes is 3 or more and time scale is > 20 ns/div.
+	
+	unsigned int activeChannels = GetActiveChannelsCount();
+	if(IsChannelEnabled(2) || IsChannelEnabled(3))
+	{	// Reduced if channel 3 or 4 is active
+		return true;
+	}
+	else if(activeChannels >= 3)
+	{	// Need to checm time scale
+		uint64_t nsPerDiv = llround(GetTimebaseScale()*FS_PER_SECOND)/FS_PER_NANOSECOND;
+		return nsPerDiv > 20;
+	}
+	return false;
+}
+
+
+/**
+	@brief Returns the max memory depth for auto mode
+ */
+uint64_t MagnovaOscilloscope::GetMaxAutoMemoryDepth()
+{
+	if(m_memodyDepthMode == MEMORY_DEPTH_AUTO_FAST)
+	{	// In fast mode, depth is limited to 20 Mpts
+		return 20*1000*1000;
+	}
+	unsigned int activeChannels = GetActiveChannelsCount();
+	if(activeChannels <= 1)
+	{
+		return 300*1000*1000;
+	}
+	else if(activeChannels == 2)
+	{
+		return 150*1000*1000;
+	}
+	else if(activeChannels == 3 || activeChannels == 4)
+	{
+		return 60*1000*1000;
+	}
+	else
+	{
+		return 30*1000*1000;
+	}
+}
+
+
 
 time_t MagnovaOscilloscope::ExtractTimestamp(const std::string& timeString, double& basetime)
 {
@@ -1519,6 +1582,7 @@ void MagnovaOscilloscope::PrepareAcquisition()
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
+	m_timebaseScaleValid = false;
 	m_triggerOffsetValid = false;
 	m_channelOffsets.clear();
 }
@@ -1671,7 +1735,34 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_MAGNOVA_BMO:
-			ret = {1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1*k, 2*k, 4*k, 5*k, 10*k, 20*k, 40*k, 50*k, 100*k, 200*k, 400*k, 500*k, 1*m, 2*m, 4*m, 5*m, 10*m, 20*m, 40*m, 50*m, 125*m, 100*m, 125*m, 200*m, 250*m, 400*m, 500*m, 800*m, 1000*m, 1600*m };
+			// Call GetSampleDepth to update Memody Depth Mode 
+			GetSampleDepth();
+			if(m_memodyDepthMode == MEMORY_DEPTH_AUTO_MAX)
+			{	// In auto modes reduce possible values to the one that match sample depth / coarse time scale
+				if(IsReducedSampleRate())
+				{
+					ret = {25, 50, 100, 250, 500, 1*k, 2500, 5*k, 10*k, 25*k, 50*k, 100*k, 250*k, 500*k, 1*m, 2500*k, 5*m, 10*m, 25*m, 50*m, 125*m, 250*m, 500*m, 1000*m };
+				}
+				else
+				{
+					ret = {50, 100, 250, 500, 1*k, 2500, 5*k, 10*k, 25*k, 50*k, 100*k, 250*k, 500*k, 1*m, 2500*k, 5*m, 10*m, 25*m, 50*m, 100*m, 200*m, 400*m, 800*m, 1600*m };
+				}
+			}
+			else if(m_memodyDepthMode == MEMORY_DEPTH_AUTO_FAST)
+			{	// In auto modes reduce possible values to the one that match sample depth / coarse time scale
+				if(IsReducedSampleRate())
+				{
+					ret = {2, 5, 10, 40, 50, 100, 400, 500, 1*k, 4*k, 5*k, 10*k, 40*k, 50*k, 100*k, 400*k, 500*k, 1*m, 2500*k, 5*m, 10*m, 25*m, 50*m, 125*m, 250*m, 500*m, 1000*m };
+				}
+				else
+				{
+					ret = {2, 5, 10, 40, 50, 100, 400, 500, 1*k, 4*k, 5*k, 10*k, 40*k, 50*k, 100*k, 400*k, 500*k, 1*m, 4*m, 5*m, 10*m, 40*m, 50*m, 100*m, 400*m, 800*m, 1600*m };
+				}
+			}
+			else
+			{	// All possible values
+				ret = {1, 2, 4, 5, 10, 20, 25, 40, 50, 100, 200, 250, 400, 500, 1*k, 2*k, 2500, 4*k, 5*k, 10*k, 20*k, 25*k, 40*k, 50*k, 100*k, 200*k, 250*k, 400*k, 500*k, 1*m, 2*m, 2500*k, 4*m, 5*m, 10*m, 20*m, 25*m, 40*m, 50*m, 100*m, 125*m, 200*m, 250*m, 400*m, 500*m, 800*m, 1000*m, 1600*m };
+			}
 			break;
 		// --------------------------------------------------
 		default:
@@ -1691,27 +1782,49 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesInterleaved()
 vector<uint64_t> MagnovaOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
-	// Sample depths depend on the number of active analog channels and digital probes :
-	// 1 analog channel or digital probe: 327.2 Mpts
-	// 2 analog channels / digital probes: 163.6 Mpts per channel
-	// 3-4 analog channels / digital probes: 81.8 Mpts per channel
-	// ≥ 5 analog channels / digital probes: 40.9 Mpts per channel
-	unsigned int activeChannels = GetActiveChannelsCount();
-	if(activeChannels <= 1)
+	// Memory depth can either be "Fixed" or "Auto" according to the scope's configuration
+	// Let's check mode by getting memory depth value
+	GetSampleDepth();
+	switch(m_memodyDepthMode)
 	{
-		ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
-	}
-	else if(activeChannels == 2)
-	{
-		ret = {10 * 1000, 25 * 1000, 50 * 1000, 100 * 1000, 250 * 1000, 500 * 1000, 1000 * 1000, 2500 * 1000, 5 * 1000 * 1000, 10 * 1000 * 1000, 25 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 163575808};
-	}
-	else if(activeChannels == 3 || activeChannels == 4)
-	{
-		ret = {5 * 1000, 12500 , 25 * 1000, 50 * 1000, 125 * 1000, 250 * 1000, 500 * 1000, 1250 * 1000, 2500 * 1000, 5 * 1000 * 1000, 12500 * 1000, 25 * 1000 * 1000, 50 * 1000 * 1000, 81787904};
-	}
-	else
-	{
-		ret = {2500, 6250 , 12500, 25 * 1000, 62500, 125 * 1000, 250 * 1000, 625 * 1000, 1250 * 1000, 2500 * 1000, 6250 * 1000, 12500 * 1000, 25 * 1000 * 1000, 40893952};
+		case MEMORY_DEPTH_AUTO_MAX:
+		case MEMORY_DEPTH_AUTO_FAST:
+			// In auto mode, memory depth can be (as tested on the scope, only for Extended Capture mode) :
+			if(IsReducedSampleRate())
+			{
+				ret = {39, 42, 48, 60, 120, 240, 480, 1200, 2400, 4800, 12000, 24000, 48000, 120000, 240000, 480000, 1200000, 2400000, 4800000, 9600000, 12000000, 15000000, 19200000, 24000000, 30000000, 48000000, 60000000, 120000000, 150000000};
+			}
+			else
+			{
+				ret = {40, 46, 56, 77, 192, 384, 768, 1920, 3840, 7680, 19200, 38400, 76800, 192000, 384000, 768000, 1920000, 3840000, 7680000, 12000000, 19200000, 30000000, 38400000, 60000000, 76800000, 120000000, 150000000, 192000000, 240000000, 300000000};
+			}
+			break;
+		case MEMORY_DEPTH_FIXED:
+		default:
+			// In fixed mode, sample depths depend on the number of active analog channels and digital probes :
+			// 1 analog channel or digital probe: 327.2 Mpts
+			// 2 analog channels / digital probes: 163.6 Mpts per channel
+			// 3-4 analog channels / digital probes: 81.8 Mpts per channel
+			// ≥ 5 analog channels / digital probes: 40.9 Mpts per channel
+			unsigned int activeChannels = GetActiveChannelsCount();
+
+			if(activeChannels <= 1)
+			{
+				ret = {20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1000 * 1000, 2000 * 1000, 5000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 200 * 1000 * 1000, 327151616};
+			}
+			else if(activeChannels == 2)
+			{
+				ret = {10 * 1000, 25 * 1000, 50 * 1000, 100 * 1000, 250 * 1000, 500 * 1000, 1000 * 1000, 2500 * 1000, 5 * 1000 * 1000, 10 * 1000 * 1000, 25 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 163575808};
+			}
+			else if(activeChannels == 3 || activeChannels == 4)
+			{
+				ret = {5 * 1000, 12500 , 25 * 1000, 50 * 1000, 125 * 1000, 250 * 1000, 500 * 1000, 1250 * 1000, 2500 * 1000, 5 * 1000 * 1000, 12500 * 1000, 25 * 1000 * 1000, 50 * 1000 * 1000, 81787904};
+			}
+			else
+			{
+				ret = {2500, 6250 , 12500, 25 * 1000, 62500, 125 * 1000, 250 * 1000, 625 * 1000, 1250 * 1000, 2500 * 1000, 6250 * 1000, 12500 * 1000, 25 * 1000 * 1000, 40893952};
+			}
+			break;
 	}
 	return ret;
 }
@@ -1768,6 +1881,24 @@ uint64_t MagnovaOscilloscope::GetSampleRate()
 	return m_sampleRate;
 }
 
+/**
+ * Returns the timebase scale in s
+ */
+double MagnovaOscilloscope::GetTimebaseScale()
+{
+    {
+        lock_guard<recursive_mutex> lock(m_cacheMutex);
+        if(m_timebaseScaleValid)
+            return m_timebaseScale;
+    }
+	double scale = stod(converse(":TIMebase:SCALe?"));
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_timebaseScale = scale;
+	m_timebaseScaleValid = true;
+	return m_timebaseScale;
+}
+
+
 uint64_t MagnovaOscilloscope::GetSampleDepth()
 {
     {
@@ -1778,25 +1909,48 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 	double f;
 	// Possible values are : AUTo, AFASt, Integer in pts
 	string reply = converse(":ACQUIRE:MDEPTH?");
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	if(reply == "AUTo" || reply == "AFASt")
-	{	// TODO :Get Sample depth based on srate and timebase
-		reply = converse(":TIMebase:SCALe?");
-		double scale = stof(reply);
-		if(scale > 0)
-		{
-			m_memoryDepth = scale * 25 * GetSampleRate();
-		}
-		else
-		{
-			m_memoryDepth = 10000000;
-		}
-	}
-	else
+	MemoryDepthMode mode =  (reply == "AUTo") ? MEMORY_DEPTH_AUTO_MAX : (reply == "AFASt") ? MEMORY_DEPTH_AUTO_FAST : MEMORY_DEPTH_FIXED;
+	uint64_t depth;
+	switch(mode)
 	{
-		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
-		m_memoryDepth = static_cast<int64_t>(f);
+		case MEMORY_DEPTH_AUTO_MAX:
+		case MEMORY_DEPTH_AUTO_FAST:
+			{
+			// Get Sample depth based on srate and timebase
+			// Auto (Max): Memory length = recording time * sample rate. If the maximum memory is exceeded, the sample rate is halved until the memory length is <= maximum. 
+			// TODO : Auto (Fast): Memory length = recording time * sample rate. If over 20 Mpts/CH, the sample rate is halved until the memory length is <= 20 Mpts.
+			double scale = GetTimebaseScale();
+			depth = llround(scale * 24 * GetSampleRate());
+			if(depth < 77)
+			{	// Special handling of small values
+				if	   (depth == 48) 	depth = 60;
+				else if(depth == 38) 	depth = 56;
+				else if(depth == 24) 	depth = 48;
+				else if(depth == 19) 	depth = 46;
+				else if(depth == 12) 	depth = 42;
+				else if(depth == 8)  	depth = 40;
+				else if(depth == 5)  	depth = 39;
+			}
+			else
+			{
+				uint64_t maxDepth = GetMaxAutoMemoryDepth();
+				if(depth > maxDepth)
+				{
+					depth = maxDepth;
+				}
+			}
+			LogDebug("Auto memory depth activated, calculating Mdepth based on time scale %f and sample rate %" PRIu64 ": mdepth = %" PRIu64 ".\n",scale,GetSampleRate(),depth);
+			}
+			break;
+		default:
+		case MEMORY_DEPTH_FIXED:
+			f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+			depth = static_cast<int64_t>(f);
+			break;
 	}
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_memoryDepth = depth;
+	m_memodyDepthMode = mode;
 	m_memoryDepthValid = true;
 	return m_memoryDepth;
 }
@@ -1821,6 +1975,7 @@ void MagnovaOscilloscope::SetSampleDepth(uint64_t depth)
 	//If we query the instrument later, the cache will be updated then.
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_memoryDepthValid = false;
+	m_timebaseScaleValid= false;
 	m_sampleRateValid = false;
 	m_triggerOffsetValid = false;
 }
@@ -1831,7 +1986,7 @@ void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 		double sampletime = GetSampleDepth() / (double)rate;
-		double scale = sampletime / 25; // TODO: check that should be 12 or 24 (when in extended capture rate) ?
+		double scale = sampletime / 24; // TODO: check that should be 12 or 24 (when in extended capture rate) ?
 
 		switch(m_modelid)
 		{
@@ -1857,6 +2012,7 @@ void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
+	m_timebaseScaleValid = false;
 	m_triggerOffsetValid = false;
 }
 
@@ -2442,7 +2598,7 @@ void MagnovaOscilloscope::PullDropoutTrigger()
 	}
 
 	//Dropout time
-	dt->SetDropoutTime(stof(converse(":TRIGGER:TIMeout:TIME?"))*FS_PER_SECOND);
+	dt->SetDropoutTime(llround(stod(converse(":TRIGGER:TIMeout:TIME?"))*FS_PER_SECOND));
 
 	//Edge type
 	GetTriggerSlope(dt,converse(":TRIGGER:TIMeout:SLOPE?"));
@@ -2549,7 +2705,7 @@ void MagnovaOscilloscope::PullPulseWidthTrigger()
 	pt->SetCondition(GetCondition(converse(":TRIGGER:PULSe:TIMing?")));
 
 	// Lower/upper not available on Magnova's pulse, only Threshod is available so let's map it lower bound
-	pt->SetLowerBound(stof((converse(":TRIGger:PULSe:THReshold?")))*FS_PER_SECOND);
+	pt->SetLowerBound(llround(stod((converse(":TRIGger:PULSe:THReshold?")))*FS_PER_SECOND));
 	//Min range
 	//pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:PULSe:DURation:LOWer?")));
 
@@ -2605,10 +2761,10 @@ void MagnovaOscilloscope::PullRuntTrigger()
 	rt->SetUpperBound(stof(converse(":TRIGGER:RUNT:LEVel2?")));
 
 	//Lower bound
-	rt->SetLowerInterval(stof(converse(":TRIGGER:RUNT:DURation:LOWer?"))*FS_PER_SECOND);
+	rt->SetLowerInterval(llround(stod(converse(":TRIGGER:RUNT:DURation:LOWer?"))*FS_PER_SECOND));
 
 	//Upper interval
-	rt->SetUpperInterval(stof(converse(":TRIGGER:RUNT:DURation:UPPer?"))*FS_PER_SECOND);
+	rt->SetUpperInterval(llround(stod(converse(":TRIGGER:RUNT:DURation:UPPer?"))*FS_PER_SECOND));
 
 	//Slope
 	reply = Trim(converse(":TRIGger:RUNT:POLarity?"));
@@ -2659,10 +2815,10 @@ void MagnovaOscilloscope::PullSlewRateTrigger()
 	st->SetUpperBound(stof(converse(":TRIGGER:SLOPe:LEVel2?")));
 
 	//Lower interval
-	st->SetLowerInterval(stof(converse(":TRIGGER:SLOPe:DURation:LOWer?")) * FS_PER_SECOND);
+	st->SetLowerInterval(llround(stod(converse(":TRIGGER:SLOPe:DURation:LOWer?")) * FS_PER_SECOND));
 
 	//Upper interval
-	st->SetUpperInterval(stof(converse(":TRIGGER:SLOPe:DURation:UPPer?")) * FS_PER_SECOND);
+	st->SetUpperInterval(llround(stod(converse(":TRIGGER:SLOPe:DURation:UPPer?")) * FS_PER_SECOND));
 
 	//Slope
 	string reply = Trim(converse(":TRIGger:SLOPe:TYPE?"));
@@ -2938,10 +3094,10 @@ void MagnovaOscilloscope::PullGlitchTrigger()
 	gt->SetCondition(GetCondition(converse(":TRIGGER:INTerval:TIMing?")));
 
 	//Lower bound
-	gt->SetLowerBound(stof(converse(":TRIGger:INTerval:DURation:LOWer?"))*FS_PER_SECOND);
+	gt->SetLowerBound(llround(stod(converse(":TRIGger:INTerval:DURation:LOWer?"))*FS_PER_SECOND));
 
 	//Upper interval
-	gt->SetUpperBound(stof(converse(":TRIGger:INTerval:DURation:UPPer?"))*FS_PER_SECOND);
+	gt->SetUpperBound(llround(stod(converse(":TRIGger:INTerval:DURation:UPPer?"))*FS_PER_SECOND));
 }
 
 /**
@@ -2986,7 +3142,7 @@ void MagnovaOscilloscope::PullNthEdgeBurstTrigger()
 	GetTriggerSlope(bt,converse(":TRIGger:NEDGe:SLOPe?"));
 
 	//Idle time 
-	bt->SetIdleTime(stof(converse(":TRIGger:NEDGe:IDLE?"))*FS_PER_SECOND);
+	bt->SetIdleTime(llround(stod(converse(":TRIGger:NEDGe:IDLE?"))*FS_PER_SECOND));
 
 	//Edge number
 	bt->SetEdgeNumber(stoi(converse(":TRIGger:NEDGe:COUNt?")));
