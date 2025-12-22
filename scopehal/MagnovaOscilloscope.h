@@ -293,6 +293,8 @@ protected:
 
 	uint64_t GetMaxAutoMemoryDepth(uint64_t original);
 
+	static uint8_t GetCaptureScreenDivisions(MemoryDepthMode mode, uint64_t srate);
+
 	void PrepareAcquisition();
 
 	std::string GetDigitalChannelBankName(size_t channel);

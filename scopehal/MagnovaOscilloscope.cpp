@@ -1095,6 +1095,30 @@ uint64_t MagnovaOscilloscope::GetMemoryDepthForSrate(uint64_t srate)
 	return m_memoryDepth; // Use current memory depth if not found
 }
 
+uint8_t MagnovaOscilloscope::GetCaptureScreenDivisions(MemoryDepthMode mode, uint64_t srate)
+{	// TODO: change 24 to 12 if acquire mode is not extended
+	if(mode == MEMORY_DEPTH_AUTO_FAST || mode == MEMORY_DEPTH_AUTO_MAX)
+	{
+		return 24;
+	}
+	else
+	{	// In manual mode the value can either be 25 or 40 depending on srate: if srate contains '1' or '5' digits, it's 40, otherwise it's 25 (as per empirical determination)
+		// for srate values > 1000000
+		if(srate > 1000000)
+		{
+			string stringSrate = to_string(srate);
+			for (char c : stringSrate) 
+			{
+				if (c == '1' || c == '5') 
+				{
+					return 40;
+				}
+			}
+		}
+		return 25;
+	}
+}
+
 /**
 	@brief Returns the max memory depth for auto mode
  */
@@ -1940,7 +1964,7 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 			// Auto (Max): Memory length = recording time * sample rate. If the maximum memory is exceeded, the sample rate is halved until the memory length is <= maximum. 
 			// TODO : Auto (Fast): Memory length = recording time * sample rate. If over 20 Mpts/CH, the sample rate is halved until the memory length is <= 20 Mpts.
 			double scale = GetTimebaseScale();
-			depth = llround(scale * 24 * GetSampleRate());
+			depth = llround(scale * GetCaptureScreenDivisions(mode,0) * GetSampleRate());
 			if(depth < 77)
 			{	// Special handling of small values
 				if	   (depth == 48) 	depth = 60;
@@ -2007,7 +2031,7 @@ void MagnovaOscilloscope::SetSampleRate(uint64_t rate)
 			sampleDepth = GetMemoryDepthForSrate(rate);
 		}
 		double sampletime = sampleDepth / (double)rate;
-		double scale = sampletime / 24; // TODO: change 24 to 12 if acquire mode is not extended
+		double scale = sampletime / GetCaptureScreenDivisions(m_memodyDepthMode,rate);
 
 		switch(m_modelid)
 		{
