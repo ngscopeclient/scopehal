@@ -1098,29 +1098,35 @@ uint64_t MagnovaOscilloscope::GetMemoryDepthForSrate(uint64_t srate)
 /**
 	@brief Returns the max memory depth for auto mode
  */
-uint64_t MagnovaOscilloscope::GetMaxAutoMemoryDepth()
+uint64_t MagnovaOscilloscope::GetMaxAutoMemoryDepth(uint64_t original)
 {
 	if(m_memodyDepthMode == MEMORY_DEPTH_AUTO_FAST)
 	{	// In fast mode, depth is limited to 20 Mpts
-		return 20*1000*1000;
+		while(original > 20*1000*1000)
+		{
+			original/=2;
+		}
+		return original;
 	}
 	unsigned int activeChannels = GetActiveChannelsCount();
+	uint64_t max; 
 	if(activeChannels <= 1)
 	{
-		return 300*1000*1000;
+		max = 300*1000*1000;
 	}
 	else if(activeChannels == 2)
 	{
-		return 150*1000*1000;
+		max = 150*1000*1000;
 	}
 	else if(activeChannels == 3 || activeChannels == 4)
 	{
-		return 60*1000*1000;
+		max = 60*1000*1000;
 	}
 	else
 	{
-		return 30*1000*1000;
+		max = 30*1000*1000;
 	}
+	return min(original,max);
 }
 
 
@@ -1947,11 +1953,7 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 			}
 			else
 			{
-				uint64_t maxDepth = GetMaxAutoMemoryDepth();
-				if(depth > maxDepth)
-				{
-					depth = maxDepth;
-				}
+				depth = GetMaxAutoMemoryDepth(depth);
 			}
 			LogDebug("Auto memory depth activated, calculating Mdepth based on time scale %f and sample rate %" PRIu64 ": mdepth = %" PRIu64 ".\n",scale,GetSampleRate(),depth);
 			}
@@ -2172,7 +2174,7 @@ bool MagnovaOscilloscope::IsInterleaving()
 	switch(m_modelid)
 	{
 		case MODEL_MAGNOVA_BMO:
-			if((m_channelsEnabled[2] == true) || (m_channelsEnabled[3] == true))
+			if((IsChannelEnabled(2)) || (IsChannelEnabled(3) == true))
 			{	// Interleaving if Channel 3 or 4 are active
 				return true;
 			}

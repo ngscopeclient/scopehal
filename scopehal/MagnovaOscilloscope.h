@@ -291,7 +291,7 @@ protected:
 
 	uint64_t GetMemoryDepthForSrate(uint64_t srate);
 
-	uint64_t GetMaxAutoMemoryDepth();
+	uint64_t GetMaxAutoMemoryDepth(uint64_t original);
 
 	void PrepareAcquisition();
 
