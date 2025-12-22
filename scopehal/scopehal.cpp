@@ -49,6 +49,7 @@
 #include "KeysightDCA.h"
 #include "LeCroyOscilloscope.h"
 #include "LeCroyFWPOscilloscope.h"
+#include "MagnovaOscilloscope.h"
 #include "PicoOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
@@ -249,6 +250,7 @@ void DriverStaticInit()
 	AddDriverClass(RSRTO6Oscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(LeCroyFWPOscilloscope);
+	AddDriverClass(MagnovaOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 	AddDriverClass(TektronixHSIOscilloscope);
