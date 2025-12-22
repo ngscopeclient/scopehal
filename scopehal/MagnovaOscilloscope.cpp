@@ -1962,7 +1962,7 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 			{
 			// Get Sample depth based on srate and timebase
 			// Auto (Max): Memory length = recording time * sample rate. If the maximum memory is exceeded, the sample rate is halved until the memory length is <= maximum. 
-			// TODO : Auto (Fast): Memory length = recording time * sample rate. If over 20 Mpts/CH, the sample rate is halved until the memory length is <= 20 Mpts.
+			// Auto (Fast): Memory length = recording time * sample rate. If over 20 Mpts/CH, the sample rate is halved until the memory length is <= 20 Mpts.
 			double scale = GetTimebaseScale();
 			depth = llround(scale * GetCaptureScreenDivisions(mode,0) * GetSampleRate());
 			if(depth < 77)
