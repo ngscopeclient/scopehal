@@ -58,10 +58,10 @@ static auto parseDouble(string const &input, const string &fmt = "%lf")
 	return parseNumeric<double>(input, fmt);
 }
 
-// static auto parseU64(string const &input, const string &fmt = "%" PRIu64)
-// {
-// 	return parseNumeric<uint64_t>(input, fmt);
-// }
+static auto parseU64(string const &input, const string &fmt = "%" PRIu64)
+{
+	return parseNumeric<uint64_t>(input, fmt);
+}
 
 //TODO: this would make sens to move to some utility library
 template<typename T>
@@ -426,7 +426,42 @@ void RigolOscilloscope::AnalyzeDeviceCapabilities() {
 			m_analogChannelCount = m_modelNew.number % 10;
 			m_digitalChannelCount = 16;
 			
-			// Hacky workaround since :SYST:OPT:STAT doesn't work properly on some scopes
+			// Hacky workarounds since :SYST:OPT:STAT doesn't work properly on some scopes (especially patched FWs)
+			// Such scopes reply with 0 to all option querios even though they have all active.
+
+			if (m_analogChannelCount < 4)
+				do // lambda would be cleaner, but current implementation of logging does not support trace logs from lambdas
+				{
+					lock_guard<recursive_mutex> lock(m_transport->GetMutex()); // this sequence may not be interrupted by others
+					// MSO5072 has 4 HW channels, but 2 are available only as an option ("4CH")
+					// As previously mentioned, :SYST:OPT:STAT? <option> it no reliable.
+					// Approach is to clear errors, try to change some CH3 option, check for errors, if not error occurs -> 4CH option is available
+					m_transport->SendCommandQueued("*CLS");
+					if (auto stb = parseU64(m_transport->SendCommandQueuedWithReply("*STB?")); not stb.has_value())
+					{
+						LogError("Failed to read STB\n");
+						break;
+					}
+					// alter vernier settings, as we will alter it alter it alter anyway, so it's nothing that should persist from the original device state
+					m_transport->SendCommandQueued(":CHAN3:VERN ON");
+					if (auto stb = parseU64(m_transport->SendCommandQueuedWithReply("*STB?")); not stb.has_value())
+					{
+						LogError("Failed to read STB\n");
+						break;
+					}
+					else
+					{
+						if ((*stb & 4)) // error generated -> CHAN3 and CHAN4 not available
+						{
+							m_transport->SendCommandQueued("*CLS");
+							break;
+						}
+
+						LogTrace("4CH option present\n");
+						m_analogChannelCount = 4;
+					}
+				} while(0);
+			
 			// Only enable chan 1
 			m_transport->SendCommandQueued("CHAN1:DISP 1");
 			m_transport->SendCommandQueued("CHAN2:DISP 0");
