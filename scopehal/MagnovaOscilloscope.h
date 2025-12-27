@@ -146,6 +146,13 @@ public:
 		MEMORY_DEPTH_FIXED
 	};
 
+	// Memory depth mode
+	enum CaptureMode
+	{
+		CAPTURE_MODE_NORMAL,
+		CAPTURE_MODE_EXTENDED
+	};
+
 
 	Model GetModelID() { return m_modelid; }
 
@@ -293,7 +300,9 @@ protected:
 
 	uint64_t GetMaxAutoMemoryDepth(uint64_t original);
 
-	static uint8_t GetCaptureScreenDivisions(MemoryDepthMode mode, uint64_t srate);
+	CaptureMode GetCaptureMode();
+
+	static double GetCaptureScreenDivisions(MemoryDepthMode memoryMode, CaptureMode captureMode, uint64_t srate);
 
 	void PrepareAcquisition();
 
@@ -361,9 +370,11 @@ protected:
 	int64_t m_sampleRate;
 	bool m_memoryDepthValid;
 	int64_t m_memoryDepth;
+	bool m_captureModeValid;
+	CaptureMode m_captudeMode;
 	bool m_timebaseScaleValid;
 	double m_timebaseScale;
-	MemoryDepthMode m_memodyDepthMode;
+	MemoryDepthMode m_memoryDepthMode;
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;
