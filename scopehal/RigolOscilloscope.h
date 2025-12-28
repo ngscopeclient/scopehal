@@ -125,7 +125,7 @@ protected:
 	};
 
 	enum class CaptureFormat : int {
-		BYTE = 0, // a waveform point occupies one byte (namely 8 bits).
+		BYTE_ = 0, // a waveform point occupies one byte (namely 8 bits). Suffix _ because msys64/ucrt64/include/minwindef.h defines BYTE as char :facepalm:
 		WORD = 1, // a waveform point occupies two bytes (namely 16 bits) in which the lower 8 bits are valid and the higher 8 bits are 0.
 		ASC = 2   // waveform points in character number. Waveform points are returned in scientific notation and separated by commas./
 	};
