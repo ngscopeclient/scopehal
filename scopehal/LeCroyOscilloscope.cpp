@@ -3715,6 +3715,36 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 
 void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 {
+	if(m_modelid == MODEL_WAVESURFER_3K)
+	{
+		//Wavesurfer 3K does not support setting sample rate directly.
+		//Approximate by adjusting time/div to yield the requested rate for the current depth.
+		if(rate == 0)
+		{
+			LogWarning("Wavesurfer 3K sample rate request was zero, cannot set\n");
+			m_sampleRateValid = false;
+			return;
+		}
+
+		auto depth = GetSampleDepth();
+		if(depth == 0)
+		{
+			LogWarning("Wavesurfer 3K returned zero depth, cannot set sample rate\n");
+			m_sampleRateValid = false;
+			return;
+		}
+
+		double sec_per_div = (static_cast<double>(depth) / static_cast<double>(rate)) / 10.0;
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.Horizontal.HorScale = ") + to_string_sci(sec_per_div) + "'");
+
+		//Flush the cache to force a read so we know the actual rate we got.
+		m_sampleRateValid = false;
+		m_memoryDepthValid = false;
+		m_triggerOffsetValid = false;
+		return;
+	}
+
 	m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Horizontal.SampleRate = ") + to_string(rate) + "'");
 
 	m_sampleRate = rate;
