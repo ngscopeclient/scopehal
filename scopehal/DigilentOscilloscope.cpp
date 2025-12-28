@@ -266,9 +266,16 @@ OscilloscopeChannel* DigilentOscilloscope::GetExternalTrigger()
 
 Oscilloscope::TriggerMode DigilentOscilloscope::PollTrigger()
 {
-	//Always report "triggered" so we can block on AcquireData() in ScopeThread
-	//TODO: peek function of some sort?
-	return TRIGGER_MODE_TRIGGERED;
+	//Is the trigger armed? If not, report stopped
+	if(!IsTriggerArmed())
+		return TRIGGER_MODE_STOP;
+
+	//See if we have data ready
+	if(dynamic_cast<SCPITwinLanTransport*>(m_transport)->GetSecondarySocket().GetRxBytesAvailable() > 0)
+		return TRIGGER_MODE_TRIGGERED;
+
+	else
+		return TRIGGER_MODE_RUN;
 }
 
 bool DigilentOscilloscope::AcquireData()

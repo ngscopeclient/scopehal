@@ -338,10 +338,6 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 
 	else
 		return TRIGGER_MODE_RUN;
-
-	//Always report "triggered" so we can block on AcquireData() in ScopeThread
-	//TODO: peek function of some sort?
-	//return TRIGGER_MODE_TRIGGERED;
 }
 
 bool ThunderScopeOscilloscope::AcquireData()
