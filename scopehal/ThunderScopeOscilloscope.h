@@ -164,6 +164,9 @@ protected:
 		MODE_12BIT
 	} m_adcMode;
 
+	///@brief True if we've already requested data for the current acquisition from the server
+	bool m_dataRequested;
+
 public:
 
 	static std::string GetDriverNameInternal();

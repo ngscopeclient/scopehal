@@ -68,6 +68,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	, m_diag_droppedWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
 	, m_diag_droppedPercent(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT))
 	, m_adcMode(MODE_8BIT)
+	, m_dataRequested(false)
 {
 	m_analogChannelCount = 4;
 
@@ -319,15 +320,34 @@ OscilloscopeChannel* ThunderScopeOscilloscope::GetExternalTrigger()
 
 Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 {
+	//Is the trigger armed? If not, report stopped
+	if(!IsTriggerArmed())
+		return TRIGGER_MODE_STOP;
+
+	//If we haven't yet sent the data request, do so
+	if(!m_dataRequested)
+	{
+		const uint8_t r = 'S';
+		m_transport->SendRawData(1, &r);
+		m_dataRequested = true;
+	}
+
+	//See if we have data ready
+	if(dynamic_cast<SCPITwinLanTransport*>(m_transport)->GetSecondarySocket().GetRxBytesAvailable() > 0)
+		return TRIGGER_MODE_TRIGGERED;
+
+	else
+		return TRIGGER_MODE_RUN;
+
 	//Always report "triggered" so we can block on AcquireData() in ScopeThread
 	//TODO: peek function of some sort?
-	return TRIGGER_MODE_TRIGGERED;
+	//return TRIGGER_MODE_TRIGGERED;
 }
 
 bool ThunderScopeOscilloscope::AcquireData()
 {
-	const uint8_t r = 'S';
-	m_transport->SendRawData(1, &r);
+	//Need to resend the data request for the next trigger
+	m_dataRequested = false;
 
 	//Read Version No.
 	uint8_t version;
