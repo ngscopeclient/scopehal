@@ -925,9 +925,9 @@ float RigolOscilloscope::GetDigitalThreshold(size_t channel)
 	// pods index values start at 1
 	auto level = [&]() -> double {
 		auto const level_str = m_transport->SendCommandQueuedWithReply(string(":LA:POD") + to_string(bankIdx + 1) + ":THR?");
-		auto const level = parseDouble(level_str);
-		if (level)
-			return *level;
+		auto const level_opt = parseDouble(level_str);
+		if (level_opt)
+			return *level_opt;
 		LogError("could not parse channel %s threshold from %s\n", GetChannel(channel)->GetDisplayName().c_str(), level_str.c_str());
 		return 0;
 	}();
@@ -3023,9 +3023,9 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 			// it may fail in the first loop, but whould get valid value in the second
 			// this way we avoid recursion
 			auto const depth_str = m_transport->SendCommandQueuedWithReply(":ACQ:MDEP?");
-			auto const depth = parseDouble(depth_str);
-			if (depth)
-				return *depth;
+			auto const depth_opt = parseDouble(depth_str);
+			if (depth_opt)
+				return *depth_opt;
 			LogError("could not parse sampled depth from %s. Falling back to lowest one\n", depth_str.c_str());
 			auto depths = GetSampleDepthsNonInterleaved();
 			if (depths.empty())
