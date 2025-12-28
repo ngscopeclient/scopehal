@@ -3364,6 +3364,13 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 					ret.push_back(20 * g);
 				break;
 
+			case MODEL_WAVESURFER_3K:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				break;
+
 			default:
 				break;
 		}
