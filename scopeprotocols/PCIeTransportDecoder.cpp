@@ -172,6 +172,7 @@ void PCIeTransportDecoder::Refresh()
 	} address_type;
 	*/
 
+	bool isConfig				= false;
 	for(size_t i=0; i<len; i++)
 	{
 		auto sym = data->m_samples[i];
@@ -463,15 +464,21 @@ void PCIeTransportDecoder::Refresh()
 					switch(type)
 					{
 						//Memory, IO, or config access?
+						case PCIeTransportSymbol::TYPE_CFG_RD_0:
+						case PCIeTransportSymbol::TYPE_CFG_WR_0:
+						case PCIeTransportSymbol::TYPE_CFG_RD_1:
+						case PCIeTransportSymbol::TYPE_CFG_WR_1:
+							isConfig = true;
+							state = STATE_MEMORY_0;
+							break;
+
+						//Memory or IO access?
 						case PCIeTransportSymbol::TYPE_MEM_RD:
 						case PCIeTransportSymbol::TYPE_MEM_RD_LK:
 						case PCIeTransportSymbol::TYPE_MEM_WR:
 						case PCIeTransportSymbol::TYPE_IO_RD:
 						case PCIeTransportSymbol::TYPE_IO_WR:
-						case PCIeTransportSymbol::TYPE_CFG_RD_0:
-						case PCIeTransportSymbol::TYPE_CFG_WR_0:
-						case PCIeTransportSymbol::TYPE_CFG_RD_1:
-						case PCIeTransportSymbol::TYPE_CFG_WR_1:
+							isConfig = false;
 							state = STATE_MEMORY_0;
 							break;
 
@@ -732,6 +739,19 @@ void PCIeTransportDecoder::Refresh()
 
 						if(format_4word)
 							state = STATE_ADDRESS_1;
+						else if(isConfig)
+						{
+							//High part of address is the completer
+							pack->m_headers["Completer"] = FormatID(mem_addr >> 16);
+
+							//Low part is the register ID
+							//TODO: decode names?
+							snprintf(tmp, sizeof(tmp), "%04" PRIx64, mem_addr & 0xffff);
+							pack->m_headers["Addr"] = tmp;
+
+							nbyte = 0;
+							state = STATE_DATA;
+						}
 						else
 						{
 							snprintf(tmp, sizeof(tmp), "%08" PRIx64, mem_addr);
