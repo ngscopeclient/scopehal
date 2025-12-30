@@ -345,6 +345,10 @@ bool ThunderScopeOscilloscope::AcquireData()
 	//Need to resend the data request for the next trigger
 	m_dataRequested = false;
 
+	//Immediately get the next request in flight if we want to continue triggering
+	if(!m_triggerOneShot)
+		PollTrigger();
+
 	//Read Version No.
 	uint8_t version;
 	if(!m_transport->ReadRawData(sizeof(version), (uint8_t*)&version))
