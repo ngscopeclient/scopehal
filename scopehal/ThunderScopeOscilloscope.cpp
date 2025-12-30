@@ -68,7 +68,8 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	, m_diag_droppedWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
 	, m_diag_droppedPercent(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT))
 	, m_adcMode(MODE_8BIT)
-	, m_dataRequested(false)
+	, m_lastSeq(0)
+	, m_dropUntilSeq(0)
 {
 	m_analogChannelCount = 4;
 
@@ -102,6 +103,10 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	auto csock = dynamic_cast<SCPITwinLanTransport*>(m_transport);
 	if(!csock)
 		LogFatal("ThunderScopeOscilloscope expects a SCPITwinLanTransport\n");
+
+	//Request entry to credit-based flow control mode rather than lock-step mode
+	const uint8_t r = 'C';
+	m_transport->SendRawData(1, &r);
 
 	//set initial bandwidth on all channels to full
 	m_bandwidthLimits.resize(4);
@@ -324,17 +329,21 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 	if(!IsTriggerArmed())
 		return TRIGGER_MODE_STOP;
 
-	//If we haven't yet sent the data request, do so
-	if(!m_dataRequested)
-	{
-		const uint8_t r = 'S';
-		m_transport->SendRawData(1, &r);
-		m_dataRequested = true;
-	}
-
 	//See if we have data ready
 	if(dynamic_cast<SCPITwinLanTransport*>(m_transport)->GetSecondarySocket().GetRxBytesAvailable() > 0)
+	{
+		//Do we have old stale waveforms to drop still in the socket buffer? Throw it out
+		if(m_dropUntilSeq > m_lastSeq)
+		{
+			LogTrace("Dropping until sequence %u, last received sequence was %u. Need to drop this waveform\n",
+				(unsigned int)m_dropUntilSeq, (unsigned int)m_lastSeq);
+			DoAcquireData(false);
+			return TRIGGER_MODE_RUN;
+		}
+
+		//No, this is a fresh waveform - prepare to download it
 		return TRIGGER_MODE_TRIGGERED;
+	}
 
 	else
 		return TRIGGER_MODE_RUN;
@@ -342,22 +351,27 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 
 bool ThunderScopeOscilloscope::AcquireData()
 {
-	//Need to resend the data request for the next trigger
-	m_dataRequested = false;
+	return DoAcquireData(true);
+}
 
-	//Immediately get the next request in flight if we want to continue triggering
-	if(!m_triggerOneShot)
-		PollTrigger();
-
+bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
+{
 	//Read Version No.
 	uint8_t version;
 	if(!m_transport->ReadRawData(sizeof(version), (uint8_t*)&version))
 		return false;
 
 	//Read the sequence number of the current waveform
-	uint32_t seqnum;
-	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
+	if(!m_transport->ReadRawData(sizeof(m_lastSeq), (uint8_t*)&m_lastSeq))
 		return false;
+
+	//Acknowledge receipt of this waveform
+	m_transport->SendRawData(4, (uint8_t*)&m_lastSeq);
+
+	if(!keep)
+		LogTrace("Dropping waveform %u\n",m_lastSeq);
+	else
+		LogTrace("Keeping waveform %u\n",m_lastSeq);
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
@@ -389,7 +403,8 @@ bool ThunderScopeOscilloscope::AcquireData()
 	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
 		return false;
 
-	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
+	if(keep)
+		m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
 
 	//Acquire data for each channel
 	uint8_t chnum;
@@ -427,6 +442,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
 				return false;
+
 			float scale = config[0];
 			float offset = config[1];
 			//float trigphase = -config[2] * fs_per_sample;
@@ -449,6 +465,10 @@ bool ThunderScopeOscilloscope::AcquireData()
 				return false;
 			abuf->MarkModifiedFromCpu();
 
+			//If discarding data, stop processing at this point
+			if(!keep)
+				continue;
+
 			//Create our waveform
 			UniformAnalogWaveform* cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
@@ -470,6 +490,9 @@ bool ThunderScopeOscilloscope::AcquireData()
 			LogFatal("???\n");
 		}
 	}
+
+	if(!keep)
+		return true;
 
 	//Prefer GPU path
 	if(g_hasShaderInt8 && g_hasPushDescriptor && (dataType == DATATYPE_I8))
@@ -614,6 +637,16 @@ void ThunderScopeOscilloscope::Start()
 	m_triggerOneShot = false;
 
 	ResetPerCaptureDiagnostics();
+}
+
+void ThunderScopeOscilloscope::Stop()
+{
+	RemoteBridgeOscilloscope::Stop();
+
+	//Ask the server what the last waveform it sent was
+	m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
+	LogTrace("Trigger stopped after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
+		(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
 }
 
 void ThunderScopeOscilloscope::StartSingleTrigger()

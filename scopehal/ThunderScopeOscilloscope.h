@@ -82,6 +82,7 @@ public:
 	// Captures
 	virtual void Start() override;
 	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
 	virtual void ForceTrigger() override;
 
 	//Timebase
@@ -106,6 +107,7 @@ public:
 protected:
 	void ResetPerCaptureDiagnostics();
 	void RefreshSampleRate();
+	bool DoAcquireData(bool keep);
 
 	std::string GetChannelColor(size_t i);
 
@@ -164,8 +166,11 @@ protected:
 		MODE_12BIT
 	} m_adcMode;
 
-	///@brief True if we've already requested data for the current acquisition from the server
-	bool m_dataRequested;
+	///@brief Most recently received sequence number
+	uint32_t m_lastSeq;
+
+	///@brief Sequence number to drop until (if we get stale data after stopping the trigger)
+	uint32_t m_dropUntilSeq;
 
 public:
 
