@@ -27,219 +27,122 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EyePattern
- */
+#version 460
+#pragma shader_stage(compute)
 
-#ifndef EyePattern_h
-#define EyePattern_h
+#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_shader_atomic_int64 : require
 
-#include "EyeMask.h"
-#include "../scopehal/EyeWaveform.h"
-
-class EyeFilterConstants
+layout(std430, binding=0) restrict readonly buffer buf_clockEdges
 {
-public:
+	int64_t clockEdges[];
+};
+
+layout(std430, binding=1) restrict readonly buffer buf_waveform
+{
+	float waveform[];
+};
+
+layout(std430, binding=2) buffer buf_accum
+{
+	int64_t accum[];
+};
+
+layout(std430, binding=3) restrict readonly buffer buf_index
+{
+	uint index[];
+};
+
+layout(std430, push_constant) uniform constants
+{
 	uint64_t	width;
 	uint64_t	halfwidth;
 	int64_t		timescale;
 	int64_t		triggerPhase;
 	int64_t		xoff;
-	uint32_t	wend;
-	uint32_t	cend;
-	uint32_t	xmax;
-	uint32_t	ymax;
-	uint32_t	mwidth;
+	uint		wend;
+	uint 		cend;
+	uint 		xmax;
+	uint 		ymax;
+	uint		mwidth;
 	float		xtimescale;
 	float		yscale;
 	float		yoff;
 	float		xscale;
 };
 
-class EyePattern : public Filter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	EyePattern(const std::string& color);
+	//Figure out how many samples are allocated to each thread
+	//TODO: is this more efficient to calculate once CPU-side?
+	const uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	const uint numSamplesPerThread = (wend + 1) / numThreads;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	//Find the range of samples allocated to each thread
+	uint iclock = index[gl_GlobalInvocationID.x];
+	uint istart = gl_GlobalInvocationID.x * numSamplesPerThread;
+	uint iend = istart + numSamplesPerThread;
+	if(gl_GlobalInvocationID.x == (numThreads - 1))
+		iend = wend;
 
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	virtual float GetVoltageRange(size_t stream) override;
-	virtual float GetOffset(size_t stream) override;
-
-	virtual void ClearSweeps() override;
-
-	EyeWaveform* ReallocateWaveform();
-
-	void SetWidth(size_t width)
+	//Loop over samples for this thread
+	for(uint i=istart; i<iend && iclock < cend; i++)
 	{
-		if(m_width != width)
+		//Find time of this sample.
+		//If it's past the end of the current UI, move to the next clock edge
+		int64_t tstart = int64_t(i) * timescale + triggerPhase;
+		int64_t offset = tstart - clockEdges[iclock];
+		if(offset < 0)
+			continue;
+		uint nextclk = iclock + 1;
+		int64_t tnext = clockEdges[nextclk];
+		if(tstart >= tnext)
 		{
-			SetData(NULL, 0);
-			m_width = width;
+			//Move to the next clock edge
+			iclock ++;
+			if(iclock >= cend)
+				break;
+
+			//Figure out the offset to the next edge
+			offset = tstart - tnext;
 		}
+
+		//Interpolate position
+		float pixel_x_f = float(offset - xoff) * xscale;
+		float pixel_x_fround = floor(pixel_x_f);
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		int64_t ttnext = tnext - tstart;
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
+
+		//Early out if off end of plot
+		uint pixel_x_round = uint(floor(pixel_x_f));
+		if(pixel_x_round > xmax)
+			continue;
+
+		//Interpolate voltage, early out if clipping
+		float sampleA = waveform[i];
+		float sampleB = waveform[i+1];
+		float dv = sampleB - sampleA;
+		float nominal_voltage = sampleA + dv*dx_frac;
+		float nominal_pixel_y = nominal_voltage*yscale + yoff;
+		uint y1 = uint(nominal_pixel_y);
+		if(y1 >= ymax)
+			continue;
+
+		//Calculate how much of the pixel's intensity to put in each row
+		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+		int64_t bin2 = int64_t(yfrac * 64.0);
+		uint pixidx = y1*mwidth + pixel_x_round;
+
+		//Plot each point (this only draws the right half of the eye, we copy to the left later)
+		atomicAdd(accum[pixidx], 64 - bin2);
+		atomicAdd(accum[pixidx + mwidth], bin2);
 	}
+}
 
-	void SetHeight(size_t height)
-	{
-		if(m_height != height)
-		{
-			SetData(NULL, 0);
-			m_height = height;
-		}
-	}
-
-	int64_t GetXOffset()
-	{ return m_xoff; }
-
-	float GetXScale()
-	{ return m_xscale; }
-
-	size_t GetWidth() const
-	{ return m_width; }
-
-	size_t GetHeight() const
-	{ return m_height; }
-
-	EyeMask& GetMask()
-	{ return m_mask; }
-
-	enum ClockPolarity
-	{
-		CLOCK_RISING	= 1,
-		CLOCK_FALLING	= 2,
-		CLOCK_BOTH 		= 3	//CLOCK_RISING | CLOCK_FALLING
-	};
-
-	enum RangeMode
-	{
-		RANGE_AUTO		= 0,
-		RANGE_FIXED		= 1
-	};
-
-	enum ClockAlignment
-	{
-		ALIGN_CENTER,
-		ALIGN_EDGE
-	};
-
-	enum UIMode
-	{
-		MODE_AUTO,
-		MODE_FIXED
-	};
-
-	PROTOCOL_DECODER_INITPROC(EyePattern)
-
-protected:
-	void DoMaskTest(EyeWaveform* cap);
-
-	void RecalculateUIWidth(EyeWaveform* cap);
-
-	void SparsePackedInnerLoop(
-		SparseAnalogWaveform* waveform,
-		int64_t* data,
-		size_t wend,
-		size_t cend,
-		int32_t xmax,
-		int32_t ymax,
-		float xtimescale,
-		float yscale,
-		float yoff
-		);
-
-	void DensePackedInnerLoop(
-		UniformAnalogWaveform* waveform,
-		int64_t* data,
-		size_t wend,
-		size_t cend,
-		int32_t xmax,
-		int32_t ymax,
-		float xtimescale,
-		float yscale,
-		float yoff
-		);
-
-	void DensePackedInnerLoopGPU(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		UniformAnalogWaveform* waveform,
-		AcceleratorBuffer<int64_t>& data,
-		size_t wend,
-		size_t cend,
-		int32_t xmax,
-		int32_t ymax,
-		float xtimescale,
-		float yscale,
-		float yoff
-		);
-
-#ifdef __x86_64__
-	void DensePackedInnerLoopAVX2(
-		UniformAnalogWaveform* waveform,
-		int64_t* data,
-		size_t wend,
-		size_t cend,
-		int32_t xmax,
-		int32_t ymax,
-		float xtimescale,
-		float yscale,
-		float yoff
-		);
-
-	void DensePackedInnerLoopAVX2FMA(
-		UniformAnalogWaveform* waveform,
-		int64_t* data,
-		size_t wend,
-		size_t cend,
-		int32_t xmax,
-		int32_t ymax,
-		float xtimescale,
-		float yscale,
-		float yoff
-		);
-
-	void DensePackedInnerLoopAVX512F(
-		UniformAnalogWaveform* waveform,
-		int64_t* data,
-		size_t wend,
-		size_t cend,
-		int32_t xmax,
-		int32_t ymax,
-		float xtimescale,
-		float yscale,
-		float yoff
-		);
-#endif
-
-	size_t m_height;
-	size_t m_width;
-
-	int64_t m_xoff;
-	float m_xscale;
-	ClockAlignment m_lastClockAlign;
-
-	std::string m_saturationName;
-	std::string m_centerName;
-	std::string m_maskName;
-	std::string m_polarityName;
-	std::string m_vmodeName;
-	std::string m_rangeName;
-	std::string m_clockAlignName;
-	std::string m_rateModeName;
-	std::string m_rateName;
-
-	EyeMask m_mask;
-
-	AcceleratorBuffer<int64_t> m_clockEdges;
-	AcceleratorBuffer<uint32_t> m_indexBuffer;
-
-	std::shared_ptr<ComputePipeline> m_eyeComputePipeline;
-};
-
-#endif

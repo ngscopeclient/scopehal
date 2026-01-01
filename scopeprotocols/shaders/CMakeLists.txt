@@ -42,6 +42,7 @@ add_compute_shaders(
 		CosineSumWindow.glsl
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
+		EyePattern.glsl
 		FIRFilter.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl

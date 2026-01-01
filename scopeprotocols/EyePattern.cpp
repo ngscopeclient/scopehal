@@ -104,6 +104,9 @@ EyePattern::EyePattern(const string& color)
 
 	m_parameters[m_rateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_rateName].SetIntVal(1250000000);
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+		m_eyeComputePipeline = make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -290,8 +293,25 @@ void EyePattern::Refresh(
 		//Optimized inner loop for uniformly sampled waveforms
 		if(uwfm)
 		{
+			//GPU path requires native int64 support with atomics
+			if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+			{
+				DensePackedInnerLoopGPU(
+					cmdBuf,
+					queue,
+					uwfm,
+					cap->GetAccumBuffer(),
+					wend,
+					cend,
+					xmax,
+					ymax,
+					xtimescale,
+					yscale,
+					yoff);
+			}
+
 			#ifdef __x86_64__
-			if(g_hasAvx512F && g_hasFMA)
+			else if(g_hasAvx512F && g_hasFMA)
 				DensePackedInnerLoopAVX512F(uwfm, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 			else if(g_hasAvx2)
 			{
@@ -907,6 +927,78 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 	waveform->MarkModifiedFromCpu();
 }
 #endif /* __x86_64__ */
+
+void EyePattern::DensePackedInnerLoopGPU(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
+	UniformAnalogWaveform* waveform,
+	AcceleratorBuffer<int64_t>& data,
+	size_t wend,
+	size_t cend,
+	int32_t xmax,
+	int32_t ymax,
+	float xtimescale,
+	float yscale,
+	float yoff
+	)
+{
+	cmdBuf.begin({});
+
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
+
+	const uint32_t threadsPerBlock = 64;
+	const uint32_t numThreads = 2048;
+	const uint32_t numSamplesPerThread = (wend + 1) / numThreads;
+
+	//Push constants are basically just the function arguments
+	EyeFilterConstants cfg;
+	cfg.width = cap->GetUIWidth();
+	cfg.halfwidth = cfg.width / 2;
+	cfg.timescale = waveform->m_timescale;
+	cfg.triggerPhase = waveform->m_triggerPhase;
+	cfg.xoff = m_xoff;
+	cfg.wend = wend;
+	cfg.cend = cend;
+	cfg.xmax = xmax;
+	cfg.ymax = ymax;
+	cfg.xtimescale = xtimescale;
+	cfg.yscale = yscale;
+	cfg.yoff = yoff;
+	cfg.xscale = m_xscale;
+	cfg.mwidth = m_width;
+
+	//Allocate and fill index buffer
+	m_indexBuffer.resize(numThreads);
+	m_indexBuffer.PrepareForCpuAccess();
+	m_clockEdges.PrepareForCpuAccess();
+	for(size_t i=0; i<numThreads; i++)
+	{
+		//Get timestamp of the first sample in this thread's block
+		int64_t tstart = (i * numSamplesPerThread) * waveform->m_timescale + waveform->m_triggerPhase;
+
+		//Find the first clock edge after this sample
+		size_t iclk = BinarySearchForGequal(m_clockEdges.GetCpuPointer(), m_clockEdges.size(), tstart);
+
+		//We actually want the clock edge before this one, so decrement it
+		if(iclk > 0)
+			iclk --;
+
+		m_indexBuffer[i] = iclk;
+	}
+	m_indexBuffer.MarkModifiedFromCpu();
+
+	//Figure out how many samples per thread we're running
+	m_eyeComputePipeline->BindBufferNonblocking(0, m_clockEdges, cmdBuf);
+	m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
+	m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);
+	m_eyeComputePipeline->BindBufferNonblocking(3, m_indexBuffer, cmdBuf);
+	m_eyeComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	//Done
+	data.MarkModifiedFromGpu();
+}
 
 void EyePattern::DensePackedInnerLoop(
 	UniformAnalogWaveform* waveform,

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -187,6 +187,12 @@ bool g_hasShaderInt8 = false;
 	@ingroup vksupport
  */
 bool g_hasShaderAtomicFloat = false;
+
+/**
+	@brief Indicates whether atomic operations on the int64 type are available in shaders
+	@ingroup vksupport
+ */
+bool g_hasShaderAtomicInt64 = false;
 
 /**
 	@brief Indicates whether the VK_EXT_debug_utils extension is available
@@ -504,6 +510,16 @@ bool VulkanInit(bool skipGLFW)
 					}
 					else
 						LogDebug("int8:                   no\n");
+
+					if(vulkan12Features.shaderBufferInt64Atomics)
+						LogDebug("atomic int64 in SSBO:   yes\n");
+					else
+						LogDebug("atomic int64 in SSBO:   no\n");
+
+					if(vulkan12Features.shaderSharedInt64Atomics)
+						LogDebug("atomic int64 in shared: yes\n");
+					else
+						LogDebug("atomic int64 in shared: no\n");
 				}
 
 				const size_t k = 1024LL;
@@ -716,6 +732,7 @@ bool VulkanInit(bool skipGLFW)
 				vk::PhysicalDevice16BitStorageFeatures features16bit;
 				vk::PhysicalDevice8BitStorageFeatures features8bit;
 				vk::PhysicalDeviceVulkan12Features featuresVulkan12;
+				vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
 				void* pNext = nullptr;
 				if(device.getFeatures().shaderFloat64)
 				{
@@ -766,6 +783,18 @@ bool VulkanInit(bool skipGLFW)
 						{
 							featuresVulkan12.shaderInt8 = true;
 							LogDebug("Enabling 8-bit integer support\n");
+						}
+
+						if(vulkan12Features.shaderBufferInt64Atomics)
+						{
+							featuresVulkan12.shaderBufferInt64Atomics = true;
+							LogDebug("Enabling 64-bit atomic support for SSBOs\n");
+						}
+
+						if(vulkan12Features.shaderSharedInt64Atomics)
+						{
+							featuresVulkan12.shaderSharedInt64Atomics = true;
+							LogDebug("Enabling 64-bit atomic support for shared memory\n");
 						}
 
 						//Enable 8 bit SSBOs
@@ -833,6 +862,11 @@ bool VulkanInit(bool skipGLFW)
 						g_hasShaderAtomicFloat = true;
 						LogDebug("Device has VK_EXT_shader_atomic_float, requesting it\n");
 					}
+					if(!strcmp(&ext.extensionName[0], "VK_KHR_shader_atomic_int64"))
+					{
+						g_hasShaderAtomicInt64 = true;
+						LogDebug("Device has VK_KHR_shader_atomic_int64, requesting it\n");
+					}
 
 					if(!strcmp(&ext.extensionName[0], "VK_EXT_memory_budget"))
 					{
@@ -855,6 +889,11 @@ bool VulkanInit(bool skipGLFW)
 					devextensions.push_back("VK_KHR_shader_non_semantic_info");
 				if(g_hasShaderAtomicFloat)
 					devextensions.push_back("VK_EXT_shader_atomic_float");
+				if(g_hasShaderAtomicInt64)
+				{
+					devextensions.push_back("VK_KHR_shader_atomic_int64");
+
+				}
 				if(g_hasMemoryBudget)
 					devextensions.push_back("VK_EXT_memory_budget");
 				if(g_hasPushDescriptor)

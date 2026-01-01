@@ -80,7 +80,7 @@ EyeWaveform::~EyeWaveform()
  */
 void EyeWaveform::Normalize()
 {
-	PrepareForCpuAccess();
+	m_accumdata.PrepareForCpuAccess();
 
 	//Preprocessing
 	int64_t nmax = 0;

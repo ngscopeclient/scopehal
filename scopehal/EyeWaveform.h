@@ -74,6 +74,9 @@ public:
 	int64_t* GetAccumData()
 	{ return m_accumdata.GetCpuPointer(); }
 
+	AcceleratorBuffer<int64_t>& GetAccumBuffer()
+	{ return m_accumdata; }
+
 	void Normalize();
 
 	///@brief Get the total number of UIs integrated in this eye

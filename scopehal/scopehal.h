@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -93,6 +93,7 @@ extern bool g_hasAvx2;
 extern bool g_gpuFilterEnabled;
 extern bool g_hasShaderFloat64;
 extern bool g_hasShaderInt64;
+extern bool g_hasShaderAtomicInt64;
 extern bool g_hasShaderInt16;
 extern bool g_hasShaderInt8;
 extern bool g_hasShaderAtomicFloat;
