@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -72,7 +72,7 @@ public:
 
 	///@brief Returns a pointer to the raw (not normalized) accumulator data
 	int64_t* GetAccumData()
-	{ return m_accumdata; }
+	{ return m_accumdata.GetCpuPointer(); }
 
 	void Normalize();
 
@@ -146,15 +146,51 @@ public:
 	{ return m_type; }
 
 	virtual void FreeGpuMemory() override
-	{}
+	{ m_accumdata.FreeGpuBuffer(); }
 
 	virtual bool HasGpuBuffer() override
-	{ return false; }
+	{ return m_accumdata.HasGpuBuffer(); }
+
+	virtual void PrepareForCpuAccess() override
+	{
+		m_outdata.PrepareForCpuAccess();
+		m_accumdata.PrepareForCpuAccess();
+	}
+
+	virtual void PrepareForGpuAccess() override
+	{
+		m_outdata.PrepareForGpuAccess();
+		m_accumdata.PrepareForGpuAccess();
+	}
+
+	virtual void MarkSamplesModifiedFromCpu() override
+	{
+		m_outdata.MarkModifiedFromCpu();
+		m_accumdata.MarkModifiedFromCpu();
+	}
+
+	virtual void MarkSamplesModifiedFromGpu() override
+	{
+		m_outdata.MarkModifiedFromGpu();
+		m_accumdata.MarkModifiedFromGpu();
+	}
+
+	virtual void MarkModifiedFromCpu() override
+	{
+		m_outdata.MarkModifiedFromCpu();
+		m_accumdata.MarkModifiedFromCpu();
+	}
+
+	virtual void MarkModifiedFromGpu() override
+	{
+		m_outdata.MarkModifiedFromGpu();
+		m_accumdata.MarkModifiedFromGpu();
+	}
 
 protected:
 
 	///@brief Accumulator buffer
-	int64_t* m_accumdata;
+	AcceleratorBuffer<int64_t> m_accumdata;
 
 	///@brief Total UIs integrated
 	size_t m_totalUIs;

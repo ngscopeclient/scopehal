@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -790,6 +790,7 @@ void MultiLaneBERT::MeasureEye(size_t i)
 				accum[y*256 + x + 64] = ber * 1e15;
 		}
 	}
+	cap->MarkModifiedFromCpu();
 	cap->Normalize();
 	cap->IntegrateUIs(1, 1);	//have to put something here, but we don't have the true count value
 
@@ -803,8 +804,6 @@ void MultiLaneBERT::MeasureEye(size_t i)
 		-cap->m_uiWidth);
 	GetChannel(i)->SetScalarValue(BERTInputChannel::STREAM_MASKHITRATE, rate);
 	cap->SetMaskHitRate(rate);
-
-	cap->MarkModifiedFromCpu();
 }
 
 bool MultiLaneBERT::AcquireData()

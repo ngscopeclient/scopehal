@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,15 +64,15 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center, EyeType etyp
 	, m_type(etype)
 {
 	size_t npix = width*height;
-	m_accumdata = new int64_t[npix];
+	m_accumdata.resize(npix);
+	m_accumdata.PrepareForCpuAccess();
 	for(size_t i=0; i<npix; i++)
 		m_accumdata[i] = 0;
+	m_accumdata.MarkModifiedFromCpu();
 }
 
 EyeWaveform::~EyeWaveform()
 {
-	delete[] m_accumdata;
-	m_accumdata = NULL;
 }
 
 /**
@@ -80,13 +80,16 @@ EyeWaveform::~EyeWaveform()
  */
 void EyeWaveform::Normalize()
 {
+	PrepareForCpuAccess();
+
 	//Preprocessing
 	int64_t nmax = 0;
 	int64_t halfwidth = m_width/2;
 	size_t blocksize = halfwidth * sizeof(int64_t);
+	auto ptr = m_accumdata.GetCpuPointer();
 	for(size_t y=0; y<m_height; y++)
 	{
-		int64_t* row = m_accumdata + y*m_width;
+		int64_t* row = ptr + y*m_width;
 
 		//Find peak amplitude
 		for(size_t x=halfwidth; x<m_width; x++)

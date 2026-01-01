@@ -518,6 +518,8 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		pix[0] 		 += EYE_ACCUM_SCALE - bin2;
 		pix[m_width] += bin2;
 	}
+
+	waveform->MarkModifiedFromCpu();
 }
 
 __attribute__((target("avx2,fma")))
@@ -713,6 +715,8 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 		pix[0] 		 += EYE_ACCUM_SCALE - bin2;
 		pix[m_width] += bin2;
 	}
+
+	waveform->MarkModifiedFromCpu();
 }
 
 __attribute__((target("avx512f,fma")))
@@ -899,6 +903,8 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 		pix[0] 		 += EYE_ACCUM_SCALE - bin2;
 		pix[m_width] += bin2;
 	}
+
+	waveform->MarkModifiedFromCpu();
 }
 #endif /* __x86_64__ */
 
@@ -975,6 +981,8 @@ void EyePattern::DensePackedInnerLoop(
 		pix[0] 		 += 64 - bin2;
 		pix[m_width] += bin2;
 	}
+
+	waveform->MarkModifiedFromCpu();
 }
 
 void EyePattern::SparsePackedInnerLoop(
@@ -1051,6 +1059,8 @@ void EyePattern::SparsePackedInnerLoop(
 		pix[0] 		 += 64 - bin2;
 		pix[m_width] += bin2;
 	}
+
+	waveform->MarkModifiedFromCpu();
 }
 
 EyeWaveform* EyePattern::ReallocateWaveform()
