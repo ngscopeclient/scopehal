@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -120,11 +120,10 @@ public:
 protected:
 	void DoMaskTest(EyeWaveform* cap);
 
-	void RecalculateUIWidth(std::vector<int64_t>& clock_edges, EyeWaveform* cap);
+	void RecalculateUIWidth(EyeWaveform* cap);
 
 	void SparsePackedInnerLoop(
 		SparseAnalogWaveform* waveform,
-		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
 		size_t cend,
@@ -137,7 +136,6 @@ protected:
 
 	void DensePackedInnerLoop(
 		UniformAnalogWaveform* waveform,
-		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
 		size_t cend,
@@ -151,7 +149,6 @@ protected:
 #ifdef __x86_64__
 	void DensePackedInnerLoopAVX2(
 		UniformAnalogWaveform* waveform,
-		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
 		size_t cend,
@@ -164,7 +161,6 @@ protected:
 
 	void DensePackedInnerLoopAVX2FMA(
 		UniformAnalogWaveform* waveform,
-		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
 		size_t cend,
@@ -177,7 +173,6 @@ protected:
 
 	void DensePackedInnerLoopAVX512F(
 		UniformAnalogWaveform* waveform,
-		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
 		size_t cend,
@@ -207,6 +202,8 @@ protected:
 	std::string m_rateName;
 
 	EyeMask m_mask;
+
+	AcceleratorBuffer<int64_t> m_clockEdges;
 };
 
 #endif

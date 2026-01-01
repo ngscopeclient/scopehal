@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -495,6 +495,18 @@ public:
 		if(m_size != m_capacity)
 			Reallocate(m_size);
 	}
+
+	/**
+		@brief Copies our content from a std::vector
+	 */
+	 __attribute__((noinline))
+	 void CopyFrom(const std::vector<T>& rhs)
+	 {
+		 PrepareForCpuAccess();
+		 resize(rhs.size());
+		 memcpy(m_cpuPtr, &rhs[0], m_size * sizeof(T));
+		 MarkModifiedFromCpu();
+	 }
 
 	/**
 		@brief Copies our content from another AcceleratorBuffer
