@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "EyePattern.h"
+#include "ClockRecoveryFilter.h"
 #include <algorithm>
 #ifdef __x86_64__
 #pragma GCC diagnostic push
@@ -220,7 +221,21 @@ void EyePattern::Refresh(
 			break;
 
 		case CLOCK_BOTH:
-			FindZeroCrossings(sclk, uclk, clock_edges);
+			{
+				//Optimization: If the clock is coming from a CDR filter, every sample is an edge by definition
+				//Just copy the timestamps (or can we even do zero copy somehow?)
+				auto pcdr = dynamic_cast<ClockRecoveryFilter*>(GetInput(1).m_channel);
+				if(pcdr)
+				{
+					clock_edges.resize(sclk->m_offsets.size());
+					sclk->PrepareForCpuAccess();
+					memcpy(&clock_edges[0], sclk->m_offsets.GetCpuPointer(), sclk->m_offsets.size() * sizeof(int64_t));
+				}
+
+				//No, actually do zero crossing search
+				else
+					FindZeroCrossings(sclk, uclk, clock_edges);
+			}
 			break;
 	}
 
