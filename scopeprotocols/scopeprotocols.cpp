@@ -126,6 +126,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(GateFilter);
 	AddDecoderClass(GlitchRemovalFilter);
 	AddDecoderClass(GroupDelayFilter);
+	AddDecoderClass(GPUClockRecoveryFilter);
 	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);
 	AddDecoderClass(HyperRAMDecoder);

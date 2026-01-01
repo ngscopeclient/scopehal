@@ -30,89 +30,44 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of SParameterFilter
-	@ingroup core
+	@brief Declaration of GPUClockRecoveryFilter
  */
+#ifndef GPUClockRecoveryFilter_h
+#define GPUClockRecoveryFilter_h
 
-#include "scopehal.h"
+class QueueHandle;
 
-using namespace std;
-
-SParameterFilter::SParameterFilter(const string& color, Category cat)
-	: SParameterSourceFilter(color, cat)
-	, m_portCountName("Port Count")
+class GPUClockRecoveryFilterConstants
 {
-	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_portCountName].SetIntVal(2);
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &SParameterFilter::RefreshPorts));
+public:
+	/*
+	uint32_t offsetP;
+	uint32_t offsetN;
+	*/
+	uint32_t size;
+};
 
-	RefreshPorts();
-}
-
-SParameterFilter::~SParameterFilter()
+class GPUClockRecoveryFilter : public Filter
 {
-}
+public:
+	GPUClockRecoveryFilter(const std::string& color);
+	~GPUClockRecoveryFilter();
 
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
-bool SParameterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//All inputs are required
-	if(stream.m_channel == NULL)
-		return false;
+	static std::string GetProtocolName();
 
-	//Must be a valid port number (assume we take a single set of s-params as input)
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
-	if(i >= (2*nports*nports) )
-		return false;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	//X axis must be Hz
-	if(stream.GetXAxisUnits() != Unit(Unit::UNIT_HZ))
-		return false;
+	PROTOCOL_DECODER_INITPROC(GPUClockRecoveryFilter)
 
-	//Angle: Y axis unit must be degrees
-	if(i & 1)
-	{
-		if(stream.GetYAxisUnits() != Unit(Unit::UNIT_DEGREES))
-			return false;
-	}
+protected:
 
-	//Magnitude: Y axis unit must be dB
-	else
-	{
-		if(stream.GetYAxisUnits() != Unit(Unit::UNIT_DB))
-			return false;
-	}
+	ComputePipeline m_computePipeline;
 
-	return true;
-}
+	std::string m_baudname;
+	std::string m_threshname;
+};
 
-void SParameterFilter::RefreshPorts()
-{
-	m_params.Allocate(m_parameters[m_portCountName].GetIntVal());
-	SetupStreams();
-
-	//Create new inputs
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
-	for(size_t to = 0; to < nports; to++)
-	{
-		for(size_t from = 0; from < nports; from ++)
-		{
-			//If we already have this input, do nothing
-			if( (to*nports + from)*2 < m_inputs.size())
-				continue;
-
-			auto pname = string("S") + to_string(to+1) + to_string(from+1);
-			CreateInput(pname + "_mag");
-			CreateInput(pname + "_ang");
-		}
-	}
-
-	//Delete extra inputs
-	size_t nin = nports*nports*2;
-	for(size_t i=nin; i<m_inputs.size(); i++)
-		SetInput(i, nullptr, true);
-	m_inputs.resize(nin);
-	m_signalNames.resize(nin);
-
-	m_inputsChangedSignal.emit();
-}
+#endif

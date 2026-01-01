@@ -86,6 +86,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FullWidthHalfMax.cpp
 	GateFilter.cpp
 	GlitchRemovalFilter.cpp
+	GPUClockRecoveryFilter.cpp
 	GroupDelayFilter.cpp
 	HistogramFilter.cpp
 	HorizontalBathtub.cpp

@@ -137,6 +137,7 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #endif
 
 #include "FlowGraphNode.h"
+#include "SinkNode.h"
 #include "Instrument.h"
 #include "StreamDescriptor.h"
 

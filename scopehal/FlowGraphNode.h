@@ -175,8 +175,15 @@ protected:
 	///Names of signals we take as input
 	std::vector<std::string> m_signalNames;
 
-	///The channel (if any) connected to each of our inputs
+	///@brief The channel (if any) connected to each of our inputs
 	std::vector<StreamDescriptor> m_inputs;
+
+	/**
+		@brief The nodes (if any) that each of our streams drives
+
+		m_sinks[i] is the set of sinks for stream i
+	 */
+	std::vector< std::set<FlowGraphNode*> > m_sinks;
 
 	//Parameters
 	ParameterMapType m_parameters;

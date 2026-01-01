@@ -126,6 +126,11 @@ size_t InstrumentChannel::AddStream(Unit yunit, const string& name, Stream::Stre
 {
 	size_t index = m_streams.size();
 	m_streams.push_back(Stream(yunit, name, stype, flags));
+
+	//Allocate space for sinks list
+	if(m_sinks.size() <= index)
+		m_sinks.resize(index + 1);
+
 	return index;
 }
 

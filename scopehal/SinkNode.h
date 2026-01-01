@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,89 +30,22 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of SParameterFilter
-	@ingroup core
+	@brief Declaration of SinkNode
  */
 
-#include "scopehal.h"
+#ifndef SinkNode_h
+#define SinkNode_h
 
-using namespace std;
+/**
+	@brief A sink node is a node in the filter graph that has no outputs.
 
-SParameterFilter::SParameterFilter(const string& color, Category cat)
-	: SParameterSourceFilter(color, cat)
-	, m_portCountName("Port Count")
+	@ingroup core
+ */
+class SinkNode : public FlowGraphNode
 {
-	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_portCountName].SetIntVal(2);
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &SParameterFilter::RefreshPorts));
+public:
+	SinkNode();
+	virtual ~SinkNode();
+};
 
-	RefreshPorts();
-}
-
-SParameterFilter::~SParameterFilter()
-{
-}
-
-
-bool SParameterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//All inputs are required
-	if(stream.m_channel == NULL)
-		return false;
-
-	//Must be a valid port number (assume we take a single set of s-params as input)
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
-	if(i >= (2*nports*nports) )
-		return false;
-
-	//X axis must be Hz
-	if(stream.GetXAxisUnits() != Unit(Unit::UNIT_HZ))
-		return false;
-
-	//Angle: Y axis unit must be degrees
-	if(i & 1)
-	{
-		if(stream.GetYAxisUnits() != Unit(Unit::UNIT_DEGREES))
-			return false;
-	}
-
-	//Magnitude: Y axis unit must be dB
-	else
-	{
-		if(stream.GetYAxisUnits() != Unit(Unit::UNIT_DB))
-			return false;
-	}
-
-	return true;
-}
-
-void SParameterFilter::RefreshPorts()
-{
-	m_params.Allocate(m_parameters[m_portCountName].GetIntVal());
-	SetupStreams();
-
-	//Create new inputs
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
-	for(size_t to = 0; to < nports; to++)
-	{
-		for(size_t from = 0; from < nports; from ++)
-		{
-			//If we already have this input, do nothing
-			if( (to*nports + from)*2 < m_inputs.size())
-				continue;
-
-			auto pname = string("S") + to_string(to+1) + to_string(from+1);
-			CreateInput(pname + "_mag");
-			CreateInput(pname + "_ang");
-		}
-	}
-
-	//Delete extra inputs
-	size_t nin = nports*nports*2;
-	for(size_t i=nin; i<m_inputs.size(); i++)
-		SetInput(i, nullptr, true);
-	m_inputs.resize(nin);
-	m_signalNames.resize(nin);
-
-	m_inputsChangedSignal.emit();
-}
+#endif

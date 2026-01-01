@@ -89,6 +89,7 @@ set(SCOPEHAL_SOURCES
 	TouchstoneParser.cpp
 
 	FlowGraphNode.cpp
+	SinkNode.cpp
 	Trigger.cpp
 	CDRTrigger.cpp
 	CDR8B10BTrigger.cpp

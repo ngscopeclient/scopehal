@@ -72,7 +72,11 @@ FlowGraphNode::~FlowGraphNode()
 void FlowGraphNode::DetachInputs()
 {
 	for(auto& c : m_inputs)
+	{
 		c.m_channel = nullptr;
+
+		//TODO: disconnect us from their sinks
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,6 +172,16 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 
 		if(stream.m_channel == nullptr)	//NULL is always legal
 		{
+			//Remove us from the old input's sink list
+			if(m_inputs[i].m_channel)
+				m_inputs[i].m_channel->m_sinks[m_inputs[i].m_stream].erase(this);
+
+			//Deref whatever was there (if anything).
+			auto oldchan = dynamic_cast<OscilloscopeChannel*>(m_inputs[i].m_channel);
+			if(oldchan)
+				oldchan->Release();
+
+			//Make the new connection
 			m_inputs[i] = StreamDescriptor(nullptr, 0);
 
 			//Notify the derived class in case it wants to do anything
@@ -175,16 +189,14 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 			return;
 		}
 
-		//If forcing, don't validate the channel
+		//If not forcing, make sure the input is legal
 		if(!force)
 		{
 			if(!ValidateChannel(i, stream))
 			{
+				//If validation fails, set the input to null
 				LogError("Invalid channel for input %zu of node\n", i);
-				m_inputs[i] = StreamDescriptor(nullptr, 0);
-
-				//Notify the derived class in case it wants to do anything
-				OnInputChanged(i);
+				SetInput(i, StreamDescriptor(nullptr, 0), false);
 				return;
 			}
 		}
@@ -202,7 +214,11 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 		if(schan)
 			schan->AddRef();
 
-		//Deref whatever was there (if anything)
+		//Remove us from the old input's sink list
+		if(m_inputs[i].m_channel)
+			m_inputs[i].m_channel->m_sinks[m_inputs[i].m_stream].erase(this);
+
+		//Deref whatever was there (if anything).
 		auto oldchan = dynamic_cast<OscilloscopeChannel*>(m_inputs[i].m_channel);
 		if(oldchan)
 			oldchan->Release();
