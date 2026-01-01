@@ -88,22 +88,36 @@ void main()
 		iend = wend;
 
 	//Loop over samples for this thread
+	float lastSample = waveform[istart];
+	int64_t lastClock = clockEdges[iclock];
+	int64_t tnext = clockEdges[iclock + 1];
+	int64_t tnext_adv = tnext;
 	for(uint i=istart; i<iend && iclock < cend; i++)
 	{
-		//Find time of this sample.
-		//If it's past the end of the current UI, move to the next clock edge
+		//Find time of this sample
 		int64_t tstart = int64_t(i) * timescale + triggerPhase;
-		int64_t offset = tstart - clockEdges[iclock];
+		tnext = tnext_adv;
+		int64_t ttnext = tnext - tstart;
+
+		//Fetch the next sample
+		float sampleA = lastSample;
+		float sampleB = waveform[i+1];
+		lastSample = sampleB;
+
+		//If it's past the end of the current UI, move to the next clock edge
+		int64_t offset = tstart - lastClock;
 		if(offset < 0)
 			continue;
-		uint nextclk = iclock + 1;
-		int64_t tnext = clockEdges[nextclk];
 		if(tstart >= tnext)
 		{
 			//Move to the next clock edge
 			iclock ++;
+			lastClock = tnext;
 			if(iclock >= cend)
 				break;
+
+			//Prefetch the next edge timestamp
+			tnext_adv = clockEdges[iclock + 1];
 
 			//Figure out the offset to the next edge
 			offset = tstart - tnext;
@@ -116,7 +130,6 @@ void main()
 
 		//Drop anything past half a UI if the next clock edge is a long ways out
 		//(this is needed for irregularly sampled data like DDR RAM)
-		int64_t ttnext = tnext - tstart;
 		if( (offset > halfwidth) && (ttnext > width) )
 			continue;
 
@@ -126,8 +139,6 @@ void main()
 			continue;
 
 		//Interpolate voltage, early out if clipping
-		float sampleA = waveform[i];
-		float sampleB = waveform[i+1];
 		float dv = sampleB - sampleA;
 		float nominal_voltage = sampleA + dv*dx_frac;
 		float nominal_pixel_y = nominal_voltage*yscale + yoff;

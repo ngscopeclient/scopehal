@@ -63,6 +63,9 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center, EyeType etyp
 	, m_maskHitRate(0)
 	, m_type(etype)
 {
+	m_accumdata.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+	m_accumdata.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+
 	size_t npix = width*height;
 	m_accumdata.resize(npix);
 	m_accumdata.PrepareForCpuAccess();

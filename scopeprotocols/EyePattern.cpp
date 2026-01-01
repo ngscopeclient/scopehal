@@ -59,6 +59,8 @@ EyePattern::EyePattern(const string& color)
 	, m_clockAlignName("Clock Alignment")
 	, m_rateModeName("Bit Rate Mode")
 	, m_rateName("Bit Rate")
+	, m_clockEdges("EyePattern.clockEdges")
+	, m_indexBuffer("EyePattern.indexBuffer")
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_EYE);
 	AddStream(Unit(Unit::UNIT_RATIO_SCI), "hitrate", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -107,6 +109,8 @@ EyePattern::EyePattern(const string& color)
 
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 		m_eyeComputePipeline = make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
+
+	m_indexBuffer.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -947,7 +951,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 
 	const uint32_t threadsPerBlock = 64;
-	const uint32_t numThreads = 2048;
+	const uint32_t numThreads = 4096;
 	const uint32_t numSamplesPerThread = (wend + 1) / numThreads;
 
 	//Push constants are basically just the function arguments
