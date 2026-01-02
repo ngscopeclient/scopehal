@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,15 +36,15 @@
 
 using namespace std;
 
-//#define PLL_DEBUG_OUTPUTS
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
 {
-	AddDigitalStream("data");
+	AddDigitalStream("recClk");
+	AddStream(Unit(Unit::UNIT_VOLTS), "sampledData", Stream::STREAM_TYPE_ANALOG);
+
 	CreateInput("IN");
 	CreateInput("Gate");
 
@@ -56,12 +56,11 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_threshname].SetFloatVal(0);
 
-	#ifdef PLL_DEBUG_OUTPUTS
-	AddStream(Unit::UNIT_FS, "period", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit::UNIT_FS, "dphase", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit::UNIT_FS, "dfreq", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit::UNIT_FS, "drift", Stream::STREAM_TYPE_ANALOG);
-	#endif
+	if(g_hasShaderInt8 && g_hasShaderInt64)
+	{
+		m_fillSquarewaveAndDurationsComputePipeline =
+			make_shared<ComputePipeline>("shaders/FillSquarewaveAndDurations.spv", 3, sizeof(uint32_t));
+	}
 }
 
 ClockRecoveryFilter::~ClockRecoveryFilter()
@@ -178,46 +177,85 @@ void ClockRecoveryFilter::Refresh(
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	cap->PrepareForCpuAccess();
 
+	//Create analog output waveform for sampled data
+	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
+	scap->m_triggerPhase = 0;
+	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
+	scap->PrepareForCpuAccess();
+
+	//Get timestamp of the last sample
 	int64_t tend;
 	if(sadin || uadin)
 		tend = GetOffsetScaled(sadin, uadin, din->size()-1);
 	else
 		tend = GetOffsetScaled(sddin, uddin, din->size()-1);
 
-	#ifdef PLL_DEBUG_OUTPUTS
-	auto debugPeriod = SetupEmptySparseAnalogOutputWaveform(cap, 1);
-	auto debugPhase = SetupEmptySparseAnalogOutputWaveform(cap, 2);
-	auto debugFreq = SetupEmptySparseAnalogOutputWaveform(cap, 3);
-	auto debugDrift = SetupEmptySparseAnalogOutputWaveform(cap, 4);
-	#endif
-
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
 	cap->m_offsets.reserve(edges.size());
 	if(gate)
-		InnerLoopWithGating(*cap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
+		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 	else
-		InnerLoopWithNoGating(*cap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
+		InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
+
+	SetData(cap, 0);
+	SetData(scap, 1);
+
+	//Offsets always get filled by the CPU at this point in time
+	cap->m_offsets.MarkModifiedFromCpu();
 
 	//Generate the squarewave and duration values to match the calculated timestamps
+	if(g_hasShaderInt8 && g_hasShaderInt64)
+	{
+		//Allocate output buffers as needed
+		size_t len = cap->m_offsets.size();
+		cap->m_samples.resize(len);
+		cap->m_durations.resize(len);
+
+		cmdBuf.begin({});
+
+		uint32_t cfg = len;
+
+		m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(0, cap->m_offsets, cmdBuf);
+		m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(1, cap->m_durations, cmdBuf);
+		m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(2, cap->m_samples, cmdBuf);
+
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+		m_fillSquarewaveAndDurationsComputePipeline->Dispatch(
+			cmdBuf,
+			cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+
+		queue->SubmitAndBlock(cmdBuf);
+		cap->MarkModifiedFromGpu();
+	}
+
 	//TODO: GPU this?
 	//Important to FillDurations() after FillSquarewave() since FillDurations() expects to use sample size
 	#ifdef __x86_64__
-	if(g_hasAvx2)
+	else if(g_hasAvx2)
 	{
 		FillSquarewaveAVX2(*cap);
 		FillDurationsAVX2(*cap);
+		//FillDurationsAVX2(*scap);
+
+		cap->MarkModifiedFromCpu();
 	}
 	else
 	#endif
 	{
 		FillSquarewaveGeneric(*cap);
 		FillDurationsGeneric(*cap);
+		//FillDurationsGeneric(*scap);
+
+		cap->MarkModifiedFromCpu();
 	}
 
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
+	//TODO do stuff here
+	scap->MarkModifiedFromCpu();
 }
 
 /**
@@ -241,6 +279,7 @@ void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
  */
 void ClockRecoveryFilter::InnerLoopWithGating(
 	SparseDigitalWaveform& cap,
+	SparseAnalogWaveform& scap,
 	AcceleratorBuffer<int64_t>& edges,
 	size_t nedges,
 	int64_t tend,
@@ -391,24 +430,6 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 					else
 						edgepos += period / 400;
 
-					#ifdef PLL_DEBUG_OUTPUTS
-						debugPeriod->m_offsets.push_back(edgepos + period/2);
-						debugPeriod->m_durations.push_back(period);
-						debugPeriod->m_samples.push_back(period);
-
-						debugPhase->m_offsets.push_back(edgepos + period/2);
-						debugPhase->m_durations.push_back(period);
-						debugPhase->m_samples.push_back(dphase);
-
-						debugFreq->m_offsets.push_back(edgepos + period/2);
-						debugFreq->m_durations.push_back(period);
-						debugFreq->m_samples.push_back(dperiod);
-
-						debugDrift->m_offsets.push_back(edgepos + period/2);
-						debugDrift->m_durations.push_back(period);
-						debugDrift->m_samples.push_back(period - initialPeriod);
-					#endif
-
 					if(period < fnyquist)
 					{
 						LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
@@ -433,6 +454,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 
 void ClockRecoveryFilter::InnerLoopWithNoGating(
 	SparseDigitalWaveform& cap,
+	SparseAnalogWaveform& scap,
 	AcceleratorBuffer<int64_t>& edges,
 	size_t nedges,
 	int64_t tend,
@@ -442,8 +464,6 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 {
 	size_t nedge = 1;
 	int64_t edgepos = edges[0];
-
-	//[[maybe_unused]] int64_t total_error = 0;
 
 	float initialFrequency = 1.0 / initialPeriod;
 	int64_t glitchCutoff = initialPeriod / 10;
@@ -507,26 +527,6 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 				else
 					edgepos += bangbang;
 
-				/*
-				#ifdef PLL_DEBUG_OUTPUTS
-					debugPeriod->m_offsets.push_back(edgepos + period/2);
-					debugPeriod->m_durations.push_back(period);
-					debugPeriod->m_samples.push_back(period);
-
-					debugPhase->m_offsets.push_back(edgepos + period/2);
-					debugPhase->m_durations.push_back(period);
-					debugPhase->m_samples.push_back(dphase);
-
-					debugFreq->m_offsets.push_back(edgepos + period/2);
-					debugFreq->m_durations.push_back(period);
-					debugFreq->m_samples.push_back(dperiod);
-
-					debugDrift->m_offsets.push_back(edgepos + period/2);
-					debugDrift->m_durations.push_back(period);
-					debugDrift->m_samples.push_back(period - initialPeriod);
-				#endif
-				*/
-
 				if(iperiod < fnyquist)
 				{
 					LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
@@ -542,9 +542,6 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 		//Add the sample (90 deg phase offset from the internal NCO)
 		cap.m_offsets.push_back_nomarkmod(edgepos + center);
 	}
-
-	//total_error /= edges.size();
-	//LogTrace("average phase error %zu\n", total_error);
 }
 
 #ifdef __x86_64__

@@ -43,6 +43,7 @@ add_compute_shaders(
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
 		EyePattern.glsl
+		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl

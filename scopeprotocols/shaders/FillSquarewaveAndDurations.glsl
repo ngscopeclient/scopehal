@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,67 +27,50 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ClockRecoveryFilter
- */
-#ifndef ClockRecoveryFilter_h
-#define ClockRecoveryFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-#include "../scopehal/LevelCrossingDetector.h"
+#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_shader_8bit_storage : require
 
-class ClockRecoveryFilter : public Filter
+layout(std430, binding=0) restrict readonly buffer buf_offsets
 {
-public:
-	ClockRecoveryFilter(const std::string& color);
-	virtual ~ClockRecoveryFilter();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(ClockRecoveryFilter)
-
-protected:
-	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
-
-	void InnerLoopWithGating(
-		SparseDigitalWaveform& cap,
-		SparseAnalogWaveform& scap,
-		AcceleratorBuffer<int64_t>& edges,
-		size_t nedges,
-		int64_t tend,
-		int64_t initialPeriod,
-		int64_t halfPeriod,
-		int64_t fnyquist,
-		WaveformBase* gate,
-		SparseDigitalWaveform* sgate,
-		UniformDigitalWaveform* ugate);
-
-	void InnerLoopWithNoGating(
-		SparseDigitalWaveform& cap,
-		SparseAnalogWaveform& scap,
-		AcceleratorBuffer<int64_t>& edges,
-		size_t nedges,
-		int64_t tend,
-		int64_t initialPeriod,
-		int64_t halfPeriod,
-		int64_t fnyquist);
-
-#ifdef __x86_64__
-	void FillSquarewaveAVX2(SparseDigitalWaveform& cap);
-#endif
-
-	std::string m_baudname;
-	std::string m_threshname;
-
-	LevelCrossingDetector m_detector;
-
-	std::shared_ptr<ComputePipeline> m_fillSquarewaveAndDurationsComputePipeline;
+	int64_t offsets[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_durations
+{
+	int64_t durations[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_data
+{
+	uint8_t data[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//2D thread ID
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
+		return;
+
+	//Fill duration
+	if(i == (size-1))
+		durations[i] = 1;
+	else
+		durations[i] = offsets[i+1] - offsets[i];
+
+	//Fill value
+	if( (i & 1) == 1)
+		data[i] = uint8_t(1);
+	else
+		data[i] = uint8_t(0);
+}
