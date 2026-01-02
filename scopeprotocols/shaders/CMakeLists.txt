@@ -33,6 +33,7 @@ add_compute_shaders(
 		ACRMS.glsl
 		ACRMS_Trend.glsl
 		BlackmanHarrisWindow.glsl
+		ClockRecoveryPLL_FirstPass.glsl
 		ComplexBlackmanHarrisWindow.glsl
 		ComplexCosineSumWindow.glsl
 		ComplexRectangularWindow.glsl

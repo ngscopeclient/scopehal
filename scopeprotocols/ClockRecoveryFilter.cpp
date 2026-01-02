@@ -61,6 +61,20 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 		m_fillSquarewaveAndDurationsComputePipeline =
 			make_shared<ComputePipeline>("shaders/FillSquarewaveAndDurations.spv", 3, sizeof(uint32_t));
 	}
+
+	if(g_hasShaderInt64)
+	{
+		m_firstPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FirstPass.spv", 3, sizeof(uint32_t));
+
+		//Set up GPU temporary buffers
+		m_firstPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_firstPassState.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+
+		//Add debug outputs
+		AddDigitalStream("DEBUG_BlockBoundaries");
+		AddDigitalStream("DEBUG_FirstPassOffsets");
+	}
 }
 
 ClockRecoveryFilter::~ClockRecoveryFilter()
@@ -178,14 +192,12 @@ void ClockRecoveryFilter::Refresh(
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	cap->PrepareForCpuAccess();
 	cap->m_offsets.reserve(edges.size());
-	SetData(cap, 0);
 
 	//Create analog output waveform for sampled data
 	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
 	scap->m_triggerPhase = 0;
 	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	scap->PrepareForCpuAccess();
-	SetData(scap, 1);
 
 	//Get timestamp of the last sample
 	int64_t tend;
@@ -216,6 +228,111 @@ void ClockRecoveryFilter::Refresh(
 	{
 		edges.PrepareForCpuAccess();
 		InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
+
+		//Figure out roughly how many toggles we expect to see in the waveform
+		int64_t expectedNumEdges = (edges[nedges-1] / initialPeriod);
+
+		//TODO: what extensions are needed here
+		//We need a fair number of edges in each thread block for the PLL to lock and not overlap too much
+		if(g_hasShaderInt64 && (expectedNumEdges > 100000) )
+		{
+			//First pass: run the PLL separately on each chunk of the waveform
+			//TODO: do we need to tune numThreads to lock well to short waveforms?
+			const uint64_t numThreads = 1024;
+			const uint64_t blockSize = 64;
+			const uint64_t numBlocks = numThreads / blockSize;
+			const uint64_t maxEdges = din->size() / 2;
+
+			//We have no idea how many edges we might generate since the PLL can slew arbitrarily depending on input.
+			//The hard upper bound is Nyquist (one edge every 2 input samples) so allocate that much to start
+			m_firstPassTimestamps.resize(maxEdges);
+
+			//Allocate thread output buffers
+			const uint64_t numStateValuesPerThread = 2;
+			m_firstPassState.resize(numThreads * numStateValuesPerThread);
+
+			cmdBuf.begin({});
+
+			//Constants for first pass
+			ClockRecoveryConstants cfg;
+			cfg.nedges = nedges;
+			cfg.fnyquist = fnyquist;
+			cfg.maxOffsetsPerThread = maxEdges / numThreads;
+			cfg.initialPeriod = initialPeriod;
+			cfg.halfPeriod = halfPeriod;
+			cfg.tend = tend;
+
+			//Run the first pass
+			m_firstPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
+			m_firstPassComputePipeline->BindBufferNonblocking(1, m_firstPassTimestamps, cmdBuf);
+			m_firstPassComputePipeline->BindBufferNonblocking(2, m_firstPassState, cmdBuf);
+			m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+
+			m_firstPassTimestamps.MarkModifiedFromGpu();
+			m_firstPassState.MarkModifiedFromGpu();
+
+			cmdBuf.end();
+
+			queue->SubmitAndBlock(cmdBuf);
+
+			//Read back results
+			m_firstPassTimestamps.PrepareForCpuAccess();
+			m_firstPassState.PrepareForCpuAccess();
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			//DEBUG DEBUG DEBUG
+			//Copy first pass timestamps and manually reduce into a new waveform
+			//then fill it so we can see what we generated
+
+			LogDebug("Dumping stats\n");
+			for(int i=0; i<10; i++)
+			{
+				LogDebug("Thread %d: generated %ld samples, final period %s\n",
+					i,
+					m_firstPassState[i*2],
+					Unit(Unit::UNIT_FS).PrettyPrint(m_firstPassState[i*2 + 1]).c_str());
+			}
+
+			//Dump block boundary data to a channel
+			edges.PrepareForCpuAccess();
+			auto bbcap = SetupEmptySparseDigitalOutputWaveform(din, 2);
+			bbcap->m_triggerPhase = 0;
+			bbcap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
+			bbcap->PrepareForCpuAccess();
+			bbcap->Resize(numThreads);
+			uint64_t numEdgesPerThread = nedges / numThreads;
+			for(uint64_t i=0; i<numThreads; i++)
+				bbcap->m_offsets[i] = edges[i * numEdgesPerThread];
+			FillSquarewaveAVX2(*bbcap);
+			FillDurationsAVX2(*bbcap);
+			bbcap->MarkModifiedFromCpu();
+
+			//Figure out how many total samples we got
+			size_t numTotalSamples = 0;
+			for(uint64_t i=0; i<numThreads; i++)
+				numTotalSamples += m_firstPassState[i*2];
+			LogDebug("Got total %ld samples\n", numTotalSamples);
+
+			//Dump first pass sample offsets to a channel
+			auto foffsets = SetupEmptySparseDigitalOutputWaveform(din, 3);
+			foffsets->m_triggerPhase = 0;
+			foffsets->m_timescale = 1;		//recovered clock time scale is single femtoseconds
+			foffsets->PrepareForCpuAccess();
+			foffsets->Resize(numTotalSamples);
+			uint64_t iout = 0;
+			for(uint64_t i=0; i<numThreads; i++)
+			{
+				uint64_t ifrom = i * cfg.maxOffsetsPerThread;
+				uint64_t blocksize = m_firstPassState[i*2];
+				for(uint64_t j=0; j<blocksize; j++)
+					foffsets->m_offsets[iout ++] = m_firstPassTimestamps[ifrom + j];
+			}
+			FillSquarewaveAVX2(*foffsets);
+			FillDurationsAVX2(*foffsets);
+			foffsets->MarkModifiedFromCpu();
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		}
 	}
 
 	//Offsets always get filled by the CPU at this point in time
@@ -488,7 +605,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 	float fHalfPeriod = halfPeriod;
 
 	//Predict how many edges we're going to need and allocate space in advance
-	//(capture length divided by expected UI length plus 1M extra saples as of margin)
+	//(capture length divided by expected UI length plus 1M extra samples as of margin)
 	int64_t expectedNumEdges = (edges[edgemax] / initialPeriod) + 1000000;
 	cap.Reserve(expectedNumEdges);
 
@@ -514,8 +631,6 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 				fdphase -= fperiod;
 			if(fdphase < -fHalfPeriod)
 				fdphase += fperiod;
-
-			//total_error += i64abs(dphase);
 
 			//Find frequency error
 			float uiLen = (tnext - tlast);

@@ -125,7 +125,6 @@
 #include "FrequencyMeasurement.h"
 #include "GateFilter.h"
 #include "GlitchRemovalFilter.h"
-#include "GPUClockRecoveryFilter.h"
 #include "GroupDelayFilter.h"
 #include "HistogramFilter.h"
 #include "HorizontalBathtub.h"
