@@ -108,9 +108,19 @@ EyePattern::EyePattern(const string& color)
 	m_parameters[m_rateName].SetIntVal(1250000000);
 
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
-		m_eyeComputePipeline = make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
+	{
+		m_eyeComputePipeline =
+			make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
+		m_eyeNormalizeReduceComputePipeline =
+			make_shared<ComputePipeline>("shaders/EyeNormalizeReduce.spv", 2, sizeof(EyeNormalizeConstants));
+		m_eyeNormalizeScaleComputePipeline =
+			make_shared<ComputePipeline>("shaders/EyeNormalizeScale.spv", 3, sizeof(EyeNormalizeConstants));
+	}
 
 	m_indexBuffer.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+
+	m_normalizeMaxBuf.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+	m_normalizeMaxBuf.resize(1);
 
 	m_clockEdgesMuxed = nullptr;
 }
@@ -341,7 +351,20 @@ void EyePattern::Refresh(
 
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(m_clockEdgesMuxed->size(), waveform->size());
-	cap->Normalize();
+
+	//Normalize the waveform and copy the right to the left
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		cap->Normalize(
+			cmdBuf,
+			queue,
+			m_eyeNormalizeReduceComputePipeline,
+			m_eyeNormalizeScaleComputePipeline,
+			m_normalizeMaxBuf);
+	}
+	else
+		cap->Normalize();
+
 	m_streams[2].m_value = cap->GetTotalUIs();
 	m_streams[3].m_value = cap->GetTotalSamples();
 
@@ -1000,7 +1023,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 	}
 	m_indexBuffer.MarkModifiedFromCpu();
 
-	//Figure out how many samples per thread we're running
+	//Run the kernel
 	m_eyeComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);

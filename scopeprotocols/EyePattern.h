@@ -240,8 +240,11 @@ protected:
 	AcceleratorBuffer<uint32_t> m_indexBuffer;
 
 	AcceleratorBuffer<int64_t>* m_clockEdgesMuxed;
+	AcceleratorBuffer<int64_t> m_normalizeMaxBuf;
 
 	std::shared_ptr<ComputePipeline> m_eyeComputePipeline;
+	std::shared_ptr<ComputePipeline> m_eyeNormalizeReduceComputePipeline;
+	std::shared_ptr<ComputePipeline> m_eyeNormalizeScaleComputePipeline;
 };
 
 #endif

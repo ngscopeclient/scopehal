@@ -105,16 +105,50 @@ void EyeWaveform::Normalize()
 		nmax = 1;
 	float norm = 2.0f / nmax;
 
-	/*
-		Normalize with saturation
-		TODO: do this in a shader?
-	 */
+	//Normalize with saturation
 	norm *= m_saturationLevel;
 	size_t len = m_width * m_height;
 	m_outdata.PrepareForCpuAccess();
 	for(size_t i=0; i<len; i++)
 		m_outdata[i] = min(1.0f, m_accumdata[i] * norm);
 	m_outdata.MarkModifiedFromCpu();
+}
+
+void EyeWaveform::Normalize(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
+	shared_ptr<ComputePipeline> normalizeReducePipe,
+	shared_ptr<ComputePipeline> normalizeScalePipe,
+	AcceleratorBuffer<int64_t>& nmaxBuf)
+{
+	//GPU reduction
+	const uint32_t threadsPerBlock = 64;
+	cmdBuf.begin({});
+
+	EyeNormalizeConstants cfg;
+	cfg.width = m_width;
+	cfg.height = m_height;
+	cfg.satLevel = m_saturationLevel;
+
+	//First pass: find maximum and copy right half to left half
+	normalizeReducePipe->BindBufferNonblocking(0, m_accumdata, cmdBuf);
+	normalizeReducePipe->BindBufferNonblocking(1, nmaxBuf, cmdBuf);
+	normalizeReducePipe->Dispatch(cmdBuf, cfg, GetComputeBlockCount(m_height, threadsPerBlock));
+	normalizeReducePipe->AddComputeMemoryBarrier(cmdBuf);
+
+	nmaxBuf.MarkModifiedFromGpu();
+	m_accumdata.MarkModifiedFromGpu();
+
+	//Second pass: actually normalize
+	normalizeScalePipe->BindBufferNonblocking(0, m_accumdata, cmdBuf);
+	normalizeScalePipe->BindBufferNonblocking(1, nmaxBuf, cmdBuf);
+	normalizeScalePipe->BindBufferNonblocking(2, m_outdata, cmdBuf);
+	normalizeScalePipe->Dispatch(cmdBuf, cfg, GetComputeBlockCount(m_height, threadsPerBlock));
+
+	m_outdata.MarkModifiedFromGpu();
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
 
 /**

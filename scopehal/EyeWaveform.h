@@ -41,6 +41,14 @@
 
 #define EYE_ACCUM_SCALE 64
 
+class EyeNormalizeConstants
+{
+public:
+	uint32_t	width;
+	uint32_t	height;
+	float		satLevel;
+};
+
 /**
 	@brief An eye-pattern waveform
 	@ingroup datamodel
@@ -78,6 +86,13 @@ public:
 	{ return m_accumdata; }
 
 	void Normalize();
+	void Normalize(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		std::shared_ptr<ComputePipeline> normalizeReducePipe,
+		std::shared_ptr<ComputePipeline> normalizeScalePipe,
+		AcceleratorBuffer<int64_t>& nmaxBuf
+		);
 
 	///@brief Get the total number of UIs integrated in this eye
 	size_t GetTotalUIs()
