@@ -41,6 +41,8 @@ using namespace std;
 
 ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
+	, m_baudRate(m_parameters["Symbol rate"])
+	, m_threshold(m_parameters["Threshold"])
 {
 	AddDigitalStream("recClk");
 	AddStream(Unit(Unit::UNIT_VOLTS), "sampledData", Stream::STREAM_TYPE_ANALOG);
@@ -48,13 +50,11 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	CreateInput("IN");
 	CreateInput("Gate");
 
-	m_baudname = "Symbol rate";
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_baudname].SetFloatVal(1250000000);	//1.25 Gbps
+	m_baudRate = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_baudRate.SetFloatVal(1250000000);	//1.25 Gbps
 
-	m_threshname = "Threshold";
-	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_threshname].SetFloatVal(0);
+	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_threshold.SetFloatVal(0);
 
 	if(g_hasShaderInt8 && g_hasShaderInt64)
 	{
@@ -122,13 +122,27 @@ void ClockRecoveryFilter::Refresh(
 	auto gate = GetInputWaveform(1);
 	auto sgate = dynamic_cast<SparseDigitalWaveform*>(gate);
 	auto ugate = dynamic_cast<UniformDigitalWaveform*>(gate);
+
+	//Get nominal period used for the first cycle of the NCO
+	int64_t initialPeriod = round(FS_PER_SECOND / m_baudRate.GetFloatVal());
+	int64_t halfPeriod = initialPeriod / 2;
+
+	//Disallow frequencies higher than Nyquist of the input and bail early if we try
+	int64_t fnyquist = 2*din->m_timescale;
+	if( initialPeriod < fnyquist)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+
+	//If we have a gate signal we're doing a fully CPU based datapath, get ready for that
 	if(gate)
 		gate->PrepareForCpuAccess();
 
 	//Timestamps of the edges
 	size_t nedges = 0;
 	AcceleratorBuffer<int64_t> vedges;
-	float threshold = m_parameters[m_threshname].GetFloatVal();
+	float threshold = m_threshold.GetFloatVal();
 	if(uadin)
 		nedges = m_detector.FindZeroCrossings(uadin, threshold, cmdBuf, queue);
 	else
@@ -137,14 +151,14 @@ void ClockRecoveryFilter::Refresh(
 
 		vector<int64_t> edges;
 		if(sadin)
-			FindZeroCrossings(sadin, m_parameters[m_threshname].GetFloatVal(), edges);
+			FindZeroCrossings(sadin, threshold, edges);
 		else if(uddin)
 			FindZeroCrossings(uddin, edges);
 		else if(sddin)
 			FindZeroCrossings(sddin, edges);
 		nedges = edges.size();
 
-		//Inefficient but this is a less frwuently used code path
+		//Inefficient but this is a less frequently used code path
 		vedges.resize(nedges);
 		vedges.PrepareForCpuAccess();
 		memcpy(vedges.GetCpuPointer(), &edges[0], nedges*sizeof(int64_t));
@@ -157,49 +171,52 @@ void ClockRecoveryFilter::Refresh(
 
 	//Edge array
 	auto& edges = uadin ? m_detector.GetResults() : vedges;
-	edges.PrepareForCpuAccess();
-
-	//Get nominal period used for the first cycle of the NCO
-	int64_t initialPeriod = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
-	int64_t halfPeriod = initialPeriod / 2;
-
-	//Disallow frequencies higher than Nyquist of the input
-	int64_t fnyquist = 2*din->m_timescale;
-	if( initialPeriod < fnyquist)
-	{
-		SetData(nullptr, 0);
-		return;
-	}
 
 	//Create the output waveform and copy our timescales
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	cap->PrepareForCpuAccess();
+	cap->m_offsets.reserve(edges.size());
+	SetData(cap, 0);
 
 	//Create analog output waveform for sampled data
 	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
 	scap->m_triggerPhase = 0;
 	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	scap->PrepareForCpuAccess();
+	SetData(scap, 1);
 
 	//Get timestamp of the last sample
 	int64_t tend;
-	if(sadin || uadin)
-		tend = GetOffsetScaled(sadin, uadin, din->size()-1);
+	if(uadin)
+	{
+		//This can be done entirely with metadata and doesn't need to pull samples from the GPU
+		tend = GetOffsetScaled(uadin, din->size()-1);
+	}
+	else if(sadin)
+	{
+		sadin->PrepareForCpuAccess();
+		tend = GetOffsetScaled(sadin, din->size()-1);
+	}
 	else
+	{
+		din->PrepareForCpuAccess();
 		tend = GetOffsetScaled(sddin, uddin, din->size()-1);
+	}
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
-	cap->m_offsets.reserve(edges.size());
 	if(gate)
+	{
+		edges.PrepareForCpuAccess();
 		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
+	}
 	else
+	{
+		edges.PrepareForCpuAccess();
 		InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
-
-	SetData(cap, 0);
-	SetData(scap, 1);
+	}
 
 	//Offsets always get filled by the CPU at this point in time
 	cap->m_offsets.MarkModifiedFromCpu();
