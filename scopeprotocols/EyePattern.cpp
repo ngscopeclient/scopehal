@@ -162,6 +162,11 @@ float EyePattern::GetOffset(size_t /*stream*/)
 	return -m_parameters[m_centerName].GetFloatVal();
 }
 
+FlowGraphNode::DataLocation EyePattern::GetInputLocation()
+{
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -187,9 +192,6 @@ void EyePattern::Refresh(
 	auto waveform = GetInputWaveform(0);
 	auto clock = GetInputWaveform(1);
 
-	waveform->PrepareForCpuAccess();
-	clock->PrepareForCpuAccess();
-
 	SetYAxisUnits(GetInput(0).GetYAxisUnits(), 0);
 
 	//If center of the eye was changed, reset existing eye data
@@ -208,8 +210,8 @@ void EyePattern::Refresh(
 	ClockAlignment clock_align = static_cast<ClockAlignment>(m_parameters[m_clockAlignName].GetIntVal());
 	if(m_lastClockAlign != clock_align)
 	{
-		SetData(NULL, 0);
-		cap = NULL;
+		SetData(nullptr, 0);
+		cap = nullptr;
 		m_lastClockAlign = clock_align;
 	}
 
@@ -388,6 +390,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	)
 {
 	m_clockEdgesMuxed->PrepareForCpuAccess();
+	waveform->PrepareForCpuAccess();
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
@@ -590,6 +593,7 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 	)
 {
 	m_clockEdgesMuxed->PrepareForCpuAccess();
+	waveform->PrepareForCpuAccess();
 	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
@@ -788,6 +792,7 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 	)
 {
 	m_clockEdgesMuxed->PrepareForCpuAccess();
+	waveform->PrepareForCpuAccess();
 	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
@@ -1049,6 +1054,7 @@ void EyePattern::DensePackedInnerLoop(
 	)
 {
 	m_clockEdgesMuxed->PrepareForCpuAccess();
+	waveform->PrepareForCpuAccess();
 	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
@@ -1127,6 +1133,7 @@ void EyePattern::SparsePackedInnerLoop(
 	)
 {
 	m_clockEdgesMuxed->PrepareForCpuAccess();
+	waveform->PrepareForCpuAccess();
 	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
