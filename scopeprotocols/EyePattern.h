@@ -239,6 +239,8 @@ protected:
 	AcceleratorBuffer<int64_t> m_clockEdges;
 	AcceleratorBuffer<uint32_t> m_indexBuffer;
 
+	AcceleratorBuffer<int64_t>* m_clockEdgesMuxed;
+
 	std::shared_ptr<ComputePipeline> m_eyeComputePipeline;
 };
 

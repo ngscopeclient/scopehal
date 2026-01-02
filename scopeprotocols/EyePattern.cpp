@@ -111,6 +111,8 @@ EyePattern::EyePattern(const string& color)
 		m_eyeComputePipeline = make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
 
 	m_indexBuffer.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+
+	m_clockEdgesMuxed = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -225,6 +227,7 @@ void EyePattern::Refresh(
 				vector<int64_t> clock_edges;
 				FindRisingEdges(sclk, uclk, clock_edges);
 				m_clockEdges.CopyFrom(clock_edges);
+				m_clockEdgesMuxed = &m_clockEdges;
 			}
 			break;
 
@@ -234,16 +237,17 @@ void EyePattern::Refresh(
 				vector<int64_t> clock_edges;
 				FindFallingEdges(sclk, uclk, clock_edges);
 				m_clockEdges.CopyFrom(clock_edges);
+				m_clockEdgesMuxed = &m_clockEdges;
 			}
 			break;
 
 		case CLOCK_BOTH:
 			{
 				//Fast path: If the clock is coming from a CDR filter, every sample is an edge by definition
-				//Just copy the timestamps (or can we even do zero copy somehow?)
+				//Zero-copy use those timestamps
 				auto pcdr = dynamic_cast<ClockRecoveryFilter*>(GetInput(1).m_channel);
 				if(pcdr)
-					m_clockEdges.CopyFrom(sclk->m_offsets);
+					m_clockEdgesMuxed = &sclk->m_offsets;
 
 				//slow path
 				else
@@ -251,13 +255,14 @@ void EyePattern::Refresh(
 					vector<int64_t> clock_edges;
 					FindZeroCrossings(sclk, uclk, clock_edges);
 					m_clockEdges.CopyFrom(clock_edges);
+					m_clockEdgesMuxed = &m_clockEdges;
 				}
 			}
 			break;
 	}
 
 	//If no clock edges, don't change anything
-	if(m_clockEdges.empty())
+	if(m_clockEdgesMuxed->empty())
 		return;
 
 	//Calculate the nominal UI width
@@ -268,10 +273,10 @@ void EyePattern::Refresh(
 	//All of the eye creation logic assumes a center aligned clock.
 	if(clock_align == ALIGN_EDGE)
 	{
-		m_clockEdges.PrepareForCpuAccess();
-		for(size_t i=0; i<m_clockEdges.size(); i++)
-			m_clockEdges[i] += cap->m_uiWidth / 2;
-		m_clockEdges.MarkModifiedFromCpu();
+		m_clockEdgesMuxed->PrepareForCpuAccess();
+		for(size_t i=0; i<m_clockEdgesMuxed->size(); i++)
+			(*m_clockEdgesMuxed)[i] += cap->m_uiWidth / 2;
+		m_clockEdgesMuxed->MarkModifiedFromCpu();
 	}
 
 	//Recompute scales
@@ -286,7 +291,7 @@ void EyePattern::Refresh(
 	float xtimescale = waveform->m_timescale * m_xscale;
 
 	//Process the eye
-	size_t cend = m_clockEdges.size() - 1;
+	size_t cend = m_clockEdgesMuxed->size() - 1;
 	size_t wend = waveform->size()-1;
 	int32_t ymax = m_height - 1;
 	int32_t xmax = m_width - 1;
@@ -335,7 +340,7 @@ void EyePattern::Refresh(
 	}
 
 	//Count total number of UIs we've integrated
-	cap->IntegrateUIs(m_clockEdges.size(), waveform->size());
+	cap->IntegrateUIs(m_clockEdgesMuxed->size(), waveform->size());
 	cap->Normalize();
 	m_streams[2].m_value = cap->GetTotalUIs();
 	m_streams[3].m_value = cap->GetTotalSamples();
@@ -359,7 +364,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	float yoff
 	)
 {
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
@@ -382,6 +387,8 @@ void EyePattern::DensePackedInnerLoopAVX2(
 
 	float* samples = (float*)&waveform->m_samples[0];
 
+	auto& edges = *m_clockEdgesMuxed;
+
 	//Main unrolled loop, 8 samples per iteration
 	size_t i = 0;
 	uint32_t bufmax = m_width * (m_height - 1);
@@ -398,11 +405,11 @@ void EyePattern::DensePackedInnerLoopAVX2(
 			//Find time of this sample.
 			//If it's past the end of the current UI, move to the next clock edge
 			int64_t tstart = k * waveform->m_timescale + waveform->m_triggerPhase;
-			offset[j] = tstart - m_clockEdges[iclock];
+			offset[j] = tstart - edges[iclock];
 			if(offset[j] < 0)
 				continue;
 			size_t nextclk = iclock + 1;
-			int64_t tnext = m_clockEdges[nextclk];
+			int64_t tnext = edges[nextclk];
 			if(tstart >= tnext)
 			{
 				//Move to the next clock edge
@@ -493,11 +500,11 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
 		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - m_clockEdges[iclock];
+		int64_t offset = tstart - edges[iclock];
 		if(offset < 0)
 			continue;
 		size_t nextclk = iclock + 1;
-		int64_t tnext = m_clockEdges[nextclk];
+		int64_t tnext = edges[nextclk];
 		if(tstart >= tnext)
 		{
 			//Move to the next clock edge
@@ -559,7 +566,8 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 	float yoff
 	)
 {
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
+	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
@@ -598,11 +606,11 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 			//Find time of this sample.
 			//If it's past the end of the current UI, move to the next clock edge
 			int64_t tstart = k * waveform->m_timescale + waveform->m_triggerPhase;
-			offset[j] = tstart - m_clockEdges[iclock];
+			offset[j] = tstart - edges[iclock];
 			if(offset[j] < 0)
 				continue;
 			size_t nextclk = iclock + 1;
-			int64_t tnext = m_clockEdges[nextclk];
+			int64_t tnext = edges[nextclk];
 			if(tstart >= tnext)
 			{
 				//Move to the next clock edge
@@ -690,11 +698,11 @@ void EyePattern::DensePackedInnerLoopAVX2FMA(
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
 		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - m_clockEdges[iclock];
+		int64_t offset = tstart - edges[iclock];
 		if(offset < 0)
 			continue;
 		size_t nextclk = iclock + 1;
-		int64_t tnext = m_clockEdges[nextclk];
+		int64_t tnext = edges[nextclk];
 		if(tstart >= tnext)
 		{
 			//Move to the next clock edge
@@ -756,7 +764,8 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 	float yoff
 	)
 {
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
+	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
@@ -793,11 +802,11 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 			//Find time of this sample.
 			//If it's past the end of the current UI, move to the next clock edge
 			int64_t tstart = k * waveform->m_timescale + waveform->m_triggerPhase;
-			offset[j] = tstart - m_clockEdges[iclock];
+			offset[j] = tstart - edges[iclock];
 			if(offset[j] < 0)
 				continue;
 			size_t nextclk = iclock + 1;
-			int64_t tnext = m_clockEdges[nextclk];
+			int64_t tnext = edges[nextclk];
 			if(tstart >= tnext)
 			{
 				//Move to the next clock edge
@@ -878,11 +887,11 @@ void EyePattern::DensePackedInnerLoopAVX512F(
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
 		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - m_clockEdges[iclock];
+		int64_t offset = tstart - edges[iclock];
 		if(offset < 0)
 			continue;
 		size_t nextclk = iclock + 1;
-		int64_t tnext = m_clockEdges[nextclk];
+		int64_t tnext = edges[nextclk];
 		if(tstart >= tnext)
 		{
 			//Move to the next clock edge
@@ -974,14 +983,14 @@ void EyePattern::DensePackedInnerLoopGPU(
 	//Allocate and fill index buffer
 	m_indexBuffer.resize(numThreads);
 	m_indexBuffer.PrepareForCpuAccess();
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
 	for(size_t i=0; i<numThreads; i++)
 	{
 		//Get timestamp of the first sample in this thread's block
 		int64_t tstart = (i * numSamplesPerThread) * waveform->m_timescale + waveform->m_triggerPhase;
 
 		//Find the first clock edge after this sample
-		size_t iclk = BinarySearchForGequal(m_clockEdges.GetCpuPointer(), m_clockEdges.size(), tstart);
+		size_t iclk = BinarySearchForGequal(m_clockEdgesMuxed->GetCpuPointer(), m_clockEdgesMuxed->size(), tstart);
 
 		//We actually want the clock edge before this one, so decrement it
 		if(iclk > 0)
@@ -992,7 +1001,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 	m_indexBuffer.MarkModifiedFromCpu();
 
 	//Figure out how many samples per thread we're running
-	m_eyeComputePipeline->BindBufferNonblocking(0, m_clockEdges, cmdBuf);
+	m_eyeComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(3, m_indexBuffer, cmdBuf);
@@ -1016,7 +1025,8 @@ void EyePattern::DensePackedInnerLoop(
 	float yoff
 	)
 {
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
+	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
@@ -1028,11 +1038,11 @@ void EyePattern::DensePackedInnerLoop(
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
 		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - m_clockEdges[iclock];
+		int64_t offset = tstart - edges[iclock];
 		if(offset < 0)
 			continue;
 		size_t nextclk = iclock + 1;
-		int64_t tnext = m_clockEdges[nextclk];
+		int64_t tnext = edges[nextclk];
 		if(tstart >= tnext)
 		{
 			//Move to the next clock edge
@@ -1093,7 +1103,8 @@ void EyePattern::SparsePackedInnerLoop(
 	float yoff
 	)
 {
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
+	auto& edges = *m_clockEdgesMuxed;
 
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
@@ -1105,11 +1116,11 @@ void EyePattern::SparsePackedInnerLoop(
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
 		int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - m_clockEdges[iclock];
+		int64_t offset = tstart - edges[iclock];
 		if(offset < 0)
 			continue;
 		size_t nextclk = iclock + 1;
-		int64_t tnext = m_clockEdges[nextclk];
+		int64_t tnext = edges[nextclk];
 		if(tstart >= tnext)
 		{
 			//Move to the next clock edge
@@ -1169,7 +1180,8 @@ EyeWaveform* EyePattern::ReallocateWaveform()
 
 void EyePattern::RecalculateUIWidth(EyeWaveform* cap)
 {
-	m_clockEdges.PrepareForCpuAccess();
+	m_clockEdgesMuxed->PrepareForCpuAccess();
+	auto& edges = *m_clockEdgesMuxed;
 
 	//If manual override, don't look at anything else
 	if(m_parameters[m_rateModeName].GetIntVal() == MODE_FIXED)
@@ -1179,7 +1191,7 @@ void EyePattern::RecalculateUIWidth(EyeWaveform* cap)
 	}
 
 	//average between 10 and 1000 UIs to get eye width
-	size_t count = m_clockEdges.size();
+	size_t count = m_clockEdgesMuxed->size();
 	if(count < 10)
 		return;
 	if(count > 1000)
@@ -1188,7 +1200,7 @@ void EyePattern::RecalculateUIWidth(EyeWaveform* cap)
 	//Find width of each UI
 	vector<int64_t> ui_widths;
 	for(size_t i=0; i<count; i++)
-		ui_widths.push_back(m_clockEdges[i+1] - m_clockEdges[i]);
+		ui_widths.push_back(edges[i+1] - edges[i]);
 
 	//Sort, discard the top and bottom 10%, and average the rest to calculate nominal width
 	sort(ui_widths.begin(), ui_widths.begin() + count);
