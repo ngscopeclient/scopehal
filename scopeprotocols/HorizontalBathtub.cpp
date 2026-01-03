@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -107,15 +107,34 @@ void HorizontalBathtub::Refresh()
 	cap->m_triggerPhase = -din->m_uiWidth/2;
 	cap->m_timescale = fs_per_pixel;
 
+	//Get the eye opening we're targeting
+	//TODO: PAM4 support
+	int eyemid = 0;
+	switch(din->m_numLevels)
+	{
+		case 2:
+			eyemid = din->m_midpoints[0];
+			break;
+
+		case 3:
+			if(ybin > ymid)
+				eyemid = din->m_midpoints[1];
+			else
+				eyemid = din->m_midpoints[0];
+			break;
+
+		default:
+			break;
+	}
+
 	//Extract the single scanline we're interested in
-	//TODO: support non-NRZ waveforms
 	size_t len = din->GetWidth();
 	auto halflen = len/2;
 	auto quartlen = halflen/2;
 	cap->Resize(halflen);
 	for(size_t i=0; i<halflen; i++)
 	{
-		auto ber = din->GetBERAtPoint(i + quartlen, ybin, din->GetWidth()/2, din->GetHeight()/2);
+		auto ber = din->GetBERAtPoint(i + quartlen, ybin, din->GetWidth()/2, eyemid);
 		if(ber < 1e-20)
 			cap->m_samples[i] = -20;
 		else
