@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -232,6 +232,10 @@ float EyeMask::CalculateHitRate(
 	float xoff
 	)
 {
+	//TODO: GPU this?
+	//For now, we're running on the CPU though. Make sure the data is here when we need it
+	cap->GetAccumBuffer().PrepareForCpuAccess();
+
 	if(!m_canvas || (m_width != width) || (m_height != height))
 	{
 		m_width = width;

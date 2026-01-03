@@ -167,6 +167,8 @@ void EyeWaveform::Normalize(
  */
 double EyeWaveform::GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, ssize_t ymid)
 {
+	m_accumdata.PrepareForCpuAccess();
+
 	if(m_type == EYE_BER)
 	{
 		//out of bounds? all error
