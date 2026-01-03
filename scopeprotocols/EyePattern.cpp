@@ -59,6 +59,7 @@ EyePattern::EyePattern(const string& color)
 	, m_clockAlignName("Clock Alignment")
 	, m_rateModeName("Bit Rate Mode")
 	, m_rateName("Bit Rate")
+	, m_numLevelsName("Modulation Levels")
 	, m_clockEdges("EyePattern.clockEdges")
 	, m_indexBuffer("EyePattern.indexBuffer")
 {
@@ -93,6 +94,9 @@ EyePattern::EyePattern(const string& color)
 
 	m_parameters[m_rangeName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_rangeName].SetFloatVal(0.25);
+
+	m_parameters[m_numLevelsName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_numLevelsName].SetIntVal(2);
 
 	m_parameters[m_clockAlignName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_clockAlignName].AddEnumValue("Center", ALIGN_CENTER);
@@ -201,8 +205,8 @@ void EyePattern::Refresh(
 	{
 		if(fabs(cap->GetCenterVoltage() - center) > 0.001)
 		{
-			SetData(NULL, 0);
-			cap = NULL;
+			SetData(nullptr, 0);
+			cap = nullptr;
 		}
 	}
 
@@ -225,7 +229,32 @@ void EyePattern::Refresh(
 	if(cap == nullptr)
 		cap = ReallocateWaveform();
 	cap->m_saturationLevel = m_parameters[m_saturationName].GetFloatVal();
+	cap->m_numLevels = m_parameters[m_numLevelsName].GetIntVal();
 	int64_t* data = cap->GetAccumData();
+
+	//Set eye midpoint levels
+	//If NRZ, it's the vertical midpoint
+	if(cap->m_midpoints.size() != cap->m_numLevels)
+	{
+		cap->m_midpoints.resize(cap->m_numLevels);
+		switch(cap->m_numLevels)
+		{
+			//NRZ: midpoint of eye is midpoint of the single opening
+			case 2:
+				cap->m_midpoints[0] = m_height / 2;
+				break;
+
+			//PAM3 / MLT3: assume we're centered and use the midpoint of the top and bottom halves (1/4 and 3/4 points)
+			case 3:
+				cap->m_midpoints[0] = m_height / 4;
+				cap->m_midpoints[1] = m_height * 3 / 4;
+				break;
+
+			default:
+				LogWarning("Don't know how to find midpoints for %zu-level eye\n", cap->m_numLevels);
+				break;
+		}
+	}
 
 	//Find all toggles in the clock
 	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clock);

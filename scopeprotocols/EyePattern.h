@@ -234,6 +234,7 @@ protected:
 	std::string m_clockAlignName;
 	std::string m_rateModeName;
 	std::string m_rateName;
+	std::string m_numLevelsName;
 
 	EyeMask m_mask;
 

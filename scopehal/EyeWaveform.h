@@ -163,6 +163,16 @@ public:
 	EyeType GetType()
 	{ return m_type; }
 
+	/**
+		@brief Number of modulation levels (2 = NRZ, 3 = MLT3/PAM3, 4 = PAM4, etc)
+	 */
+	size_t m_numLevels;
+
+	/**
+		@brief Midpoint levels for each eye opening
+	 */
+	std::vector<int> m_midpoints;
+
 	virtual void FreeGpuMemory() override
 	{ m_accumdata.FreeGpuBuffer(); }
 

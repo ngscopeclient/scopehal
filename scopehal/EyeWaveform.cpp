@@ -57,6 +57,7 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center, EyeType etyp
 	: DensityFunctionWaveform(width, height)
 	, m_uiWidth(0)
 	, m_saturationLevel(1)
+	, m_numLevels(2)
 	, m_totalUIs(0)
 	, m_totalSamples(0)
 	, m_centerVoltage(center)
