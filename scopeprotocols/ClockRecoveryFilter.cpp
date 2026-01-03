@@ -85,11 +85,6 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 
 		m_secondPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_secondPassState.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
-
-		//Add debug outputs
-		AddDigitalStream("DEBUG_BlockBoundaries");
-		AddDigitalStream("DEBUG_FirstPassOffsets");
-		AddDigitalStream("DEBUG_SecondPassOffsets");
 	}
 }
 
@@ -315,7 +310,7 @@ void ClockRecoveryFilter::Refresh(
 			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
 
-			//Figure out how many edges we have
+			//Figure out how many edges we ended up with
 			//TODO: can we avoid this readback?
 			m_firstPassState.PrepareForCpuAccess();
 			m_secondPassState.PrepareForCpuAccess();
@@ -325,164 +320,6 @@ void ClockRecoveryFilter::Refresh(
 
 			//Get final edge count
 			cap->Resize(numSamples);
-			LogDebug("Got %zu edges\n", numSamples);
-
-			////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			//DEBUG DEBUG DEBUG
-			//Copy first pass timestamps and manually reduce into a new waveform
-			//then fill it so we can see what we generated
-			/*
-			//Read back results
-			m_firstPassTimestamps.PrepareForCpuAccess();
-			m_firstPassState.PrepareForCpuAccess();
-			m_secondPassTimestamps.PrepareForCpuAccess();
-			m_secondPassState.PrepareForCpuAccess();
-
-			LogDebug("-------\n");
-			*/
-			/*
-			LogDebug("First pass stats\n");
-			for(int i=0; i<10; i++)
-			{
-				LogIndenter li;
-				LogDebug("Thread %d: generated %ld samples, final period %s\n",
-					i,
-					m_firstPassState[i*2],
-					Unit(Unit::UNIT_FS).PrettyPrint(m_firstPassState[i*2 + 1]).c_str());
-			}
-
-			LogDebug("Second pass stats\n");
-			for(int i=0; i<10; i++)
-			{
-				LogIndenter li;
-				LogDebug("Thread %d: generated %ld samples, final period %s\n",
-					i,
-					m_secondPassState[i*2],
-					Unit(Unit::UNIT_FS).PrettyPrint(m_secondPassState[i*2 + 1]).c_str());
-			}*/
-			/*
-			uint64_t numEdgesPerThread = nedges / numThreads;
-			edges.PrepareForCpuAccess();
-			uint64_t nPrintBlock = 0;
-			uint64_t numBlockSamples = m_secondPassState[nPrintBlock*2];
-			int64_t tBlockLast = m_secondPassTimestamps[nPrintBlock * cfg.maxOffsetsPerThread + numBlockSamples - 1];
-			int64_t tBlockFirst = m_secondPassTimestamps[(nPrintBlock + 1) * cfg.maxOffsetsPerThread];
-			LogDebug("Last sample of block %ld:   %ld\n", nPrintBlock, tBlockLast);
-			LogDebug("First sample of block %ld:  %ld\n", nPrintBlock + 1, tBlockFirst);
-			LogDebug("Nominal start of block %ld: %ld\n", nPrintBlock + 1, edges[(nPrintBlock + 2) * numEdgesPerThread]);
-
-
-			//Dump block boundary data to a channel
-			edges.PrepareForCpuAccess();
-			auto bbcap = SetupEmptySparseDigitalOutputWaveform(din, 2);
-			bbcap->m_triggerPhase = 0;
-			bbcap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
-			bbcap->PrepareForCpuAccess();
-			bbcap->Resize(numThreads);
-			for(uint64_t i=0; i<numThreads; i++)
-				bbcap->m_offsets[i] = edges[i * numEdgesPerThread];
-			FillSquarewaveAVX2(*bbcap);
-			FillDurationsAVX2(*bbcap);
-			bbcap->MarkModifiedFromCpu();
-			*/
-			/*
-			//FIRST PASS dumping
-			//Figure out how many total samples we got
-			size_t numTotalSamples = 0;
-			for(uint64_t i=0; i<numThreads; i++)
-				numTotalSamples += m_firstPassState[i*2];
-			LogDebug("First pass: Got total %ld samples\n", numTotalSamples);
-
-			//Dump first pass sample offsets to a channel
-			auto foffsets = SetupEmptySparseDigitalOutputWaveform(din, 3);
-			foffsets->m_triggerPhase = 0;
-			foffsets->m_timescale = 1;		//recovered clock time scale is single femtoseconds
-			foffsets->PrepareForCpuAccess();
-			foffsets->Resize(numTotalSamples);
-			uint64_t iout = 0;
-			for(uint64_t i=0; i<numThreads; i++)
-			{
-				uint64_t ifrom = i * cfg.maxOffsetsPerThread;
-				uint64_t blocksize = m_firstPassState[i*2];
-				for(uint64_t j=0; j<blocksize; j++)
-					foffsets->m_offsets[iout ++] = m_firstPassTimestamps[ifrom + j];
-			}
-			FillSquarewaveAVX2(*foffsets);
-			FillDurationsAVX2(*foffsets);
-			foffsets->MarkModifiedFromCpu();
-
-			//Figure out how many total samples we got
-			numTotalSamples = 0;
-			for(uint64_t i=0; i<numThreads; i++)
-				numTotalSamples += m_secondPassState[i*2];
-			LogDebug("Second pass: Got total %ld samples\n", numTotalSamples);
-
-			//Copy first block first pass
-			uint64_t numFirstBlockSamples = m_firstPassState[0];
-			numTotalSamples += numFirstBlockSamples;
-
-			//Dump second pass sample offsets to a channel
-			auto soffsets = SetupEmptySparseDigitalOutputWaveform(din, 4);
-			soffsets->m_triggerPhase = 0;
-			soffsets->m_timescale = 1;		//recovered clock time scale is single femtoseconds
-			soffsets->PrepareForCpuAccess();
-			soffsets->Resize(numTotalSamples);
-			iout = 0;
-			for(uint64_t i=0; i<numFirstBlockSamples; i++)
-				soffsets->m_offsets[iout ++] = m_firstPassTimestamps[i];
-			for(uint64_t i=0; i<numThreads; i++)
-			{
-				uint64_t ifrom = i * cfg.maxOffsetsPerThread;
-				uint64_t blocksize = m_secondPassState[i*2];
-				for(uint64_t j=0; j<blocksize; j++)
-					soffsets->m_offsets[iout ++] = m_secondPassTimestamps[ifrom + j];
-			}
-			FillSquarewaveAVX2(*soffsets);
-			FillDurationsAVX2(*soffsets);
-			soffsets->MarkModifiedFromCpu();
-
-			//Print out some stuff at the block 0-1 boundary
-			uint64_t numFirst = m_firstPassState[0];
-			LogDebug("End of block 0, first pass:\n");
-			for(uint64_t i=5; i>0; i--)
-			{
-				LogIndenter li;
-				LogDebug("%ld\n", m_firstPassTimestamps[numFirst - i]);
-			}
-			LogDebug("Start of block 1, second pass:\n");
-			for(uint64_t i=0; i<5; i++)
-			{
-				LogIndenter li;
-				LogDebug("%ld\n", m_secondPassTimestamps[i]);
-			}
-			LogDebug("Timestamp of first input edge in block 1: %ld\n", edges[numEdgesPerThread]);
-
-			////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			*/
-
-			//Check timestamps on final pass for deltas or duplicates
-			//TODO: make this a unit test?
-			cap->PrepareForCpuAccess();
-			int64_t tolerance = initialPeriod / 25;
-			size_t nfail = 0;
-			for(size_t i=0; i<cap->m_offsets.size() - 1; i++)
-			{
-				int64_t delta = cap->m_offsets[i+1] - cap->m_offsets[i];
-				if(llabs(delta - initialPeriod) > tolerance)
-				{
-					LogDebug("FAIL: delta at T=%s is %s (%ld, %ld)\n",
-						Unit(Unit::UNIT_FS).PrettyPrint(cap->m_offsets[i]).c_str(),
-						Unit(Unit::UNIT_FS).PrettyPrint(delta).c_str(),
-						cap->m_offsets[i], cap->m_offsets[i+1]);
-
-					nfail ++;
-					if(nfail > 10)
-					{
-						LogDebug("Too many errors, truncating log\n");
-						break;
-					}
-				}
-			}
 		}
 
 		else
