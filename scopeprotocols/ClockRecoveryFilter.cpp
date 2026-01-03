@@ -201,7 +201,6 @@ void ClockRecoveryFilter::Refresh(
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
-	cap->PrepareForCpuAccess();
 	cap->m_offsets.reserve(edges.size());
 
 	//Create analog output waveform for sampled data
@@ -233,17 +232,15 @@ void ClockRecoveryFilter::Refresh(
 	if(gate)
 	{
 		edges.PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
 		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 		cap->m_offsets.MarkModifiedFromCpu();
 	}
 	else
 	{
 		//Figure out roughly how many toggles we expect to see in the waveform
-		//TODO: can we just use the number of samples as a proxy??
-		edges.PrepareForCpuAccess();
-		int64_t expectedNumEdges = (edges[nedges-1] / initialPeriod);
+		int64_t expectedNumEdges = (tend / initialPeriod);
 
-		//TODO: what extensions are needed here
 		//We need a fair number of edges in each thread block for the PLL to lock and not overlap too much
 		if(g_hasShaderInt64 && (expectedNumEdges > 100000) && (m_mtMode.GetIntVal() == MT_GPU) )
 		{
@@ -325,6 +322,7 @@ void ClockRecoveryFilter::Refresh(
 		else
 		{
 			edges.PrepareForCpuAccess();
+			cap->PrepareForCpuAccess();
 			InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
 			cap->m_offsets.MarkModifiedFromCpu();
 		}
