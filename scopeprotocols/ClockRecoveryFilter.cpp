@@ -43,6 +43,7 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
 	, m_baudRate(m_parameters["Symbol rate"])
 	, m_threshold(m_parameters["Threshold"])
+	, m_mtMode(m_parameters["Multithreading"])
 {
 	AddDigitalStream("recClk");
 	AddStream(Unit(Unit::UNIT_VOLTS), "sampledData", Stream::STREAM_TYPE_ANALOG);
@@ -55,6 +56,11 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 
 	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_threshold.SetFloatVal(0);
+
+	m_mtMode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_mtMode.AddEnumValue("CPU single thread", MT_SINGLE_THREAD);
+	m_mtMode.AddEnumValue("GPU", MT_GPU);
+	m_mtMode.SetIntVal(MT_GPU);
 
 	if(g_hasShaderInt8 && g_hasShaderInt64)
 	{
@@ -69,6 +75,9 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 
 		m_secondPassComputePipeline =
 			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_SecondPass.spv", 5, sizeof(uint32_t));
+
+		m_finalPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FinalPass.spv", 5, sizeof(uint32_t));
 
 		//Set up GPU temporary buffers
 		m_firstPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
@@ -230,22 +239,22 @@ void ClockRecoveryFilter::Refresh(
 	{
 		edges.PrepareForCpuAccess();
 		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
+		cap->m_offsets.MarkModifiedFromCpu();
 	}
 	else
 	{
-		edges.PrepareForCpuAccess();
-		InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
-
 		//Figure out roughly how many toggles we expect to see in the waveform
+		//TODO: can we just use the number of samples as a proxy??
+		edges.PrepareForCpuAccess();
 		int64_t expectedNumEdges = (edges[nedges-1] / initialPeriod);
 
 		//TODO: what extensions are needed here
 		//We need a fair number of edges in each thread block for the PLL to lock and not overlap too much
-		if(g_hasShaderInt64 && (expectedNumEdges > 100000) )
+		if(g_hasShaderInt64 && (expectedNumEdges > 100000) && (m_mtMode.GetIntVal() == MT_GPU) )
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
 			//TODO: do we need to tune numThreads to lock well to short waveforms?
-			const uint64_t numThreads = 1024;
+			const uint64_t numThreads = 2048;
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
 			const uint64_t maxEdges = din->size() / 2;
@@ -254,6 +263,7 @@ void ClockRecoveryFilter::Refresh(
 			//The hard upper bound is Nyquist (one edge every 2 input samples) so allocate that much to start
 			m_firstPassTimestamps.resize(maxEdges);
 			m_secondPassTimestamps.resize(maxEdges);
+			cap->Resize(maxEdges);
 
 			//Allocate thread output buffers
 			const uint64_t numStateValuesPerThread = 2;
@@ -287,27 +297,50 @@ void ClockRecoveryFilter::Refresh(
 			m_secondPassComputePipeline->BindBufferNonblocking(3, m_secondPassTimestamps, cmdBuf);
 			m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassState, cmdBuf);
 			m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+			m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 			m_secondPassTimestamps.MarkModifiedFromGpu();
 			m_secondPassState.MarkModifiedFromGpu();
 
-			cmdBuf.end();
+			//Run the final pass
+			m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassState, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(2, m_secondPassTimestamps, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(3, m_secondPassState, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
+			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
+			cap->m_offsets.MarkModifiedFromGpu();
+
+			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
 
+			//Figure out how many edges we have
+			//TODO: can we avoid this readback?
+			m_firstPassState.PrepareForCpuAccess();
+			m_secondPassState.PrepareForCpuAccess();
+			uint64_t numSamples = m_firstPassState[0];
+			for(uint64_t i=0; i<numThreads; i++)
+				numSamples += m_secondPassState[i*2];
+
+			//Get final edge count
+			cap->Resize(numSamples);
+			LogDebug("Got %zu edges\n", numSamples);
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			//DEBUG DEBUG DEBUG
+			//Copy first pass timestamps and manually reduce into a new waveform
+			//then fill it so we can see what we generated
+			/*
 			//Read back results
 			m_firstPassTimestamps.PrepareForCpuAccess();
 			m_firstPassState.PrepareForCpuAccess();
 			m_secondPassTimestamps.PrepareForCpuAccess();
 			m_secondPassState.PrepareForCpuAccess();
 
-			////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			//DEBUG DEBUG DEBUG
-			//Copy first pass timestamps and manually reduce into a new waveform
-			//then fill it so we can see what we generated
-
 			LogDebug("-------\n");
-
+			*/
+			/*
 			LogDebug("First pass stats\n");
 			for(int i=0; i<10; i++)
 			{
@@ -326,7 +359,18 @@ void ClockRecoveryFilter::Refresh(
 					i,
 					m_secondPassState[i*2],
 					Unit(Unit::UNIT_FS).PrettyPrint(m_secondPassState[i*2 + 1]).c_str());
-			}
+			}*/
+			/*
+			uint64_t numEdgesPerThread = nedges / numThreads;
+			edges.PrepareForCpuAccess();
+			uint64_t nPrintBlock = 0;
+			uint64_t numBlockSamples = m_secondPassState[nPrintBlock*2];
+			int64_t tBlockLast = m_secondPassTimestamps[nPrintBlock * cfg.maxOffsetsPerThread + numBlockSamples - 1];
+			int64_t tBlockFirst = m_secondPassTimestamps[(nPrintBlock + 1) * cfg.maxOffsetsPerThread];
+			LogDebug("Last sample of block %ld:   %ld\n", nPrintBlock, tBlockLast);
+			LogDebug("First sample of block %ld:  %ld\n", nPrintBlock + 1, tBlockFirst);
+			LogDebug("Nominal start of block %ld: %ld\n", nPrintBlock + 1, edges[(nPrintBlock + 2) * numEdgesPerThread]);
+
 
 			//Dump block boundary data to a channel
 			edges.PrepareForCpuAccess();
@@ -335,13 +379,13 @@ void ClockRecoveryFilter::Refresh(
 			bbcap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 			bbcap->PrepareForCpuAccess();
 			bbcap->Resize(numThreads);
-			uint64_t numEdgesPerThread = nedges / numThreads;
 			for(uint64_t i=0; i<numThreads; i++)
 				bbcap->m_offsets[i] = edges[i * numEdgesPerThread];
 			FillSquarewaveAVX2(*bbcap);
 			FillDurationsAVX2(*bbcap);
 			bbcap->MarkModifiedFromCpu();
-
+			*/
+			/*
 			//FIRST PASS dumping
 			//Figure out how many total samples we got
 			size_t numTotalSamples = 0;
@@ -414,11 +458,40 @@ void ClockRecoveryFilter::Refresh(
 			LogDebug("Timestamp of first input edge in block 1: %ld\n", edges[numEdgesPerThread]);
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			*/
+
+			//Check timestamps on final pass for deltas or duplicates
+			//TODO: make this a unit test?
+			cap->PrepareForCpuAccess();
+			int64_t tolerance = initialPeriod / 25;
+			size_t nfail = 0;
+			for(size_t i=0; i<cap->m_offsets.size() - 1; i++)
+			{
+				int64_t delta = cap->m_offsets[i+1] - cap->m_offsets[i];
+				if(llabs(delta - initialPeriod) > tolerance)
+				{
+					LogDebug("FAIL: delta at T=%s is %s (%ld, %ld)\n",
+						Unit(Unit::UNIT_FS).PrettyPrint(cap->m_offsets[i]).c_str(),
+						Unit(Unit::UNIT_FS).PrettyPrint(delta).c_str(),
+						cap->m_offsets[i], cap->m_offsets[i+1]);
+
+					nfail ++;
+					if(nfail > 10)
+					{
+						LogDebug("Too many errors, truncating log\n");
+						break;
+					}
+				}
+			}
+		}
+
+		else
+		{
+			edges.PrepareForCpuAccess();
+			InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
+			cap->m_offsets.MarkModifiedFromCpu();
 		}
 	}
-
-	//Offsets always get filled by the CPU at this point in time
-	cap->m_offsets.MarkModifiedFromCpu();
 
 	//Generate the squarewave and duration values to match the calculated timestamps
 	if(g_hasShaderInt8 && g_hasShaderInt64)
@@ -495,7 +568,7 @@ void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
  */
 void ClockRecoveryFilter::InnerLoopWithGating(
 	SparseDigitalWaveform& cap,
-	SparseAnalogWaveform& scap,
+	[[maybe_unused]] SparseAnalogWaveform& scap,
 	AcceleratorBuffer<int64_t>& edges,
 	size_t nedges,
 	int64_t tend,
@@ -670,7 +743,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 
 void ClockRecoveryFilter::InnerLoopWithNoGating(
 	SparseDigitalWaveform& cap,
-	SparseAnalogWaveform& scap,
+	[[maybe_unused]] SparseAnalogWaveform& scap,
 	AcceleratorBuffer<int64_t>& edges,
 	size_t nedges,
 	int64_t tend,

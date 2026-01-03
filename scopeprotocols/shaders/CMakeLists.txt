@@ -35,6 +35,7 @@ add_compute_shaders(
 		BlackmanHarrisWindow.glsl
 		ClockRecoveryPLL_FirstPass.glsl
 		ClockRecoveryPLL_SecondPass.glsl
+		ClockRecoveryPLL_FinalPass.glsl
 		ComplexBlackmanHarrisWindow.glsl
 		ComplexCosineSumWindow.glsl
 		ComplexRectangularWindow.glsl

@@ -70,12 +70,16 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	//The very last thread does nothing (there's no additional buffer to roll into
+	//The very last thread does nothing (there's no additional buffer to roll into)
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 	uint numEdgesPerThread = nedges / numThreads;
 	bool lastThread = (gl_GlobalInvocationID.x == (numThreads - 1));
 	if(lastThread)
+	{
+		stateSecondPass[gl_GlobalInvocationID.x*2]	 	= 0;
+		stateSecondPass[gl_GlobalInvocationID.x*2 + 1]	= 0;
 		return;
+	}
 	lastThread = (gl_GlobalInvocationID.x == (numThreads - 2));
 
 	//Initial starting sample indexes for this thread
@@ -84,7 +88,7 @@ void main()
 	if(nedge >= nedges-1)
 		nedge = nedges-1;
 
-	//Don't actually start at this edge! Start at the timestamp of the last edge in the previous pass
+	//Don't actually start at this edge! Start at the NCO phase from the previous pass
 	uint numPreviousEdges = uint(stateFirstPass[gl_GlobalInvocationID.x*2]);
 	if(numPreviousEdges > 0)
 		numPreviousEdges --;
@@ -97,7 +101,8 @@ void main()
 	float glitchCutoff = float(secondPassInitialPeriod / 10);
 	float fHalfPeriod = float(halfPeriod);
 
-	//Advance by the NCO period so we don't double up edges
+	//Advance by one NCO period so we don't double up the edge at the end of the previous pass
+	//We want to start one cycle later with no feedback correction
 	edgepos += secondPassInitialPeriod;
 
 	//End timestamp and edge index for this thread
@@ -111,7 +116,18 @@ void main()
 	else
 	{
 		edgemax = nStartingEdge + numEdgesPerThread;
-		tThreadEnd = edges[edgemax];
+
+		//For the second pass: our ending timestamp should actually be the timestamp of the first pass's last edge
+		//since that's where the next block started phase 2 from
+		uint numPrev = uint(stateFirstPass[(gl_GlobalInvocationID.x + 1)*2]);
+		if(numPrev > 0)
+			numPrev --;
+		tThreadEnd = offsetsFirstPass[((gl_GlobalInvocationID.x + 1) * maxOffsetsPerThread) + numPrev];
+
+		//Move end point halfway to the next UI to provide a bit of jitter margin
+		//but be well before the next block starts
+		int64_t uiLen = stateFirstPass[(gl_GlobalInvocationID.x + 1)*2 + 1];
+		tThreadEnd += uiLen / 2;
 	}
 
 	//Output buffer pointers
@@ -181,14 +197,15 @@ void main()
 			tnext = edges[++nedge];
 		}
 
-		//Add the sample (90 deg phase offset from the internal NCO)
-		//Maybe we don't want to add the phase shift until the final pass?
-		offsetsSecondPass[outputBase + iout] = edgepos /*+ center*/;
+		//Add the sample (no phase offset)
+		offsetsSecondPass[outputBase + iout] = edgepos;
 		iout ++;
 
 		//Bail if we've run out of places to store output (should never happen, just to be safe)
 		if(iout >= maxOffsetsPerThread)
 			break;
+
+		//TODO: align to the first pass and stop? Or save that for third pass
 	}
 
 	//Save final stats

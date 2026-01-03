@@ -98,6 +98,20 @@ protected:
 	///@brief Threshold for edge detection
 	FilterParameter& m_threshold;
 
+	enum MtModes
+	{
+		MT_SINGLE_THREAD,
+		MT_GPU
+	};
+
+	/**
+		@brief Enable the GPU version of the filter where possible
+
+		Normally we don't need this switch, but since there can be slight changes to jitter behavior it's probably
+		better to have it than not
+	 */
+	FilterParameter& m_mtMode;
+
 	LevelCrossingDetector m_detector;
 
 	///@brief Compute pipeline for filling output
@@ -108,6 +122,9 @@ protected:
 
 	///@brief Compute pipeline for second PLL pass
 	std::shared_ptr<ComputePipeline> m_secondPassComputePipeline;
+
+	///@brief Compute pipeline for final reduction pass
+	std::shared_ptr<ComputePipeline> m_finalPassComputePipeline;
 
 	///@brief Output timestamp buffer for first PLL pass
 	AcceleratorBuffer<int64_t> m_firstPassTimestamps;

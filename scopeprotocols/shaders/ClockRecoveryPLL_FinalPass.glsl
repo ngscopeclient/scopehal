@@ -32,19 +32,29 @@
 
 #extension GL_ARB_gpu_shader_int64 : require
 
-layout(std430, binding=0) restrict readonly buffer buf_edges
+layout(std430, binding=0) restrict readonly buffer buf_offsetsFirstPass
 {
-	int64_t edges[];
+	int64_t offsetsFirstPass[];
 };
 
-layout(std430, binding=1) restrict writeonly buffer buf_offsets
+layout(std430, binding=1) restrict readonly buffer buf_stateFirstPass
+{
+	int64_t stateFirstPass[];
+};
+
+layout(std430, binding=2) restrict readonly buffer buf_offsetsSecondPass
+{
+	int64_t offsetsSecondPass[];
+};
+
+layout(std430, binding=3) restrict readonly buffer buf_stateSecondPass
+{
+	int64_t stateSecondPass[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_offsets
 {
 	int64_t offsets[];
-};
-
-layout(std430, binding=2) restrict writeonly buffer buf_stateout
-{
-	int64_t stateOut[];
 };
 
 layout(std430, push_constant) uniform constants
@@ -60,111 +70,44 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	//Initial starting sample indexes for this thread
-	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	uint numEdgesPerThread = nedges / numThreads;
-	uint nStartingEdge = gl_GlobalInvocationID.x * numEdgesPerThread;
-	uint nedge = nStartingEdge;
-	int64_t edgepos = edges[nStartingEdge];
-	nedge ++;
-
-	//Starting frequency
-	float initialFrequency = 1.0 / float(initialPeriod);
-	float glitchCutoff = float(initialPeriod / 10);
-	int64_t halfPeriod = initialPeriod / 2;
-	float fHalfPeriod = float(halfPeriod);
-
-	//End timestamp and edge index for this thread
-	int64_t tThreadEnd;
-	uint edgemax;
-	if(gl_GlobalInvocationID.x == (numThreads - 1))
+	//If this is the first thread, special case since we copy from the first block
+	if(gl_GlobalInvocationID.x == 0)
 	{
-		tThreadEnd = tend;
-		edgemax = nedges - 1;
-	}
-	else
-	{
-		edgemax = nStartingEdge + numEdgesPerThread - 1;
-		tThreadEnd = edges[edgemax];
-	}
-
-	//Output buffer pointers
-	uint outputBase = gl_GlobalInvocationID.x * maxOffsetsPerThread;
-	uint iout = 0;
-
-	//Initial PLL state
-	int64_t tlast = 0;
-	int64_t iperiod = initialPeriod;
-	float fperiod = float(iperiod);
-	for(; (edgepos < tThreadEnd) && (nedge < edgemax); edgepos += iperiod)
-	{
-		int64_t center = iperiod/2;
-
-		//See if the next edge occurred in this UI.
-		//If not, just run the NCO open loop.
-		//Allow multiple edges in the UI if the frequency is way off.
-		int64_t tnext = edges[nedge];
-		while( (tnext + center < edgepos) && (nedge < edgemax) )
+		uint count = uint(stateFirstPass[0]);
+		int64_t lastOffset = offsetsFirstPass[0];
+		for(uint i=1; i<count; i++)
 		{
-			//Find phase error
-			int64_t dphase = (edgepos - tnext) - iperiod;
-			float fdphase = float(dphase);
-
-			//If we're more than half a UI off, assume this is actually part of the next UI
-			if(fdphase > fHalfPeriod)
-				fdphase -= fperiod;
-			if(fdphase < -fHalfPeriod)
-				fdphase += fperiod;
-
-			//Find frequency error
-			float uiLen = float(tnext - tlast);
-			float fdperiod = 0;
-			if(uiLen > glitchCutoff)		//Sanity check: no correction if we have a glitch
-			{
-				float numUIs = round(uiLen * initialFrequency);
-				if(numUIs != 0)	//divide by zero check needed in some cases
-				{
-					uiLen /= numUIs;
-					fdperiod = fperiod - uiLen;
-				}
-			}
-
-			if(tlast != 0)
-			{
-				//Frequency and phase error term
-				float errorTerm = (fdperiod * 0.006) + (fdphase * 0.002);
-				fperiod -= errorTerm;
-				iperiod = int64_t(fperiod);
-
-				//HACK: immediate bang-bang phase shift
-				int64_t bangbang = int64_t(fperiod * 0.0025);
-				if(dphase > 0)
-					edgepos -= bangbang;
-				else
-					edgepos += bangbang;
-
-				if(iperiod < fnyquist)
-				{
-					//LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
-					nedge = nedges;
-					break;
-				}
-			}
-
-			tlast = tnext;
-			tnext = edges[++nedge];
+			int64_t nextOffset = offsetsFirstPass[i];
+			int64_t delta = nextOffset - lastOffset;
+			offsets[i-1] = lastOffset + delta/2;	//90 degree phase shift
+			lastOffset = nextOffset;
 		}
 
-		//Add the sample (no phase offset)
-		offsets[outputBase + iout] = edgepos;
-		iout ++;
-
-		//Bail if we've run out of places to store output (should never happen, just to be safe)
-		if(iout >= maxOffsetsPerThread)
-			break;
+		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
+		offsets[count-1] = lastOffset + stateFirstPass[1]/2;
 	}
 
-	//Save final stats
-	stateOut[gl_GlobalInvocationID.x*2] 	= int64_t(iout);
-	stateOut[gl_GlobalInvocationID.x*2 + 1] = iperiod;
+	//Everything else copies from subsequent blocks
+	else
+	{
+		//Find starting sample index
+		uint writebase = uint(stateFirstPass[0]);
+		for(uint i=1; i<gl_GlobalInvocationID.x; i++)
+			writebase += uint(stateSecondPass[(i-1)*2]);
+
+		//Copy samples
+		uint count = uint(stateSecondPass[(gl_GlobalInvocationID.x - 1)*2]);
+		uint readbase = (gl_GlobalInvocationID.x - 1) * maxOffsetsPerThread;
+		int64_t lastOffset = offsetsSecondPass[readbase];
+		for(uint i=1; i<count; i++)
+		{
+			int64_t nextOffset = offsetsSecondPass[readbase + i];
+			int64_t delta = nextOffset - lastOffset;
+			offsets[writebase + i - 1] = lastOffset + delta/2;	//90 degree phase shift
+			lastOffset = nextOffset;
+		}
+
+		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
+		offsets[writebase + count - 1] = lastOffset + stateSecondPass[(gl_GlobalInvocationID.x - 1)*2 + 1]/2;
+	}
 }
