@@ -67,13 +67,20 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 		m_firstPassComputePipeline =
 			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FirstPass.spv", 3, sizeof(uint32_t));
 
+		m_secondPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_SecondPass.spv", 5, sizeof(uint32_t));
+
 		//Set up GPU temporary buffers
 		m_firstPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_firstPassState.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 
+		m_secondPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_secondPassState.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+
 		//Add debug outputs
 		AddDigitalStream("DEBUG_BlockBoundaries");
 		AddDigitalStream("DEBUG_FirstPassOffsets");
+		AddDigitalStream("DEBUG_SecondPassOffsets");
 	}
 }
 
@@ -246,10 +253,12 @@ void ClockRecoveryFilter::Refresh(
 			//We have no idea how many edges we might generate since the PLL can slew arbitrarily depending on input.
 			//The hard upper bound is Nyquist (one edge every 2 input samples) so allocate that much to start
 			m_firstPassTimestamps.resize(maxEdges);
+			m_secondPassTimestamps.resize(maxEdges);
 
 			//Allocate thread output buffers
 			const uint64_t numStateValuesPerThread = 2;
 			m_firstPassState.resize(numThreads * numStateValuesPerThread);
+			m_secondPassState.resize(numThreads * numStateValuesPerThread);
 
 			cmdBuf.begin({});
 
@@ -259,7 +268,6 @@ void ClockRecoveryFilter::Refresh(
 			cfg.fnyquist = fnyquist;
 			cfg.maxOffsetsPerThread = maxEdges / numThreads;
 			cfg.initialPeriod = initialPeriod;
-			cfg.halfPeriod = halfPeriod;
 			cfg.tend = tend;
 
 			//Run the first pass
@@ -267,9 +275,21 @@ void ClockRecoveryFilter::Refresh(
 			m_firstPassComputePipeline->BindBufferNonblocking(1, m_firstPassTimestamps, cmdBuf);
 			m_firstPassComputePipeline->BindBufferNonblocking(2, m_firstPassState, cmdBuf);
 			m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+			m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 			m_firstPassTimestamps.MarkModifiedFromGpu();
 			m_firstPassState.MarkModifiedFromGpu();
+
+			//Run the second pass
+			m_secondPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
+			m_secondPassComputePipeline->BindBufferNonblocking(1, m_firstPassTimestamps, cmdBuf);
+			m_secondPassComputePipeline->BindBufferNonblocking(2, m_firstPassState, cmdBuf);
+			m_secondPassComputePipeline->BindBufferNonblocking(3, m_secondPassTimestamps, cmdBuf);
+			m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassState, cmdBuf);
+			m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+
+			m_secondPassTimestamps.MarkModifiedFromGpu();
+			m_secondPassState.MarkModifiedFromGpu();
 
 			cmdBuf.end();
 
@@ -278,19 +298,34 @@ void ClockRecoveryFilter::Refresh(
 			//Read back results
 			m_firstPassTimestamps.PrepareForCpuAccess();
 			m_firstPassState.PrepareForCpuAccess();
+			m_secondPassTimestamps.PrepareForCpuAccess();
+			m_secondPassState.PrepareForCpuAccess();
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			//DEBUG DEBUG DEBUG
 			//Copy first pass timestamps and manually reduce into a new waveform
 			//then fill it so we can see what we generated
 
-			LogDebug("Dumping stats\n");
+			LogDebug("-------\n");
+
+			LogDebug("First pass stats\n");
 			for(int i=0; i<10; i++)
 			{
+				LogIndenter li;
 				LogDebug("Thread %d: generated %ld samples, final period %s\n",
 					i,
 					m_firstPassState[i*2],
 					Unit(Unit::UNIT_FS).PrettyPrint(m_firstPassState[i*2 + 1]).c_str());
+			}
+
+			LogDebug("Second pass stats\n");
+			for(int i=0; i<10; i++)
+			{
+				LogIndenter li;
+				LogDebug("Thread %d: generated %ld samples, final period %s\n",
+					i,
+					m_secondPassState[i*2],
+					Unit(Unit::UNIT_FS).PrettyPrint(m_secondPassState[i*2 + 1]).c_str());
 			}
 
 			//Dump block boundary data to a channel
@@ -307,11 +342,12 @@ void ClockRecoveryFilter::Refresh(
 			FillDurationsAVX2(*bbcap);
 			bbcap->MarkModifiedFromCpu();
 
+			//FIRST PASS dumping
 			//Figure out how many total samples we got
 			size_t numTotalSamples = 0;
 			for(uint64_t i=0; i<numThreads; i++)
 				numTotalSamples += m_firstPassState[i*2];
-			LogDebug("Got total %ld samples\n", numTotalSamples);
+			LogDebug("First pass: Got total %ld samples\n", numTotalSamples);
 
 			//Dump first pass sample offsets to a channel
 			auto foffsets = SetupEmptySparseDigitalOutputWaveform(din, 3);
@@ -330,6 +366,52 @@ void ClockRecoveryFilter::Refresh(
 			FillSquarewaveAVX2(*foffsets);
 			FillDurationsAVX2(*foffsets);
 			foffsets->MarkModifiedFromCpu();
+
+			//Figure out how many total samples we got
+			numTotalSamples = 0;
+			for(uint64_t i=0; i<numThreads; i++)
+				numTotalSamples += m_secondPassState[i*2];
+			LogDebug("Second pass: Got total %ld samples\n", numTotalSamples);
+
+			//Copy first block first pass
+			uint64_t numFirstBlockSamples = m_firstPassState[0];
+			numTotalSamples += numFirstBlockSamples;
+
+			//Dump second pass sample offsets to a channel
+			auto soffsets = SetupEmptySparseDigitalOutputWaveform(din, 4);
+			soffsets->m_triggerPhase = 0;
+			soffsets->m_timescale = 1;		//recovered clock time scale is single femtoseconds
+			soffsets->PrepareForCpuAccess();
+			soffsets->Resize(numTotalSamples);
+			iout = 0;
+			for(uint64_t i=0; i<numFirstBlockSamples; i++)
+				soffsets->m_offsets[iout ++] = m_firstPassTimestamps[i];
+			for(uint64_t i=0; i<numThreads; i++)
+			{
+				uint64_t ifrom = i * cfg.maxOffsetsPerThread;
+				uint64_t blocksize = m_secondPassState[i*2];
+				for(uint64_t j=0; j<blocksize; j++)
+					soffsets->m_offsets[iout ++] = m_secondPassTimestamps[ifrom + j];
+			}
+			FillSquarewaveAVX2(*soffsets);
+			FillDurationsAVX2(*soffsets);
+			soffsets->MarkModifiedFromCpu();
+
+			//Print out some stuff at the block 0-1 boundary
+			uint64_t numFirst = m_firstPassState[0];
+			LogDebug("End of block 0, first pass:\n");
+			for(uint64_t i=5; i>0; i--)
+			{
+				LogIndenter li;
+				LogDebug("%ld\n", m_firstPassTimestamps[numFirst - i]);
+			}
+			LogDebug("Start of block 1, second pass:\n");
+			for(uint64_t i=0; i<5; i++)
+			{
+				LogIndenter li;
+				LogDebug("%ld\n", m_secondPassTimestamps[i]);
+			}
+			LogDebug("Timestamp of first input edge in block 1: %ld\n", edges[numEdgesPerThread]);
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		}

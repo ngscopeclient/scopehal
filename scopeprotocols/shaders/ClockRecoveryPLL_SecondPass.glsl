@@ -37,14 +37,24 @@ layout(std430, binding=0) restrict readonly buffer buf_edges
 	int64_t edges[];
 };
 
-layout(std430, binding=1) restrict writeonly buffer buf_offsets
+layout(std430, binding=1) restrict readonly buffer buf_offsetsFirstPass
 {
-	int64_t offsets[];
+	int64_t offsetsFirstPass[];
 };
 
-layout(std430, binding=2) restrict writeonly buffer buf_stateout
+layout(std430, binding=2) restrict readonly buffer buf_stateFirstPass
 {
-	int64_t stateOut[];
+	int64_t stateFirstPass[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_offsetsSecondPass
+{
+	int64_t offsetsSecondPass[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_stateSecondPass
+{
+	int64_t stateSecondPass[];
 };
 
 layout(std430, push_constant) uniform constants
@@ -60,24 +70,40 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	//Initial starting sample indexes for this thread
+	//The very last thread does nothing (there's no additional buffer to roll into
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 	uint numEdgesPerThread = nedges / numThreads;
-	uint nStartingEdge = gl_GlobalInvocationID.x * numEdgesPerThread;
+	bool lastThread = (gl_GlobalInvocationID.x == (numThreads - 1));
+	if(lastThread)
+		return;
+	lastThread = (gl_GlobalInvocationID.x == (numThreads - 2));
+
+	//Initial starting sample indexes for this thread
+	uint nStartingEdge = (gl_GlobalInvocationID.x + 1) * numEdgesPerThread;
 	uint nedge = nStartingEdge;
-	int64_t edgepos = edges[nStartingEdge];
-	nedge ++;
+	if(nedge >= nedges-1)
+		nedge = nedges-1;
+
+	//Don't actually start at this edge! Start at the timestamp of the last edge in the previous pass
+	uint numPreviousEdges = uint(stateFirstPass[gl_GlobalInvocationID.x*2]);
+	if(numPreviousEdges > 0)
+		numPreviousEdges --;
+	int64_t edgepos = offsetsFirstPass[(gl_GlobalInvocationID.x * maxOffsetsPerThread) + numPreviousEdges];
 
 	//Starting frequency
-	float initialFrequency = 1.0 / float(initialPeriod);
-	float glitchCutoff = float(initialPeriod / 10);
-	int64_t halfPeriod = initialPeriod / 2;
+	int64_t secondPassInitialPeriod = stateFirstPass[gl_GlobalInvocationID.x*2 + 1];
+	int64_t halfPeriod = secondPassInitialPeriod / 2;
+	float initialFrequency = 1.0 / float(secondPassInitialPeriod);
+	float glitchCutoff = float(secondPassInitialPeriod / 10);
 	float fHalfPeriod = float(halfPeriod);
+
+	//Advance by the NCO period so we don't double up edges
+	edgepos += secondPassInitialPeriod;
 
 	//End timestamp and edge index for this thread
 	int64_t tThreadEnd;
 	uint edgemax;
-	if(gl_GlobalInvocationID.x == (numThreads - 1))
+	if(lastThread)
 	{
 		tThreadEnd = tend;
 		edgemax = nedges - 1;
@@ -94,7 +120,7 @@ void main()
 
 	//Initial PLL state
 	int64_t tlast = 0;
-	int64_t iperiod = initialPeriod;
+	int64_t iperiod = secondPassInitialPeriod;
 	float fperiod = float(iperiod);
 	for(; (edgepos < tThreadEnd) && (nedge < edgemax); edgepos += iperiod)
 	{
@@ -157,7 +183,7 @@ void main()
 
 		//Add the sample (90 deg phase offset from the internal NCO)
 		//Maybe we don't want to add the phase shift until the final pass?
-		offsets[outputBase + iout] = edgepos /*+ center*/;
+		offsetsSecondPass[outputBase + iout] = edgepos /*+ center*/;
 		iout ++;
 
 		//Bail if we've run out of places to store output (should never happen, just to be safe)
@@ -166,6 +192,6 @@ void main()
 	}
 
 	//Save final stats
-	stateOut[gl_GlobalInvocationID.x*2] 	= int64_t(iout);
-	stateOut[gl_GlobalInvocationID.x*2 + 1] = iperiod;
+	stateSecondPass[gl_GlobalInvocationID.x*2]	 	= int64_t(iout);
+	stateSecondPass[gl_GlobalInvocationID.x*2 + 1]	= iperiod;
 }

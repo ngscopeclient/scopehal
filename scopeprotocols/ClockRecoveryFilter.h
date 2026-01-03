@@ -41,7 +41,6 @@ class ClockRecoveryConstants
 {
 public:
 	int64_t		initialPeriod;
-	int64_t		halfPeriod;
 	int64_t		fnyquist;
 	int64_t		tend;
 	uint32_t	nedges;
@@ -107,17 +106,32 @@ protected:
 	///@brief Compute pipeline for first PLL pass
 	std::shared_ptr<ComputePipeline> m_firstPassComputePipeline;
 
+	///@brief Compute pipeline for second PLL pass
+	std::shared_ptr<ComputePipeline> m_secondPassComputePipeline;
+
 	///@brief Output timestamp buffer for first PLL pass
 	AcceleratorBuffer<int64_t> m_firstPassTimestamps;
 
 	/**
 		@brief Output status buffer for first PLL pass
 
-		x int64s per thread:
+		2 int64s per thread:
 			Number of samples written
 			Ending period
 	 */
 	AcceleratorBuffer<int64_t> m_firstPassState;
+
+	///@brief Output timestamp buffer for second PLL pass
+	AcceleratorBuffer<int64_t> m_secondPassTimestamps;
+
+	/**
+		@brief Output status buffer for second PLL pass
+
+		2 int64s per thread:
+			Number of samples written
+			Ending period
+	 */
+	AcceleratorBuffer<int64_t> m_secondPassState;
 };
 
 #endif
