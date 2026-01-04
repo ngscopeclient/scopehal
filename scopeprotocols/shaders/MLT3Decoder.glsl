@@ -27,53 +27,50 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTXDecoder
- */
-#ifndef Ethernet100BaseTXDecoder_h
-#define Ethernet100BaseTXDecoder_h
+#version 460
+#pragma shader_stage(compute)
 
-class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	Ethernet100BaseTXDecoder(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
-
-protected:
-	int GetState(float voltage)
-	{
-		if(voltage > 0.5)
-			return 1;
-		else if(voltage < -0.5)
-			return -1;
-		else
-			return 0;
-	}
-
-	void DecodeStates(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		SparseAnalogWaveform* samples);
-
-	bool TrySync(
-		std::vector<uint8_t>& descrambled_bits,
-		size_t idle_offset,
-		size_t stop);
-
-	///@brief Raw scrambled serial bit stream after MLT-3 decoding
-	AcceleratorBuffer<uint8_t> m_phyBits;
-
-	///@brief Compute pipeline for MLT-3 decoding
-	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;
+	float din[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_dout
+{
+	uint8_t dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+int GetState(float voltage)
+{
+	if(voltage > 0.5)
+		return 1;
+	else if(voltage < -0.5)
+		return -1;
+	else
+		return 0;
+}
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= len)
+		return;
+
+	//No transition = logic 0
+	if(GetState(din[i]) == GetState(din[i+1]))
+		dout[i] = uint8_t(0);
+
+	//Transition = logic 1
+	else
+		dout[i] = uint8_t(1);
+
+}

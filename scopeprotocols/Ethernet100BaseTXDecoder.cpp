@@ -44,7 +44,13 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 
 	CreateInput("sampledData");
 
-	m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+	if(g_hasShaderInt8)
+	{
+		m_mlt3DecodeComputePipeline =
+			make_shared<ComputePipeline>("shaders/MLT3Decoder.spv", 2, sizeof(uint32_t));
+
+		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,9 +81,7 @@ Filter::DataLocation Ethernet100BaseTXDecoder::GetInputLocation()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void Ethernet100BaseTXDecoder::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	ClearPackets();
 
@@ -96,10 +100,12 @@ void Ethernet100BaseTXDecoder::Refresh(
 	}
 
 	//MLT-3 decode
-	DecodeStates(din);
+	DecodeStates(cmdBuf, queue, din);
 
 	//RX LFSR sync
 	m_phyBits.PrepareForCpuAccess();
+	din->m_offsets.PrepareForCpuAccess();
+	din->m_durations.PrepareForCpuAccess();
 	size_t nbits = m_phyBits.size();
 	vector<uint8_t> descrambled_bits;
 	bool synced = false;
@@ -288,31 +294,56 @@ void Ethernet100BaseTXDecoder::Refresh(
 	cap->MarkModifiedFromCpu();
 }
 
-void Ethernet100BaseTXDecoder::DecodeStates(SparseAnalogWaveform* samples)
+void Ethernet100BaseTXDecoder::DecodeStates(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
+	SparseAnalogWaveform* samples)
 {
-	samples->PrepareForCpuAccess();
-
-	//TODO: some kind of sanity checking that voltage is changing in the right direction
-	int oldstate = GetState(samples->m_samples[0]);
 	size_t ilen = samples->size();
-	m_phyBits.PrepareForCpuAccess();
-	m_phyBits.resize(ilen-1);
-	for(size_t i=1; i<ilen; i++)
+
+	if(g_hasShaderInt8)
 	{
-		int nstate = GetState(samples->m_samples[i]);
+		cmdBuf.begin({});
 
-		//No transition? Add a "0" bit
-		if(nstate == oldstate)
-			m_phyBits[i-1] = false;
+		uint32_t nthreads = ilen - 1;
+		m_phyBits.resize(nthreads);
+		const uint32_t compute_block_count = GetComputeBlockCount(nthreads, 64);
+		m_mlt3DecodeComputePipeline->BindBufferNonblocking(0, samples->m_samples, cmdBuf);
+		m_mlt3DecodeComputePipeline->BindBufferNonblocking(1, m_phyBits, cmdBuf, true);
+		m_mlt3DecodeComputePipeline->Dispatch(cmdBuf, nthreads,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
 
-		//Transition? Add a "1" bit
-		else
-			m_phyBits[i-1] = true;
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 
-		oldstate = nstate;
+		m_phyBits.MarkModifiedFromGpu();
 	}
+	else
+	{
+		samples->PrepareForCpuAccess();
 
-	m_phyBits.MarkModifiedFromCpu();
+		//TODO: some kind of sanity checking that voltage is changing in the right direction
+		int oldstate = GetState(samples->m_samples[0]);
+		m_phyBits.PrepareForCpuAccess();
+		m_phyBits.resize(ilen-1);
+		for(size_t i=1; i<ilen; i++)
+		{
+			int nstate = GetState(samples->m_samples[i]);
+
+			//No transition? Add a "0" bit
+			if(nstate == oldstate)
+				m_phyBits[i-1] = false;
+
+			//Transition? Add a "1" bit
+			else
+				m_phyBits[i-1] = true;
+
+			oldstate = nstate;
+		}
+
+		m_phyBits.MarkModifiedFromCpu();
+	}
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(
