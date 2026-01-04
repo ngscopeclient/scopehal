@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -70,7 +70,9 @@ protected:
 		MODE_CONTINUOUS_APPEND,
 		MODE_CONTINUOUS_OVERWRITE,
 		MODE_MANUAL_APPEND,
-		MODE_MANUAL_OVERWRITE
+		MODE_MANUAL_OVERWRITE,
+		MODE_CONTINUOUS_PIPE,
+		MODE_MANUAL_PIPE
 	};
 
 	std::string m_fname;

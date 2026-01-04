@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,6 +35,31 @@
  */
 #ifndef PcapngExportFilter_h
 #define PcapngExportFilter_h
+
+struct shb_t
+{
+	uint32_t	block_type;
+	uint32_t	block_total_length;
+	uint32_t	byte_order_magic;
+	uint16_t	major_version;
+	uint16_t	minor_version;
+	uint64_t	section_length;
+};
+
+struct idb_t
+{
+	uint32_t	block_type;
+	uint32_t	block_total_length;
+	uint16_t	link_type;
+	uint16_t	reserved;
+	uint32_t	snap_len;
+};
+
+struct optionhdr_t
+{
+	uint16_t	id;
+	uint16_t	len;
+};
 
 #include "ExportFilter.h"
 #include "EthernetProtocolDecoder.h"

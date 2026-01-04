@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,6 +59,8 @@ ExportFilter::ExportFilter(const string& color)
 	m_parameters[m_mode].AddEnumValue("Append (manual)", MODE_MANUAL_APPEND);
 	m_parameters[m_mode].AddEnumValue("Overwrite (continuous)", MODE_CONTINUOUS_OVERWRITE);
 	m_parameters[m_mode].AddEnumValue("Overwrite (manual)", MODE_MANUAL_OVERWRITE);
+	m_parameters[m_mode].AddEnumValue("Pipe (continuous)", MODE_CONTINUOUS_PIPE);
+	m_parameters[m_mode].AddEnumValue("Pipe (manual)", MODE_MANUAL_PIPE);
 
 	//Default to manual trigger mode so we don't have the file grow huge before the user can react
 	m_parameters[m_mode].SetIntVal(MODE_MANUAL_OVERWRITE);
@@ -84,11 +86,13 @@ void ExportFilter::Refresh()
 			//fall through
 
 		case MODE_CONTINUOUS_APPEND:
+		case MODE_CONTINUOUS_PIPE:
 			Export();
 
 		//Manual mode - don't do anything during Refresh()
 		case MODE_MANUAL_APPEND:
 		case MODE_MANUAL_OVERWRITE:
+		case MODE_MANUAL_PIPE:
 			break;
 	}
 }
