@@ -92,29 +92,10 @@ void Ethernet100BaseTXDecoder::Refresh(
 		SetData(nullptr, 0);
 		return;
 	}
-	auto& samples = *din;
-	samples.PrepareForCpuAccess();
-	size_t ilen = samples.size();
 
 	//MLT-3 decode
-	//TODO: some kind of sanity checking that voltage is changing in the right direction
-	int oldstate = GetState(samples.m_samples[0]);
 	vector<uint8_t> bits;
-	bits.resize(ilen-1);
-	for(size_t i=1; i<ilen; i++)
-	{
-		int nstate = GetState(samples.m_samples[i]);
-
-		//No transition? Add a "0" bit
-		if(nstate == oldstate)
-			bits[i-1] = false;
-
-		//Transition? Add a "1" bit
-		else
-			bits[i-1] = true;
-
-		oldstate = nstate;
-	}
+	DecodeStates(bits, din);
 
 	//RX LFSR sync
 	size_t nbits = bits.size();
@@ -250,7 +231,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 			EthernetFrameSegment segment;
 			segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
 			cap->m_offsets.push_back(current_start * cap->m_timescale);
-			uint64_t end = samples.m_offsets[idle_offset + i + 4] + samples.m_durations[idle_offset + i + 4];
+			uint64_t end = din->m_offsets[idle_offset + i + 4] + din->m_durations[idle_offset + i + 4];
 			cap->m_durations.push_back((end - current_start) * cap->m_timescale);
 			cap->m_samples.push_back(segment);
 
@@ -286,7 +267,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 		unsigned int decoded = code_5to4[code];
 		if(first)
 		{
-			current_start = samples.m_offsets[idle_offset + i];
+			current_start = din->m_offsets[idle_offset + i];
 			current_byte = decoded;
 		}
 		else
@@ -295,7 +276,7 @@ void Ethernet100BaseTXDecoder::Refresh(
 
 			bytes.push_back(current_byte);
 			starts.push_back(current_start * cap->m_timescale);
-			uint64_t end = samples.m_offsets[idle_offset + i + 4] + samples.m_durations[idle_offset + i + 4];
+			uint64_t end = din->m_offsets[idle_offset + i + 4] + din->m_durations[idle_offset + i + 4];
 			ends.push_back(end * cap->m_timescale);
 		}
 
@@ -303,6 +284,30 @@ void Ethernet100BaseTXDecoder::Refresh(
 	}
 
 	cap->MarkModifiedFromCpu();
+}
+
+void Ethernet100BaseTXDecoder::DecodeStates(vector<uint8_t>& bits, SparseAnalogWaveform* samples)
+{
+	samples->PrepareForCpuAccess();
+
+	//TODO: some kind of sanity checking that voltage is changing in the right direction
+	int oldstate = GetState(samples->m_samples[0]);
+	size_t ilen = samples->size();
+	bits.resize(ilen-1);
+	for(size_t i=1; i<ilen; i++)
+	{
+		int nstate = GetState(samples->m_samples[i]);
+
+		//No transition? Add a "0" bit
+		if(nstate == oldstate)
+			bits[i-1] = false;
+
+		//Transition? Add a "1" bit
+		else
+			bits[i-1] = true;
+
+		oldstate = nstate;
+	}
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(
