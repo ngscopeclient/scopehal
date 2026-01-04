@@ -733,17 +733,22 @@ public:
 		@param data		The data signal to sample. Can be be sparse or uniform of any type.
 		@param clock	The clock signal to use. Must be sparse or uniform digital.
 		@param samples	Output waveform. Must be sparse and same data type as data.
+		@param cpuOnly	true to mark the output waveform as a CPU-side temporary buffer that will never be used on the GPU
 	 */
 	template<class T, class R, class S>
 	__attribute__((noinline))
-	static void SampleOnAnyEdges(T* data, R* clock, SparseWaveform<S>& samples)
+	static void SampleOnAnyEdges(T* data, R* clock, SparseWaveform<S>& samples, bool cpuOnly = true)
 	{
 		//Compile-time check to make sure inputs are correct types
 		AssertTypeIsDigitalWaveform(clock);
 		AssertSampleTypesAreSame(data, &samples);
 
 		samples.clear();
-		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		if(cpuOnly)
+			samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		clock->PrepareForCpuAccess();
+		data->PrepareForCpuAccess();
+		samples.PrepareForCpuAccess();
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -756,7 +761,6 @@ public:
 		{
 			//Allocate exactly enough space
 			samples.Resize(clock->size());
-			samples.PrepareForCpuAccess();
 
 			size_t ndata = 0;
 			size_t nout = 0;
@@ -779,13 +783,11 @@ public:
 				nout ++;
 			}
 			samples.Resize(nout);
-			samples.MarkModifiedFromCpu();
 		}
 		else
 		{
 			samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
 												//if it's smaller than this, we won't waste a lot of memory
-			samples.PrepareForCpuAccess();
 
 			size_t ndata = 0;
 			for(size_t i=1; i<len; i++)
@@ -806,6 +808,7 @@ public:
 				samples.m_samples.push_back(data->m_samples[ndata]);
 			}
 		}
+		samples.MarkModifiedFromCpu();
 
 		//Compute sample durations
 		#ifdef __x86_64__

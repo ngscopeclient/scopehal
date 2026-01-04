@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,8 +42,7 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	m_signalNames.clear();
 	m_inputs.clear();
 
-	CreateInput("data");
-	CreateInput("clk");
+	CreateInput("sampledData");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,8 +60,6 @@ bool Ethernet100BaseTXDecoder::ValidateChannel(size_t i, StreamDescriptor stream
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
 
 	return false;
 }
@@ -79,21 +76,19 @@ void Ethernet100BaseTXDecoder::Refresh(
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetInputWaveform(0);
-	auto clk = GetInputWaveform(1);
-	din->PrepareForCpuAccess();
-	clk->PrepareForCpuAccess();
-
-	//Sample the input on the edges of the recovered clock
-	SparseAnalogWaveform samples;
-	samples.SetCpuOnlyHint();
+	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	auto& samples = *din;
 	samples.PrepareForCpuAccess();
-	SampleOnAnyEdgesBase(din, clk, samples);
 	size_t ilen = samples.size();
 
 	//MLT-3 decode

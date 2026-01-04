@@ -203,6 +203,13 @@ void ClockRecoveryFilter::Refresh(
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	cap->m_offsets.reserve(edges.size());
 
+	//If no output data yet, set scales
+	if(GetData(1) == nullptr)
+	{
+		SetVoltageRange(GetInput(0).GetVoltageRange(), 1);
+		SetOffset(GetInput(0).GetOffset(), 1);
+	}
+
 	//Create analog output waveform for sampled data
 	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
 	scap->m_triggerPhase = 0;
@@ -306,10 +313,6 @@ void ClockRecoveryFilter::Refresh(
 			m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
 			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
-			//Output was entirely created on the GPU, no need to touch the CPU for that
-			cap->MarkModifiedFromGpu();
-			generatedSquarewaveOnGPU = true;
-
 			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
 
@@ -320,6 +323,10 @@ void ClockRecoveryFilter::Refresh(
 			uint64_t numSamples = m_firstPassState[0];
 			for(uint64_t i=0; i<numThreads; i++)
 				numSamples += m_secondPassState[i*2];
+
+			//Output was entirely created on the GPU, no need to touch the CPU for that
+			cap->MarkModifiedFromGpu();
+			generatedSquarewaveOnGPU = true;
 
 			//Get final edge count
 			cap->Resize(numSamples);
@@ -388,8 +395,12 @@ void ClockRecoveryFilter::Refresh(
 		cap->MarkModifiedFromCpu();
 	}
 
-	//TODO do stuff here
-	scap->MarkModifiedFromCpu();
+	//Generate sampled analog output if applicable
+	//TODO: GPU this where possible and don't do a separate sampling pass
+	if(uadin)
+		SampleOnAnyEdges(uadin, cap, *scap, false);
+	else if(sadin)
+		SampleOnAnyEdges(sadin, cap, *scap, false);
 }
 
 /**
