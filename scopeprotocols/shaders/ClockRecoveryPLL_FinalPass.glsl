@@ -31,6 +31,7 @@
 #pragma shader_stage(compute)
 
 #extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_shader_8bit_storage : require
 
 layout(std430, binding=0) restrict readonly buffer buf_offsetsFirstPass
 {
@@ -57,6 +58,16 @@ layout(std430, binding=4) restrict writeonly buffer buf_offsets
 	int64_t offsets[];
 };
 
+layout(std430, binding=5) restrict writeonly buffer buf_squarewave
+{
+	uint8_t squarewave[];
+};
+
+layout(std430, binding=6) restrict writeonly buffer buf_durations
+{
+	int64_t durations[];
+};
+
 layout(std430, push_constant) uniform constants
 {
 	int64_t	initialPeriod;
@@ -77,14 +88,24 @@ void main()
 		int64_t lastOffset = offsetsFirstPass[0];
 		for(uint i=1; i<count; i++)
 		{
+			uint iout = i - 1;
 			int64_t nextOffset = offsetsFirstPass[i];
 			int64_t delta = nextOffset - lastOffset;
-			offsets[i-1] = lastOffset + delta/2;	//90 degree phase shift
+
+			//Generate the squarewave output
+			offsets[iout] = lastOffset + delta/2;	//90 degree phase shift
+			squarewave[iout] = uint8_t(iout & 1);
+			durations[iout] = delta;
+
 			lastOffset = nextOffset;
 		}
 
 		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
-		offsets[count-1] = lastOffset + stateFirstPass[1]/2;
+		uint iout = count - 1;
+		int64_t lastPeriod = stateFirstPass[1];
+		offsets[iout] = lastOffset + lastPeriod/2;
+		squarewave[iout] = uint8_t(iout & 1);
+		durations[iout] = lastPeriod;
 	}
 
 	//Everything else copies from subsequent blocks
@@ -101,13 +122,23 @@ void main()
 		int64_t lastOffset = offsetsSecondPass[readbase];
 		for(uint i=1; i<count; i++)
 		{
+			uint iout = writebase + i - 1;
 			int64_t nextOffset = offsetsSecondPass[readbase + i];
 			int64_t delta = nextOffset - lastOffset;
-			offsets[writebase + i - 1] = lastOffset + delta/2;	//90 degree phase shift
+
+			//Generate the squarewave output
+			offsets[iout] = lastOffset + delta/2;	//90 degree phase shift
+			squarewave[iout] = uint8_t(iout & 1);
+			durations[iout] = delta;
+
 			lastOffset = nextOffset;
 		}
 
 		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
-		offsets[writebase + count - 1] = lastOffset + stateSecondPass[(gl_GlobalInvocationID.x - 1)*2 + 1]/2;
+		uint iout = writebase + count - 1;
+		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.x - 1)*2 + 1];
+		offsets[iout] = lastOffset + lastPeriod/2;
+		squarewave[iout] = uint8_t(iout & 1);
+		durations[iout] = lastPeriod;
 	}
 }
