@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -82,11 +82,8 @@ void IPv4Decoder::Refresh()
 	size_t len = din->m_samples.size();
 
 	//Loop over the events and process stuff
-	auto cap = new IPv4Waveform;
+	auto cap = SetupEmptyWaveform<IPv4Waveform>(din, 0);
 	cap->PrepareForCpuAccess();
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	int state = 0;
 	int header_len = 0;
@@ -401,7 +398,6 @@ void IPv4Decoder::Refresh()
 
 	//TODO: packet decode too
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
