@@ -59,13 +59,15 @@ protected:
 			return 0;
 	}
 
-	void DecodeStates(std::vector<uint8_t>& bits, SparseAnalogWaveform* samples);
+	void DecodeStates(SparseAnalogWaveform* samples);
 
 	bool TrySync(
-		std::vector<uint8_t>& bits,
 		std::vector<uint8_t>& descrambled_bits,
 		size_t idle_offset,
 		size_t stop);
+
+	///@brief Raw scrambled serial bit stream after MLT-3 decoding
+	AcceleratorBuffer<uint8_t> m_phyBits;
 };
 
 #endif

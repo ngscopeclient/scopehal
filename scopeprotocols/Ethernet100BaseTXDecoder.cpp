@@ -43,6 +43,8 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	m_inputs.clear();
 
 	CreateInput("sampledData");
+
+	m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,17 +96,17 @@ void Ethernet100BaseTXDecoder::Refresh(
 	}
 
 	//MLT-3 decode
-	vector<uint8_t> bits;
-	DecodeStates(bits, din);
+	DecodeStates(din);
 
 	//RX LFSR sync
-	size_t nbits = bits.size();
+	m_phyBits.PrepareForCpuAccess();
+	size_t nbits = m_phyBits.size();
 	vector<uint8_t> descrambled_bits;
 	bool synced = false;
 	size_t idle_offset = 0;
 	for(; idle_offset<15000; idle_offset++)
 	{
-		if(TrySync(bits, descrambled_bits, idle_offset, nbits))
+		if(TrySync(descrambled_bits, idle_offset, nbits))
 		{
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
@@ -286,55 +288,57 @@ void Ethernet100BaseTXDecoder::Refresh(
 	cap->MarkModifiedFromCpu();
 }
 
-void Ethernet100BaseTXDecoder::DecodeStates(vector<uint8_t>& bits, SparseAnalogWaveform* samples)
+void Ethernet100BaseTXDecoder::DecodeStates(SparseAnalogWaveform* samples)
 {
 	samples->PrepareForCpuAccess();
 
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int oldstate = GetState(samples->m_samples[0]);
 	size_t ilen = samples->size();
-	bits.resize(ilen-1);
+	m_phyBits.PrepareForCpuAccess();
+	m_phyBits.resize(ilen-1);
 	for(size_t i=1; i<ilen; i++)
 	{
 		int nstate = GetState(samples->m_samples[i]);
 
 		//No transition? Add a "0" bit
 		if(nstate == oldstate)
-			bits[i-1] = false;
+			m_phyBits[i-1] = false;
 
 		//Transition? Add a "1" bit
 		else
-			bits[i-1] = true;
+			m_phyBits[i-1] = true;
 
 		oldstate = nstate;
 	}
+
+	m_phyBits.MarkModifiedFromCpu();
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(
-	vector<uint8_t>& bits,
 	vector<uint8_t>& descrambled_bits,
 	size_t idle_offset,
 	size_t stop)
 {
-	if( (idle_offset + 64) >= bits.size())
+	if( (idle_offset + 64) >= m_phyBits.size())
 		return false;
 
 	//For now, assume the link is idle at the time we triggered
 	unsigned int lfsr =
-		( (!bits[idle_offset + 0]) << 10 ) |
-		( (!bits[idle_offset + 1]) << 9 ) |
-		( (!bits[idle_offset + 2]) << 8 ) |
-		( (!bits[idle_offset + 3]) << 7 ) |
-		( (!bits[idle_offset + 4]) << 6 ) |
-		( (!bits[idle_offset + 5]) << 5 ) |
-		( (!bits[idle_offset + 6]) << 4 ) |
-		( (!bits[idle_offset + 7]) << 3 ) |
-		( (!bits[idle_offset + 8]) << 2 ) |
-		( (!bits[idle_offset + 9]) << 1 ) |
-		( (!bits[idle_offset + 10]) << 0 );
+		( (!m_phyBits[idle_offset + 0]) << 10 ) |
+		( (!m_phyBits[idle_offset + 1]) << 9 ) |
+		( (!m_phyBits[idle_offset + 2]) << 8 ) |
+		( (!m_phyBits[idle_offset + 3]) << 7 ) |
+		( (!m_phyBits[idle_offset + 4]) << 6 ) |
+		( (!m_phyBits[idle_offset + 5]) << 5 ) |
+		( (!m_phyBits[idle_offset + 6]) << 4 ) |
+		( (!m_phyBits[idle_offset + 7]) << 3 ) |
+		( (!m_phyBits[idle_offset + 8]) << 2 ) |
+		( (!m_phyBits[idle_offset + 9]) << 1 ) |
+		( (!m_phyBits[idle_offset + 10]) << 0 );
 
 	//Descramble
-	stop = min(stop, bits.size());
+	stop = min(stop, m_phyBits.size());
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
 	descrambled_bits.resize(len);
@@ -343,7 +347,7 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	for(size_t i=start; i < stop; i++)
 	{
 		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-		bool b = bits[i] ^ (lfsr & 1);
+		bool b = m_phyBits[i] ^ (lfsr & 1);
 		descrambled_bits[iout] = b;
 		iout ++;
 
