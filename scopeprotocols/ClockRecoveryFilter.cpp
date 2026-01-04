@@ -71,13 +71,13 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
 		m_firstPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FirstPass.spv", 3, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FirstPass.spv", 3, sizeof(ClockRecoveryConstants));
 
 		m_secondPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_SecondPass.spv", 5, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_SecondPass.spv", 5, sizeof(ClockRecoveryConstants));
 
 		m_finalPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FinalPass.spv", 7, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FinalPass.spv", 9, sizeof(ClockRecoveryConstants));
 
 		//Set up GPU temporary buffers
 		m_firstPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
@@ -250,7 +250,10 @@ void ClockRecoveryFilter::Refresh(
 		int64_t expectedNumEdges = (tend / initialPeriod);
 
 		//We need a fair number of edges in each thread block for the PLL to lock and not overlap too much
-		if(g_hasShaderInt64 && g_hasShaderInt8 && (expectedNumEdges > 100000) && (m_mtMode.GetIntVal() == MT_GPU) )
+		//For now we assume input is uniformly sampled and fall back if not
+		if(	g_hasShaderInt64 && g_hasShaderInt8 &&
+			(expectedNumEdges > 100000) && (m_mtMode.GetIntVal() == MT_GPU) &&
+			uadin)
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
 			//TODO: do we need to tune numThreads to lock well to short waveforms?
@@ -272,13 +275,16 @@ void ClockRecoveryFilter::Refresh(
 
 			cmdBuf.begin({});
 
-			//Constants for first pass
+			//Constants shared by all passes
 			ClockRecoveryConstants cfg;
 			cfg.nedges = nedges;
 			cfg.fnyquist = fnyquist;
 			cfg.maxOffsetsPerThread = maxEdges / numThreads;
 			cfg.initialPeriod = initialPeriod;
 			cfg.tend = tend;
+			cfg.timescale = din->m_timescale;
+			cfg.triggerPhase = din->m_triggerPhase;
+			cfg.maxInputSamples = din->size();
 
 			//Run the first pass
 			m_firstPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
@@ -302,8 +308,10 @@ void ClockRecoveryFilter::Refresh(
 			m_secondPassTimestamps.MarkModifiedFromGpu();
 			m_secondPassState.MarkModifiedFromGpu();
 
+			scap->m_samples.resize(maxEdges);
+
 			//Run the final pass.
-			//This also generates the squarewave output
+			//This also generates the squarewave output and the sample data
 			m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassState, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(2, m_secondPassTimestamps, cmdBuf);
@@ -311,6 +319,9 @@ void ClockRecoveryFilter::Refresh(
 			m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(7, scap->m_samples, cmdBuf);
+			//this assumes input is uniformly sampled for now
+			m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
 			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
 			cmdBuf.end();
@@ -326,10 +337,16 @@ void ClockRecoveryFilter::Refresh(
 
 			//Output was entirely created on the GPU, no need to touch the CPU for that
 			cap->MarkModifiedFromGpu();
+			scap->MarkModifiedFromGpu();
 			generatedSquarewaveOnGPU = true;
 
-			//Get final edge count
+			//Resize to final edge count
 			cap->Resize(numSamples);
+			scap->Resize(numSamples);
+
+			//Copy the offsets and durations from the sampled data
+			scap->m_offsets.CopyFrom(cap->m_offsets, false);
+			scap->m_durations.CopyFrom(cap->m_durations, false);
 		}
 
 		else
@@ -395,12 +412,15 @@ void ClockRecoveryFilter::Refresh(
 		cap->MarkModifiedFromCpu();
 	}
 
-	//Generate sampled analog output if applicable
-	//TODO: GPU this where possible and don't do a separate sampling pass
-	if(uadin)
-		SampleOnAnyEdges(uadin, cap, *scap, false);
-	else if(sadin)
-		SampleOnAnyEdges(sadin, cap, *scap, false);
+	//Generate sampled analog output if not already done GPU side
+	if(!generatedSquarewaveOnGPU)
+	{
+		//TODO: GPU this where possible and don't do a separate sampling pass
+		if(uadin)
+			SampleOnAnyEdges(uadin, cap, *scap, false);
+		else if(sadin)
+			SampleOnAnyEdges(sadin, cap, *scap, false);
+	}
 }
 
 /**

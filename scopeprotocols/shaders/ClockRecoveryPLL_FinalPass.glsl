@@ -68,13 +68,26 @@ layout(std430, binding=6) restrict writeonly buffer buf_durations
 	int64_t durations[];
 };
 
+layout(std430, binding=7) restrict writeonly buffer buf_ssamples
+{
+	float ssamples[];
+};
+
+layout(std430, binding=8) restrict readonly buffer buf_din
+{
+	float isamples[];
+};
+
 layout(std430, push_constant) uniform constants
 {
 	int64_t	initialPeriod;
 	int64_t fnyquist;
 	int64_t	tend;
+	int64_t	timescale;
+	int64_t	triggerPhase;
 	uint	nedges;
 	uint	maxOffsetsPerThread;
+	uint	maxInputSamples;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -93,9 +106,14 @@ void main()
 			int64_t delta = nextOffset - lastOffset;
 
 			//Generate the squarewave output
-			offsets[iout] = lastOffset + delta/2;	//90 degree phase shift
+			int64_t tout = lastOffset + delta/2;	//90 degree phase shift
+			offsets[iout] = tout;
 			squarewave[iout] = uint8_t(iout & 1);
 			durations[iout] = delta;
+
+			//Generate sampled data output
+			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
+			ssamples[iout] = isamples[nsample];
 
 			lastOffset = nextOffset;
 		}
@@ -103,9 +121,14 @@ void main()
 		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
 		uint iout = count - 1;
 		int64_t lastPeriod = stateFirstPass[1];
-		offsets[iout] = lastOffset + lastPeriod/2;
+		int64_t tout = lastOffset + lastPeriod/2;
+		offsets[iout] = tout;
 		squarewave[iout] = uint8_t(iout & 1);
 		durations[iout] = lastPeriod;
+
+		//Generate sampled data output
+		uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
+		ssamples[iout] = isamples[nsample];
 	}
 
 	//Everything else copies from subsequent blocks
@@ -127,9 +150,14 @@ void main()
 			int64_t delta = nextOffset - lastOffset;
 
 			//Generate the squarewave output
-			offsets[iout] = lastOffset + delta/2;	//90 degree phase shift
+			int64_t tout = lastOffset + delta/2;	//90 degree phase shift
+			offsets[iout] = tout;
 			squarewave[iout] = uint8_t(iout & 1);
 			durations[iout] = delta;
+
+			//Generate sampled data output
+			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
+			ssamples[iout] = isamples[nsample];
 
 			lastOffset = nextOffset;
 		}
@@ -137,8 +165,13 @@ void main()
 		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
 		uint iout = writebase + count - 1;
 		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.x - 1)*2 + 1];
-		offsets[iout] = lastOffset + lastPeriod/2;
+		int64_t tout = lastOffset + lastPeriod/2;
+		offsets[iout] = tout;
 		squarewave[iout] = uint8_t(iout & 1);
 		durations[iout] = lastPeriod;
+
+		//Generate sampled data output
+		uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
+		ssamples[iout] = isamples[nsample];
 	}
 }

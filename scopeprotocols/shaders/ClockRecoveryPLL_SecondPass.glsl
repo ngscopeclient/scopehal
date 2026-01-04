@@ -62,8 +62,11 @@ layout(std430, push_constant) uniform constants
 	int64_t	initialPeriod;
 	int64_t fnyquist;
 	int64_t	tend;
+	int64_t	timescale;
+	int64_t	triggerPhase;
 	uint	nedges;
 	uint	maxOffsetsPerThread;
+	uint	maxInputSamples;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;

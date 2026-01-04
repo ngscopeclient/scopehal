@@ -512,11 +512,11 @@ public:
 		@brief Copies our content from another AcceleratorBuffer
 	 */
 	 __attribute__((noinline))
-	void CopyFrom(const AcceleratorBuffer<T>& rhs)
+	void CopyFrom(const AcceleratorBuffer<T>& rhs, bool reallocateToMatch = true)
 	{
 		//Copy placement hints from the other instance, then resize to match
 		SetCpuAccessHint(rhs.m_cpuAccessHint);
-		SetGpuAccessHint(rhs.m_gpuAccessHint, true);
+		SetGpuAccessHint(rhs.m_gpuAccessHint, reallocateToMatch);
 		resize(rhs.m_size);
 
 		//Valid data CPU side? Copy it to here

@@ -43,8 +43,11 @@ public:
 	int64_t		initialPeriod;
 	int64_t		fnyquist;
 	int64_t		tend;
+	int64_t		timescale;
+	int64_t		triggerPhase;
 	uint32_t	nedges;
 	uint32_t	maxOffsetsPerThread;
+	uint32_t	maxInputSamples;
 };
 
 class ClockRecoveryFilter : public Filter
