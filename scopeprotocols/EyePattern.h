@@ -44,8 +44,8 @@ class EyeIndexConstants
 public:
 	int64_t		timescale;
 	int64_t		triggerPhase;
-	uint		len;
-	uint		numSamplesPerThread;
+	uint32_t	len;
+	uint32_t	numSamplesPerThread;
 };
 
 class EyeFilterConstants
