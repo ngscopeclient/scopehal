@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,8 +37,8 @@ using namespace std;
 
 TIEMeasurement::TIEMeasurement(const string& color)
 	: Filter(color, CAT_CLOCK)
-	, m_threshname("Threshold")
-	, m_skipname("Skip Start")
+	, m_threshold(m_parameters["Threshold"])
+	, m_skipStart(m_parameters["Skip Start"])
 {
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
@@ -46,11 +46,13 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	CreateInput("Clock");
 	CreateInput("Golden");
 
-	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_threshname].SetFloatVal(0);
+	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_threshold.SetFloatVal(0);
 
-	m_parameters[m_skipname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_skipname].SetIntVal(0);
+	m_skipStart = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_skipStart.SetIntVal(0);
+
+	m_clockEdgesMuxed = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,11 +84,11 @@ string TIEMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TIEMeasurement::Refresh()
+void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -101,7 +103,6 @@ void TIEMeasurement::Refresh()
 	auto ugolden = dynamic_cast<UniformDigitalWaveform*>(golden);
 	size_t len = min(clk->size(), golden->size());
 
-	clk->PrepareForCpuAccess();
 	golden->PrepareForCpuAccess();
 
 	//Create the output
@@ -111,19 +112,35 @@ void TIEMeasurement::Refresh()
 	cap->PrepareForCpuAccess();
 
 	//Timestamps of the edges
-	vector<int64_t> edges;
-	if(uaclk || saclk)
-		FindZeroCrossings(saclk, uaclk, m_parameters[m_threshname].GetFloatVal(), edges);
+	//Fast path: GPU edge detection on uniform input
+	if(uaclk)
+	{
+		m_detector.FindZeroCrossings(uaclk, m_threshold.GetFloatVal(), cmdBuf, queue);
+		m_clockEdgesMuxed = &m_detector.GetResults();
+	}
+
+	//Slow path: look for edges on the CPU
 	else
-		FindZeroCrossings(sdclk, udclk, edges);
+	{
+		clk->PrepareForCpuAccess();
+		vector<int64_t> clock_edges;
+		if(sdclk || udclk)
+			FindZeroCrossings(sdclk, udclk, clock_edges);
+		else
+			FindZeroCrossings(saclk, uaclk, m_threshold.GetFloatVal(), clock_edges);
+		m_clockEdges.CopyFrom(clock_edges);
+		m_clockEdgesMuxed = &m_clockEdges;
+	}
 
 	//Ignore edges before things have stabilized
-	int64_t skip_time = m_parameters[m_skipname].GetIntVal();
+	int64_t skip_time = m_skipStart.GetIntVal();
 
 	//For each input clock edge, find the closest recovered clock edge
+	//For now, this is all CPU side
 	size_t iedge = 0;
 	size_t tlast = 0;
-	for(auto atime : edges)
+	m_clockEdgesMuxed->PrepareForCpuAccess();
+	for(auto atime : *m_clockEdgesMuxed)
 	{
 		if(iedge >= len)
 			break;
@@ -191,8 +208,6 @@ void TIEMeasurement::Refresh()
 
 		tlast = golden_center;
 	}
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }

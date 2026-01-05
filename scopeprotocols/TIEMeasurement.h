@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,12 +35,14 @@
 #ifndef TIEMeasurement_h
 #define TIEMeasurement_h
 
+#include "../scopehal/LevelCrossingDetector.h"
+
 class TIEMeasurement : public Filter
 {
 public:
 	TIEMeasurement(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -49,8 +51,13 @@ public:
 	PROTOCOL_DECODER_INITPROC(TIEMeasurement)
 
 protected:
-	std::string m_threshname;
-	std::string m_skipname;
+	FilterParameter& m_threshold;
+	FilterParameter& m_skipStart;
+
+	AcceleratorBuffer<int64_t> m_clockEdges;
+	AcceleratorBuffer<int64_t>* m_clockEdgesMuxed;
+
+	LevelCrossingDetector m_detector;
 };
 
 #endif
