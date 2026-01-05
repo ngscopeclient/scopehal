@@ -38,6 +38,7 @@ add_compute_shaders(
 		EyeNormalizeScale.glsl
 		FindZeroCrossings.glsl
 		Gather.glsl
+		Histogram.glsl
 		MinMax.glsl
 		NoisySine.glsl
 		NoisySineSum.glsl

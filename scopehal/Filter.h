@@ -42,6 +42,15 @@
 
 class QueueHandle;
 
+class HistogramConstants
+{
+public:
+	uint32_t	size;
+	uint32_t	bins;
+	float		nmin;
+	float		nmax;
+};
+
 /**
 	@brief Describes a particular revision of a waveform
 	@ingroup core
@@ -729,6 +738,63 @@ public:
 			return MakeHistogram(s, low, high, bins);
 		else
 			return MakeHistogram(u, low, high, bins);
+	}
+
+	/**
+		@brief Makes a histogram from a waveform with the specified number of bins.
+
+		Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
+
+		Requires GPU side int64 support
+
+		@param low	Low endpoint of the histogram (volts)
+		@param high High endpoint of the histogram (volts)
+		@param bins	Number of histogram bins
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void MakeHistogram(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		ComputePipeline& histogramPipeline,
+		T* cap,
+		AcceleratorBuffer<uint64_t>& hist,
+		float low,
+		float high,
+		size_t bins)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		//Early out if we have zero span
+		if(bins == 0)
+			return;
+
+		const uint32_t nthreads = 4096;
+		const uint32_t threadsPerBlock = 64;
+
+		//Fill the input histogram with zeroes CPU side for now
+		//TODO: GPU side fill
+		hist.resize(bins);
+		hist.PrepareForCpuAccess();
+		memset(hist.GetCpuPointer(), 0, bins*sizeof(int64_t));
+		hist.MarkModifiedFromCpu();
+
+		//Push constants
+		HistogramConstants cfg;
+		cfg.size = cap->size();
+		cfg.bins = bins;
+		cfg.nmin = low;
+		cfg.nmax = high;
+
+		cmdBuf.begin({});
+		histogramPipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+		histogramPipeline.BindBufferNonblocking(1, hist, cmdBuf);
+		histogramPipeline.Dispatch(cmdBuf, cfg, nthreads / threadsPerBlock);
+
+		hist.MarkModifiedFromGpu();
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 	}
 
 	/**

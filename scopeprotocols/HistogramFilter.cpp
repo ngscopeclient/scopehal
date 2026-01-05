@@ -69,6 +69,14 @@ HistogramFilter::HistogramFilter(const string& color)
 	m_range = 1;
 
 	ClearSweeps();
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -237,21 +245,14 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	}
 	LogTrace("Final configuration: %zu bins of %s\n", bins, xunit.PrettyPrint(binsize).c_str());
 
-	//Calculate histogram for our incoming data
-	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
-
-	//Reallocate the histogram if we changed it
+	//Reallocate the histogram if we changed configuration
 	if(reallocate)
 	{
 		//Reallocate our waveform
-		cap = new UniformAnalogWaveform;
+		cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 		cap->m_timescale = binsize;
-		cap->m_startTimestamp = din->m_startTimestamp;
-		cap->m_startFemtoseconds = din->m_startFemtoseconds;
 		cap->m_triggerPhase = m_min * scale;
 		cap->m_flags = 0; // Updated at end
-		SetData(cap, 0);
-
 		cap->Resize(bins);
 		cap->PrepareForCpuAccess();
 
@@ -260,12 +261,36 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 			m_histogram.push_back(0);
 	}
 
-	//Update histogram
+	//Calculate histogram for our incoming data
 	size_t vmax = 0;
-	for(size_t i=0; i<bins; i++)
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
-		m_histogram[i] += data[i];
-		vmax = max(vmax, m_histogram[i]);
+		//GPU side histogram calculation
+		if(sdin)
+			MakeHistogram(cmdBuf, queue, *m_histogramPipeline, sdin, m_histogramBuf, m_min, m_max, bins);
+		else
+			MakeHistogram(cmdBuf, queue, *m_histogramPipeline, udin, m_histogramBuf, m_min, m_max, bins);
+
+		m_histogramBuf.PrepareForCpuAccess();
+
+		//Update histogram
+		for(size_t i=0; i<bins; i++)
+		{
+			m_histogram[i] += m_histogramBuf[i];
+			vmax = max(vmax, m_histogram[i]);
+		}
+	}
+	else
+	{
+		//CPU side fallback
+		auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
+
+		//Update histogram
+		for(size_t i=0; i<bins; i++)
+		{
+			m_histogram[i] += data[i];
+			vmax = max(vmax, m_histogram[i]);
+		}
 	}
 
 	//Generate output
