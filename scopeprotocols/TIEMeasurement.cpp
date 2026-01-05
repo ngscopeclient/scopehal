@@ -122,11 +122,17 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
 
-	//Timestamps of the edges
-	//Fast path: GPU edge detection on uniform input
-	if(uaclk)
+	//Fastest path: if our reference signal was fed to the CDR PLL driving our golden input,
+	//it's already been edge detected. Use those edges instead!
+	float threshold = m_threshold.GetFloatVal();
+	auto pcdr = dynamic_cast<ClockRecoveryFilter*>(GetInput(1).m_channel);
+	if(pcdr && (fabs(pcdr->GetThreshold() - threshold) < 0.01) && (pcdr->GetInput(0) == GetInput(0)) && uaclk)
+		m_clockEdgesMuxed = &pcdr->GetZeroCrossings();
+
+	//Normal fast path: GPU edge detection on uniform input
+	else if(uaclk)
 	{
-		m_detector.FindZeroCrossings(uaclk, m_threshold.GetFloatVal(), cmdBuf, queue);
+		m_detector.FindZeroCrossings(uaclk, threshold, cmdBuf, queue);
 		m_clockEdgesMuxed = &m_detector.GetResults();
 	}
 
@@ -138,7 +144,7 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		if(sdclk || udclk)
 			FindZeroCrossings(sdclk, udclk, clock_edges);
 		else
-			FindZeroCrossings(saclk, uaclk, m_threshold.GetFloatVal(), clock_edges);
+			FindZeroCrossings(saclk, uaclk, threshold, clock_edges);
 		m_clockEdges.CopyFrom(clock_edges);
 		m_clockEdgesMuxed = &m_clockEdges;
 	}
@@ -151,7 +157,6 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 
 	//For each input clock edge, find the closest recovered clock edge
 	//Fast path: golden clock came from CDR filter and we have GPU native int64 support
-	auto pcdr = dynamic_cast<ClockRecoveryFilter*>(GetInput(1).m_channel);
 	if(g_hasShaderInt64 && pcdr && sgolden)
 	{
 		cmdBuf.begin({});

@@ -65,6 +65,13 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(ClockRecoveryFilter)
 
+	///@brief Allow our zero crossings to be reused in downstream filters (e.g. TIE) if valid (input is uniform)
+	AcceleratorBuffer<int64_t>& GetZeroCrossings()
+	{ return m_detector.GetResults(); }
+
+	float GetThreshold()
+	{ return m_threshold.GetFloatVal(); }
+
 protected:
 	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
 
