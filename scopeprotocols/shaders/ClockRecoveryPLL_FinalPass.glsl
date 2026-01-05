@@ -147,19 +147,20 @@ void main()
 		{
 			uint iout = writebase + i - 1;
 			int64_t nextOffset = offsetsSecondPass[readbase + i];
+			squarewave[iout] = uint8_t(iout & 1);
+
 			int64_t delta = nextOffset - lastOffset;
+			int64_t tout = lastOffset + delta/2;	//90 degree phase shift
+			lastOffset = nextOffset;
 
 			//Generate the squarewave output
-			int64_t tout = lastOffset + delta/2;	//90 degree phase shift
+			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
+			float sampledData = isamples[nsample];
 			offsets[iout] = tout;
-			squarewave[iout] = uint8_t(iout & 1);
 			durations[iout] = delta;
 
 			//Generate sampled data output
-			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
-			ssamples[iout] = isamples[nsample];
-
-			lastOffset = nextOffset;
+			ssamples[iout] = sampledData;
 		}
 
 		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase

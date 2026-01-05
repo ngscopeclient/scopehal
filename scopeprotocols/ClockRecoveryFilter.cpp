@@ -257,7 +257,7 @@ void ClockRecoveryFilter::Refresh(
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
 			//TODO: do we need to tune numThreads to lock well to short waveforms?
-			const uint64_t numThreads = 2048;
+			const uint64_t numThreads = 4096;
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
 			const uint64_t maxEdges = din->size() / 2;

@@ -171,7 +171,7 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		//Entry 0 is number of edges written
 		//Entry 2i + 1 is offset
 		//Entry 2i + 2 is TIE
-		const uint32_t numThreads = 2048;
+		const uint32_t numThreads = 16384;
 		const uint32_t threadsPerBlock = 64;
 		const uint32_t numBlocks = numThreads / threadsPerBlock;
 		const uint32_t maxEdgesPerThread = (m_clockEdgesMuxed->size() | (numThreads-1)) / numThreads;

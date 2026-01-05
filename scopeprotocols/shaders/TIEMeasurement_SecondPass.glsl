@@ -66,13 +66,34 @@ layout(std430, push_constant) uniform constants
 	uint	maxEdgesPerThread;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define BLOCK_SIZE 64
+
+layout(local_size_x=BLOCK_SIZE, local_size_y=1, local_size_z=1) in;
+
+shared uint blockbase;
+shared uint startingSum;
 
 void main()
 {
-	//Find starting sample index
-	uint writebase = 0;
-	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
+	//Initialize shared variables
+	if(gl_LocalInvocationID.x == 0)
+	{
+		startingSum = 0;
+		blockbase = gl_GlobalInvocationID.x;
+	}
+	barrier();
+	memoryBarrierShared();
+
+	//Find starting sample index for the block
+	uint tmp = 0;
+	for(uint i=0; i < blockbase; i += BLOCK_SIZE)
+		tmp += uint(firstPassOutput[i * blockBufferSize]);
+	atomicAdd(startingSum, tmp);
+	barrier();
+	memoryBarrierShared();
+
+	uint writebase = startingSum;
+	for(uint i=blockbase; i<gl_GlobalInvocationID.x; i++)
 		writebase += uint(firstPassOutput[i * blockBufferSize]);
 
 	//Copy samples
