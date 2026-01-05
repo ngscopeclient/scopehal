@@ -31,47 +31,162 @@
 #pragma shader_stage(compute)
 
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_shader_atomic_int64 : require
 
-layout(std430, binding=0) restrict buffer buf_accumData
+layout(std430, binding=0) restrict readonly buffer buf_clockEdges
 {
-	int64_t accumData[];
+	int64_t clockEdges[];
 };
 
-layout(std430, binding=1) buffer buf_reduceData
+layout(std430, binding=1) restrict readonly buffer buf_goldenOffsets
 {
-	int64_t nmax;
+	int64_t golden[];
 };
 
-layout(std430, binding=2) buffer buf_outData
+layout(std430, binding=2) restrict writeonly buffer buf_out
 {
-	float outData[];
+	int64_t dout[];
 };
 
 layout(std430, push_constant) uniform constants
 {
-	uint	width;
-	uint	height;
-	float	satLevel;
+	int64_t	skip_time;
+	uint	nedges;
+	uint	ngolden;
+	uint	blockBufferSize;
+	uint	maxEdgesPerThread;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	//thread X coordinate is actually our Y position, weird but that's how it worked out lol
-	if(gl_GlobalInvocationID.x >= height)
-		return;
+	//Each thread processes an equal-sized group of edges in the input signal (not the golden).
+	//Get the timestamp of our first edge
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint i = gl_GlobalInvocationID.x * maxEdgesPerThread;
+	int64_t target = clockEdges[i];
 
-	//Calculate scaling factor for normalization
-	int64_t imax = nmax;
-	if(imax == 0)
-		imax = 1;
-	float norm = 2.0 * satLevel / float(imax);
+	//Binary search for the first golden clock edge after this sample
+	uint pos = ngolden/2;
+	uint last_lo = 0;
+	uint last_hi = ngolden-1;
+	uint iedge = 0;
+	if(ngolden > 0)
+	{
+		//Clip if out of range
+		if(golden[0] >= target)
+			iedge = 0;
+		else if(golden[last_hi] < target)
+			iedge = ngolden - 1;
 
-	//Normalize the output
-	uint base = gl_GlobalInvocationID.x * width;
-	for(uint x=0; x<width; x++)
-		outData[base + x] = min(1.0, float(accumData[base + x])*norm);
+		//Main loop
+		else
+		{
+			while(true)
+			{
+				//Stop if we've bracketed the target
+				if( (last_hi - last_lo) <= 1)
+				{
+					iedge = last_lo;
+					break;
+				}
+
+				//Move down
+				if(golden[pos] > target)
+				{
+					uint delta = pos - last_lo;
+					last_hi = pos;
+					pos = last_lo + delta/2;
+				}
+
+				//Move up
+				else
+				{
+					uint delta = last_hi - pos;
+					last_lo = pos;
+					pos = last_hi - delta/2;
+				}
+			}
+		}
+	}
+
+	//We actually want the clock edge before the target, so decrement it unless it's the first in the capture
+	if(iedge > 0)
+		iedge --;
+
+	//Index of the next output sample
+	uint outputBase = gl_GlobalInvocationID.x * blockBufferSize;
+	uint nOutputEdge = 0;
+
+	//End of the input range
+	uint lastEdge = min(i + maxEdgesPerThread, nedges);
+
+	for(; i < lastEdge; i ++)
+	{
+		int64_t atime = clockEdges[i];
+
+		//Ran out of golden clock edges? Stop
+		if(iedge >= ngolden)
+			break;
+
+		int64_t prev_edge = golden[iedge];
+		int64_t next_edge = prev_edge;
+		uint jedge = iedge;
+
+		bool hit = false;
+
+		//Look for a pair of edges bracketing our edge
+		while(true)
+		{
+			prev_edge = next_edge;
+			next_edge = golden[jedge];
+
+			//First golden edge is after this signal edge
+			if(prev_edge > atime)
+				break;
+
+			//Bracketed
+			if( (prev_edge < atime) && (next_edge > atime) )
+			{
+				hit = true;
+				break;
+			}
+
+			//No, keep looking
+			jedge ++;
+
+			//End of capture
+			if(jedge >= ngolden)
+				break;
+		}
+
+		//No interval error possible without a reference clock edge.
+		if(!hit)
+			continue;
+
+		//Hit! We're bracketed. Start the next search from this edge
+		iedge = jedge;
+
+		//Since the CDR filter adds a 90 degree phase offset for sampling in the middle of the data eye,
+		//we need to use the *midpoint* of the golden clock cycle as the nominal position of the clock
+		//edge for TIE measurements.
+		int64_t golden_period = next_edge - prev_edge;
+		int64_t golden_center = prev_edge + golden_period/2;
+
+		//Ignore edges before things have stabilized
+		if(prev_edge < skip_time)
+		{}
+
+		else
+		{
+			//Add a new sample
+			//Worry about durations later. We just store offset and TIE
+			dout[2*nOutputEdge + outputBase + 1] = golden_center;
+			dout[2*nOutputEdge + outputBase + 2] = atime - golden_center;
+			nOutputEdge ++;
+		}
+	}
+
+	//Store the total number of samples written
+	dout[outputBase] = int64_t(nOutputEdge);
 }
-
