@@ -102,10 +102,16 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	//MLT-3 decode
 	DecodeStates(cmdBuf, queue, din);
 
+	//Get all our inputs on the CPU in one big batch transfer
+	//TODO: do we want to use the transfer queue/mutex for this??
+	cmdBuf.begin({});
+	m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
+	din->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+	din->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
 	//RX LFSR sync
-	m_phyBits.PrepareForCpuAccess();
-	din->m_offsets.PrepareForCpuAccess();
-	din->m_durations.PrepareForCpuAccess();
 	size_t nbits = m_phyBits.size();
 	vector<uint8_t> descrambled_bits;
 	bool synced = false;
