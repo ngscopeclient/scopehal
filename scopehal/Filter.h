@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -452,6 +452,53 @@ public:
 				vmin = f;
 			if(f > vmax)
 				vmax = f;
+		}
+	}
+
+	/**
+		@brief Gets the min and max voltage of a waveform on the GPU
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void GetMinMaxVoltage(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		ComputePipeline& minmaxPipeline,
+		AcceleratorBuffer<float>& scratchMin,
+		AcceleratorBuffer<float>& scratchMax,
+		T* cap,
+		float& vmin,
+		float& vmax
+		)
+	{
+		//GPU side min/max
+		const uint32_t nthreads = 4096;
+		const uint32_t threadsPerBlock = 64;
+		scratchMin.resize(nthreads);
+		scratchMax.resize(nthreads);
+
+		cmdBuf.begin({});
+		minmaxPipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+		minmaxPipeline.BindBufferNonblocking(1, scratchMin, cmdBuf);
+		minmaxPipeline.BindBufferNonblocking(2, scratchMax, cmdBuf);
+		minmaxPipeline.Dispatch(cmdBuf, (uint32_t)cap->size(), nthreads / threadsPerBlock);
+
+		scratchMin.MarkModifiedFromGpu();
+		scratchMax.MarkModifiedFromGpu();
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Final reduction on CPU (TODO: faster to do second shader invocation and read one value??)
+		scratchMin.PrepareForCpuAccess();
+		scratchMax.PrepareForCpuAccess();
+
+		vmin = scratchMin[0];
+		vmax = scratchMax[0];
+		for(uint32_t i=1; i<nthreads; i++)
+		{
+			vmin = std::min(vmin, scratchMin[i]);
+			vmax = std::max(vmax, scratchMax[i]);
 		}
 	}
 

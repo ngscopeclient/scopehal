@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,54 +27,57 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of HistogramFilter
- */
-#ifndef HistogramFilter_h
-#define HistogramFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-class HistogramFilter : public Filter
+layout(std430, binding=0) restrict readonly buffer buf_pin
 {
-public:
-	HistogramFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
-
-	virtual float GetVoltageRange(size_t stream) override;
-	virtual void SetVoltageRange(float range, size_t stream) override;
-
-	virtual float GetOffset(size_t stream) override;
-	virtual void SetOffset(float offset, size_t stream) override;
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	virtual void ClearSweeps() override;
-
-	PROTOCOL_DECODER_INITPROC(HistogramFilter)
-
-protected:
-	std::string m_autorangeName;
-	std::string m_minName;
-	std::string m_maxName;
-	std::string m_binSizeName;
-
-	float m_midpoint;
-	float m_range;
-
-	float m_min;
-	float m_max;
-
-	std::vector<size_t> m_histogram;
-
-	//Minmax calculation for bounds
-	ComputePipeline m_minmaxPipeline;
-	AcceleratorBuffer<float> m_minbuf;
-	AcceleratorBuffer<float> m_maxbuf;
+	float pin[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_pmin
+{
+	float pmin[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_pmax
+{
+	float pmax[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//Divide work up into blocks
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint nthread = gl_GlobalInvocationID.x;
+	uint samplesPerThread = size / numThreads;
+
+	//Find our thread's block
+	uint istart = nthread * samplesPerThread;
+	uint iend = istart + samplesPerThread;
+	if(nthread == numThreads - 1)
+		iend = size;
+
+	//Start with min/max at our first sample
+	float fmin = pin[istart];
+	float fmax = pin[istart];
+
+	//Loop over our block of samples
+	for(uint i=istart+1; i < iend; i ++)
+	{
+		float f = pin[i];
+		fmin = min(fmin, f);
+		fmax = max(fmax, f);
+	}
+
+	//Write reduced output
+	pmin[nthread] = fmin;
+	pmax[nthread] = fmax;
+}

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,11 +36,12 @@ using namespace std;
 // Construction / destruction
 
 HistogramFilter::HistogramFilter(const string& color)
-	: Filter(color, CAT_MATH),
-	  m_autorangeName("Autorange?"),
-	  m_minName("Min Value"),
-	  m_maxName("Max Value"),
-	  m_binSizeName("Bin Size")
+	: Filter(color, CAT_MATH)
+	, m_autorangeName("Autorange?")
+	, m_minName("Min Value")
+	, m_maxName("Max Value")
+	, m_binSizeName("Bin Size")
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_COUNTS_SCI), "data", Stream::STREAM_TYPE_ANALOG);
 
@@ -133,7 +134,7 @@ void HistogramFilter::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-void HistogramFilter::Refresh()
+void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -161,9 +162,13 @@ void HistogramFilter::Refresh()
 	m_parameters[m_maxName].SetUnit(xunit);
 	m_parameters[m_binSizeName].SetUnit(m_xAxisUnit);
 
-	//Calculate min/max of the input data
-	float nmin = GetMinVoltage(sdin, udin);
-	float nmax = GetMaxVoltage(sdin, udin);
+	//GPU side min/max
+	float nmin;
+	float nmax;
+	if(sdin)
+		GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, sdin, nmin, nmax);
+	else
+		GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, udin, nmin, nmax);
 	LogTrace("nmin = %s, nmax = %s\n", xunit.PrettyPrint(nmin).c_str(), xunit.PrettyPrint(nmax).c_str());
 
 	//Calculate bin count

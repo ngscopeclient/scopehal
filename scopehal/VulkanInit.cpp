@@ -733,6 +733,7 @@ bool VulkanInit(bool skipGLFW)
 				vk::PhysicalDevice8BitStorageFeatures features8bit;
 				vk::PhysicalDeviceVulkan12Features featuresVulkan12;
 				vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
+				vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT featuresAtomicFloat;
 				void* pNext = nullptr;
 				if(device.getFeatures().shaderFloat64)
 				{
@@ -758,11 +759,23 @@ bool VulkanInit(bool skipGLFW)
 						vk::PhysicalDeviceFeatures2,
 						vk::PhysicalDevice16BitStorageFeatures,
 						vk::PhysicalDevice8BitStorageFeatures,
-						vk::PhysicalDeviceVulkan12Features
+						vk::PhysicalDeviceVulkan12Features,
+						vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT
 						>();
 					auto storageFeatures16 = std::get<1>(features2);
 					auto storageFeatures8 = std::get<2>(features2);
 					auto vulkan12Features = std::get<3>(features2);
+					auto atomicFloatFeatures = std::get<4>(features2);
+
+					//Atomic float on shared memory is core, but SSBOs is an extension
+					if(atomicFloatFeatures.shaderBufferFloat32Atomics)
+					{
+						LogDebug("Enabling 32-bit atomic float support for SSBOs\n");
+
+						featuresAtomicFloat.shaderBufferFloat32Atomics = true;
+						featuresAtomicFloat.pNext = pNext;
+						pNext = &featuresAtomicFloat;
+					}
 
 					//Enable 16 bit SSBOs
 					if(storageFeatures16.storageBuffer16BitAccess && storageFeatures16.uniformAndStorageBuffer16BitAccess)
@@ -788,13 +801,13 @@ bool VulkanInit(bool skipGLFW)
 						if(vulkan12Features.shaderBufferInt64Atomics)
 						{
 							featuresVulkan12.shaderBufferInt64Atomics = true;
-							LogDebug("Enabling 64-bit atomic support for SSBOs\n");
+							LogDebug("Enabling 64-bit atomic int support for SSBOs\n");
 						}
 
 						if(vulkan12Features.shaderSharedInt64Atomics)
 						{
 							featuresVulkan12.shaderSharedInt64Atomics = true;
-							LogDebug("Enabling 64-bit atomic support for shared memory\n");
+							LogDebug("Enabling 64-bit atomic int support for shared memory\n");
 						}
 
 						//Enable 8 bit SSBOs
@@ -890,10 +903,7 @@ bool VulkanInit(bool skipGLFW)
 				if(g_hasShaderAtomicFloat)
 					devextensions.push_back("VK_EXT_shader_atomic_float");
 				if(g_hasShaderAtomicInt64)
-				{
 					devextensions.push_back("VK_KHR_shader_atomic_int64");
-
-				}
 				if(g_hasMemoryBudget)
 					devextensions.push_back("VK_EXT_memory_budget");
 				if(g_hasPushDescriptor)
