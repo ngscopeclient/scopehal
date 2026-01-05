@@ -111,6 +111,12 @@ string HistogramFilter::GetProtocolName()
 	return "Histogram";
 }
 
+Filter::DataLocation HistogramFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 float HistogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
@@ -152,7 +158,6 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	}
 
 	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
@@ -283,6 +288,14 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	else
 	{
 		//CPU side fallback
+		cmdBuf.begin({});
+		if(sdin)
+			sdin->m_samples.PrepareForCpuAccessNonblocking(cmdBuf);
+		else
+			udin->m_samples.PrepareForCpuAccessNonblocking(cmdBuf);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
 		auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
 
 		//Update histogram
