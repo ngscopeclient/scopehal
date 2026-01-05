@@ -943,6 +943,25 @@ public:
 	}
 
 	/**
+		@brief Prepares the buffer to be accessed from the CPU, without blocking
+
+		This MUST be called prior to accessing the CPU-side buffer to ensure that m_cpuPtr is valid and up to date.
+	 */
+	void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf)
+	{
+		//Early out if no content
+		if(m_size == 0)
+			return;
+
+		//If there's no buffer at all on the CPU, allocate one
+		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
+			AllocateCpuBuffer(m_capacity);
+
+		if(m_cpuPhysMemIsStale)
+			CopyToCpuNonblocking(cmdBuf);
+	}
+
+	/**
 		@brief Prepares the buffer to be accessed from the GPU
 
 		This MUST be called prior to accessing the GPU-side buffer to ensure that m_gpuPhysMem is valid and up to date.
@@ -1024,6 +1043,22 @@ protected:
 
 		//Submit the request and block until it completes
 		g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
+
+		m_cpuPhysMemIsStale = false;
+	}
+
+	/**
+		@brief Copy the buffer contents from GPU to CPU without blocking on the CPU
+	 */
+	void CopyToCpuNonblocking(vk::raii::CommandBuffer& cmdBuf)
+	{
+		assert(std::is_trivially_copyable<T>::value);
+
+		//Make the transfer request
+		vk::BufferCopy region(0, 0, m_size * sizeof(T));
+		cmdBuf.copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
+
+		//No barrier needed when copying to CPU
 
 		m_cpuPhysMemIsStale = false;
 	}
