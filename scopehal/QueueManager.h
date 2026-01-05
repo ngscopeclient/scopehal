@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -65,6 +65,12 @@ public:
 
 	const std::string& GetName() const
 	{ return m_name; }
+
+	void WaitIdle()
+	{
+		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		_waitFence();
+	}
 
 public:
 	//non-copyable

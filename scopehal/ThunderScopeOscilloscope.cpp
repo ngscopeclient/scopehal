@@ -421,6 +421,8 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	vector<float> scales;
 	vector<float> offsets;
 
+	bool processedWaveformsOnGPU = true;
+
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
@@ -470,7 +472,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				continue;
 
 			//Create our waveform
-			UniformAnalogWaveform* cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
+			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = t;
@@ -484,6 +486,63 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			offsets.push_back(offset);
 
 			s[GetOscilloscopeChannel(chnum)] = cap;
+
+			//Kick off the GPU-side processing of the waveform to run nonblocking while we download the next
+			//Wait for any previous waveform processing to finish first, since we're reusing the command buffer
+			if(!keep)
+			{}
+			else if(g_hasShaderInt8 && g_hasPushDescriptor && (dataType == DATATYPE_I8))
+			{
+				m_queue->WaitIdle();
+				m_cmdBuf->begin({});
+
+				m_conversion8BitPipeline->Bind(*m_cmdBuf);
+				m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+				m_conversion8BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+				ConvertRawSamplesShaderArgs args;
+				args.size = cap->size();
+				args.gain = scales[i];
+				args.offset = -offsets[i];
+
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+				m_conversion8BitPipeline->DispatchNoRebind(
+					*m_cmdBuf, args,
+					min(compute_block_count, 32768u),
+					compute_block_count / 32768 + 1);
+
+				cap->MarkModifiedFromGpu();
+				m_cmdBuf->end();
+				m_queue->Submit(*m_cmdBuf);
+			}
+			else if(g_hasShaderInt16 && g_hasPushDescriptor && (dataType == DATATYPE_I16))
+			{
+				m_queue->WaitIdle();
+				m_cmdBuf->begin({});
+
+				m_conversion16BitPipeline->Bind(*m_cmdBuf);
+				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+				m_conversion16BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+				ConvertRawSamplesShaderArgs args;
+				args.size = cap->size();
+				args.gain = scales[i];
+				args.offset = -offsets[i];
+
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+				m_conversion16BitPipeline->DispatchNoRebind(
+					*m_cmdBuf, args,
+					min(compute_block_count, 32768u),
+					compute_block_count / 32768 + 1);
+
+				cap->MarkModifiedFromGpu();
+				m_cmdBuf->end();
+				m_queue->Submit(*m_cmdBuf);
+			}
+
+			//Not available, fall back to CPU side processing
+			else
+				processedWaveformsOnGPU = false;
 		}
 		else
 		{
@@ -494,67 +553,9 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	if(!keep)
 		return true;
 
-	//Prefer GPU path
-	if(g_hasShaderInt8 && g_hasPushDescriptor && (dataType == DATATYPE_I8))
-	{
-		m_cmdBuf->begin({});
-
-		m_conversion8BitPipeline->Bind(*m_cmdBuf);
-
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-
-			m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-			m_conversion8BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
-
-			ConvertRawSamplesShaderArgs args;
-			args.size = cap->size();
-			args.gain = scales[i];
-			args.offset = -offsets[i];
-
-			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-			m_conversion8BitPipeline->DispatchNoRebind(
-				*m_cmdBuf, args,
-				min(compute_block_count, 32768u),
-				compute_block_count / 32768 + 1);
-
-			cap->MarkModifiedFromGpu();
-		}
-
-		m_cmdBuf->end();
-		m_queue->SubmitAndBlock(*m_cmdBuf);
-	}
-	else if(g_hasShaderInt16 && g_hasPushDescriptor && (dataType == DATATYPE_I16))
-	{
-		m_cmdBuf->begin({});
-
-		m_conversion16BitPipeline->Bind(*m_cmdBuf);
-
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-
-			m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-			m_conversion16BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
-
-			ConvertRawSamplesShaderArgs args;
-			args.size = cap->size();
-			args.gain = scales[i];
-			args.offset = -offsets[i];
-
-			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-			m_conversion16BitPipeline->DispatchNoRebind(
-				*m_cmdBuf, args,
-				min(compute_block_count, 32768u),
-				compute_block_count / 32768 + 1);
-
-			cap->MarkModifiedFromGpu();
-		}
-
-		m_cmdBuf->end();
-		m_queue->SubmitAndBlock(*m_cmdBuf);
-	}
+	//Wait for GPU to finish
+	if(processedWaveformsOnGPU)
+		m_queue->WaitIdle();
 
 	//Fallback path if GPU doesn't have suitable integer support
 	else
