@@ -198,11 +198,12 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		m_secondPassOutput.MarkModifiedFromGpu();
 		cap->MarkModifiedFromGpu();
 
+		m_secondPassOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
 		//Update final sample count
-		m_secondPassOutput.PrepareForCpuAccess();
 		cap->Resize(m_secondPassOutput[0]);
 	}
 	else if(pcdr && sgolden)

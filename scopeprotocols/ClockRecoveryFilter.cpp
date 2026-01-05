@@ -214,7 +214,6 @@ void ClockRecoveryFilter::Refresh(
 	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
 	scap->m_triggerPhase = 0;
 	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
-	scap->PrepareForCpuAccess();
 
 	//Get timestamp of the last sample
 	int64_t tend;
@@ -241,6 +240,7 @@ void ClockRecoveryFilter::Refresh(
 	{
 		edges.PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
+		scap->PrepareForCpuAccess();
 		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 		cap->m_offsets.MarkModifiedFromCpu();
 	}
@@ -324,13 +324,14 @@ void ClockRecoveryFilter::Refresh(
 			m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
 			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
+			m_firstPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_secondPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+
 			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
 
 			//Figure out how many edges we ended up with
 			//TODO: can we avoid this readback?
-			m_firstPassState.PrepareForCpuAccess();
-			m_secondPassState.PrepareForCpuAccess();
 			uint64_t numSamples = m_firstPassState[0];
 			for(uint64_t i=0; i<numThreads; i++)
 				numSamples += m_secondPassState[i*2];

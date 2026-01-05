@@ -1054,11 +1054,21 @@ protected:
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
+		//Add a barrier just in case a shader is still writing to it
+		cmdBuf.pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eShaderWrite,
+				vk::AccessFlagBits::eTransferRead
+				),
+			{},
+			{});
+
 		//Make the transfer request
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		cmdBuf.copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
-
-		//No barrier needed when copying to CPU
 
 		m_cpuPhysMemIsStale = false;
 	}

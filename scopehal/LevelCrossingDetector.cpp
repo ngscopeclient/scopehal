@@ -148,11 +148,13 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 
 	m_outbuf.MarkModifiedFromGpu();
 
+	m_gatherIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
+
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
 	//Grab the length off the GPU immediately then resize the buffer so we can use normal iterators on it
-	m_gatherIndexes.PrepareForCpuAccess();
+	//m_gatherIndexes.PrepareForCpuAccess();
 	auto len = m_gatherIndexes[numThreads];
 	m_outbuf.resize(len);
 	return len;
