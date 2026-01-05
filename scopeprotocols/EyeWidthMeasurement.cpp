@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -78,10 +78,16 @@ string EyeWidthMeasurement::GetProtocolName()
 	return "Eye Width";
 }
 
+Filter::DataLocation EyeWidthMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EyeWidthMeasurement::Refresh()
+void EyeWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	if(!VerifyAllInputsOK(true))
 	{
@@ -95,8 +101,10 @@ void EyeWidthMeasurement::Refresh()
 
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
-	din->PrepareForCpuAccess();
-	cap->PrepareForCpuAccess();
+	cmdBuf.begin({});
+	din->GetAccumBuffer().PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 	cap->m_timescale = 1;
 
 	//Make sure voltages are in the right order

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -82,10 +82,16 @@ string EyeHeightMeasurement::GetProtocolName()
 	return "Eye Height";
 }
 
+Filter::DataLocation EyeHeightMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EyeHeightMeasurement::Refresh()
+void EyeHeightMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	if(!VerifyAllInputsOK(true))
 	{
@@ -99,8 +105,11 @@ void EyeHeightMeasurement::Refresh()
 
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
-	din->PrepareForCpuAccess();
+	cmdBuf.begin({});
+	din->GetOutData().PrepareForCpuAccessNonblocking(cmdBuf);
 	cap->PrepareForCpuAccess();
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 	cap->m_timescale = 1;
 
 	//Make sure times are in the right order
