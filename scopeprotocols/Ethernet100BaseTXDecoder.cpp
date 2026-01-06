@@ -156,7 +156,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			queue->m_family );
 		m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
-		vk::CommandBufferAllocateInfo bufinfo(*m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+		vk::CommandBufferAllocateInfo bufinfo(**m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
 		m_transferCmdBuf = make_unique<vk::raii::CommandBuffer>(
 			std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 	}
