@@ -31,6 +31,7 @@
 #pragma shader_stage(compute)
 
 #extension GL_EXT_shader_8bit_storage : require
+#extension GL_EXT_debug_printf : enable
 
 layout(std430, binding=0) restrict readonly buffer buf_din
 {
@@ -52,7 +53,6 @@ layout(std430, push_constant) uniform constants
 	uint len;
 	uint samplesPerThread;
 	uint startOffset;
-	uint initialLfsrState;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -68,9 +68,35 @@ void main()
 	if(end >= len)
 		end = len;
 
+	//Assume the link is idle at this offset, then see if we got it right
+	//TODO: can we make this bit twiddling a bit less verbose??
+	uint idle_offset = startOffset - 11;
+	uint lfsr = 0;
+	if(uint(din[idle_offset + 0]) == 0)
+		lfsr |= (1 << 10);
+	if(uint(din[idle_offset + 1]) == 0)
+		lfsr |= (1 << 9);
+	if(uint(din[idle_offset + 2]) == 0)
+		lfsr |= (1 << 8);
+	if(uint(din[idle_offset + 3]) == 0)
+		lfsr |= (1 << 7);
+	if(uint(din[idle_offset + 4]) == 0)
+		lfsr |= (1 << 6);
+	if(uint(din[idle_offset + 5]) == 0)
+		lfsr |= (1 << 5);
+	if(uint(din[idle_offset + 6]) == 0)
+		lfsr |= (1 << 4);
+	if(uint(din[idle_offset + 7]) == 0)
+		lfsr |= (1 << 3);
+	if(uint(din[idle_offset + 8]) == 0)
+		lfsr |= (1 << 2);
+	if(uint(din[idle_offset + 9]) == 0)
+		lfsr |= (1 << 1);
+	if(uint(din[idle_offset + 10]) == 0)
+		lfsr |= (1 << 0);
+
 	//Calculate LFSR state at the start of this block given the initial state
 	uint advance = gl_GlobalInvocationID.x * samplesPerThread;
-	uint lfsr = initialLfsrState;
 	uint tmp = 0;
 	for(uint iterbit = 0; iterbit < 30; iterbit ++)
 	{

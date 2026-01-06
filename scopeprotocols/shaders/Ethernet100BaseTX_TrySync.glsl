@@ -27,84 +27,84 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTXDecoder
- */
-#ifndef Ethernet100BaseTXDecoder_h
-#define Ethernet100BaseTXDecoder_h
+#version 460
+#pragma shader_stage(compute)
 
-class Ethernet100BaseTXDescramblerConstants
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	len;
-	uint32_t	samplesPerThread;
-	uint32_t	startOffset;
+	uint8_t din[];
 };
 
-class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	Ethernet100BaseTXDecoder(const std::string& color);
+	uint8_t dout[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-	static std::string GetProtocolName();
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+};
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
-
-protected:
-	int GetState(float voltage)
+void main()
+{
+	//Bounds check
+	const uint searchWindow = 64;
+	if( (gl_GlobalInvocationID.x + searchWindow) >= len)
 	{
-		if(voltage > 0.5)
-			return 1;
-		else if(voltage < -0.5)
-			return -1;
-		else
-			return 0;
+		dout[gl_GlobalInvocationID.x] = uint8_t(0);
+		return;
 	}
 
-	void DecodeStates(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		SparseAnalogWaveform* samples);
+	//Assume the link is idle at this offset, then see if we got it right
+	//TODO: can we make this bit twiddling a bit less verbose??
+	uint lfsr = 0;
+	if(uint(din[gl_GlobalInvocationID.x + 0]) == 0)
+		lfsr |= (1 << 10);
+	if(uint(din[gl_GlobalInvocationID.x + 1]) == 0)
+		lfsr |= (1 << 9);
+	if(uint(din[gl_GlobalInvocationID.x + 2]) == 0)
+		lfsr |= (1 << 8);
+	if(uint(din[gl_GlobalInvocationID.x + 3]) == 0)
+		lfsr |= (1 << 7);
+	if(uint(din[gl_GlobalInvocationID.x + 4]) == 0)
+		lfsr |= (1 << 6);
+	if(uint(din[gl_GlobalInvocationID.x + 5]) == 0)
+		lfsr |= (1 << 5);
+	if(uint(din[gl_GlobalInvocationID.x + 6]) == 0)
+		lfsr |= (1 << 4);
+	if(uint(din[gl_GlobalInvocationID.x + 7]) == 0)
+		lfsr |= (1 << 3);
+	if(uint(din[gl_GlobalInvocationID.x + 8]) == 0)
+		lfsr |= (1 << 2);
+	if(uint(din[gl_GlobalInvocationID.x + 9]) == 0)
+		lfsr |= (1 << 1);
+	if(uint(din[gl_GlobalInvocationID.x + 10]) == 0)
+		lfsr |= (1 << 0);
 
-	bool TrySync(size_t idle_offset);
+	//We should have at least 64 "1" bits in a row once the descrambling is done.
+	//The minimum inter-frame gap is a lot bigger than this.
+	uint start = gl_GlobalInvocationID.x + 11;
+	uint stop = start + searchWindow;
+	bool ok = true;
+	for(uint i=start; i < stop; i++)
+	{
+		uint c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
+		lfsr = (lfsr << 1) ^ c;
 
-	void Descramble(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue, size_t idle_offset);
+		//If it's not a 1 bit (idle character is all 1s), no go
+		if( (uint(din[i]) ^ c) != 1)
+		{
+			ok = false;
+			break;
+		}
+	}
 
-	///@brief Raw scrambled serial bit stream after MLT-3 decoding
-	AcceleratorBuffer<uint8_t> m_phyBits;
-
-	///@brief Descrambled serial bit stream after LFSR
-	AcceleratorBuffer<uint8_t> m_descrambledBits;
-
-	///@brief Results from TrySync
-	AcceleratorBuffer<uint8_t> m_trySyncOutput;
-
-	///@brief LFSR lookahead table
-	AcceleratorBuffer<uint32_t> m_lfsrTable;
-
-	///@brief Compute pipeline for MLT-3 decoding
-	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;
-
-	///@brief Compute pipeline for TrySync
-	std::shared_ptr<ComputePipeline> m_trySyncComputePipeline;
-
-	///@brief Compute pipeline for descrambling
-	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
-
-	///@brief Pool of command buffers
-	std::unique_ptr<vk::raii::CommandPool> m_cmdPool;
-
-	///@brief Command buffer for transfers
-	std::unique_ptr<vk::raii::CommandBuffer> m_transferCmdBuf;
-
-	//@brief Queue for transfers
-	std::shared_ptr<QueueHandle> m_transferQueue;
-};
-
-#endif
+	if(ok)
+		dout[gl_GlobalInvocationID.x] = uint8_t(1);
+	else
+		dout[gl_GlobalInvocationID.x] = uint8_t(0);
+}

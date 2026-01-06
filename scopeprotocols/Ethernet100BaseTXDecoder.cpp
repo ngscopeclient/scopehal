@@ -84,6 +84,9 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 		m_mlt3DecodeComputePipeline =
 			make_shared<ComputePipeline>("shaders/MLT3Decoder.spv", 2, sizeof(uint32_t));
 
+		m_trySyncComputePipeline =
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_TrySync.spv", 2, sizeof(uint32_t));
+
 		m_descrambleComputePipeline =
 			make_shared<ComputePipeline>(
 				"shaders/Ethernet100BaseTXDescrambler.spv",
@@ -93,6 +96,7 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_descrambledBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_lfsrTable.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_trySyncOutput.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 	}
 }
 
@@ -157,37 +161,92 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 	}
 
-	//Copy input timestamps to CPU and overlap this with other processing
+	//Copy input timestamps to CPU as early as possible, so it can run while other processing is active
 	m_transferCmdBuf->begin({});
 	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf);
 	din->m_durations.PrepareForCpuAccessNonblocking(*m_transferCmdBuf);
 	m_transferCmdBuf->end();
 	m_transferQueue->SubmitAndBlock(*m_transferCmdBuf);
 
-	//MLT-3 decode
-	DecodeStates(cmdBuf, queue, din);
-
-	//RX LFSR sync
+	//MLT-3 decode and RX LFSR sync
+	//A max-sized Ethernet frame is 1500 bytes (12000 bits, or 15000 after 4b5b coding)
+	//TODO: this might occasionally fail to sync if a jumbo frame starts exactly when the trigger starts
+	//Do we want to go larger?
 	bool synced = false;
 	size_t idle_offset = 0;
-	for(; idle_offset<15000; idle_offset++)
+	const uint32_t maxOffset = 16384;
+	if(g_hasShaderInt8)
 	{
-		if(TrySync(idle_offset))
-		{
-			//Good sync, descramble it now
-			Descramble(cmdBuf, queue, idle_offset);
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numBlocks = maxOffset / threadsPerBlock;
 
-			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
-			synced = true;
-			break;
+		size_t ilen = din->size();
+		cmdBuf.begin({});
+
+		//Decode sampled analog voltages to MLT-3 symbols
+		uint32_t nthreads = ilen - 1;
+		m_phyBits.resize(nthreads);
+		const uint32_t compute_block_count = GetComputeBlockCount(nthreads, 64);
+		m_mlt3DecodeComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_mlt3DecodeComputePipeline->BindBufferNonblocking(1, m_phyBits, cmdBuf, true);
+		m_mlt3DecodeComputePipeline->Dispatch(cmdBuf, nthreads,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+		m_mlt3DecodeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+		m_phyBits.MarkModifiedFromGpu();
+
+		//TODO: we don't want to have to do this anymore!!
+		//m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		//Then look for LFSR sync
+		m_trySyncOutput.resize(maxOffset);
+		m_trySyncComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
+		m_trySyncComputePipeline->BindBufferNonblocking(1, m_trySyncOutput, cmdBuf, true);
+		m_trySyncComputePipeline->Dispatch(cmdBuf, (uint32_t)din->size(), numBlocks);
+
+		m_trySyncOutput.MarkModifiedFromGpu();
+		m_trySyncOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Check results
+		for(; idle_offset < maxOffset; idle_offset++)
+		{
+			if(m_trySyncOutput[idle_offset])
+			{
+				LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
+				synced = true;
+				break;
+			}
 		}
 	}
+	else
+	{
+		//MLT-3 decode
+		DecodeStates(cmdBuf, queue, din);
+
+		for(; idle_offset < maxOffset; idle_offset++)
+		{
+			if(TrySync(idle_offset))
+			{
+				LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
+				synced = true;
+				break;
+			}
+		}
+	}
+
+	//Make sure we got a good LFSR sync
 	if(!synced)
 	{
 		LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
 		SetData(nullptr, 0);
 		return;
 	}
+
+	//Good sync, descramble it now
+	Descramble(cmdBuf, queue, idle_offset);
 
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
 	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
@@ -366,60 +425,34 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 {
 	size_t ilen = samples->size();
 
-	if(g_hasShaderInt8)
+	samples->PrepareForCpuAccess();
+
+	//TODO: some kind of sanity checking that voltage is changing in the right direction
+	int oldstate = GetState(samples->m_samples[0]);
+	m_phyBits.PrepareForCpuAccess();
+	m_phyBits.resize(ilen-1);
+	for(size_t i=1; i<ilen; i++)
 	{
-		cmdBuf.begin({});
+		int nstate = GetState(samples->m_samples[i]);
 
-		//First step: decode sampled analog voltages to MLT-3 symbols
-		uint32_t nthreads = ilen - 1;
-		m_phyBits.resize(nthreads);
-		const uint32_t compute_block_count = GetComputeBlockCount(nthreads, 64);
-		m_mlt3DecodeComputePipeline->BindBufferNonblocking(0, samples->m_samples, cmdBuf);
-		m_mlt3DecodeComputePipeline->BindBufferNonblocking(1, m_phyBits, cmdBuf, true);
-		m_mlt3DecodeComputePipeline->Dispatch(cmdBuf, nthreads,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+		//No transition? Add a "0" bit
+		if(nstate == oldstate)
+			m_phyBits[i-1] = false;
 
-		m_phyBits.MarkModifiedFromGpu();
+		//Transition? Add a "1" bit
+		else
+			m_phyBits[i-1] = true;
 
-		//Copy buffers back to the CPU after initial processing is done
-		//since we look for the scrambler sync on the CPU for noow
-		m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
-
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
+		oldstate = nstate;
 	}
-	else
-	{
-		samples->PrepareForCpuAccess();
 
-		//TODO: some kind of sanity checking that voltage is changing in the right direction
-		int oldstate = GetState(samples->m_samples[0]);
-		m_phyBits.PrepareForCpuAccess();
-		m_phyBits.resize(ilen-1);
-		for(size_t i=1; i<ilen; i++)
-		{
-			int nstate = GetState(samples->m_samples[i]);
+	m_phyBits.MarkModifiedFromCpu();
 
-			//No transition? Add a "0" bit
-			if(nstate == oldstate)
-				m_phyBits[i-1] = false;
-
-			//Transition? Add a "1" bit
-			else
-				m_phyBits[i-1] = true;
-
-			oldstate = nstate;
-		}
-
-		m_phyBits.MarkModifiedFromCpu();
-
-		//Grab the bits onto the CPU for future descrambling
-		cmdBuf.begin({});
-		m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-	}
+	//Grab the bits onto the CPU for future descrambling
+	cmdBuf.begin({});
+	m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
 
 /**
@@ -476,20 +509,6 @@ void Ethernet100BaseTXDecoder::Descramble(
 	if( (idle_offset + 64) >= m_phyBits.size())
 		return;
 
-	//Initial descrambler state
-	unsigned int lfsr =
-		( (!m_phyBits[idle_offset + 0]) << 10 ) |
-		( (!m_phyBits[idle_offset + 1]) << 9 ) |
-		( (!m_phyBits[idle_offset + 2]) << 8 ) |
-		( (!m_phyBits[idle_offset + 3]) << 7 ) |
-		( (!m_phyBits[idle_offset + 4]) << 6 ) |
-		( (!m_phyBits[idle_offset + 5]) << 5 ) |
-		( (!m_phyBits[idle_offset + 6]) << 4 ) |
-		( (!m_phyBits[idle_offset + 7]) << 3 ) |
-		( (!m_phyBits[idle_offset + 8]) << 2 ) |
-		( (!m_phyBits[idle_offset + 9]) << 1 ) |
-		( (!m_phyBits[idle_offset + 10]) << 0 );
-
 	size_t stop = m_phyBits.size();
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
@@ -521,7 +540,6 @@ void Ethernet100BaseTXDecoder::Descramble(
 		cfg.len = m_phyBits.size();
 		cfg.samplesPerThread = (len | (numThreads-1)) / numThreads;
 		cfg.startOffset = start;
-		cfg.initialLfsrState = lfsr;
 
 		cmdBuf.begin({});
 
@@ -542,6 +560,20 @@ void Ethernet100BaseTXDecoder::Descramble(
 		//Do everything CPU side
 		m_descrambledBits.PrepareForCpuAccess();
 		m_descrambledBits.MarkModifiedFromCpu();
+
+		//Initial descrambler state
+		unsigned int lfsr =
+			( (!m_phyBits[idle_offset + 0]) << 10 ) |
+			( (!m_phyBits[idle_offset + 1]) << 9 ) |
+			( (!m_phyBits[idle_offset + 2]) << 8 ) |
+			( (!m_phyBits[idle_offset + 3]) << 7 ) |
+			( (!m_phyBits[idle_offset + 4]) << 6 ) |
+			( (!m_phyBits[idle_offset + 5]) << 5 ) |
+			( (!m_phyBits[idle_offset + 6]) << 4 ) |
+			( (!m_phyBits[idle_offset + 7]) << 3 ) |
+			( (!m_phyBits[idle_offset + 8]) << 2 ) |
+			( (!m_phyBits[idle_offset + 9]) << 1 ) |
+			( (!m_phyBits[idle_offset + 10]) << 0 );
 
 		//Descramble
 		size_t iout = 0;
