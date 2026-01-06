@@ -41,6 +41,7 @@ public:
 	uint32_t	len;
 	uint32_t	samplesPerThread;
 	uint32_t	startOffset;
+	uint32_t	initialLfsrState;
 };
 
 class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
@@ -77,18 +78,17 @@ protected:
 	void Descramble(
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue,
-		size_t idle_offset);
-
-	uint32_t CalculateFutureLFSR(uint32_t start, uint32_t steps);
+		size_t idle_offset,
+		SparseAnalogWaveform* samples);
 
 	///@brief Raw scrambled serial bit stream after MLT-3 decoding
 	AcceleratorBuffer<uint8_t> m_phyBits;
 
-	///@brief Starting LFSR values for each descrambler thread
-	AcceleratorBuffer<uint32_t> m_startingLFSR;
-
 	///@brief descrambled serial bit stream after LFSR
 	AcceleratorBuffer<uint8_t> m_descrambledBits;
+
+	///@brief LFSR lookahead table
+	AcceleratorBuffer<uint32_t> m_lfsrTable;
 
 	///@brief Compute pipeline for MLT-3 decoding
 	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;

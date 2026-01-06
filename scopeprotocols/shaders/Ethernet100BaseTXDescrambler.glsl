@@ -37,9 +37,9 @@ layout(std430, binding=0) restrict readonly buffer buf_din
 	uint8_t din[];
 };
 
-layout(std430, binding=1) restrict readonly buffer buf_seeds
+layout(std430, binding=1) restrict readonly buffer buf_lfsrTable
 {
-	uint seeds[];
+	uint lfsrTable[];
 };
 
 layout(std430, binding=2) restrict writeonly buffer buf_dout
@@ -52,6 +52,7 @@ layout(std430, push_constant) uniform constants
 	uint len;
 	uint samplesPerThread;
 	uint startOffset;
+	uint initialLfsrState;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -67,8 +68,27 @@ void main()
 	if(end >= len)
 		end = len;
 
-	//Initialize scrambler seed. For now read this from outside, maybe calculate on GPU later
-	uint lfsr = seeds[gl_GlobalInvocationID.x];
+	//Calculate LFSR state at the start of this block given the initial state
+	uint advance = gl_GlobalInvocationID.x * samplesPerThread;
+	uint lfsr = initialLfsrState;
+	uint tmp = 0;
+	for(uint iterbit = 0; iterbit < 30; iterbit ++)
+	{
+		//if input bit is set, use that table entry
+		if( (advance & (1 << iterbit)) != 0 )
+		{
+			tmp = 0;
+
+			//xor each table entry into it
+			for(int i=0; i<11; i++)
+			{
+				if( (lfsr & (1 << i) ) != 0)
+					tmp ^= lfsrTable[iterbit*11 + i];
+			}
+
+			lfsr = tmp;
+		}
+	}
 
 	//Run the descrambler loop
 	uint iout = baseIdx;
