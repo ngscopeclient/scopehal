@@ -102,15 +102,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	//MLT-3 decode
 	DecodeStates(cmdBuf, queue, din);
 
-	//Get all our inputs on the CPU in one big batch transfer
-	//TODO: do we want to use the transfer queue/mutex for this??
-	cmdBuf.begin({});
-	m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
-	din->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
-	din->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
 	//RX LFSR sync
 	size_t nbits = m_phyBits.size();
 	vector<uint8_t> descrambled_bits;
@@ -120,6 +111,9 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	{
 		if(TrySync(descrambled_bits, idle_offset, nbits))
 		{
+			//Good sync, descramble it now
+			Descramble(descrambled_bits, idle_offset, nbits);
+
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
 			break;
@@ -311,6 +305,7 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 	{
 		cmdBuf.begin({});
 
+		//First step: decode sampled analog voltages to MLT-3 symbols
 		uint32_t nthreads = ilen - 1;
 		m_phyBits.resize(nthreads);
 		const uint32_t compute_block_count = GetComputeBlockCount(nthreads, 64);
@@ -320,10 +315,15 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
 
+		m_phyBits.MarkModifiedFromGpu();
+
+		//Copy buffers back to the CPU after initial processing is done
+		m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
+		samples->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+		samples->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
-
-		m_phyBits.MarkModifiedFromGpu();
 	}
 	else
 	{
@@ -349,14 +349,26 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 		}
 
 		m_phyBits.MarkModifiedFromCpu();
+
+		//Get everything we need for the next bit on the CPU
+		cmdBuf.begin({});
+		m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
+		samples->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+		samples->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 	}
 }
 
+/**
+	@brief Try descrambling the first 64 bits at the requested offset and see if it makes sene
+ */
 bool Ethernet100BaseTXDecoder::TrySync(
 	vector<uint8_t>& descrambled_bits,
 	size_t idle_offset,
 	size_t stop)
 {
+	//Bounds check
 	if( (idle_offset + 64) >= m_phyBits.size())
 		return false;
 
@@ -383,9 +395,9 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	size_t iout = 0;
 	for(size_t i=start; i < stop; i++)
 	{
-		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-		bool b = m_phyBits[i] ^ (lfsr & 1);
-		descrambled_bits[iout] = b;
+		bool c = ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
+		lfsr = (lfsr << 1) ^ c;
+		descrambled_bits[iout] = m_phyBits[i] ^ c;
 		iout ++;
 
 		if(iout == window)
@@ -397,9 +409,53 @@ bool Ethernet100BaseTXDecoder::TrySync(
 				if(descrambled_bits[j + idle_offset + 11] != 1)
 					return false;
 			}
+
+			//All good if we get to here
+			return true;
 		}
 	}
 
-	//All good if we get to here
-	return true;
+	//should never get here
+	return false;
+}
+
+/**
+	@brief Actually run the descrambler
+ */
+void Ethernet100BaseTXDecoder::Descramble(
+	vector<uint8_t>& descrambled_bits,
+	size_t idle_offset,
+	size_t stop)
+{
+	//Bounds check
+	if( (idle_offset + 64) >= m_phyBits.size())
+		return;
+
+	//Initial descrambler state
+	unsigned int lfsr =
+		( (!m_phyBits[idle_offset + 0]) << 10 ) |
+		( (!m_phyBits[idle_offset + 1]) << 9 ) |
+		( (!m_phyBits[idle_offset + 2]) << 8 ) |
+		( (!m_phyBits[idle_offset + 3]) << 7 ) |
+		( (!m_phyBits[idle_offset + 4]) << 6 ) |
+		( (!m_phyBits[idle_offset + 5]) << 5 ) |
+		( (!m_phyBits[idle_offset + 6]) << 4 ) |
+		( (!m_phyBits[idle_offset + 7]) << 3 ) |
+		( (!m_phyBits[idle_offset + 8]) << 2 ) |
+		( (!m_phyBits[idle_offset + 9]) << 1 ) |
+		( (!m_phyBits[idle_offset + 10]) << 0 );
+
+	//Descramble
+	stop = min(stop, m_phyBits.size());
+	size_t start = idle_offset + 11;
+	size_t len = stop - start;
+	descrambled_bits.resize(len);
+	size_t iout = 0;
+	for(size_t i=start; i < stop; i++)
+	{
+		bool c = ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
+		lfsr = (lfsr << 1) ^ c;
+		descrambled_bits[iout] = m_phyBits[i] ^ c;
+		iout ++;
+	}
 }

@@ -69,6 +69,11 @@ protected:
 		size_t idle_offset,
 		size_t stop);
 
+	void Descramble(
+		std::vector<uint8_t>& descrambled_bits,
+		size_t idle_offset,
+		size_t stop);
+
 	///@brief Raw scrambled serial bit stream after MLT-3 decoding
 	AcceleratorBuffer<uint8_t> m_phyBits;
 
