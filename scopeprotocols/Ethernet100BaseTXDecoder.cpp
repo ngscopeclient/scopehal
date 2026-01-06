@@ -50,6 +50,7 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 			make_shared<ComputePipeline>("shaders/MLT3Decoder.spv", 2, sizeof(uint32_t));
 
 		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_descrambledBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 	}
 }
 
@@ -104,15 +105,14 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	//RX LFSR sync
 	size_t nbits = m_phyBits.size();
-	vector<uint8_t> descrambled_bits;
 	bool synced = false;
 	size_t idle_offset = 0;
 	for(; idle_offset<15000; idle_offset++)
 	{
-		if(TrySync(descrambled_bits, idle_offset, nbits))
+		if(TrySync(idle_offset, nbits))
 		{
 			//Good sync, descramble it now
-			Descramble(descrambled_bits, idle_offset, nbits);
+			Descramble(idle_offset, nbits);
 
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
@@ -122,7 +122,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	if(!synced)
 	{
 		LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
-		descrambled_bits.clear();
 		SetData(nullptr, 0);
 		return;
 	}
@@ -140,13 +139,13 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
 	size_t i = 0;
 	bool hit = true;
-	size_t des10 = descrambled_bits.size() - 10;
+	size_t des10 = m_descrambledBits.size() - 10;
 	for(i=0; i<des10; i++)
 	{
 		hit = true;
 		for(int j=0; j<10; j++)
 		{
-			bool b = descrambled_bits[i+j];
+			bool b = m_descrambledBits[i+j];
 			if(b != ssd[j])
 			{
 				hit = false;
@@ -209,19 +208,21 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	vector<uint64_t> starts;
 	vector<uint64_t> ends;
 
+	m_descrambledBits.PrepareForCpuAccess();
+
 	//Grab 5 bits at a time and decode them
 	bool first = true;
 	uint8_t current_byte = 0;
 	uint64_t current_start = 0;
-	size_t deslen = descrambled_bits.size()-5;
+	size_t deslen = m_descrambledBits.size()-5;
 	for(; i<deslen; i+=5)
 	{
 		unsigned int code =
-			(descrambled_bits[i+0] ? 16 : 0) |
-			(descrambled_bits[i+1] ? 8 : 0) |
-			(descrambled_bits[i+2] ? 4 : 0) |
-			(descrambled_bits[i+3] ? 2 : 0) |
-			(descrambled_bits[i+4] ? 1 : 0);
+			(m_descrambledBits[i+0] ? 16 : 0) |
+			(m_descrambledBits[i+1] ? 8 : 0) |
+			(m_descrambledBits[i+2] ? 4 : 0) |
+			(m_descrambledBits[i+3] ? 2 : 0) |
+			(m_descrambledBits[i+4] ? 1 : 0);
 
 		//Handle special stuff
 		if(code == 0x18)
@@ -363,11 +364,11 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 /**
 	@brief Try descrambling the first 64 bits at the requested offset and see if it makes sene
  */
-bool Ethernet100BaseTXDecoder::TrySync(
-	vector<uint8_t>& descrambled_bits,
-	size_t idle_offset,
-	size_t stop)
+bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset, size_t stop)
 {
+	m_descrambledBits.PrepareForCpuAccess();
+	m_descrambledBits.MarkModifiedFromCpu();
+
 	//Bounds check
 	if( (idle_offset + 64) >= m_phyBits.size())
 		return false;
@@ -390,14 +391,14 @@ bool Ethernet100BaseTXDecoder::TrySync(
 	stop = min(stop, m_phyBits.size());
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
-	descrambled_bits.resize(len);
+	m_descrambledBits.resize(len);
 	size_t window = 64 + idle_offset + 11;
 	size_t iout = 0;
 	for(size_t i=start; i < stop; i++)
 	{
 		bool c = ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
 		lfsr = (lfsr << 1) ^ c;
-		descrambled_bits[iout] = m_phyBits[i] ^ c;
+		m_descrambledBits[iout] = m_phyBits[i] ^ c;
 		iout ++;
 
 		if(iout == window)
@@ -406,7 +407,7 @@ bool Ethernet100BaseTXDecoder::TrySync(
 			//The minimum inter-frame gap is a lot bigger than this.
 			for(int j=0; j<64; j++)
 			{
-				if(descrambled_bits[j + idle_offset + 11] != 1)
+				if(m_descrambledBits[j + idle_offset + 11] != 1)
 					return false;
 			}
 
@@ -422,11 +423,11 @@ bool Ethernet100BaseTXDecoder::TrySync(
 /**
 	@brief Actually run the descrambler
  */
-void Ethernet100BaseTXDecoder::Descramble(
-	vector<uint8_t>& descrambled_bits,
-	size_t idle_offset,
-	size_t stop)
+void Ethernet100BaseTXDecoder::Descramble(size_t idle_offset, size_t stop)
 {
+	m_descrambledBits.PrepareForCpuAccess();
+	m_descrambledBits.MarkModifiedFromCpu();
+
 	//Bounds check
 	if( (idle_offset + 64) >= m_phyBits.size())
 		return;
@@ -449,13 +450,74 @@ void Ethernet100BaseTXDecoder::Descramble(
 	stop = min(stop, m_phyBits.size());
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
-	descrambled_bits.resize(len);
+	m_descrambledBits.resize(len);
 	size_t iout = 0;
 	for(size_t i=start; i < stop; i++)
 	{
 		bool c = ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
 		lfsr = (lfsr << 1) ^ c;
-		descrambled_bits[iout] = m_phyBits[i] ^ c;
+		m_descrambledBits[iout] = m_phyBits[i] ^ c;
 		iout ++;
 	}
+}
+
+uint32_t Ethernet100BaseTXDecoder::CalculateFutureLFSR(uint32_t start, uint32_t steps)
+{
+	//Coefficient table for all possible powers of two loop iterations
+	const uint16_t lfsrTable[][11] =
+	{
+		{ 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x400, 0x001 },	//0
+		{ 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x001, 0x002 },	//1
+		{ 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x005, 0x00a, 0x004, 0x008 },	//2
+		{ 0x100, 0x201, 0x402, 0x005, 0x00a, 0x014, 0x028, 0x050, 0x0a0, 0x040, 0x080 },	//3
+		{ 0x0a0, 0x140, 0x281, 0x502, 0x204, 0x408, 0x011, 0x022, 0x044, 0x028, 0x050 },	//4
+		{ 0x42a, 0x055, 0x0aa, 0x154, 0x2a9, 0x552, 0x2a4, 0x548, 0x290, 0x10a, 0x215 },	//5
+		{ 0x646, 0x48d, 0x11b, 0x237, 0x46e, 0x0dd, 0x1ba, 0x375, 0x6eb, 0x391, 0x723 },	//6
+		{ 0x09e, 0x13c, 0x279, 0x4f2, 0x1e5, 0x3cb, 0x797, 0x72e, 0x65c, 0x427, 0x04f },	//7
+		{ 0x17c, 0x2f9, 0x5f2, 0x3e4, 0x7c9, 0x792, 0x724, 0x648, 0x491, 0x05f, 0x0be },	//8
+		{ 0x5f8, 0x3f0, 0x7e1, 0x7c2, 0x784, 0x708, 0x610, 0x421, 0x043, 0x57e, 0x2fc },	//9
+		{ 0x7c0, 0x780, 0x700, 0x600, 0x401, 0x003, 0x006, 0x00c, 0x018, 0x7f0, 0x7e0 },	//10
+		{ 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x400, 0x001 },	//11
+		{ 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x001, 0x002 },	//12
+		{ 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x005, 0x00a, 0x004, 0x008 },	//13
+		{ 0x100, 0x201, 0x402, 0x005, 0x00a, 0x014, 0x028, 0x050, 0x0a0, 0x040, 0x080 },	//14
+		{ 0x0a0, 0x140, 0x281, 0x502, 0x204, 0x408, 0x011, 0x022, 0x044, 0x028, 0x050 },	//15
+		{ 0x42a, 0x055, 0x0aa, 0x154, 0x2a9, 0x552, 0x2a4, 0x548, 0x290, 0x10a, 0x215 },	//16
+		{ 0x646, 0x48d, 0x11b, 0x237, 0x46e, 0x0dd, 0x1ba, 0x375, 0x6eb, 0x391, 0x723 },	//17
+		{ 0x09e, 0x13c, 0x279, 0x4f2, 0x1e5, 0x3cb, 0x797, 0x72e, 0x65c, 0x427, 0x04f },	//18
+		{ 0x17c, 0x2f9, 0x5f2, 0x3e4, 0x7c9, 0x792, 0x724, 0x648, 0x491, 0x05f, 0x0be },	//19
+		{ 0x5f8, 0x3f0, 0x7e1, 0x7c2, 0x784, 0x708, 0x610, 0x421, 0x043, 0x57e, 0x2fc },	//20
+		{ 0x7c0, 0x780, 0x700, 0x600, 0x401, 0x003, 0x006, 0x00c, 0x018, 0x7f0, 0x7e0 },	//21
+		{ 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x400, 0x001 },	//22
+		{ 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x001, 0x002 },	//23
+		{ 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x005, 0x00a, 0x004, 0x008 },	//24
+		{ 0x100, 0x201, 0x402, 0x005, 0x00a, 0x014, 0x028, 0x050, 0x0a0, 0x040, 0x080 },	//25
+		{ 0x0a0, 0x140, 0x281, 0x502, 0x204, 0x408, 0x011, 0x022, 0x044, 0x028, 0x050 },	//26
+		{ 0x42a, 0x055, 0x0aa, 0x154, 0x2a9, 0x552, 0x2a4, 0x548, 0x290, 0x10a, 0x215 },	//27
+		{ 0x646, 0x48d, 0x11b, 0x237, 0x46e, 0x0dd, 0x1ba, 0x375, 0x6eb, 0x391, 0x723 },	//28
+		{ 0x09e, 0x13c, 0x279, 0x4f2, 0x1e5, 0x3cb, 0x797, 0x72e, 0x65c, 0x427, 0x04f }		//29
+	};
+
+	uint32_t state = start;
+	uint32_t tmp = 0;
+
+	for(unsigned int iterbit = 0; iterbit < 30; iterbit ++)
+	{
+		//if input bit is set, use that table entry
+		if(steps & (1 << iterbit))
+		{
+			tmp = 0;
+
+			//xor each table entry into it
+			for(int i=0; i<11; i++)
+			{
+				if(state & (1 << i) )
+					tmp ^= lfsrTable[iterbit][i];
+			}
+
+			state = tmp;
+		}
+	}
+
+	return state;
 }

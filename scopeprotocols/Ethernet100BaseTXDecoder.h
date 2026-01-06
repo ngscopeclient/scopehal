@@ -64,18 +64,17 @@ protected:
 		std::shared_ptr<QueueHandle> queue,
 		SparseAnalogWaveform* samples);
 
-	bool TrySync(
-		std::vector<uint8_t>& descrambled_bits,
-		size_t idle_offset,
-		size_t stop);
+	bool TrySync(size_t idle_offset, size_t stop);
 
-	void Descramble(
-		std::vector<uint8_t>& descrambled_bits,
-		size_t idle_offset,
-		size_t stop);
+	void Descramble(size_t idle_offset, size_t stop);
+
+	uint32_t CalculateFutureLFSR(uint32_t start, uint32_t steps);
 
 	///@brief Raw scrambled serial bit stream after MLT-3 decoding
 	AcceleratorBuffer<uint8_t> m_phyBits;
+
+	///@brief descrambled serial bit stream after LFSR
+	AcceleratorBuffer<uint8_t> m_descrambledBits;
 
 	///@brief Compute pipeline for MLT-3 decoding
 	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;
