@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,6 +47,8 @@ public:
 	virtual std::string GetVendor() const;
 	virtual std::string GetSerial() const;
 	virtual std::string GetDriverName() const =0;
+
+	virtual void BackgroundProcessing() override;
 
 protected:
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);

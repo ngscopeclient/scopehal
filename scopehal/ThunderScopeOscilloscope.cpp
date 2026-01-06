@@ -323,6 +323,16 @@ OscilloscopeChannel* ThunderScopeOscilloscope::GetExternalTrigger()
 	return NULL;
 }
 
+void ThunderScopeOscilloscope::BackgroundProcessing()
+{
+	//Call the base class to flush the transport etc
+	RemoteBridgeOscilloscope::BackgroundProcessing();
+
+	//Push any previously acquired waveforms to the RX buffer if we have them
+	lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
+	PushPendingWaveformsIfReady();
+}
+
 Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 {
 	//Is the trigger armed? If not, report stopped
@@ -411,9 +421,10 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	uint8_t dataType;
 	uint64_t memdepth;
 	float config[3];
-	SequenceSet s;
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
+
+	lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
 
 	//Analog channels get processed separately
 	vector<UniformAnalogWaveform*> awfms;
@@ -435,6 +446,14 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		abuf->resize(memdepth);
 		abuf->PrepareForCpuAccess();
 		achans.push_back(chnum);
+
+		//At this point, we need to have any previously queued waveforms finish
+		//since we're going to be reusing the same buffers very shortly
+		if(i == 0)
+		{
+			m_queue->WaitIdle();
+			PushPendingWaveformsIfReady();
+		}
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
@@ -485,7 +504,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			scales.push_back(scale);
 			offsets.push_back(offset);
 
-			s[GetOscilloscopeChannel(chnum)] = cap;
+			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
 
 			//Kick off the GPU-side processing of the waveform to run nonblocking while we download the next
 			//Wait for any previous waveform processing to finish first, since we're reusing the command buffer
@@ -553,12 +572,8 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	if(!keep)
 		return true;
 
-	//Wait for GPU to finish
-	if(processedWaveformsOnGPU)
-		m_queue->WaitIdle();
-
 	//Fallback path if GPU doesn't have suitable integer support
-	else
+	if(!processedWaveformsOnGPU)
 	{
 		//Process analog captures in parallel
 		#pragma omp parallel for
@@ -586,20 +601,45 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			}
 			cap->MarkModifiedFromCpu();
 		}
+
+		//If we did CPU side conversion, push the waveforms to our queue now
+		PushPendingWaveformsIfReady();
 	}
 
+	m_receiveClock.Tick();
+	m_diag_receivedWFMHz.SetFloatVal(m_receiveClock.GetAverageHz());
+
+	//If this was a one-shot trigger we're no longer armed
+	if(m_triggerOneShot)
+		m_triggerArmed = false;
+
+	return true;
+}
+
+/**
+	@brief Wait for waveform conversion to finish, then push it to the pending waveforms buffer
+ */
+void ThunderScopeOscilloscope::PushPendingWaveformsIfReady()
+{
+	if(m_wipWaveforms.empty())
+		return;
+
+	//Wait up to 1ms for GPU side conversion to finish and return if it's not done
+	if(!m_queue->WaitIdleWithTimeout(1000 * 1000))
+		return;
+
+	//Save the waveforms to our queue
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(m_wipWaveforms);
+
+	//Bump waveform performance counters
 	FilterParameter* param = &m_diag_totalWFMs;
 	int total = param->GetIntVal() + 1;
 	param->SetIntVal(total);
 
+	//If we got backed up, drop the extra waveforms
 	param = &m_diag_droppedWFMs;
 	int dropped = param->GetIntVal();
-
-	//Save the waveforms to our queue
-	m_pendingWaveformsMutex.lock();
-	m_pendingWaveforms.push_back(s);
-
-	//If we get backed up, drop the extra waveforms
 	while (m_pendingWaveforms.size() > 2)
 	{
 		SequenceSet set = *m_pendingWaveforms.begin();
@@ -610,21 +650,14 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		dropped++;
 	}
 
-	m_pendingWaveformsMutex.unlock();
-
+	//Update dropped waveform perf counter
 	param->SetIntVal(dropped);
-
 	param = &m_diag_droppedPercent;
 	param->SetFloatVal((float)dropped / (float)total);
 
-	m_receiveClock.Tick();
-	m_diag_receivedWFMHz.SetFloatVal(m_receiveClock.GetAverageHz());
+	m_pendingWaveformsMutex.unlock();
 
-	//If this was a one-shot trigger we're no longer armed
-	if(m_triggerOneShot)
-		m_triggerArmed = false;
-
-	return true;
+	m_wipWaveforms.clear();
 }
 
 void ThunderScopeOscilloscope::Start()
@@ -643,6 +676,13 @@ void ThunderScopeOscilloscope::Start()
 void ThunderScopeOscilloscope::Stop()
 {
 	RemoteBridgeOscilloscope::Stop();
+
+	//Wait for any previous in-progress waveforms to finish processing
+	{
+		lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
+		while(!m_wipWaveforms.empty())
+			PushPendingWaveformsIfReady();
+	}
 
 	//Ask the server what the last waveform it sent was
 	m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));

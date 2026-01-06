@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -75,6 +75,7 @@ public:
 	virtual void EnableChannel(size_t i) override;
 
 	//Triggering
+	virtual void BackgroundProcessing() override;
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
 	virtual bool AcquireData() override;
 	virtual void PushEdgeTrigger(EdgeTrigger* trig) override;
@@ -108,6 +109,8 @@ protected:
 	void ResetPerCaptureDiagnostics();
 	void RefreshSampleRate();
 	bool DoAcquireData(bool keep);
+
+	void PushPendingWaveformsIfReady();
 
 	std::string GetChannelColor(size_t i);
 
@@ -171,6 +174,12 @@ protected:
 
 	///@brief Sequence number to drop until (if we get stale data after stopping the trigger)
 	uint32_t m_dropUntilSeq;
+
+	///@brief Mutex for m_wipWaveforms
+	std::recursive_mutex m_wipWaveformMutex;
+
+	///@brief Waveforms actively being downloaded and processed but not ready to push to the filter graph yet
+	SequenceSet m_wipWaveforms;
 
 public:
 

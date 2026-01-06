@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -119,6 +119,26 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 	}
 	m_queue->submit(info, **m_fence);
 	_waitFence();
+}
+
+/**
+	@brief Wait for previous submits to complete, but only up to a timeout
+
+	@return true if now idle, false if timeout
+ */
+bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
+{
+	//No fence? Already idle
+	if(!m_fence)
+		return true;
+
+	//Wait exactly once for the submit, time out if not finished
+	if(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, nanoseconds))
+		return false;
+
+	//If we get here, the most recent wait was the one that finished
+	m_fence = nullptr;
+	return true;
 }
 
 void QueueHandle::_waitFence()

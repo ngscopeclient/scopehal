@@ -66,11 +66,16 @@ public:
 	const std::string& GetName() const
 	{ return m_name; }
 
+	/**
+		@brief Wait for all previous submits to complete
+	 */
 	void WaitIdle()
 	{
 		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
 		_waitFence();
 	}
+
+	bool WaitIdleWithTimeout(uint64_t nanoseconds);
 
 public:
 	//non-copyable

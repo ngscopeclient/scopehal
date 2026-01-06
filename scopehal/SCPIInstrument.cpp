@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,6 +43,14 @@ SCPIInstrument::SCPIInstrument(SCPITransport* transport, bool identify)
 SCPIInstrument::~SCPIInstrument()
 {
 
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Default background processing - just flush the transport
+
+void SCPIInstrument::BackgroundProcessing()
+{
+	m_transport->FlushCommandQueue();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
