@@ -27,74 +27,56 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTXDecoder
- */
-#ifndef Ethernet100BaseTXDecoder_h
-#define Ethernet100BaseTXDecoder_h
+#version 460
+#pragma shader_stage(compute)
 
-class Ethernet100BaseTXDescramblerConstants
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	len;
-	uint32_t	samplesPerThread;
-	uint32_t	startOffset;
+	uint8_t din[];
 };
 
-class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
+layout(std430, binding=1) restrict readonly buffer buf_seeds
 {
-public:
-	Ethernet100BaseTXDecoder(const std::string& color);
+	uint seeds[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-	static std::string GetProtocolName();
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	uint8_t dout[];
+};
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+	uint samplesPerThread;
+	uint startOffset;
+};
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-protected:
-	int GetState(float voltage)
+void main()
+{
+	//Get thread index
+	uint baseIdx = gl_GlobalInvocationID.x * samplesPerThread;
+	uint start = baseIdx + startOffset;
+	if(start >= len)
+		return;
+	uint end = start + samplesPerThread;
+	if(end >= len)
+		end = len;
+
+	//Initialize scrambler seed. For now read this from outside, maybe calculate on GPU later
+	uint lfsr = seeds[gl_GlobalInvocationID.x];
+
+	//Run the descrambler loop
+	uint iout = baseIdx;
+	for(uint i=start; i<end; i++)
 	{
-		if(voltage > 0.5)
-			return 1;
-		else if(voltage < -0.5)
-			return -1;
-		else
-			return 0;
+		uint c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
+		lfsr = (lfsr << 1) ^ c;
+		dout[iout] = uint8_t( uint(din[i]) ^ c );
+		iout ++;
 	}
-
-	void DecodeStates(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		SparseAnalogWaveform* samples);
-
-	bool TrySync(size_t idle_offset, size_t stop);
-
-	void Descramble(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		size_t idle_offset);
-
-	uint32_t CalculateFutureLFSR(uint32_t start, uint32_t steps);
-
-	///@brief Raw scrambled serial bit stream after MLT-3 decoding
-	AcceleratorBuffer<uint8_t> m_phyBits;
-
-	///@brief Starting LFSR values for each descrambler thread
-	AcceleratorBuffer<uint32_t> m_startingLFSR;
-
-	///@brief descrambled serial bit stream after LFSR
-	AcceleratorBuffer<uint8_t> m_descrambledBits;
-
-	///@brief Compute pipeline for MLT-3 decoding
-	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;
-
-	///@brief Compute pipeline for descrambling
-	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
-};
-
-#endif
+}

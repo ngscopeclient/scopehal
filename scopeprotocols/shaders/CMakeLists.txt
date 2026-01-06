@@ -45,6 +45,7 @@ add_compute_shaders(
 		CosineSumWindow.glsl
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
+		Ethernet100BaseTXDescrambler.glsl
 		EyePattern.glsl
 		EyePattern_IndexSearch.glsl
 		FillSquarewaveAndDurations.glsl

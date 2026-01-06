@@ -49,8 +49,15 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 		m_mlt3DecodeComputePipeline =
 			make_shared<ComputePipeline>("shaders/MLT3Decoder.spv", 2, sizeof(uint32_t));
 
+		m_descrambleComputePipeline =
+			make_shared<ComputePipeline>(
+				"shaders/Ethernet100BaseTXDescrambler.spv",
+				3,
+				sizeof(Ethernet100BaseTXDescramblerConstants));
+
 		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_descrambledBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_startingLFSR.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 	}
 }
 
@@ -112,7 +119,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		if(TrySync(idle_offset, nbits))
 		{
 			//Good sync, descramble it now
-			Descramble(idle_offset, nbits);
+			Descramble(cmdBuf, queue, idle_offset);
 
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
@@ -207,8 +214,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	vector<uint8_t> bytes;
 	vector<uint64_t> starts;
 	vector<uint64_t> ends;
-
-	m_descrambledBits.PrepareForCpuAccess();
 
 	//Grab 5 bits at a time and decode them
 	bool first = true;
@@ -319,6 +324,7 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 		m_phyBits.MarkModifiedFromGpu();
 
 		//Copy buffers back to the CPU after initial processing is done
+		//since we look for the scrambler sync on the CPU for noow
 		m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
 		samples->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
 		samples->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
@@ -351,7 +357,7 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 
 		m_phyBits.MarkModifiedFromCpu();
 
-		//Get everything we need for the next bit on the CPU
+		//Grab the bits onto the CPU for future descrambling
 		cmdBuf.begin({});
 		m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
 		samples->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
@@ -396,7 +402,7 @@ bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset, size_t stop)
 	size_t iout = 0;
 	for(size_t i=start; i < stop; i++)
 	{
-		bool c = ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
+		bool c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
 		lfsr = (lfsr << 1) ^ c;
 		m_descrambledBits[iout] = m_phyBits[i] ^ c;
 		iout ++;
@@ -423,11 +429,11 @@ bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset, size_t stop)
 /**
 	@brief Actually run the descrambler
  */
-void Ethernet100BaseTXDecoder::Descramble(size_t idle_offset, size_t stop)
+void Ethernet100BaseTXDecoder::Descramble(
+	vk::raii::CommandBuffer& cmdBuf,
+	std::shared_ptr<QueueHandle> queue,
+	size_t idle_offset)
 {
-	m_descrambledBits.PrepareForCpuAccess();
-	m_descrambledBits.MarkModifiedFromCpu();
-
 	//Bounds check
 	if( (idle_offset + 64) >= m_phyBits.size())
 		return;
@@ -446,18 +452,58 @@ void Ethernet100BaseTXDecoder::Descramble(size_t idle_offset, size_t stop)
 		( (!m_phyBits[idle_offset + 9]) << 1 ) |
 		( (!m_phyBits[idle_offset + 10]) << 0 );
 
-	//Descramble
-	stop = min(stop, m_phyBits.size());
+	size_t stop = m_phyBits.size();
 	size_t start = idle_offset + 11;
 	size_t len = stop - start;
 	m_descrambledBits.resize(len);
-	size_t iout = 0;
-	for(size_t i=start; i < stop; i++)
+
+	//GPU accelerated path
+	if(g_hasShaderInt8)
 	{
-		bool c = ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-		lfsr = (lfsr << 1) ^ c;
-		m_descrambledBits[iout] = m_phyBits[i] ^ c;
-		iout ++;
+		const uint32_t numThreads = 16384;
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numBlocks = numThreads / threadsPerBlock;
+
+		Ethernet100BaseTXDescramblerConstants cfg;
+		cfg.len = m_phyBits.size();
+		cfg.samplesPerThread = (len | (numThreads-1)) / numThreads;
+		cfg.startOffset = start;
+
+		//Calculate initial LFSR values for each thread (TODO GPU this)
+		m_startingLFSR.resize(numThreads);
+		m_startingLFSR.PrepareForCpuAccess();
+		for(uint32_t i=0; i<numThreads; i++)
+			m_startingLFSR[i] = CalculateFutureLFSR(lfsr, i*cfg.samplesPerThread);
+		m_startingLFSR.MarkModifiedFromCpu();
+
+		cmdBuf.begin({});
+		m_descrambleComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
+		m_descrambleComputePipeline->BindBufferNonblocking(1, m_startingLFSR, cmdBuf);
+		m_descrambleComputePipeline->BindBufferNonblocking(2, m_descrambledBits, cmdBuf, true);
+		m_descrambleComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+
+		m_descrambledBits.MarkModifiedFromGpu();
+		m_descrambledBits.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+	}
+
+	else
+	{
+		//Do everything CPU side
+		m_descrambledBits.PrepareForCpuAccess();
+		m_descrambledBits.MarkModifiedFromCpu();
+
+		//Descramble
+		size_t iout = 0;
+		for(size_t i=start; i < stop; i++)
+		{
+			bool c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
+			lfsr = (lfsr << 1) ^ c;
+			m_descrambledBits[iout] = m_phyBits[i] ^ c;
+			iout ++;
+		}
 	}
 }
 
