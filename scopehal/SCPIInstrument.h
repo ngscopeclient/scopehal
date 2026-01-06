@@ -40,12 +40,12 @@ public:
 	SCPIInstrument(SCPITransport* transport, bool identify = true);
 	virtual ~SCPIInstrument();
 
-	virtual std::string GetTransportConnectionString();
-	virtual std::string GetTransportName();
+	virtual std::string GetTransportConnectionString() override;
+	virtual std::string GetTransportName() override;
 
-	virtual std::string GetName() const;
-	virtual std::string GetVendor() const;
-	virtual std::string GetSerial() const;
+	virtual std::string GetName() const override;
+	virtual std::string GetVendor() const override;
+	virtual std::string GetSerial() const override;
 	virtual std::string GetDriverName() const =0;
 
 	virtual void BackgroundProcessing() override;
