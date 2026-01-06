@@ -73,13 +73,9 @@ protected:
 		std::shared_ptr<QueueHandle> queue,
 		SparseAnalogWaveform* samples);
 
-	bool TrySync(size_t idle_offset, size_t stop);
+	bool TrySync(size_t idle_offset);
 
-	void Descramble(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		size_t idle_offset,
-		SparseAnalogWaveform* samples);
+	void Descramble(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue, size_t idle_offset);
 
 	///@brief Raw scrambled serial bit stream after MLT-3 decoding
 	AcceleratorBuffer<uint8_t> m_phyBits;
@@ -95,6 +91,15 @@ protected:
 
 	///@brief Compute pipeline for descrambling
 	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
+
+	///@brief Pool of command buffers
+	std::unique_ptr<vk::raii::CommandPool> m_cmdPool;
+
+	///@brief Command buffer for transfers
+	std::unique_ptr<vk::raii::CommandBuffer> m_transferCmdBuf;
+
+	//@brief Queue for transfers
+	std::shared_ptr<QueueHandle> m_transferQueue;
 };
 
 #endif

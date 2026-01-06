@@ -142,19 +142,40 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		return;
 	}
 
+	//Make transfer helpers if this is the first time
+	if(!m_cmdPool)
+	{
+		m_transferQueue = g_vkQueueManager->GetComputeQueue("Ethernet100BaseTXDecoder.queue");
+
+		vk::CommandPoolCreateInfo poolInfo(
+			vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+			queue->m_family );
+		m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+		vk::CommandBufferAllocateInfo bufinfo(*m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+		m_transferCmdBuf = make_unique<vk::raii::CommandBuffer>(
+			std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+	}
+
+	//Copy input timestamps to CPU and overlap this with other processing
+	m_transferCmdBuf->begin({});
+	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf);
+	din->m_durations.PrepareForCpuAccessNonblocking(*m_transferCmdBuf);
+	m_transferCmdBuf->end();
+	m_transferQueue->SubmitAndBlock(*m_transferCmdBuf);
+
 	//MLT-3 decode
 	DecodeStates(cmdBuf, queue, din);
 
 	//RX LFSR sync
-	size_t nbits = m_phyBits.size();
 	bool synced = false;
 	size_t idle_offset = 0;
 	for(; idle_offset<15000; idle_offset++)
 	{
-		if(TrySync(idle_offset, nbits))
+		if(TrySync(idle_offset))
 		{
 			//Good sync, descramble it now
-			Descramble(cmdBuf, queue, idle_offset, din);
+			Descramble(cmdBuf, queue, idle_offset);
 
 			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 			synced = true;
@@ -204,6 +225,9 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		return;
 	}
 	LogTrace("Found SSD at %zu\n", i);
+
+	//Wait until all of the timestamps are ready
+	m_transferQueue->WaitIdle();
 
 	//Skip the J-K as we already parsed it
 	i += 10;
@@ -401,16 +425,14 @@ void Ethernet100BaseTXDecoder::DecodeStates(
 /**
 	@brief Try descrambling the first 64 bits at the requested offset and see if it makes sene
  */
-bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset, size_t stop)
+bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset)
 {
-	m_descrambledBits.PrepareForCpuAccess();
-	m_descrambledBits.MarkModifiedFromCpu();
-
 	//Bounds check
-	if( (idle_offset + 64) >= m_phyBits.size())
+	const size_t searchWindow = 64;
+	if( (idle_offset + searchWindow) >= m_phyBits.size())
 		return false;
 
-	//For now, assume the link is idle at the time we triggered
+	//Assume the link is idle at the time we triggered, then see if we got it right
 	unsigned int lfsr =
 		( (!m_phyBits[idle_offset + 0]) << 10 ) |
 		( (!m_phyBits[idle_offset + 1]) << 9 ) |
@@ -424,37 +446,22 @@ bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset, size_t stop)
 		( (!m_phyBits[idle_offset + 9]) << 1 ) |
 		( (!m_phyBits[idle_offset + 10]) << 0 );
 
-	//Descramble
-	stop = min(stop, m_phyBits.size());
+	//We should have at least 64 "1" bits in a row once the descrambling is done.
+	//The minimum inter-frame gap is a lot bigger than this.
 	size_t start = idle_offset + 11;
-	size_t len = stop - start;
-	m_descrambledBits.resize(len);
-	size_t window = 64 + idle_offset + 11;
-	size_t iout = 0;
+	size_t stop = start + searchWindow;;
 	for(size_t i=start; i < stop; i++)
 	{
 		bool c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
 		lfsr = (lfsr << 1) ^ c;
-		m_descrambledBits[iout] = m_phyBits[i] ^ c;
-		iout ++;
 
-		if(iout == window)
-		{
-			//We should have at least 64 "1" bits in a row once the descrambling is done.
-			//The minimum inter-frame gap is a lot bigger than this.
-			for(int j=0; j<64; j++)
-			{
-				if(m_descrambledBits[j + idle_offset + 11] != 1)
-					return false;
-			}
-
-			//All good if we get to here
-			return true;
-		}
+		//If it's not a 1 bit (idle character is all 1s), no go
+		if( (m_phyBits[i] ^ c) != 1)
+			return false;
 	}
 
-	//should never get here
-	return false;
+	//all good if we get here
+	return true;
 }
 
 /**
@@ -462,9 +469,8 @@ bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset, size_t stop)
  */
 void Ethernet100BaseTXDecoder::Descramble(
 	vk::raii::CommandBuffer& cmdBuf,
-	std::shared_ptr<QueueHandle> queue,
-	size_t idle_offset,
-	SparseAnalogWaveform* samples)
+	shared_ptr<QueueHandle> queue,
+	size_t idle_offset)
 {
 	//Bounds check
 	if( (idle_offset + 64) >= m_phyBits.size())
@@ -518,8 +524,6 @@ void Ethernet100BaseTXDecoder::Descramble(
 		cfg.initialLfsrState = lfsr;
 
 		cmdBuf.begin({});
-		samples->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
-		samples->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
 
 		m_descrambleComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
 		m_descrambleComputePipeline->BindBufferNonblocking(1, m_lfsrTable, cmdBuf);
@@ -535,12 +539,6 @@ void Ethernet100BaseTXDecoder::Descramble(
 
 	else
 	{
-		cmdBuf.begin({});
-		samples->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
-		samples->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-
 		//Do everything CPU side
 		m_descrambledBits.PrepareForCpuAccess();
 		m_descrambledBits.MarkModifiedFromCpu();
