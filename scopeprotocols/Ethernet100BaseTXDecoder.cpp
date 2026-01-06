@@ -195,9 +195,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		m_mlt3DecodeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 		m_phyBits.MarkModifiedFromGpu();
 
-		//TODO: we don't want to have to do this anymore!!
-		//m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
-
 		//Then look for LFSR sync
 		m_trySyncOutput.resize(maxOffset);
 		m_trySyncComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
