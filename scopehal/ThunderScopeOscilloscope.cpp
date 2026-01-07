@@ -381,7 +381,9 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	if(!keep)
 		LogTrace("Dropping waveform %u\n",m_lastSeq);
 	else
-		LogTrace("Keeping waveform %u\n",m_lastSeq);
+	{
+		//LogTrace("Keeping waveform %u\n",m_lastSeq);
+	}
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
@@ -642,6 +644,8 @@ void ThunderScopeOscilloscope::PushPendingWaveformsIfReady()
 	int dropped = param->GetIntVal();
 	while (m_pendingWaveforms.size() > 2)
 	{
+		LogTrace("Dropping waveform due to excessive pend queue depth\n");
+
 		SequenceSet set = *m_pendingWaveforms.begin();
 		for(auto it : set)
 			AddWaveformToAnalogPool(it.second);
