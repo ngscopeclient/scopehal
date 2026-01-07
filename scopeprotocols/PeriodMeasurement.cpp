@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -132,7 +132,7 @@ void PeriodMeasurement::Refresh()
 	//For the scalar average output, find the total number of zero crossings and divide by the spacing
 	//(excluding partial cycles at start and end).
 	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
-	double ncycles = (elen - 1) / 2;
+	double ncycles = elen - 1;
 	double interval = edges[elen-1] - edges[0];
-	m_streams[1].m_value = interval / ncycles;
+	m_streams[1].m_value = (2 * interval) / ncycles;
 }
