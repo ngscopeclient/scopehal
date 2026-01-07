@@ -132,6 +132,10 @@ void ClockRecoveryFilter::Refresh(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("ClockRecoveryFilter::Refresh");
+	#endif
+
 	//Require a data signal, but not necessarily a gate
 	if(!VerifyInputOK(0))
 	{

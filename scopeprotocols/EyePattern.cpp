@@ -185,6 +185,10 @@ void EyePattern::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("EyePattern::Refresh");
+	#endif
+
 	LogIndenter li;
 
 	if(!VerifyAllInputsOK())

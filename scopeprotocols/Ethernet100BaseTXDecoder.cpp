@@ -130,6 +130,10 @@ Filter::DataLocation Ethernet100BaseTXDecoder::GetInputLocation()
 
 void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("Ethernet100BaseTXDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())

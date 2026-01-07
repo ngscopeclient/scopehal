@@ -106,6 +106,10 @@ Filter::DataLocation TIEMeasurement::GetInputLocation()
 
 void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("TIEMeasurement::Refresh");
+	#endif
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(nullptr, 0);

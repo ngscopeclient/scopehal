@@ -66,6 +66,10 @@
 
 #include "config.h"
 
+#ifdef HAVE_NVTX
+#include <nvtx3/nvtx3.hpp>
+#endif
+
 //Vulkan is now a mandatory dependency, so no compile time enable flag
 //(disable some warnings in Vulkan headers that we can't do anything about)
 #pragma GCC diagnostic push

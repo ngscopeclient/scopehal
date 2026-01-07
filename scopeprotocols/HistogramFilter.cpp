@@ -150,6 +150,10 @@ void HistogramFilter::ClearSweeps()
 
 void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nvrange("HistogramFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{

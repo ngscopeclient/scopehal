@@ -342,6 +342,10 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 	//See if we have data ready
 	if(dynamic_cast<SCPITwinLanTransport*>(m_transport)->GetSecondarySocket().GetRxBytesAvailable() > 0)
 	{
+		#ifdef HAVE_NVTX
+			nvtxMark("PollTrigger");
+		#endif
+
 		//Do we have old stale waveforms to drop still in the socket buffer? Throw it out
 		if(m_dropUntilSeq > m_lastSeq)
 		{
@@ -366,6 +370,10 @@ bool ThunderScopeOscilloscope::AcquireData()
 
 bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("ThunderScopeOscilloscope::DoAcquireData");
+	#endif
+
 	//Read Version No.
 	uint8_t version;
 	if(!m_transport->ReadRawData(sizeof(version), (uint8_t*)&version))
@@ -443,6 +451,10 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			return false;
 		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
+
+		#ifdef HAVE_NVTX
+			nvtx3::scoped_range range2(string("Channel ") + to_string(chnum));
+		#endif
 
 		auto& abuf = m_analogRawWaveformBuffers[chnum];
 		abuf->resize(memdepth);
@@ -662,6 +674,10 @@ void ThunderScopeOscilloscope::PushPendingWaveformsIfReady()
 	m_pendingWaveformsMutex.unlock();
 
 	m_wipWaveforms.clear();
+
+	#ifdef HAVE_NVTX
+		nvtxMark("Pushed waveforms");
+	#endif
 }
 
 void ThunderScopeOscilloscope::Start()
