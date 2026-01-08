@@ -45,13 +45,13 @@ add_compute_shaders(
 		CosineSumWindow.glsl
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
-		Ethernet100BaseTXDescrambler.glsl
+		Ethernet100BaseTX_Descrambler.glsl
+		Ethernet100BaseTX_MLT3Decoder.glsl
 		Ethernet100BaseTX_TrySync.glsl
 		EyePattern.glsl
 		EyePattern_IndexSearch.glsl
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
-		MLT3Decoder.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl

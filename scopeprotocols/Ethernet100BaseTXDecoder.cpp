@@ -82,14 +82,14 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	if(g_hasShaderInt8)
 	{
 		m_mlt3DecodeComputePipeline =
-			make_shared<ComputePipeline>("shaders/MLT3Decoder.spv", 2, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_MLT3Decoder.spv", 2, sizeof(uint32_t));
 
 		m_trySyncComputePipeline =
 			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_TrySync.spv", 2, sizeof(uint32_t));
 
 		m_descrambleComputePipeline =
 			make_shared<ComputePipeline>(
-				"shaders/Ethernet100BaseTXDescrambler.spv",
+				"shaders/Ethernet100BaseTX_Descrambler.spv",
 				3,
 				sizeof(Ethernet100BaseTXDescramblerConstants));
 
@@ -172,6 +172,14 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	m_transferCmdBuf->end();
 	m_transferQueue->SubmitAndBlock(*m_transferCmdBuf);
 
+	//Copy our waveform setup from the input. Output has femtosecond resolution since we sampled on clock edges
+	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(din, 0, true);
+	cap->SetCpuOnlyHint();
+	cap->Reserve(1000000);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
+
 	//MLT-3 decode and RX LFSR sync
 	//A max-sized Ethernet frame is 1500 bytes (12000 bits, or 15000 after 4b5b coding)
 	//TODO: this might occasionally fail to sync if a jumbo frame starts exactly when the trigger starts
@@ -247,15 +255,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	//Good sync, descramble it now
 	Descramble(cmdBuf, queue, idle_offset);
-
-	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
-	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
-	auto cap = SetupEmptyWaveform<EthernetWaveform>(din,0, true);
-	cap->SetCpuOnlyHint();
-	cap->Reserve(1000000);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	//Search until we find a 1100010001 (J-K, start of stream) sequence
 	bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
