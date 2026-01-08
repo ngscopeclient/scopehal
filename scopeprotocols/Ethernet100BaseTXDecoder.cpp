@@ -73,6 +73,11 @@ static const uint16_t g_lfsrTable[][11] =
 
 Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
+	, m_phyBits("Ethernet100BaseTXDecoder.m_phyBits")
+	, m_descrambledBits("Ethernet100BaseTXDecoder.m_descrambledBits")
+	, m_trySyncOutput("Ethernet100BaseTXDecoder.m_trySyncOutput")
+	, m_findSSDOutput("Ethernet100BaseTXDecoder.m_findSSDOutput")
+	, m_lfsrTable("Ethernet100BaseTXDecoder.m_lfsrTable")
 {
 	m_signalNames.clear();
 	m_inputs.clear();
@@ -722,9 +727,13 @@ void Ethernet100BaseTXDecoder::Descramble(vk::raii::CommandBuffer& cmdBuf, size_
 		m_descrambleComputePipeline->BindBufferNonblocking(1, m_lfsrTable, cmdBuf);
 		m_descrambleComputePipeline->BindBufferNonblocking(2, m_descrambledBits, cmdBuf, true);
 		m_descrambleComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
+		m_descrambleComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 		m_descrambledBits.MarkModifiedFromGpu();
-		m_descrambledBits.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		//needed for 4b5b descrambling if we can't do that GPU side
+		if(!g_hasShaderInt64)
+			m_descrambledBits.PrepareForCpuAccessNonblocking(cmdBuf);
 	}
 
 	else
