@@ -82,6 +82,10 @@ Filter::DataLocation HorizontalBathtub::GetInputLocation()
 
 void HorizontalBathtub::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("HorizontalBathtub::Refresh");
+	#endif
+
 	if(!VerifyAllInputsOK(true))
 	{
 		SetData(nullptr, 0);

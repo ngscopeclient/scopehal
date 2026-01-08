@@ -61,16 +61,18 @@ int GetState(float voltage)
 
 void main()
 {
-	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	if(i >= len)
-		return;
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	for(uint i=gl_GlobalInvocationID.x; i < len; i += numThreads)
+	{
+		float a = din[i];
+		float b = din[i+1];
 
-	//No transition = logic 0
-	if(GetState(din[i]) == GetState(din[i+1]))
-		dout[i] = uint8_t(0);
+		//No transition = logic 0
+		if(GetState(a) == GetState(b) )
+			dout[i] = uint8_t(0);
 
-	//Transition = logic 1
-	else
-		dout[i] = uint8_t(1);
-
+		//Transition = logic 1
+		else
+			dout[i] = uint8_t(1);
+	}
 }

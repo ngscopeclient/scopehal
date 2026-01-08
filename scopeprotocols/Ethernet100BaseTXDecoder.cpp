@@ -182,24 +182,23 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	if(g_hasShaderInt8)
 	{
 		const uint32_t threadsPerBlock = 64;
-		const uint32_t numBlocks = maxOffset / threadsPerBlock;
 
 		size_t ilen = din->size();
 		cmdBuf.begin({});
 
 		//Decode sampled analog voltages to MLT-3 symbols
-		uint32_t nthreads = ilen - 1;
-		m_phyBits.resize(nthreads);
-		const uint32_t compute_block_count = GetComputeBlockCount(nthreads, 64);
+		const uint32_t compute_block_count = 32768;
+		m_phyBits.resize(ilen - 1);
 		m_mlt3DecodeComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
 		m_mlt3DecodeComputePipeline->BindBufferNonblocking(1, m_phyBits, cmdBuf, true);
-		m_mlt3DecodeComputePipeline->Dispatch(cmdBuf, nthreads,
+		m_mlt3DecodeComputePipeline->Dispatch(cmdBuf, (uint32_t)ilen,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
 		m_mlt3DecodeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 		m_phyBits.MarkModifiedFromGpu();
 
 		//Then look for LFSR sync
+		const uint32_t numBlocks = maxOffset / threadsPerBlock;
 		m_trySyncOutput.resize(maxOffset);
 		m_trySyncComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
 		m_trySyncComputePipeline->BindBufferNonblocking(1, m_trySyncOutput, cmdBuf, true);
