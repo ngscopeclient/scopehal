@@ -48,19 +48,31 @@ layout(std430, binding=2) restrict writeonly buffer buf_doutBytes
 	uint8_t dout[];
 };
 
-layout(std430, binding=3) restrict writeonly buffer buf_timeOut
+layout(std430, binding=3) restrict writeonly buffer buf_offsetOut
 {
-	int64_t timeOut[];
+	int64_t offsetOut[];
 };
 
 layout(std430, push_constant) uniform constants
 {
 	uint len;
+	uint startOffset;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+layout(local_size_x=1, local_size_y=64, local_size_z=1) in;
 
 void main()
 {
+	uint i = (gl_GlobalInvocationID.z * gl_NumWorkGroups.y * gl_WorkGroupSize.y) + gl_GlobalInvocationID.y;
+	if(i >= len)
+		return;
 
+	uint a = uint(din[i*5 + startOffset + 0]) << 4;
+	uint b = uint(din[i*5 + startOffset + 1]) << 3;
+	uint c = uint(din[i*5 + startOffset + 2]) << 2;
+	uint d = uint(din[i*5 + startOffset + 3]) << 1;
+	uint e = uint(din[i*5 + startOffset + 4]) << 0;
+
+	dout[i] = uint8_t(a | b | c | d | e);
+	offsetOut[i] = offsetIn[i*5 + startOffset];
 }

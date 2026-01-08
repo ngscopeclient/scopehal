@@ -98,8 +98,13 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 
 		if(g_hasShaderInt64)
 		{
-			m_4b5bDecodeComputePipeline =
-				make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_4b5bDecode.spv", 5, sizeof(uint32_t));
+			m_4b5bDecodeComputePipeline = make_shared<ComputePipeline>(
+				"shaders/Ethernet100BaseTX_4b5bDecode.spv",
+				4,
+				sizeof(Ethernet100BaseTX4b5bConstants));
+
+			m_4b5bSamples.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+			m_4b5bTimestamps.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
 		}
 
 		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
@@ -160,27 +165,31 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		return;
 	}
 
-	//Make transfer helpers if this is the first time
-	if(!m_cmdPool)
+	//If we can't do the 4b5b descrambling CPU side, pull all of the timestamps to the CPU
+	if(! (g_hasShaderInt64 && g_hasShaderInt8) )
 	{
-		m_transferQueue = g_vkQueueManager->GetQueueWithFlags(
-			vk::QueueFlagBits::eTransfer, "Ethernet100BaseTXDecoder.queue");
+		//Make transfer helpers if this is the first time
+		if(!m_cmdPool)
+		{
+			m_transferQueue = g_vkQueueManager->GetQueueWithFlags(
+				vk::QueueFlagBits::eTransfer, "Ethernet100BaseTXDecoder.queue");
 
-		vk::CommandPoolCreateInfo poolInfo(
-			vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			m_transferQueue->m_family );
-		m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+			vk::CommandPoolCreateInfo poolInfo(
+				vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+				m_transferQueue->m_family );
+			m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
-		vk::CommandBufferAllocateInfo bufinfo(**m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-		m_transferCmdBuf = make_unique<vk::raii::CommandBuffer>(
-			std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+			vk::CommandBufferAllocateInfo bufinfo(**m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+			m_transferCmdBuf = make_unique<vk::raii::CommandBuffer>(
+				std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+		}
+
+		//Copy input timestamps to CPU as early as possible, so it can run while other processing is active
+		m_transferCmdBuf->begin({});
+		din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
+		m_transferCmdBuf->end();
+		m_transferQueue->Submit(*m_transferCmdBuf);
 	}
-
-	//Copy input timestamps to CPU as early as possible, so it can run while other processing is active
-	m_transferCmdBuf->begin({});
-	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
-	m_transferCmdBuf->end();
-	m_transferQueue->Submit(*m_transferCmdBuf);
 
 	//Copy our waveform setup from the input. Output has femtosecond resolution since we sampled on clock edges
 	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
@@ -342,8 +351,9 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	size_t i = minSSD;
 	LogTrace("Found SSD at %zu\n", i);
 
-	//Wait until all of the timestamps are ready
-	m_transferQueue->WaitIdle();
+	//Wait until all of the timestamps are ready if we're not doing the 4b5b deserialization on the GPU
+	if(! (g_hasShaderInt64 && g_hasShaderInt8) )
+		m_transferQueue->WaitIdle();
 
 	//Skip the J-K as we already parsed it
 	i += 10;
@@ -390,86 +400,199 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	vector<uint64_t> starts;
 	vector<uint64_t> ends;
 
-	//Grab 5 bits at a time and decode them
 	bool first = true;
 	uint8_t current_byte = 0;
 	uint64_t current_start = 0;
 	size_t deslen = m_descrambledBits.size()-5;
-	for(; i<deslen; i+=5)
+
+	//Decode the 4b5b symbol stream
+	size_t numSymbols = (m_descrambledBits.size() - i) / 5;
+	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
-		unsigned int code =
-			(m_descrambledBits[i+0] ? 16 : 0) |
-			(m_descrambledBits[i+1] ? 8 : 0) |
-			(m_descrambledBits[i+2] ? 4 : 0) |
-			(m_descrambledBits[i+3] ? 2 : 0) |
-			(m_descrambledBits[i+4] ? 1 : 0);
+		m_4b5bSamples.resize(numSymbols);
+		m_4b5bTimestamps.resize(numSymbols);
 
-		//Handle special stuff
-		if(code == 0x18)
+		cmdBuf.begin({});
+
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numThreads = numSymbols;
+		const uint32_t numBlocks = numThreads / threadsPerBlock;
+
+		//Do initial 5:1 deserialization on the GPU
+		Ethernet100BaseTX4b5bConstants cfg;
+		cfg.len = numSymbols;
+		cfg.startOffset = i;
+
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(0, m_descrambledBits, cmdBuf);
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(1, din->m_offsets, cmdBuf);
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(2, m_4b5bSamples, cmdBuf, true);
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(3, m_4b5bTimestamps, cmdBuf, true);
+		m_4b5bDecodeComputePipeline->Dispatch(cmdBuf, cfg,
+			1,
+			min(numBlocks, 32768u),
+			numBlocks / 32768 + 1);
+
+		m_4b5bSamples.MarkModifiedFromGpu();
+		m_4b5bTimestamps.MarkModifiedFromGpu();
+		m_4b5bSamples.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_4b5bTimestamps.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Grab one symbol at a time and decode them
+		for(size_t j=0; j<numSymbols; j++)
 		{
-			//This is a /J/. Next code should be 0x11, /K/ - start of frame.
-			//Don't check it for now, just jump ahead 5 bits and get ready to read data
-			i += 5;
-			continue;
+			unsigned int code = m_4b5bSamples[j];
+
+			//Handle special stuff
+			if(code == 0x18)
+			{
+				//This is a /J/. Next code should be 0x11, /K/ - start of frame.
+				//Don't check it for now, just jump ahead 5 bits and get ready to read data
+				i += 5;
+				continue;
+			}
+			else if(code == 0x04)
+			{
+				LogTrace("Found TX error at %zu\n", i);
+
+				//TX error
+				EthernetFrameSegment segment;
+				segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
+				cap->m_offsets.push_back(current_start * cap->m_timescale);
+				uint64_t end = m_4b5bTimestamps[j + 1];
+				cap->m_durations.push_back((end - current_start) * cap->m_timescale);
+				cap->m_samples.push_back(segment);
+
+				//reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+			else if(code == 0x0d)
+			{
+				//This is a /T/. Next code should be 0x07, /R/ - end of frame.
+				//Crunch this frame
+				BytesToFrames(bytes, starts, ends, cap);
+
+				//Skip the /R/
+				i += 5;
+
+				//and reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+
+			//TODO: process /H/ - 0x04 (error in the middle of a packet)
+
+			//Ignore idles
+			else if(code == 0x1f)
+				continue;
+
+			//Nope, normal nibble.
+			unsigned int decoded = code_5to4[code];
+			if(first)
+			{
+				current_start = m_4b5bTimestamps[j];
+				current_byte = decoded;
+			}
+			else
+			{
+				current_byte |= decoded << 4;
+
+				bytes.push_back(current_byte);
+				starts.push_back(current_start * cap->m_timescale);
+				uint64_t end = m_4b5bTimestamps[j + 1];
+				ends.push_back(end * cap->m_timescale);
+			}
+
+			first = !first;
 		}
-		else if(code == 0x04)
+	}
+
+	else
+	{
+		//Grab 5 bits at a time and decode them
+		for(; i<deslen; i+=5)
 		{
-			LogTrace("Found TX error at %zu\n", i);
+			unsigned int code =
+				(m_descrambledBits[i+0] ? 16 : 0) |
+				(m_descrambledBits[i+1] ? 8 : 0) |
+				(m_descrambledBits[i+2] ? 4 : 0) |
+				(m_descrambledBits[i+3] ? 2 : 0) |
+				(m_descrambledBits[i+4] ? 1 : 0);
 
-			//TX error
-			EthernetFrameSegment segment;
-			segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
-			cap->m_offsets.push_back(current_start * cap->m_timescale);
-			uint64_t end = din->m_offsets[idle_offset + i + 5];
-			cap->m_durations.push_back((end - current_start) * cap->m_timescale);
-			cap->m_samples.push_back(segment);
+			//Handle special stuff
+			if(code == 0x18)
+			{
+				//This is a /J/. Next code should be 0x11, /K/ - start of frame.
+				//Don't check it for now, just jump ahead 5 bits and get ready to read data
+				i += 5;
+				continue;
+			}
+			else if(code == 0x04)
+			{
+				LogTrace("Found TX error at %zu\n", i);
 
-			//reset for the next one
-			starts.clear();
-			ends.clear();
-			bytes.clear();
-			continue;
+				//TX error
+				EthernetFrameSegment segment;
+				segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
+				cap->m_offsets.push_back(current_start * cap->m_timescale);
+				uint64_t end = din->m_offsets[idle_offset + i + 5];
+				cap->m_durations.push_back((end - current_start) * cap->m_timescale);
+				cap->m_samples.push_back(segment);
+
+				//reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+			else if(code == 0x0d)
+			{
+				//This is a /T/. Next code should be 0x07, /R/ - end of frame.
+				//Crunch this frame
+				BytesToFrames(bytes, starts, ends, cap);
+
+				//Skip the /R/
+				i += 5;
+
+				//and reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+
+			//TODO: process /H/ - 0x04 (error in the middle of a packet)
+
+			//Ignore idles
+			else if(code == 0x1f)
+				continue;
+
+			//Nope, normal nibble.
+			unsigned int decoded = code_5to4[code];
+			if(first)
+			{
+				current_start = din->m_offsets[idle_offset + i];
+				current_byte = decoded;
+			}
+			else
+			{
+				current_byte |= decoded << 4;
+
+				bytes.push_back(current_byte);
+				starts.push_back(current_start * cap->m_timescale);
+				uint64_t end = din->m_offsets[idle_offset + i + 5];
+				ends.push_back(end * cap->m_timescale);
+			}
+
+			first = !first;
 		}
-		else if(code == 0x0d)
-		{
-			//This is a /T/. Next code should be 0x07, /R/ - end of frame.
-			//Crunch this frame
-			BytesToFrames(bytes, starts, ends, cap);
-
-			//Skip the /R/
-			i += 5;
-
-			//and reset for the next one
-			starts.clear();
-			ends.clear();
-			bytes.clear();
-			continue;
-		}
-
-		//TODO: process /H/ - 0x04 (error in the middle of a packet)
-
-		//Ignore idles
-		else if(code == 0x1f)
-			continue;
-
-		//Nope, normal nibble.
-		unsigned int decoded = code_5to4[code];
-		if(first)
-		{
-			current_start = din->m_offsets[idle_offset + i];
-			current_byte = decoded;
-		}
-		else
-		{
-			current_byte |= decoded << 4;
-
-			bytes.push_back(current_byte);
-			starts.push_back(current_start * cap->m_timescale);
-			uint64_t end = din->m_offsets[idle_offset + i + 5];
-			ends.push_back(end * cap->m_timescale);
-		}
-
-		first = !first;
 	}
 
 	cap->MarkModifiedFromCpu();

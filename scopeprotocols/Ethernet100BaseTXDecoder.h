@@ -43,6 +43,13 @@ public:
 	uint32_t	startOffset;
 };
 
+class Ethernet100BaseTX4b5bConstants
+{
+public:
+	uint32_t	len;
+	uint32_t	startOffset;
+};
+
 class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
 {
 public:
@@ -105,6 +112,12 @@ protected:
 
 	///@brief Compute pipeline for 4b5b decoding
 	std::shared_ptr<ComputePipeline> m_4b5bDecodeComputePipeline;
+
+	///@brief 4b5b decoder output
+	AcceleratorBuffer<uint8_t> m_4b5bSamples;
+
+	///@brief 4b5b decoder output timestamps
+	AcceleratorBuffer<uint64_t> m_4b5bTimestamps;
 
 	///@brief Pool of command buffers
 	std::unique_ptr<vk::raii::CommandPool> m_cmdPool;
