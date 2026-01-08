@@ -27,93 +27,40 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTXDecoder
- */
-#ifndef Ethernet100BaseTXDecoder_h
-#define Ethernet100BaseTXDecoder_h
+#version 460
+#pragma shader_stage(compute)
 
-class Ethernet100BaseTXDescramblerConstants
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_ARB_gpu_shader_int64 : require
+
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	len;
-	uint32_t	samplesPerThread;
-	uint32_t	startOffset;
+	uint8_t din[];
 };
 
-class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
+layout(std430, binding=1) restrict readonly buffer buf_offsetIn
 {
-public:
-	Ethernet100BaseTXDecoder(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
-
-protected:
-	int GetState(float voltage)
-	{
-		if(voltage > 0.5)
-			return 1;
-		else if(voltage < -0.5)
-			return -1;
-		else
-			return 0;
-	}
-
-	void DecodeStates(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		SparseAnalogWaveform* samples);
-
-	bool TrySync(size_t idle_offset);
-
-	void Descramble(vk::raii::CommandBuffer& cmdBuf, size_t idle_offset);
-
-	///@brief Raw scrambled serial bit stream after MLT-3 decoding
-	AcceleratorBuffer<uint8_t> m_phyBits;
-
-	///@brief Descrambled serial bit stream after LFSR
-	AcceleratorBuffer<uint8_t> m_descrambledBits;
-
-	///@brief Results from TrySync
-	AcceleratorBuffer<uint8_t> m_trySyncOutput;
-
-	///@brief Results from FindSSD
-	AcceleratorBuffer<uint32_t> m_findSSDOutput;
-
-	///@brief LFSR lookahead table
-	AcceleratorBuffer<uint32_t> m_lfsrTable;
-
-	///@brief Compute pipeline for MLT-3 decoding
-	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;
-
-	///@brief Compute pipeline for TrySync
-	std::shared_ptr<ComputePipeline> m_trySyncComputePipeline;
-
-	///@brief Compute pipeline for descrambling
-	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
-
-	///@brief Compute pipeline for finding start-of-stream descriptor
-	std::shared_ptr<ComputePipeline> m_findSSDComputePipeline;
-
-	///@brief Compute pipeline for 4b5b decoding
-	std::shared_ptr<ComputePipeline> m_4b5bDecodeComputePipeline;
-
-	///@brief Pool of command buffers
-	std::unique_ptr<vk::raii::CommandPool> m_cmdPool;
-
-	///@brief Command buffer for transfers
-	std::unique_ptr<vk::raii::CommandBuffer> m_transferCmdBuf;
-
-	//@brief Queue for transfers
-	std::shared_ptr<QueueHandle> m_transferQueue;
+	int64_t offsetIn[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_doutBytes
+{
+	uint8_t dout[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_timeOut
+{
+	int64_t timeOut[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+
+}

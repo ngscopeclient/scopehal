@@ -96,6 +96,12 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 		m_findSSDComputePipeline =
 			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_FindSSD.spv", 2, sizeof(uint32_t));
 
+		if(g_hasShaderInt64)
+		{
+			m_4b5bDecodeComputePipeline =
+				make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_4b5bDecode.spv", 5, sizeof(uint32_t));
+		}
+
 		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_descrambledBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_lfsrTable.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
@@ -173,7 +179,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	//Copy input timestamps to CPU as early as possible, so it can run while other processing is active
 	m_transferCmdBuf->begin({});
 	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
-	din->m_durations.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
 	m_transferCmdBuf->end();
 	m_transferQueue->Submit(*m_transferCmdBuf);
 
@@ -415,7 +420,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			EthernetFrameSegment segment;
 			segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
 			cap->m_offsets.push_back(current_start * cap->m_timescale);
-			uint64_t end = din->m_offsets[idle_offset + i + 4] + din->m_durations[idle_offset + i + 4];
+			uint64_t end = din->m_offsets[idle_offset + i + 5];
 			cap->m_durations.push_back((end - current_start) * cap->m_timescale);
 			cap->m_samples.push_back(segment);
 
@@ -460,7 +465,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 			bytes.push_back(current_byte);
 			starts.push_back(current_start * cap->m_timescale);
-			uint64_t end = din->m_offsets[idle_offset + i + 4] + din->m_durations[idle_offset + i + 4];
+			uint64_t end = din->m_offsets[idle_offset + i + 5];
 			ends.push_back(end * cap->m_timescale);
 		}
 

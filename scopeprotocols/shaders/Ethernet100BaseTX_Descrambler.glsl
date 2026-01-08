@@ -136,7 +136,7 @@ void main()
 		barrier();
 		memoryBarrierShared();
 
-		//Run the scrambler single threaded
+		//Run the scrambler single threaded then write back
 		if(gl_LocalInvocationID.x == 0)
 		{
 			for(int j=0; j<X_SIZE; j++)

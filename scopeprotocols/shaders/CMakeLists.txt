@@ -45,6 +45,7 @@ add_compute_shaders(
 		CosineSumWindow.glsl
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
+		Ethernet100BaseTX_4b5bDecode.glsl
 		Ethernet100BaseTX_Descrambler.glsl
 		Ethernet100BaseTX_FindSSD.glsl
 		Ethernet100BaseTX_MLT3Decoder.glsl
