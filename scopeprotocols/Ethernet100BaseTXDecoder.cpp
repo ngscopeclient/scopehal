@@ -175,7 +175,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
 	din->m_durations.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
 	m_transferCmdBuf->end();
-	m_transferQueue->SubmitAndBlock(*m_transferCmdBuf);
+	m_transferQueue->Submit(*m_transferCmdBuf);
 
 	//Copy our waveform setup from the input. Output has femtosecond resolution since we sampled on clock edges
 	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
@@ -194,8 +194,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	const uint32_t maxOffset = 16384;
 	if(g_hasShaderInt8)
 	{
-		const uint32_t threadsPerBlock = 64;
-
 		size_t ilen = din->size();
 		cmdBuf.begin({});
 
@@ -211,6 +209,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		m_phyBits.MarkModifiedFromGpu();
 
 		//Then look for LFSR sync
+		const uint32_t threadsPerBlock = 64;
 		const uint32_t numBlocks = maxOffset / threadsPerBlock;
 		m_trySyncOutput.resize(maxOffset);
 		m_trySyncComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
@@ -594,7 +593,7 @@ void Ethernet100BaseTXDecoder::Descramble(vk::raii::CommandBuffer& cmdBuf, size_
 		m_descrambleComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
 		m_descrambleComputePipeline->BindBufferNonblocking(1, m_lfsrTable, cmdBuf);
 		m_descrambleComputePipeline->BindBufferNonblocking(2, m_descrambledBits, cmdBuf, true);
-		m_descrambleComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_descrambleComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
 
 		m_descrambledBits.MarkModifiedFromGpu();
 		m_descrambledBits.PrepareForCpuAccessNonblocking(cmdBuf);

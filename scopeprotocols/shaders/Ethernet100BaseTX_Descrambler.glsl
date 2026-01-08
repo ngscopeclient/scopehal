@@ -55,12 +55,18 @@ layout(std430, push_constant) uniform constants
 	uint startOffset;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define X_SIZE 16
+#define Y_SIZE 64
+
+layout(local_size_x=X_SIZE, local_size_y=Y_SIZE, local_size_z=1) in;
+
+shared uint prefetchBuf[X_SIZE][Y_SIZE];
+shared uint outBuf[X_SIZE][Y_SIZE];
 
 void main()
 {
 	//Get thread index
-	uint baseIdx = gl_GlobalInvocationID.x * samplesPerThread;
+	uint baseIdx = gl_GlobalInvocationID.y * samplesPerThread;
 	uint start = baseIdx + startOffset;
 	if(start >= len)
 		return;
@@ -96,7 +102,8 @@ void main()
 		lfsr |= (1 << 0);
 
 	//Calculate LFSR state at the start of this block given the initial state
-	uint advance = gl_GlobalInvocationID.x * samplesPerThread;
+	//TODO: we can make this more efficient by doing mod 2047 calculations
+	uint advance = baseIdx;
 	uint tmp = 0;
 	for(uint iterbit = 0; iterbit < 30; iterbit ++)
 	{
@@ -118,11 +125,30 @@ void main()
 
 	//Run the descrambler loop
 	uint iout = baseIdx;
-	for(uint i=start; i<end; i++)
+	uint unrollEnd = end - (end % X_SIZE);
+	uint i = start;
+	for(i=start; i<end; i += X_SIZE)
 	{
-		uint c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
-		lfsr = (lfsr << 1) ^ c;
-		dout[iout] = uint8_t( uint(din[i]) ^ c );
-		iout ++;
+		//Prefetch samples in each X thread
+		uint idx = i + gl_LocalInvocationID.x;
+		if(idx < end)
+			prefetchBuf[gl_LocalInvocationID.x][gl_LocalInvocationID.y] = uint(din[idx]);
+		barrier();
+		memoryBarrierShared();
+
+		//Run the scrambler single threaded
+		if(gl_LocalInvocationID.x == 0)
+		{
+			for(int j=0; j<X_SIZE; j++)
+			{
+				if( (i + j)  >= end)
+					break;
+
+				uint c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
+				lfsr = (lfsr << 1) ^ c;
+				dout[iout] = uint8_t( prefetchBuf[j][gl_LocalInvocationID.y] ^ c );
+				iout ++;
+			}
+		}
 	}
 }
