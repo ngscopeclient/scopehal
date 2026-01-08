@@ -27,90 +27,67 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTXDecoder
- */
-#ifndef Ethernet100BaseTXDecoder_h
-#define Ethernet100BaseTXDecoder_h
+#version 460
+#pragma shader_stage(compute)
 
-class Ethernet100BaseTXDescramblerConstants
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	len;
-	uint32_t	samplesPerThread;
-	uint32_t	startOffset;
+	uint8_t din[];
 };
 
-class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	Ethernet100BaseTXDecoder(const std::string& color);
+	uint dout[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-	static std::string GetProtocolName();
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+};
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
-
-protected:
-	int GetState(float voltage)
+void main()
+{
+	//Search interleaved for more efficient memory accesses
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint end = len - 10;
+	bool found = false;
+	for(uint i=gl_GlobalInvocationID.x; i < end; i += numThreads)
 	{
-		if(voltage > 0.5)
-			return 1;
-		else if(voltage < -0.5)
-			return -1;
-		else
-			return 0;
+		bool hit = true;
+		if(uint(din[i + 0]) != 1)
+			hit = false;
+		if(uint(din[i + 1]) != 1)
+			hit = false;
+		if(uint(din[i + 2]) != 0)
+			hit = false;
+		if(uint(din[i + 3]) != 0)
+			hit = false;
+		if(uint(din[i + 4]) != 0)
+			hit = false;
+		if(uint(din[i + 5]) != 1)
+			hit = false;
+		if(uint(din[i + 6]) != 0)
+			hit = false;
+		if(uint(din[i + 7]) != 0)
+			hit = false;
+		if(uint(din[i + 8]) != 0)
+			hit = false;
+		if(uint(din[i + 9]) != 1)
+			hit = false;
+
+		if(hit)
+		{
+			dout[gl_GlobalInvocationID.x] = i;
+			found = true;
+			break;
+		}
 	}
 
-	void DecodeStates(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		SparseAnalogWaveform* samples);
-
-	bool TrySync(size_t idle_offset);
-
-	void Descramble(vk::raii::CommandBuffer& cmdBuf, size_t idle_offset);
-
-	///@brief Raw scrambled serial bit stream after MLT-3 decoding
-	AcceleratorBuffer<uint8_t> m_phyBits;
-
-	///@brief Descrambled serial bit stream after LFSR
-	AcceleratorBuffer<uint8_t> m_descrambledBits;
-
-	///@brief Results from TrySync
-	AcceleratorBuffer<uint8_t> m_trySyncOutput;
-
-	///@brief Results from FindSSD
-	AcceleratorBuffer<uint32_t> m_findSSDOutput;
-
-	///@brief LFSR lookahead table
-	AcceleratorBuffer<uint32_t> m_lfsrTable;
-
-	///@brief Compute pipeline for MLT-3 decoding
-	std::shared_ptr<ComputePipeline> m_mlt3DecodeComputePipeline;
-
-	///@brief Compute pipeline for TrySync
-	std::shared_ptr<ComputePipeline> m_trySyncComputePipeline;
-
-	///@brief Compute pipeline for descrambling
-	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
-
-	///@brief Compute pipeline for finding start-of-stream descriptor
-	std::shared_ptr<ComputePipeline> m_findSSDComputePipeline;
-
-	///@brief Pool of command buffers
-	std::unique_ptr<vk::raii::CommandPool> m_cmdPool;
-
-	///@brief Command buffer for transfers
-	std::unique_ptr<vk::raii::CommandBuffer> m_transferCmdBuf;
-
-	//@brief Queue for transfers
-	std::shared_ptr<QueueHandle> m_transferQueue;
-};
-
-#endif
+	//if we found nothing, report error
+	if(!found)
+		dout[gl_GlobalInvocationID.x] = 0xffffffff;
+}

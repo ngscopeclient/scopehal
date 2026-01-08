@@ -46,6 +46,7 @@ add_compute_shaders(
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
 		Ethernet100BaseTX_Descrambler.glsl
+		Ethernet100BaseTX_FindSSD.glsl
 		Ethernet100BaseTX_MLT3Decoder.glsl
 		Ethernet100BaseTX_TrySync.glsl
 		EyePattern.glsl

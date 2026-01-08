@@ -93,10 +93,14 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 				3,
 				sizeof(Ethernet100BaseTXDescramblerConstants));
 
+		m_findSSDComputePipeline =
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_FindSSD.spv", 2, sizeof(uint32_t));
+
 		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_descrambledBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_lfsrTable.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 		m_trySyncOutput.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_findSSDOutput.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 	}
 }
 
@@ -253,35 +257,84 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		return;
 	}
 
-	//Good sync, descramble it now
-	Descramble(cmdBuf, queue, idle_offset);
-
-	//Search until we find a 1100010001 (J-K, start of stream) sequence
-	bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
-	size_t i = 0;
-	bool hit = true;
-	size_t des10 = m_descrambledBits.size() - 10;
-	for(i=0; i<des10; i++)
+	//Descramble and check for SSD on the GPU
+	size_t minSSD = 0;
+	if(g_hasShaderInt8)
 	{
-		hit = true;
-		for(int j=0; j<10; j++)
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numThreads = 32768;
+		const uint32_t numBlocks = numThreads / threadsPerBlock;
+
+		m_findSSDOutput.resize(numThreads);
+
+		size_t ilen = din->size();
+
+		cmdBuf.begin({});
+
+		//Descramble
+		Descramble(cmdBuf, idle_offset);
+
+		//Look for SSD
+		m_findSSDComputePipeline->BindBufferNonblocking(0, m_descrambledBits, cmdBuf);
+		m_findSSDComputePipeline->BindBufferNonblocking(1, m_findSSDOutput, cmdBuf, true);
+		m_findSSDComputePipeline->Dispatch(cmdBuf, (uint32_t)ilen, numBlocks);
+		m_findSSDOutput.MarkModifiedFromGpu();
+		m_findSSDOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//See if we found one
+		minSSD = 0xffffffff;
+		for(size_t i=0; i<numThreads; i++)
+			minSSD = min((uint32_t)minSSD, m_findSSDOutput[i]);
+		if(minSSD == 0xffffffff)
 		{
-			bool b = m_descrambledBits[i+j];
-			if(b != ssd[j])
+			LogTrace("No SSD found\n");
+			return;
+		}
+	}
+
+	//CPU side descrambling and SSD search
+	else
+	{
+		//Good sync, descramble it now
+		cmdBuf.begin({});
+		Descramble(cmdBuf, idle_offset);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Search until we find a 1100010001 (J-K, start of stream) sequence
+		bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+		size_t i = 0;
+		bool hit = true;
+		size_t des10 = m_descrambledBits.size() - 10;
+		for(i=0; i<des10; i++)
+		{
+			hit = true;
+			for(int j=0; j<10; j++)
 			{
-				hit = false;
-				break;
+				bool b = m_descrambledBits[i+j];
+				if(b != ssd[j])
+				{
+					hit = false;
+					break;
+				}
 			}
+
+			if(hit)
+				break;
+		}
+		if(!hit)
+		{
+			LogTrace("No SSD found\n");
+			return;
 		}
 
-		if(hit)
-			break;
+		minSSD = i;
 	}
-	if(!hit)
-	{
-		LogTrace("No SSD found\n");
-		return;
-	}
+
+	size_t i = minSSD;
 	LogTrace("Found SSD at %zu\n", i);
 
 	//Wait until all of the timestamps are ready
@@ -499,10 +552,7 @@ bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset)
 /**
 	@brief Actually run the descrambler
  */
-void Ethernet100BaseTXDecoder::Descramble(
-	vk::raii::CommandBuffer& cmdBuf,
-	shared_ptr<QueueHandle> queue,
-	size_t idle_offset)
+void Ethernet100BaseTXDecoder::Descramble(vk::raii::CommandBuffer& cmdBuf, size_t idle_offset)
 {
 	//Bounds check
 	if( (idle_offset + 64) >= m_phyBits.size())
@@ -540,8 +590,6 @@ void Ethernet100BaseTXDecoder::Descramble(
 		cfg.samplesPerThread = (len | (numThreads-1)) / numThreads;
 		cfg.startOffset = start;
 
-		cmdBuf.begin({});
-
 		m_descrambleComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
 		m_descrambleComputePipeline->BindBufferNonblocking(1, m_lfsrTable, cmdBuf);
 		m_descrambleComputePipeline->BindBufferNonblocking(2, m_descrambledBits, cmdBuf, true);
@@ -549,9 +597,6 @@ void Ethernet100BaseTXDecoder::Descramble(
 
 		m_descrambledBits.MarkModifiedFromGpu();
 		m_descrambledBits.PrepareForCpuAccessNonblocking(cmdBuf);
-
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
 	}
 
 	else
