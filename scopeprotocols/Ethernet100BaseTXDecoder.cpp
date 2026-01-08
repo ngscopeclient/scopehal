@@ -157,11 +157,12 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	//Make transfer helpers if this is the first time
 	if(!m_cmdPool)
 	{
-		m_transferQueue = g_vkQueueManager->GetComputeQueue("Ethernet100BaseTXDecoder.queue");
+		m_transferQueue = g_vkQueueManager->GetQueueWithFlags(
+			vk::QueueFlagBits::eTransfer, "Ethernet100BaseTXDecoder.queue");
 
 		vk::CommandPoolCreateInfo poolInfo(
 			vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			queue->m_family );
+			m_transferQueue->m_family );
 		m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 		vk::CommandBufferAllocateInfo bufinfo(**m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
@@ -171,8 +172,8 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	//Copy input timestamps to CPU as early as possible, so it can run while other processing is active
 	m_transferCmdBuf->begin({});
-	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf);
-	din->m_durations.PrepareForCpuAccessNonblocking(*m_transferCmdBuf);
+	din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
+	din->m_durations.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
 	m_transferCmdBuf->end();
 	m_transferQueue->SubmitAndBlock(*m_transferCmdBuf);
 

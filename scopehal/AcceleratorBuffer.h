@@ -946,8 +946,10 @@ public:
 		@brief Prepares the buffer to be accessed from the CPU, without blocking
 
 		This MUST be called prior to accessing the CPU-side buffer to ensure that m_cpuPtr is valid and up to date.
+
+		Set skipBarrier for transfer-only transactions not following a shader invocation in the same command buffer
 	 */
-	void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf)
+	void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf, bool skipBarrier = false)
 	{
 		//Early out if no content
 		if(m_size == 0)
@@ -958,7 +960,7 @@ public:
 			AllocateCpuBuffer(m_capacity);
 
 		if(m_cpuPhysMemIsStale)
-			CopyToCpuNonblocking(cmdBuf);
+			CopyToCpuNonblocking(cmdBuf, skipBarrier);
 	}
 
 	/**
@@ -1050,21 +1052,24 @@ protected:
 	/**
 		@brief Copy the buffer contents from GPU to CPU without blocking on the CPU
 	 */
-	void CopyToCpuNonblocking(vk::raii::CommandBuffer& cmdBuf)
+	void CopyToCpuNonblocking(vk::raii::CommandBuffer& cmdBuf, bool skipBarrier = false)
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
 		//Add a barrier just in case a shader is still writing to it
-		cmdBuf.pipelineBarrier(
-			vk::PipelineStageFlagBits::eComputeShader,
-			vk::PipelineStageFlagBits::eTransfer,
-			{},
-			vk::MemoryBarrier(
-				vk::AccessFlagBits::eShaderWrite,
-				vk::AccessFlagBits::eTransferRead
-				),
-			{},
-			{});
+		if(!skipBarrier)
+		{
+			cmdBuf.pipelineBarrier(
+				vk::PipelineStageFlagBits::eComputeShader,
+				vk::PipelineStageFlagBits::eTransfer,
+				{},
+				vk::MemoryBarrier(
+					vk::AccessFlagBits::eShaderWrite,
+					vk::AccessFlagBits::eTransferRead
+					),
+				{},
+				{});
+		}
 
 		//Make the transfer request
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
