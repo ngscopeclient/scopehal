@@ -67,6 +67,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	, m_diag_totalWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
 	, m_diag_droppedWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
 	, m_diag_droppedPercent(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT))
+	, m_nextWaveformWriteBuffer(0)
 	, m_adcMode(MODE_8BIT)
 	, m_lastSeq(0)
 	, m_dropUntilSeq(0)
@@ -139,8 +140,8 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 
 	ResetPerCaptureDiagnostics();
 
-	//Initialize waveform buffers
-	for(size_t i=0; i<m_analogChannelCount; i++)
+	//Initialize waveform buffers. Allocate one extra so we can overlap download and conversion
+	for(size_t i=0; i<m_analogChannelCount + 1; i++)
 	{
 		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
 		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
@@ -452,22 +453,16 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
 
-		#ifdef HAVE_NVTX
-			nvtx3::scoped_range range2(string("Channel ") + to_string(chnum));
-		#endif
-
-		auto& abuf = m_analogRawWaveformBuffers[chnum];
+		//Grab the next free buffer
+		auto& abuf = m_analogRawWaveformBuffers[m_nextWaveformWriteBuffer];
+		m_nextWaveformWriteBuffer = (m_nextWaveformWriteBuffer + 1) % m_analogRawWaveformBuffers.size();
 		abuf->resize(memdepth);
 		abuf->PrepareForCpuAccess();
 		achans.push_back(chnum);
 
-		//At this point, we need to have any previously queued waveforms finish
-		//since we're going to be reusing the same buffers very shortly
-		if(i == 0)
-		{
-			m_queue->WaitIdle();
-			PushPendingWaveformsIfReady();
-		}
+		#ifdef HAVE_NVTX
+			nvtx3::scoped_range range2(string("Channel ") + to_string(chnum));
+		#endif
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
@@ -480,7 +475,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 			float scale = config[0];
 			float offset = config[1];
-			//float trigphase = -config[2] * fs_per_sample;
 			float trigphase = config[2];
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
@@ -518,6 +512,10 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			scales.push_back(scale);
 			offsets.push_back(offset);
 
+			//Clear out any previously pending waveforms before we queue up this one
+			if(i == 0)
+				PushPendingWaveformsIfReady();
+
 			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
 
 			//Kick off the GPU-side processing of the waveform to run nonblocking while we download the next
@@ -531,7 +529,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 				m_conversion8BitPipeline->Bind(*m_cmdBuf);
 				m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversion8BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+				m_conversion8BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
 				ConvertRawSamplesShaderArgs args;
 				args.size = cap->size();
@@ -555,7 +553,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 				m_conversion16BitPipeline->Bind(*m_cmdBuf);
 				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversion16BitPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+				m_conversion16BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
 				ConvertRawSamplesShaderArgs args;
 				args.size = cap->size();

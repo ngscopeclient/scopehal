@@ -141,6 +141,9 @@ protected:
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
 
+	///@brief Index of next buffer from m_analogRawWaveformBuffers to use
+	unsigned int m_nextWaveformWriteBuffer;
+
 	///@brief Vulkan queue used for sample conversion
 	std::shared_ptr<QueueHandle> m_queue;
 
