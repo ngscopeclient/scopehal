@@ -512,11 +512,11 @@ public:
 		@brief Copies our content from another AcceleratorBuffer
 	 */
 	 __attribute__((noinline))
-	void CopyFrom(const AcceleratorBuffer<T>& rhs)
+	void CopyFrom(const AcceleratorBuffer<T>& rhs, bool reallocateToMatch = true)
 	{
 		//Copy placement hints from the other instance, then resize to match
 		SetCpuAccessHint(rhs.m_cpuAccessHint);
-		SetGpuAccessHint(rhs.m_gpuAccessHint, true);
+		SetGpuAccessHint(rhs.m_gpuAccessHint, reallocateToMatch);
 		resize(rhs.m_size);
 
 		//Valid data CPU side? Copy it to here
@@ -943,6 +943,27 @@ public:
 	}
 
 	/**
+		@brief Prepares the buffer to be accessed from the CPU, without blocking
+
+		This MUST be called prior to accessing the CPU-side buffer to ensure that m_cpuPtr is valid and up to date.
+
+		Set skipBarrier for transfer-only transactions not following a shader invocation in the same command buffer
+	 */
+	void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf, bool skipBarrier = false)
+	{
+		//Early out if no content
+		if(m_size == 0)
+			return;
+
+		//If there's no buffer at all on the CPU, allocate one
+		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
+			AllocateCpuBuffer(m_capacity);
+
+		if(m_cpuPhysMemIsStale)
+			CopyToCpuNonblocking(cmdBuf, skipBarrier);
+	}
+
+	/**
 		@brief Prepares the buffer to be accessed from the GPU
 
 		This MUST be called prior to accessing the GPU-side buffer to ensure that m_gpuPhysMem is valid and up to date.
@@ -1024,6 +1045,35 @@ protected:
 
 		//Submit the request and block until it completes
 		g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
+
+		m_cpuPhysMemIsStale = false;
+	}
+
+	/**
+		@brief Copy the buffer contents from GPU to CPU without blocking on the CPU
+	 */
+	void CopyToCpuNonblocking(vk::raii::CommandBuffer& cmdBuf, bool skipBarrier = false)
+	{
+		assert(std::is_trivially_copyable<T>::value);
+
+		//Add a barrier just in case a shader is still writing to it
+		if(!skipBarrier)
+		{
+			cmdBuf.pipelineBarrier(
+				vk::PipelineStageFlagBits::eComputeShader,
+				vk::PipelineStageFlagBits::eTransfer,
+				{},
+				vk::MemoryBarrier(
+					vk::AccessFlagBits::eShaderWrite,
+					vk::AccessFlagBits::eTransferRead
+					),
+				{},
+				{});
+		}
+
+		//Make the transfer request
+		vk::BufferCopy region(0, 0, m_size * sizeof(T));
+		cmdBuf.copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
 
 		m_cpuPhysMemIsStale = false;
 	}

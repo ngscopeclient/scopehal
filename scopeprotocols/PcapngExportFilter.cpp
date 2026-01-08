@@ -100,6 +100,7 @@ void PcapngExportFilter::Export()
 
 		auto fname = m_parameters[m_fname].GetFileName();
 		bool append = (mode == MODE_CONTINUOUS_APPEND) || (mode == MODE_MANUAL_APPEND);
+		bool pipe = (mode == MODE_CONTINUOUS_PIPE) || (mode == MODE_MANUAL_PIPE);
 		if(append)
 			m_fp = fopen(fname.c_str(), "ab");
 		else
@@ -111,105 +112,67 @@ void PcapngExportFilter::Export()
 			return;
 		}
 
-		//See if file is empty. If so, write header
-		fseek(m_fp, 0, SEEK_END);
-		if(ftell(m_fp) == 0)
+		//See if file is empty or a pipe. If so, write header
+		if(!pipe)
+			fseek(m_fp, 0, SEEK_END);
+		if(pipe || (ftell(m_fp) == 0) )
 		{
 			LogTrace("File was empty, writing SHB\n");
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Write the SHB
 
-			//Block type
-			uint32_t blocktype = 0x0a0d0d0a;
-			if(!fwrite(&blocktype, sizeof(blocktype), 1, m_fp))
+			shb_t shb;
+			shb.block_type = 0x0a0d0d0a;
+			shb.block_total_length = 28;
+			shb.byte_order_magic = 0x1a2b3c4d;
+			shb.major_version = 1;
+			shb.minor_version = 0;
+			shb.section_length = -1;	//unspecified, live streaming
+			if(!fwrite(&shb, sizeof(shb), 1, m_fp))
 				LogError("file write failure\n");
-
-			//Length of the SHB itself
-			uint32_t shblen = 28;
-			if(!fwrite(&shblen, sizeof(shblen), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Byte order magic
-			uint32_t bom = 0x1a2b3c4d;
-			if(!fwrite(&bom, sizeof(bom), 1, m_fp))
-				LogError("file write failure\n");
-
-			//File format version (1.0)
-			uint16_t major = 1;
-			uint16_t minor = 0;
-			if(!fwrite(&major, sizeof(major), 1, m_fp))
-				LogError("file write failure\n");
-			if(!fwrite(&minor, sizeof(minor), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Section length (unspecified since we append live as data comes in and don't know a priori)
-			int64_t seclen = -1;
-			if(!fwrite(&seclen, sizeof(seclen), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Block total length again
-			if(!fwrite(&shblen, sizeof(shblen), 1, m_fp))
+			if(!fwrite(&shb.block_total_length, sizeof(shb.block_total_length), 1, m_fp))
 				LogError("file write failure\n");
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Write the IDB
 
-			//Block type
-			blocktype = 0x1;
-			if(!fwrite(&blocktype, sizeof(blocktype), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Length of the IDB itself
-			uint32_t idblen = 40;
-			if(!fwrite(&idblen, sizeof(idblen), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Link type
-			uint16_t linktype = 1;
-			if(!fwrite(&linktype, sizeof(linktype), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Padding
-			uint16_t pad = 0;
-			if(!fwrite(&pad, sizeof(pad), 1, m_fp))
-				LogError("file write failure\n");
-
-			//Snapshot length
-			uint32_t snaplen = 0;
-			if(!fwrite(&snaplen, sizeof(snaplen), 1, m_fp))
+			idb_t idb;
+			idb.block_type = 0x1;
+			idb.block_total_length = 40;
+			idb.link_type = 1;
+			idb.reserved = 0;
+			idb.snap_len = 0;
+			if(!fwrite(&idb, sizeof(idb), 1, m_fp))
 				LogError("file write failure\n");
 
 			//Option if_name (total 8 bytes)
-			uint16_t optid = 2;
-			if(!fwrite(&optid, sizeof(optid), 1, m_fp))
-				LogError("file write failure\n");
-			uint16_t optlen = 4;
-			if(!fwrite(&optlen, sizeof(optlen), 1, m_fp))
+			optionhdr_t opt;
+			opt.id = 2;
+			opt.len = 4;
+			if(!fwrite(&opt, sizeof(opt), 1, m_fp))
 				LogError("file write failure\n");
 			const char* ifname = "eth0";
 			if(!fwrite(ifname, strlen(ifname), 1, m_fp))
 				LogError("file write failure\n");
 
 			//Option it_tsresol (total 8 bytes)
-			optid = 9;
-			optlen = 1;
-			if(!fwrite(&optid, sizeof(optid), 1, m_fp))
-				LogError("file write failure\n");
-			if(!fwrite(&optlen, sizeof(optlen), 1, m_fp))
+			opt.id = 9;
+			opt.len = 1;
+			if(!fwrite(&opt, sizeof(opt), 1, m_fp))
 				LogError("file write failure\n");
 			uint8_t tsresol[4] = {9, 0, 0, 0};	//nanosecond resolution
 			if(!fwrite(tsresol, sizeof(tsresol), 1, m_fp))
 				LogError("file write failure\n");
 
 			//Option endofopt (total 4 bytes)
-			if(!fwrite(&pad, sizeof(pad), 1, m_fp))
-				LogError("file write failure\n");
-			if(!fwrite(&pad, sizeof(pad), 1, m_fp))
+			opt.id = 0;
+			opt.len = 0;
+			if(!fwrite(&opt, sizeof(opt), 1, m_fp))
 				LogError("file write failure\n");
 
 			//Write the IDB length again
-			if(!fwrite(&idblen, sizeof(idblen), 1, m_fp))
+			if(!fwrite(&idb.block_total_length, sizeof(idb.block_total_length), 1, m_fp))
 				LogError("file write failure\n");
 		}
 	}
@@ -285,6 +248,7 @@ void PcapngExportFilter::ExportPacket(vector<uint8_t>& packet, time_t timestamp,
 	uint32_t paddinglen = 4 - (blocklen % 4);
 	if(paddinglen == 4)
 		paddinglen = 0;
+	blocklen += paddinglen;
 	if(!fwrite(&blocklen, sizeof(blocklen), 1, m_fp))
 		LogError("file write failure\n");
 

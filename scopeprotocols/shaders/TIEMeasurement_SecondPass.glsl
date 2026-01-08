@@ -27,112 +27,101 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "PeriodMeasurement.h"
+#version 460
+#pragma shader_stage(compute)
 
-using namespace std;
+#extension GL_ARB_gpu_shader_int64 : require
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PeriodMeasurement::PeriodMeasurement(const string& color)
-	: Filter(color, CAT_MEASUREMENT)
+layout(std430, binding=0) restrict readonly buffer buf_firstPassOutput
 {
-	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	int64_t firstPassOutput[];
+};
 
-	//Set up channels
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict writeonly buffer buf_offsets
 {
-	if(stream.m_channel == NULL)
-		return false;
+	int64_t offsets[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string PeriodMeasurement::GetProtocolName()
+layout(std430, binding=2) restrict writeonly buffer buf_durations
 {
-	return "Period";
-}
+	int64_t durations[];
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void PeriodMeasurement::Refresh()
+layout(std430, binding=3) restrict writeonly buffer buf_samples
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	float samples[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_summary
+{
+	int64_t nsamplesOut;
+};
+
+layout(std430, push_constant) uniform constants
+{
+	int64_t	skip_time;
+	uint	nedges;
+	uint	ngolden;
+	uint	blockBufferSize;
+	uint	maxEdgesPerThread;
+};
+
+#define BLOCK_SIZE 64
+
+layout(local_size_x=BLOCK_SIZE, local_size_y=1, local_size_z=1) in;
+
+shared uint blockbase;
+shared uint startingSum;
+
+void main()
+{
+	//Initialize shared variables
+	if(gl_LocalInvocationID.x == 0)
 	{
-		SetData(NULL, 0);
-		return;
+		startingSum = 0;
+		blockbase = gl_GlobalInvocationID.x;
+	}
+	barrier();
+	memoryBarrierShared();
+
+	//Find starting sample index for the block
+	uint tmp = 0;
+	for(uint i=0; i < blockbase; i += BLOCK_SIZE)
+		tmp += uint(firstPassOutput[i * blockBufferSize]);
+	atomicAdd(startingSum, tmp);
+	barrier();
+	memoryBarrierShared();
+
+	uint writebase = startingSum;
+	for(uint i=blockbase; i<gl_GlobalInvocationID.x; i++)
+		writebase += uint(firstPassOutput[i * blockBufferSize]);
+
+	//Copy samples
+	uint readbase = gl_GlobalInvocationID.x * blockBufferSize;
+	uint count = uint(firstPassOutput[readbase]);
+	int64_t lastOffset = firstPassOutput[readbase + 1];
+	uint iout = writebase;
+	for(uint i=0; i<count; i++)
+	{
+		//Copy offset and sample data
+		int64_t offset = firstPassOutput[readbase + i*2 + 1];
+		offsets[iout] = offset;
+		samples[iout] = float(firstPassOutput[readbase + i*2 + 2]);
+
+		//Calculate duration
+		if(iout > 0)
+			durations[iout - 1] = offset - lastOffset;
+
+		lastOffset = offset;
+		iout ++;
 	}
 
-	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
-	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
-	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
-	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
+	//Set final duration to 1
+	if(iout > 0)
+		durations[iout - 1] = 1;
 
-	//Auto-threshold analog signals at 50% of full scale range
-	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
-
-	//Just find edges in digital signals
-	else if(uddin)
-		FindZeroCrossings(uddin, edges);
-	else
-		FindZeroCrossings(sddin, edges);
-
-	//We need at least one full cycle of the waveform to have a meaningful frequency
-	if(edges.size() < 2)
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-
-	size_t elen = edges.size();
-	for(size_t i=0; i < (elen - 2); i+= 2)
-	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
-
-		int64_t delta = end - start;
-
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(round(delta));
-		cap->m_samples.push_back(delta);
-	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-
-	//For the scalar average output, find the total number of zero crossings and divide by the spacing
-	//(excluding partial cycles at start and end).
-	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
-	double ncycles = elen - 1;
-	double interval = edges[elen-1] - edges[0];
-	m_streams[1].m_value = (2 * interval) / ncycles;
+	//If we're the last thread, save the final sample count
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	if(gl_GlobalInvocationID.x == (numThreads - 1) )
+		nsamplesOut = int64_t(iout);
 }

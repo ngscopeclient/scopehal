@@ -43,8 +43,11 @@ public:
 	int64_t		initialPeriod;
 	int64_t		fnyquist;
 	int64_t		tend;
+	int64_t		timescale;
+	int64_t		triggerPhase;
 	uint32_t	nedges;
 	uint32_t	maxOffsetsPerThread;
+	uint32_t	maxInputSamples;
 };
 
 class ClockRecoveryFilter : public Filter
@@ -61,6 +64,13 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(ClockRecoveryFilter)
+
+	///@brief Allow our zero crossings to be reused in downstream filters (e.g. TIE) if valid (input is uniform)
+	AcceleratorBuffer<int64_t>& GetZeroCrossings()
+	{ return m_detector.GetResults(); }
+
+	float GetThreshold()
+	{ return m_threshold.GetFloatVal(); }
 
 protected:
 	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);

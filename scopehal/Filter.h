@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,6 +41,15 @@
 #include "FlowGraphNode.h"
 
 class QueueHandle;
+
+class HistogramConstants
+{
+public:
+	uint32_t	size;
+	uint32_t	bins;
+	float		nmin;
+	float		nmax;
+};
 
 /**
 	@brief Describes a particular revision of a waveform
@@ -456,6 +465,53 @@ public:
 	}
 
 	/**
+		@brief Gets the min and max voltage of a waveform on the GPU
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void GetMinMaxVoltage(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		ComputePipeline& minmaxPipeline,
+		AcceleratorBuffer<float>& scratchMin,
+		AcceleratorBuffer<float>& scratchMax,
+		T* cap,
+		float& vmin,
+		float& vmax
+		)
+	{
+		//GPU side min/max
+		const uint32_t nthreads = 4096;
+		const uint32_t threadsPerBlock = 64;
+		scratchMin.resize(nthreads);
+		scratchMax.resize(nthreads);
+
+		cmdBuf.begin({});
+		minmaxPipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+		minmaxPipeline.BindBufferNonblocking(1, scratchMin, cmdBuf);
+		minmaxPipeline.BindBufferNonblocking(2, scratchMax, cmdBuf);
+		minmaxPipeline.Dispatch(cmdBuf, (uint32_t)cap->size(), nthreads / threadsPerBlock);
+
+		scratchMin.MarkModifiedFromGpu();
+		scratchMax.MarkModifiedFromGpu();
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Final reduction on CPU (TODO: faster to do second shader invocation and read one value??)
+		scratchMin.PrepareForCpuAccess();
+		scratchMax.PrepareForCpuAccess();
+
+		vmin = scratchMin[0];
+		vmax = scratchMax[0];
+		for(uint32_t i=1; i<nthreads; i++)
+		{
+			vmin = std::min(vmin, scratchMin[i]);
+			vmax = std::max(vmax, scratchMax[i]);
+		}
+	}
+
+	/**
 		@brief Gets the lowest voltage of a waveform
 	 */
 	template<class T>
@@ -687,6 +743,63 @@ public:
 	/**
 		@brief Makes a histogram from a waveform with the specified number of bins.
 
+		Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
+
+		Requires GPU side int64 support
+
+		@param low	Low endpoint of the histogram (volts)
+		@param high High endpoint of the histogram (volts)
+		@param bins	Number of histogram bins
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void MakeHistogram(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		ComputePipeline& histogramPipeline,
+		T* cap,
+		AcceleratorBuffer<uint64_t>& hist,
+		float low,
+		float high,
+		size_t bins)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		//Early out if we have zero span
+		if(bins == 0)
+			return;
+
+		const uint32_t nthreads = 4096;
+		const uint32_t threadsPerBlock = 64;
+
+		//Fill the input histogram with zeroes CPU side for now
+		//TODO: GPU side fill
+		hist.resize(bins);
+		hist.PrepareForCpuAccess();
+		memset(hist.GetCpuPointer(), 0, bins*sizeof(int64_t));
+		hist.MarkModifiedFromCpu();
+
+		//Push constants
+		HistogramConstants cfg;
+		cfg.size = cap->size();
+		cfg.bins = bins;
+		cfg.nmin = low;
+		cfg.nmax = high;
+
+		cmdBuf.begin({});
+		histogramPipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf);
+		histogramPipeline.BindBufferNonblocking(1, hist, cmdBuf);
+		histogramPipeline.Dispatch(cmdBuf, cfg, nthreads / threadsPerBlock);
+
+		hist.MarkModifiedFromGpu();
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+	}
+
+	/**
+		@brief Makes a histogram from a waveform with the specified number of bins.
+
 		Any values outside the range are discarded.
 
 		@param low	Low endpoint of the histogram (volts)
@@ -733,17 +846,22 @@ public:
 		@param data		The data signal to sample. Can be be sparse or uniform of any type.
 		@param clock	The clock signal to use. Must be sparse or uniform digital.
 		@param samples	Output waveform. Must be sparse and same data type as data.
+		@param cpuOnly	true to mark the output waveform as a CPU-side temporary buffer that will never be used on the GPU
 	 */
 	template<class T, class R, class S>
 	__attribute__((noinline))
-	static void SampleOnAnyEdges(T* data, R* clock, SparseWaveform<S>& samples)
+	static void SampleOnAnyEdges(T* data, R* clock, SparseWaveform<S>& samples, bool cpuOnly = true)
 	{
 		//Compile-time check to make sure inputs are correct types
 		AssertTypeIsDigitalWaveform(clock);
 		AssertSampleTypesAreSame(data, &samples);
 
 		samples.clear();
-		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		if(cpuOnly)
+			samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		clock->PrepareForCpuAccess();
+		data->PrepareForCpuAccess();
+		samples.PrepareForCpuAccess();
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -756,7 +874,6 @@ public:
 		{
 			//Allocate exactly enough space
 			samples.Resize(clock->size());
-			samples.PrepareForCpuAccess();
 
 			size_t ndata = 0;
 			size_t nout = 0;
@@ -779,13 +896,11 @@ public:
 				nout ++;
 			}
 			samples.Resize(nout);
-			samples.MarkModifiedFromCpu();
 		}
 		else
 		{
 			samples.Reserve(1 * 1024 * 1024);	//preallocate 1 MB sample buffer to avoid lots of reallocation when small
 												//if it's smaller than this, we won't waste a lot of memory
-			samples.PrepareForCpuAccess();
 
 			size_t ndata = 0;
 			for(size_t i=1; i<len; i++)
@@ -806,6 +921,7 @@ public:
 				samples.m_samples.push_back(data->m_samples[ndata]);
 			}
 		}
+		samples.MarkModifiedFromCpu();
 
 		//Compute sample durations
 		#ifdef __x86_64__

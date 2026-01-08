@@ -27,112 +27,67 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "PeriodMeasurement.h"
+#version 460
+#pragma shader_stage(compute)
 
-using namespace std;
+#extension GL_EXT_shader_8bit_storage : require
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PeriodMeasurement::PeriodMeasurement(const string& color)
-	: Filter(color, CAT_MEASUREMENT)
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	uint8_t din[];
+};
 
-	//Set up channels
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-	if(stream.m_channel == NULL)
-		return false;
+	uint dout[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string PeriodMeasurement::GetProtocolName()
+layout(std430, push_constant) uniform constants
 {
-	return "Period";
-}
+	uint len;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-void PeriodMeasurement::Refresh()
+void main()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	//Search interleaved for more efficient memory accesses
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint end = len - 10;
+	bool found = false;
+	for(uint i=gl_GlobalInvocationID.x; i < end; i += numThreads)
 	{
-		SetData(NULL, 0);
-		return;
+		bool hit = true;
+		if(uint(din[i + 0]) != 1)
+			hit = false;
+		if(uint(din[i + 1]) != 1)
+			hit = false;
+		if(uint(din[i + 2]) != 0)
+			hit = false;
+		if(uint(din[i + 3]) != 0)
+			hit = false;
+		if(uint(din[i + 4]) != 0)
+			hit = false;
+		if(uint(din[i + 5]) != 1)
+			hit = false;
+		if(uint(din[i + 6]) != 0)
+			hit = false;
+		if(uint(din[i + 7]) != 0)
+			hit = false;
+		if(uint(din[i + 8]) != 0)
+			hit = false;
+		if(uint(din[i + 9]) != 1)
+			hit = false;
+
+		if(hit)
+		{
+			dout[gl_GlobalInvocationID.x] = i;
+			found = true;
+			break;
+		}
 	}
 
-	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
-	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
-	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
-	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
-
-	//Auto-threshold analog signals at 50% of full scale range
-	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
-
-	//Just find edges in digital signals
-	else if(uddin)
-		FindZeroCrossings(uddin, edges);
-	else
-		FindZeroCrossings(sddin, edges);
-
-	//We need at least one full cycle of the waveform to have a meaningful frequency
-	if(edges.size() < 2)
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-
-	size_t elen = edges.size();
-	for(size_t i=0; i < (elen - 2); i+= 2)
-	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
-
-		int64_t delta = end - start;
-
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(round(delta));
-		cap->m_samples.push_back(delta);
-	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-
-	//For the scalar average output, find the total number of zero crossings and divide by the spacing
-	//(excluding partial cycles at start and end).
-	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
-	double ncycles = elen - 1;
-	double interval = edges[elen-1] - edges[0];
-	m_streams[1].m_value = (2 * interval) / ncycles;
+	//if we found nothing, report error
+	if(!found)
+		dout[gl_GlobalInvocationID.x] = 0xffffffff;
 }

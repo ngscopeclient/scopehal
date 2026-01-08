@@ -119,6 +119,8 @@ EyePattern::EyePattern(const string& color)
 			make_shared<ComputePipeline>("shaders/EyeNormalizeReduce.spv", 2, sizeof(EyeNormalizeConstants));
 		m_eyeNormalizeScaleComputePipeline =
 			make_shared<ComputePipeline>("shaders/EyeNormalizeScale.spv", 3, sizeof(EyeNormalizeConstants));
+		m_eyeIndexSearchPipeline =
+			make_shared<ComputePipeline>("shaders/EyePattern_IndexSearch.spv", 2, sizeof(EyeIndexConstants));
 	}
 
 	m_indexBuffer.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
@@ -183,6 +185,10 @@ void EyePattern::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("EyePattern::Refresh");
+	#endif
+
 	LogIndenter li;
 
 	if(!VerifyAllInputsOK())
@@ -1017,7 +1023,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 
 	const uint32_t threadsPerBlock = 64;
-	const uint32_t numThreads = 4096;
+	const uint32_t numThreads = 8192;
 	const uint32_t numSamplesPerThread = (wend + 1) / numThreads;
 
 	//Push constants are basically just the function arguments
@@ -1038,26 +1044,20 @@ void EyePattern::DensePackedInnerLoopGPU(
 	cfg.mwidth = m_width;
 
 	//Allocate and fill index buffer
+	EyeIndexConstants indexCfg;
+	indexCfg.timescale = waveform->m_timescale;
+	indexCfg.triggerPhase = waveform->m_triggerPhase;
+	indexCfg.len = m_clockEdgesMuxed->size();
+	indexCfg.numSamplesPerThread = numSamplesPerThread;
+
 	m_indexBuffer.resize(numThreads);
-	m_indexBuffer.PrepareForCpuAccess();
-	m_clockEdgesMuxed->PrepareForCpuAccess();
-	for(size_t i=0; i<numThreads; i++)
-	{
-		//Get timestamp of the first sample in this thread's block
-		int64_t tstart = (i * numSamplesPerThread) * waveform->m_timescale + waveform->m_triggerPhase;
+	m_eyeIndexSearchPipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
+	m_eyeIndexSearchPipeline->BindBufferNonblocking(1, m_indexBuffer, cmdBuf);
+	m_eyeIndexSearchPipeline->Dispatch(cmdBuf, indexCfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+	m_eyeIndexSearchPipeline->AddComputeMemoryBarrier(cmdBuf);
+	m_indexBuffer.MarkModifiedFromGpu();
 
-		//Find the first clock edge after this sample
-		size_t iclk = BinarySearchForGequal(m_clockEdgesMuxed->GetCpuPointer(), m_clockEdgesMuxed->size(), tstart);
-
-		//We actually want the clock edge before this one, so decrement it
-		if(iclk > 0)
-			iclk --;
-
-		m_indexBuffer[i] = iclk;
-	}
-	m_indexBuffer.MarkModifiedFromCpu();
-
-	//Run the kernel
+	//Run the main integration kernel
 	m_eyeComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
 	m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);

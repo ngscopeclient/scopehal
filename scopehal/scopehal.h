@@ -66,6 +66,10 @@
 
 #include "config.h"
 
+#ifdef HAVE_NVTX
+#include <nvtx3/nvtx3.hpp>
+#endif
+
 //Vulkan is now a mandatory dependency, so no compile time enable flag
 //(disable some warnings in Vulkan headers that we can't do anything about)
 #pragma GCC diagnostic push
@@ -89,7 +93,7 @@ extern bool g_hasAvx2;
 #define i64abs(x) labs(x)
 #endif
 
-//Enable flags for various features
+//Enable flags for various Vulkan features
 extern bool g_gpuFilterEnabled;
 extern bool g_hasShaderFloat64;
 extern bool g_hasShaderInt64;

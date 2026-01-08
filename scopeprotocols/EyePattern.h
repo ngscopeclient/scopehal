@@ -39,6 +39,15 @@
 #include "EyeMask.h"
 #include "../scopehal/EyeWaveform.h"
 
+class EyeIndexConstants
+{
+public:
+	int64_t		timescale;
+	int64_t		triggerPhase;
+	uint32_t	len;
+	uint32_t	numSamplesPerThread;
+};
+
 class EyeFilterConstants
 {
 public:
@@ -247,6 +256,7 @@ protected:
 	std::shared_ptr<ComputePipeline> m_eyeComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeNormalizeReduceComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeNormalizeScaleComputePipeline;
+	std::shared_ptr<ComputePipeline> m_eyeIndexSearchPipeline;
 };
 
 #endif

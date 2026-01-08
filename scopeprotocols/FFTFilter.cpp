@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -200,7 +200,7 @@ void FFTFilter::DoRefresh(
 
 	//Set up output and copy time scales / configuration
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
-	cap->m_triggerPhase = 1*bin_hz;
+	cap->m_triggerPhase = 0;	//first peak is DC
 	cap->m_timescale = bin_hz;
 	cap->Resize(nouts);
 

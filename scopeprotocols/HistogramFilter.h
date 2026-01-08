@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,8 @@ class HistogramFilter : public Filter
 public:
 	HistogramFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName() override;
@@ -70,6 +71,15 @@ protected:
 	float m_max;
 
 	std::vector<size_t> m_histogram;
+
+	//Minmax calculation for bounds
+	ComputePipeline m_minmaxPipeline;
+	AcceleratorBuffer<float> m_minbuf;
+	AcceleratorBuffer<float> m_maxbuf;
+
+	//Histogram calculation
+	std::shared_ptr<ComputePipeline> m_histogramPipeline;
+	AcceleratorBuffer<uint64_t> m_histogramBuf;
 };
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -33,17 +33,91 @@
 
 using namespace std;
 
+//Coefficient table for all possible powers of two loop iterations
+static const uint16_t g_lfsrTable[][11] =
+{
+	{ 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x400, 0x001 },	//0
+	{ 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x001, 0x002 },	//1
+	{ 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x005, 0x00a, 0x004, 0x008 },	//2
+	{ 0x100, 0x201, 0x402, 0x005, 0x00a, 0x014, 0x028, 0x050, 0x0a0, 0x040, 0x080 },	//3
+	{ 0x0a0, 0x140, 0x281, 0x502, 0x204, 0x408, 0x011, 0x022, 0x044, 0x028, 0x050 },	//4
+	{ 0x42a, 0x055, 0x0aa, 0x154, 0x2a9, 0x552, 0x2a4, 0x548, 0x290, 0x10a, 0x215 },	//5
+	{ 0x646, 0x48d, 0x11b, 0x237, 0x46e, 0x0dd, 0x1ba, 0x375, 0x6eb, 0x391, 0x723 },	//6
+	{ 0x09e, 0x13c, 0x279, 0x4f2, 0x1e5, 0x3cb, 0x797, 0x72e, 0x65c, 0x427, 0x04f },	//7
+	{ 0x17c, 0x2f9, 0x5f2, 0x3e4, 0x7c9, 0x792, 0x724, 0x648, 0x491, 0x05f, 0x0be },	//8
+	{ 0x5f8, 0x3f0, 0x7e1, 0x7c2, 0x784, 0x708, 0x610, 0x421, 0x043, 0x57e, 0x2fc },	//9
+	{ 0x7c0, 0x780, 0x700, 0x600, 0x401, 0x003, 0x006, 0x00c, 0x018, 0x7f0, 0x7e0 },	//10
+	{ 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x400, 0x001 },	//11
+	{ 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x001, 0x002 },	//12
+	{ 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x005, 0x00a, 0x004, 0x008 },	//13
+	{ 0x100, 0x201, 0x402, 0x005, 0x00a, 0x014, 0x028, 0x050, 0x0a0, 0x040, 0x080 },	//14
+	{ 0x0a0, 0x140, 0x281, 0x502, 0x204, 0x408, 0x011, 0x022, 0x044, 0x028, 0x050 },	//15
+	{ 0x42a, 0x055, 0x0aa, 0x154, 0x2a9, 0x552, 0x2a4, 0x548, 0x290, 0x10a, 0x215 },	//16
+	{ 0x646, 0x48d, 0x11b, 0x237, 0x46e, 0x0dd, 0x1ba, 0x375, 0x6eb, 0x391, 0x723 },	//17
+	{ 0x09e, 0x13c, 0x279, 0x4f2, 0x1e5, 0x3cb, 0x797, 0x72e, 0x65c, 0x427, 0x04f },	//18
+	{ 0x17c, 0x2f9, 0x5f2, 0x3e4, 0x7c9, 0x792, 0x724, 0x648, 0x491, 0x05f, 0x0be },	//19
+	{ 0x5f8, 0x3f0, 0x7e1, 0x7c2, 0x784, 0x708, 0x610, 0x421, 0x043, 0x57e, 0x2fc },	//20
+	{ 0x7c0, 0x780, 0x700, 0x600, 0x401, 0x003, 0x006, 0x00c, 0x018, 0x7f0, 0x7e0 },	//21
+	{ 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x400, 0x001 },	//22
+	{ 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x001, 0x002 },	//23
+	{ 0x010, 0x020, 0x040, 0x080, 0x100, 0x201, 0x402, 0x005, 0x00a, 0x004, 0x008 },	//24
+	{ 0x100, 0x201, 0x402, 0x005, 0x00a, 0x014, 0x028, 0x050, 0x0a0, 0x040, 0x080 },	//25
+	{ 0x0a0, 0x140, 0x281, 0x502, 0x204, 0x408, 0x011, 0x022, 0x044, 0x028, 0x050 },	//26
+	{ 0x42a, 0x055, 0x0aa, 0x154, 0x2a9, 0x552, 0x2a4, 0x548, 0x290, 0x10a, 0x215 },	//27
+	{ 0x646, 0x48d, 0x11b, 0x237, 0x46e, 0x0dd, 0x1ba, 0x375, 0x6eb, 0x391, 0x723 },	//28
+	{ 0x09e, 0x13c, 0x279, 0x4f2, 0x1e5, 0x3cb, 0x797, 0x72e, 0x65c, 0x427, 0x04f }		//29
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
+	, m_phyBits("Ethernet100BaseTXDecoder.m_phyBits")
+	, m_descrambledBits("Ethernet100BaseTXDecoder.m_descrambledBits")
+	, m_trySyncOutput("Ethernet100BaseTXDecoder.m_trySyncOutput")
+	, m_findSSDOutput("Ethernet100BaseTXDecoder.m_findSSDOutput")
+	, m_lfsrTable("Ethernet100BaseTXDecoder.m_lfsrTable")
 {
 	m_signalNames.clear();
 	m_inputs.clear();
 
-	CreateInput("data");
-	CreateInput("clk");
+	CreateInput("sampledData");
+
+	if(g_hasShaderInt8)
+	{
+		m_mlt3DecodeComputePipeline =
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_MLT3Decoder.spv", 2, sizeof(uint32_t));
+
+		m_trySyncComputePipeline =
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_TrySync.spv", 2, sizeof(uint32_t));
+
+		m_descrambleComputePipeline =
+			make_shared<ComputePipeline>(
+				"shaders/Ethernet100BaseTX_Descrambler.spv",
+				3,
+				sizeof(Ethernet100BaseTXDescramblerConstants));
+
+		m_findSSDComputePipeline =
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseTX_FindSSD.spv", 2, sizeof(uint32_t));
+
+		if(g_hasShaderInt64)
+		{
+			m_4b5bDecodeComputePipeline = make_shared<ComputePipeline>(
+				"shaders/Ethernet100BaseTX_4b5bDecode.spv",
+				4,
+				sizeof(Ethernet100BaseTX4b5bConstants));
+
+			m_4b5bSamples.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+			m_4b5bTimestamps.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+		}
+
+		m_phyBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_descrambledBits.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_lfsrTable.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_trySyncOutput.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_findSSDOutput.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,119 +135,230 @@ bool Ethernet100BaseTXDecoder::ValidateChannel(size_t i, StreamDescriptor stream
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
 
 	return false;
 }
 
+Filter::DataLocation Ethernet100BaseTXDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void Ethernet100BaseTXDecoder::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("Ethernet100BaseTXDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Get the input data
-	auto din = GetInputWaveform(0);
-	auto clk = GetInputWaveform(1);
-	din->PrepareForCpuAccess();
-	clk->PrepareForCpuAccess();
-
-	//Sample the input on the edges of the recovered clock
-	SparseAnalogWaveform samples;
-	samples.SetCpuOnlyHint();
-	samples.PrepareForCpuAccess();
-	SampleOnAnyEdgesBase(din, clk, samples);
-	size_t ilen = samples.size();
-
-	//MLT-3 decode
-	//TODO: some kind of sanity checking that voltage is changing in the right direction
-	int oldstate = GetState(samples.m_samples[0]);
-	vector<uint8_t> bits;
-	bits.resize(ilen-1);
-	for(size_t i=1; i<ilen; i++)
-	{
-		int nstate = GetState(samples.m_samples[i]);
-
-		//No transition? Add a "0" bit
-		if(nstate == oldstate)
-			bits[i-1] = false;
-
-		//Transition? Add a "1" bit
-		else
-			bits[i-1] = true;
-
-		oldstate = nstate;
-	}
-
-	//RX LFSR sync
-	size_t nbits = bits.size();
-	vector<uint8_t> descrambled_bits;
-	bool synced = false;
-	size_t idle_offset = 0;
-	for(; idle_offset<15000; idle_offset++)
-	{
-		if(TrySync(bits, descrambled_bits, idle_offset, nbits))
-		{
-			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
-			synced = true;
-			break;
-		}
-	}
-	if(!synced)
-	{
-		LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
-		descrambled_bits.clear();
 		SetData(nullptr, 0);
 		return;
 	}
 
-	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
+	//Get the input data
+	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+
+	//If we can't do the 4b5b descrambling CPU side, pull all of the timestamps to the CPU
+	if(! (g_hasShaderInt64 && g_hasShaderInt8) )
+	{
+		//Make transfer helpers if this is the first time
+		if(!m_cmdPool)
+		{
+			m_transferQueue = g_vkQueueManager->GetQueueWithFlags(
+				vk::QueueFlagBits::eTransfer, "Ethernet100BaseTXDecoder.queue");
+
+			vk::CommandPoolCreateInfo poolInfo(
+				vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+				m_transferQueue->m_family );
+			m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+			vk::CommandBufferAllocateInfo bufinfo(**m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+			m_transferCmdBuf = make_unique<vk::raii::CommandBuffer>(
+				std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+		}
+
+		//Copy input timestamps to CPU as early as possible, so it can run while other processing is active
+		m_transferCmdBuf->begin({});
+		din->m_offsets.PrepareForCpuAccessNonblocking(*m_transferCmdBuf, true);
+		m_transferCmdBuf->end();
+		m_transferQueue->Submit(*m_transferCmdBuf);
+	}
+
+	//Copy our waveform setup from the input. Output has femtosecond resolution since we sampled on clock edges
 	//For now, hint the capture to not use GPU memory since none of our Ethernet decodes run on the GPU
-	auto cap = SetupEmptyWaveform<EthernetWaveform>(din,0, true);
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(din, 0, true);
 	cap->SetCpuOnlyHint();
 	cap->Reserve(1000000);
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
-	//Search until we find a 1100010001 (J-K, start of stream) sequence
-	bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
-	size_t i = 0;
-	bool hit = true;
-	size_t des10 = descrambled_bits.size() - 10;
-	for(i=0; i<des10; i++)
+	//MLT-3 decode and RX LFSR sync
+	//A max-sized Ethernet frame is 1500 bytes (12000 bits, or 15000 after 4b5b coding)
+	//TODO: this might occasionally fail to sync if a jumbo frame starts exactly when the trigger starts
+	//Do we want to go larger?
+	bool synced = false;
+	size_t idle_offset = 0;
+	const uint32_t maxOffset = 16384;
+	if(g_hasShaderInt8)
 	{
-		hit = true;
-		for(int j=0; j<10; j++)
+		size_t ilen = din->size();
+		cmdBuf.begin({});
+
+		//Decode sampled analog voltages to MLT-3 symbols
+		const uint32_t compute_block_count = 32768;
+		m_phyBits.resize(ilen - 1);
+		m_mlt3DecodeComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_mlt3DecodeComputePipeline->BindBufferNonblocking(1, m_phyBits, cmdBuf, true);
+		m_mlt3DecodeComputePipeline->Dispatch(cmdBuf, (uint32_t)ilen,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+		m_mlt3DecodeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+		m_phyBits.MarkModifiedFromGpu();
+
+		//Then look for LFSR sync
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numBlocks = maxOffset / threadsPerBlock;
+		m_trySyncOutput.resize(maxOffset);
+		m_trySyncComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
+		m_trySyncComputePipeline->BindBufferNonblocking(1, m_trySyncOutput, cmdBuf, true);
+		m_trySyncComputePipeline->Dispatch(cmdBuf, (uint32_t)din->size(), numBlocks);
+
+		m_trySyncOutput.MarkModifiedFromGpu();
+		m_trySyncOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Check results
+		for(; idle_offset < maxOffset; idle_offset++)
 		{
-			bool b = descrambled_bits[i+j];
-			if(b != ssd[j])
+			if(m_trySyncOutput[idle_offset])
 			{
-				hit = false;
+				LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
+				synced = true;
 				break;
 			}
 		}
-
-		if(hit)
-			break;
 	}
-	if(!hit)
+	else
 	{
-		LogTrace("No SSD found\n");
+		//MLT-3 decode
+		DecodeStates(cmdBuf, queue, din);
+
+		for(; idle_offset < maxOffset; idle_offset++)
+		{
+			if(TrySync(idle_offset))
+			{
+				LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
+				synced = true;
+				break;
+			}
+		}
+	}
+
+	//Make sure we got a good LFSR sync
+	if(!synced)
+	{
+		LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
+		SetData(nullptr, 0);
 		return;
 	}
+
+	//Descramble and check for SSD on the GPU
+	size_t minSSD = 0;
+	if(g_hasShaderInt8)
+	{
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numThreads = 32768;
+		const uint32_t numBlocks = numThreads / threadsPerBlock;
+
+		m_findSSDOutput.resize(numThreads);
+
+		size_t ilen = din->size();
+
+		cmdBuf.begin({});
+
+		//Descramble
+		Descramble(cmdBuf, idle_offset);
+
+		//Look for SSD
+		m_findSSDComputePipeline->BindBufferNonblocking(0, m_descrambledBits, cmdBuf);
+		m_findSSDComputePipeline->BindBufferNonblocking(1, m_findSSDOutput, cmdBuf, true);
+		m_findSSDComputePipeline->Dispatch(cmdBuf, (uint32_t)ilen, numBlocks);
+		m_findSSDOutput.MarkModifiedFromGpu();
+		m_findSSDOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//See if we found one
+		minSSD = 0xffffffff;
+		for(size_t i=0; i<numThreads; i++)
+			minSSD = min((uint32_t)minSSD, m_findSSDOutput[i]);
+		if(minSSD == 0xffffffff)
+		{
+			LogTrace("No SSD found\n");
+			return;
+		}
+	}
+
+	//CPU side descrambling and SSD search
+	else
+	{
+		//Good sync, descramble it now
+		cmdBuf.begin({});
+		Descramble(cmdBuf, idle_offset);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Search until we find a 1100010001 (J-K, start of stream) sequence
+		bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+		size_t i = 0;
+		bool hit = true;
+		size_t des10 = m_descrambledBits.size() - 10;
+		for(i=0; i<des10; i++)
+		{
+			hit = true;
+			for(int j=0; j<10; j++)
+			{
+				bool b = m_descrambledBits[i+j];
+				if(b != ssd[j])
+				{
+					hit = false;
+					break;
+				}
+			}
+
+			if(hit)
+				break;
+		}
+		if(!hit)
+		{
+			LogTrace("No SSD found\n");
+			return;
+		}
+
+		minSSD = i;
+	}
+
+	size_t i = minSSD;
 	LogTrace("Found SSD at %zu\n", i);
+
+	//Wait until all of the timestamps are ready if we're not doing the 4b5b deserialization on the GPU
+	if(! (g_hasShaderInt64 && g_hasShaderInt8) )
+		m_transferQueue->WaitIdle();
 
 	//Skip the J-K as we already parsed it
 	i += 10;
@@ -220,140 +405,365 @@ void Ethernet100BaseTXDecoder::Refresh(
 	vector<uint64_t> starts;
 	vector<uint64_t> ends;
 
-	//Grab 5 bits at a time and decode them
 	bool first = true;
 	uint8_t current_byte = 0;
 	uint64_t current_start = 0;
-	size_t deslen = descrambled_bits.size()-5;
-	for(; i<deslen; i+=5)
+	size_t deslen = m_descrambledBits.size()-5;
+
+	//Decode the 4b5b symbol stream
+	size_t numSymbols = (m_descrambledBits.size() - i) / 5;
+	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
-		unsigned int code =
-			(descrambled_bits[i+0] ? 16 : 0) |
-			(descrambled_bits[i+1] ? 8 : 0) |
-			(descrambled_bits[i+2] ? 4 : 0) |
-			(descrambled_bits[i+3] ? 2 : 0) |
-			(descrambled_bits[i+4] ? 1 : 0);
+		m_4b5bSamples.resize(numSymbols);
+		m_4b5bTimestamps.resize(numSymbols);
 
-		//Handle special stuff
-		if(code == 0x18)
+		cmdBuf.begin({});
+
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numThreads = numSymbols;
+		const uint32_t numBlocks = numThreads / threadsPerBlock;
+
+		//Do initial 5:1 deserialization on the GPU
+		Ethernet100BaseTX4b5bConstants cfg;
+		cfg.len = numSymbols;
+		cfg.startOffset = i;
+
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(0, m_descrambledBits, cmdBuf);
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(1, din->m_offsets, cmdBuf);
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(2, m_4b5bSamples, cmdBuf, true);
+		m_4b5bDecodeComputePipeline->BindBufferNonblocking(3, m_4b5bTimestamps, cmdBuf, true);
+		m_4b5bDecodeComputePipeline->Dispatch(cmdBuf, cfg,
+			1,
+			min(numBlocks, 32768u),
+			numBlocks / 32768 + 1);
+
+		m_4b5bSamples.MarkModifiedFromGpu();
+		m_4b5bTimestamps.MarkModifiedFromGpu();
+		m_4b5bSamples.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_4b5bTimestamps.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Grab one symbol at a time and decode them
+		for(size_t j=0; j<numSymbols; j++)
 		{
-			//This is a /J/. Next code should be 0x11, /K/ - start of frame.
-			//Don't check it for now, just jump ahead 5 bits and get ready to read data
-			i += 5;
-			continue;
+			unsigned int code = m_4b5bSamples[j];
+
+			//Handle special stuff
+			if(code == 0x18)
+			{
+				//This is a /J/. Next code should be 0x11, /K/ - start of frame.
+				//Don't check it for now, just jump ahead 5 bits and get ready to read data
+				i += 5;
+				continue;
+			}
+			else if(code == 0x04)
+			{
+				LogTrace("Found TX error at %zu\n", i);
+
+				//TX error
+				EthernetFrameSegment segment;
+				segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
+				cap->m_offsets.push_back(current_start * cap->m_timescale);
+				uint64_t end = m_4b5bTimestamps[j + 1];
+				cap->m_durations.push_back((end - current_start) * cap->m_timescale);
+				cap->m_samples.push_back(segment);
+
+				//reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+			else if(code == 0x0d)
+			{
+				//This is a /T/. Next code should be 0x07, /R/ - end of frame.
+				//Crunch this frame
+				BytesToFrames(bytes, starts, ends, cap);
+
+				//Skip the /R/
+				i += 5;
+
+				//and reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+
+			//TODO: process /H/ - 0x04 (error in the middle of a packet)
+
+			//Ignore idles
+			else if(code == 0x1f)
+				continue;
+
+			//Nope, normal nibble.
+			unsigned int decoded = code_5to4[code];
+			if(first)
+			{
+				current_start = m_4b5bTimestamps[j];
+				current_byte = decoded;
+			}
+			else
+			{
+				current_byte |= decoded << 4;
+
+				bytes.push_back(current_byte);
+				starts.push_back(current_start * cap->m_timescale);
+				uint64_t end = m_4b5bTimestamps[j + 1];
+				ends.push_back(end * cap->m_timescale);
+			}
+
+			first = !first;
 		}
-		else if(code == 0x04)
+	}
+
+	else
+	{
+		//Grab 5 bits at a time and decode them
+		for(; i<deslen; i+=5)
 		{
-			LogTrace("Found TX error at %zu\n", i);
+			unsigned int code =
+				(m_descrambledBits[i+0] ? 16 : 0) |
+				(m_descrambledBits[i+1] ? 8 : 0) |
+				(m_descrambledBits[i+2] ? 4 : 0) |
+				(m_descrambledBits[i+3] ? 2 : 0) |
+				(m_descrambledBits[i+4] ? 1 : 0);
 
-			//TX error
-			EthernetFrameSegment segment;
-			segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
-			cap->m_offsets.push_back(current_start * cap->m_timescale);
-			uint64_t end = samples.m_offsets[idle_offset + i + 4] + samples.m_durations[idle_offset + i + 4];
-			cap->m_durations.push_back((end - current_start) * cap->m_timescale);
-			cap->m_samples.push_back(segment);
+			//Handle special stuff
+			if(code == 0x18)
+			{
+				//This is a /J/. Next code should be 0x11, /K/ - start of frame.
+				//Don't check it for now, just jump ahead 5 bits and get ready to read data
+				i += 5;
+				continue;
+			}
+			else if(code == 0x04)
+			{
+				LogTrace("Found TX error at %zu\n", i);
 
-			//reset for the next one
-			starts.clear();
-			ends.clear();
-			bytes.clear();
-			continue;
+				//TX error
+				EthernetFrameSegment segment;
+				segment.m_type = EthernetFrameSegment::TYPE_TX_ERROR;
+				cap->m_offsets.push_back(current_start * cap->m_timescale);
+				uint64_t end = din->m_offsets[idle_offset + i + 5];
+				cap->m_durations.push_back((end - current_start) * cap->m_timescale);
+				cap->m_samples.push_back(segment);
+
+				//reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+			else if(code == 0x0d)
+			{
+				//This is a /T/. Next code should be 0x07, /R/ - end of frame.
+				//Crunch this frame
+				BytesToFrames(bytes, starts, ends, cap);
+
+				//Skip the /R/
+				i += 5;
+
+				//and reset for the next one
+				starts.clear();
+				ends.clear();
+				bytes.clear();
+				continue;
+			}
+
+			//TODO: process /H/ - 0x04 (error in the middle of a packet)
+
+			//Ignore idles
+			else if(code == 0x1f)
+				continue;
+
+			//Nope, normal nibble.
+			unsigned int decoded = code_5to4[code];
+			if(first)
+			{
+				current_start = din->m_offsets[idle_offset + i];
+				current_byte = decoded;
+			}
+			else
+			{
+				current_byte |= decoded << 4;
+
+				bytes.push_back(current_byte);
+				starts.push_back(current_start * cap->m_timescale);
+				uint64_t end = din->m_offsets[idle_offset + i + 5];
+				ends.push_back(end * cap->m_timescale);
+			}
+
+			first = !first;
 		}
-		else if(code == 0x0d)
-		{
-			//This is a /T/. Next code should be 0x07, /R/ - end of frame.
-			//Crunch this frame
-			BytesToFrames(bytes, starts, ends, cap);
-
-			//Skip the /R/
-			i += 5;
-
-			//and reset for the next one
-			starts.clear();
-			ends.clear();
-			bytes.clear();
-			continue;
-		}
-
-		//TODO: process /H/ - 0x04 (error in the middle of a packet)
-
-		//Ignore idles
-		else if(code == 0x1f)
-			continue;
-
-		//Nope, normal nibble.
-		unsigned int decoded = code_5to4[code];
-		if(first)
-		{
-			current_start = samples.m_offsets[idle_offset + i];
-			current_byte = decoded;
-		}
-		else
-		{
-			current_byte |= decoded << 4;
-
-			bytes.push_back(current_byte);
-			starts.push_back(current_start * cap->m_timescale);
-			uint64_t end = samples.m_offsets[idle_offset + i + 4] + samples.m_durations[idle_offset + i + 4];
-			ends.push_back(end * cap->m_timescale);
-		}
-
-		first = !first;
 	}
 
 	cap->MarkModifiedFromCpu();
 }
 
-bool Ethernet100BaseTXDecoder::TrySync(
-	vector<uint8_t>& bits,
-	vector<uint8_t>& descrambled_bits,
-	size_t idle_offset,
-	size_t stop)
+void Ethernet100BaseTXDecoder::DecodeStates(
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue,
+	SparseAnalogWaveform* samples)
 {
-	if( (idle_offset + 64) >= bits.size())
-		return false;
+	size_t ilen = samples->size();
 
-	//For now, assume the link is idle at the time we triggered
-	unsigned int lfsr =
-		( (!bits[idle_offset + 0]) << 10 ) |
-		( (!bits[idle_offset + 1]) << 9 ) |
-		( (!bits[idle_offset + 2]) << 8 ) |
-		( (!bits[idle_offset + 3]) << 7 ) |
-		( (!bits[idle_offset + 4]) << 6 ) |
-		( (!bits[idle_offset + 5]) << 5 ) |
-		( (!bits[idle_offset + 6]) << 4 ) |
-		( (!bits[idle_offset + 7]) << 3 ) |
-		( (!bits[idle_offset + 8]) << 2 ) |
-		( (!bits[idle_offset + 9]) << 1 ) |
-		( (!bits[idle_offset + 10]) << 0 );
+	samples->PrepareForCpuAccess();
 
-	//Descramble
-	stop = min(stop, bits.size());
-	size_t start = idle_offset + 11;
-	size_t len = stop - start;
-	descrambled_bits.resize(len);
-	size_t window = 64 + idle_offset + 11;
-	size_t iout = 0;
-	for(size_t i=start; i < stop; i++)
+	//TODO: some kind of sanity checking that voltage is changing in the right direction
+	int oldstate = GetState(samples->m_samples[0]);
+	m_phyBits.PrepareForCpuAccess();
+	m_phyBits.resize(ilen-1);
+	for(size_t i=1; i<ilen; i++)
 	{
-		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-		bool b = bits[i] ^ (lfsr & 1);
-		descrambled_bits[iout] = b;
-		iout ++;
+		int nstate = GetState(samples->m_samples[i]);
 
-		if(iout == window)
-		{
-			//We should have at least 64 "1" bits in a row once the descrambling is done.
-			//The minimum inter-frame gap is a lot bigger than this.
-			for(int j=0; j<64; j++)
-			{
-				if(descrambled_bits[j + idle_offset + 11] != 1)
-					return false;
-			}
-		}
+		//No transition? Add a "0" bit
+		if(nstate == oldstate)
+			m_phyBits[i-1] = false;
+
+		//Transition? Add a "1" bit
+		else
+			m_phyBits[i-1] = true;
+
+		oldstate = nstate;
 	}
 
-	//All good if we get to here
+	m_phyBits.MarkModifiedFromCpu();
+
+	//Grab the bits onto the CPU for future descrambling
+	cmdBuf.begin({});
+	m_phyBits.PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+}
+
+/**
+	@brief Try descrambling the first 64 bits at the requested offset and see if it makes sene
+ */
+bool Ethernet100BaseTXDecoder::TrySync(size_t idle_offset)
+{
+	//Bounds check
+	const size_t searchWindow = 64;
+	if( (idle_offset + searchWindow) >= m_phyBits.size())
+		return false;
+
+	//Assume the link is idle at the time we triggered, then see if we got it right
+	unsigned int lfsr =
+		( (!m_phyBits[idle_offset + 0]) << 10 ) |
+		( (!m_phyBits[idle_offset + 1]) << 9 ) |
+		( (!m_phyBits[idle_offset + 2]) << 8 ) |
+		( (!m_phyBits[idle_offset + 3]) << 7 ) |
+		( (!m_phyBits[idle_offset + 4]) << 6 ) |
+		( (!m_phyBits[idle_offset + 5]) << 5 ) |
+		( (!m_phyBits[idle_offset + 6]) << 4 ) |
+		( (!m_phyBits[idle_offset + 7]) << 3 ) |
+		( (!m_phyBits[idle_offset + 8]) << 2 ) |
+		( (!m_phyBits[idle_offset + 9]) << 1 ) |
+		( (!m_phyBits[idle_offset + 10]) << 0 );
+
+	//We should have at least 64 "1" bits in a row once the descrambling is done.
+	//The minimum inter-frame gap is a lot bigger than this.
+	size_t start = idle_offset + 11;
+	size_t stop = start + searchWindow;;
+	for(size_t i=start; i < stop; i++)
+	{
+		bool c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
+		lfsr = (lfsr << 1) ^ c;
+
+		//If it's not a 1 bit (idle character is all 1s), no go
+		if( (m_phyBits[i] ^ c) != 1)
+			return false;
+	}
+
+	//all good if we get here
 	return true;
+}
+
+/**
+	@brief Actually run the descrambler
+ */
+void Ethernet100BaseTXDecoder::Descramble(vk::raii::CommandBuffer& cmdBuf, size_t idle_offset)
+{
+	//Bounds check
+	if( (idle_offset + 64) >= m_phyBits.size())
+		return;
+
+	size_t stop = m_phyBits.size();
+	size_t start = idle_offset + 11;
+	size_t len = stop - start;
+	m_descrambledBits.resize(len);
+
+	//GPU accelerated path
+	if(g_hasShaderInt8)
+	{
+		const uint32_t numThreads = 4096;
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numBlocks = numThreads / threadsPerBlock;
+
+		//If this is the first time, initialize the constant table
+		if(m_lfsrTable.empty())
+		{
+			const uint32_t cols = 11;
+			const uint32_t rows = 30;
+			m_lfsrTable.resize(rows * cols);
+			m_lfsrTable.PrepareForCpuAccess();
+			for(uint32_t row=0; row<rows; row++)
+			{
+				for(uint32_t col=0; col<cols; col++)
+					m_lfsrTable[row*cols + col] = g_lfsrTable[row][col];
+			}
+			m_lfsrTable.MarkModifiedFromCpu();
+		}
+
+		Ethernet100BaseTXDescramblerConstants cfg;
+		cfg.len = m_phyBits.size();
+		cfg.samplesPerThread = (len | (numThreads-1)) / numThreads;
+		cfg.startOffset = start;
+
+		m_descrambleComputePipeline->BindBufferNonblocking(0, m_phyBits, cmdBuf);
+		m_descrambleComputePipeline->BindBufferNonblocking(1, m_lfsrTable, cmdBuf);
+		m_descrambleComputePipeline->BindBufferNonblocking(2, m_descrambledBits, cmdBuf, true);
+		m_descrambleComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
+		m_descrambleComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_descrambledBits.MarkModifiedFromGpu();
+
+		//needed for 4b5b descrambling if we can't do that GPU side
+		if(!g_hasShaderInt64)
+			m_descrambledBits.PrepareForCpuAccessNonblocking(cmdBuf);
+	}
+
+	else
+	{
+		//Do everything CPU side
+		m_descrambledBits.PrepareForCpuAccess();
+		m_descrambledBits.MarkModifiedFromCpu();
+
+		//Initial descrambler state
+		unsigned int lfsr =
+			( (!m_phyBits[idle_offset + 0]) << 10 ) |
+			( (!m_phyBits[idle_offset + 1]) << 9 ) |
+			( (!m_phyBits[idle_offset + 2]) << 8 ) |
+			( (!m_phyBits[idle_offset + 3]) << 7 ) |
+			( (!m_phyBits[idle_offset + 4]) << 6 ) |
+			( (!m_phyBits[idle_offset + 5]) << 5 ) |
+			( (!m_phyBits[idle_offset + 6]) << 4 ) |
+			( (!m_phyBits[idle_offset + 7]) << 3 ) |
+			( (!m_phyBits[idle_offset + 8]) << 2 ) |
+			( (!m_phyBits[idle_offset + 9]) << 1 ) |
+			( (!m_phyBits[idle_offset + 10]) << 0 );
+
+		//Descramble
+		size_t iout = 0;
+		for(size_t i=start; i < stop; i++)
+		{
+			bool c = ( (lfsr >> 8) ^ (lfsr >> 10) ) & 1;
+			lfsr = (lfsr << 1) ^ c;
+			m_descrambledBits[iout] = m_phyBits[i] ^ c;
+			iout ++;
+		}
+	}
 }

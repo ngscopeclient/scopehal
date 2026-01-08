@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,7 +47,9 @@ public:
 	bool operator<(const Peak& rhs) const
 	{ return (m_y < rhs.m_y); }
 
+	//X coordinate is in base units, not scaled by timebase, since we do sub-sample interpolation
 	int64_t m_x;
+
 	float m_y;
 	float m_fwhm;
 };
@@ -126,30 +128,29 @@ public:
 				if(!is_peak)
 					continue;
 
-				//Do a weighted average of our immediate neighbors to fine tune our position
-				ssize_t fine_rad = 10;
-				left = std::max((ssize_t)1, i - fine_rad);
-				right = std::min(i + fine_rad, (ssize_t)nouts-1);
-				//LogDebug("peak range: %zu, %zu\n", left, right);
-				double total = 0;
-				double count = 0;
-				for(ssize_t j=left; j<=right; j++)
-				{
-					total += GetSampleTimesIndex(cap, j);
-					count += cap->m_samples[j];
-				}
-				ssize_t peak_location = round(total / count);
-				//LogDebug("Moved peak from %zu to %zd\n", (size_t)cap->m_offsets[i], peak_location);
+				//Quadratic interpolate peak position
+				//https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
+				float alpha = cap->m_samples[i-1];
+				float beta = cap->m_samples[i];
+				float gamma = cap->m_samples[i+1];
+				float p = 0.5 * (alpha - gamma) / (alpha - 2*beta + gamma);
+				int64_t peak_location =
+					(i * cap->m_timescale) +
+					static_cast<int64_t>(round(p * cap->m_timescale)) +
+					cap->m_triggerPhase;
+
+				//Interpolate peak magnitude
+				float lerpMag = beta - 0.25 * (alpha - gamma) * p;
 
 				//Move left and right from the peak until we get half magnitude
 				//If Y axis is dB, we want to be half *magnitude* not half dB
 				float hmtarget;
 				if(yUnitIsDB)
-					hmtarget = target - 3;
+					hmtarget = lerpMag - 3;
 				else
-					hmtarget = (target - baseline)/2 + baseline;
-				ssize_t hmleft = target;
-				ssize_t hmright = target;
+					hmtarget = (lerpMag - baseline)/2 + baseline;
+				ssize_t hmleft = i;
+				ssize_t hmright = i;
 				for(ssize_t j=i; j >= 0; j--)
 				{
 					//TODO: interpolate
@@ -170,7 +171,7 @@ public:
 				}
 				float fwhm = GetOffsetScaled(cap, hmright) - GetOffsetScaled(cap, hmleft);
 
-				peaks.push_back(Peak(peak_location, target, fwhm));
+				peaks.push_back(Peak(peak_location, lerpMag, fwhm));
 
 				//We know we're the highest point until at least i+search_rad.
 				//Don't bother searching those points.

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -148,10 +148,14 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 
 	m_outbuf.MarkModifiedFromGpu();
 
+	m_gatherIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
+
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
-	//Grab the length off the GPU immediately
-	m_gatherIndexes.PrepareForCpuAccess();
-	return m_gatherIndexes[numThreads];
+	//Grab the length off the GPU immediately then resize the buffer so we can use normal iterators on it
+	//m_gatherIndexes.PrepareForCpuAccess();
+	auto len = m_gatherIndexes[numThreads];
+	m_outbuf.resize(len);
+	return len;
 }

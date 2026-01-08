@@ -71,20 +71,33 @@ string HorizontalBathtub::GetProtocolName()
 	return "Horz Bathtub";
 }
 
+Filter::DataLocation HorizontalBathtub::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void HorizontalBathtub::Refresh()
+void HorizontalBathtub::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("HorizontalBathtub::Refresh");
+	#endif
+
 	if(!VerifyAllInputsOK(true))
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get the input data
 	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
+	cmdBuf.begin({});
+	din->GetAccumBuffer().PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 	float threshold = m_parameters[m_voltageName].GetFloatVal();
 
 	//Find the eye bin for this height

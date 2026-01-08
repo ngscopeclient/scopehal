@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -66,6 +66,17 @@ public:
 	const std::string& GetName() const
 	{ return m_name; }
 
+	/**
+		@brief Wait for all previous submits to complete
+	 */
+	void WaitIdle()
+	{
+		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		_waitFence();
+	}
+
+	bool WaitIdleWithTimeout(uint64_t nanoseconds);
+
 public:
 	//non-copyable
 	QueueHandle(QueueHandle const&) = delete;
@@ -87,6 +98,8 @@ protected:
 	std::shared_ptr<vk::raii::Device> m_device;
 	std::unique_ptr<vk::raii::Queue> m_queue;
 	std::unique_ptr<vk::raii::Fence> m_fence;
+
+	bool m_fenceBusy;
 };
 
 

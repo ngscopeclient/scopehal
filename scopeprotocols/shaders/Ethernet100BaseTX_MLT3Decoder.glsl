@@ -27,112 +27,52 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "PeriodMeasurement.h"
+#version 460
+#pragma shader_stage(compute)
 
-using namespace std;
+#extension GL_EXT_shader_8bit_storage : require
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PeriodMeasurement::PeriodMeasurement(const string& color)
-	: Filter(color, CAT_MEASUREMENT)
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	float din[];
+};
 
-	//Set up channels
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-	if(stream.m_channel == NULL)
-		return false;
+	uint8_t dout[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string PeriodMeasurement::GetProtocolName()
+layout(std430, push_constant) uniform constants
 {
-	return "Period";
-}
+	uint len;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+layout(local_size_x=128, local_size_y=1, local_size_z=1) in;
 
-void PeriodMeasurement::Refresh()
+int GetState(float voltage)
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
-	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
-	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
-	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
-
-	//Auto-threshold analog signals at 50% of full scale range
-	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
-
-	//Just find edges in digital signals
-	else if(uddin)
-		FindZeroCrossings(uddin, edges);
+	if(voltage > 0.5)
+		return 1;
+	else if(voltage < -0.5)
+		return -1;
 	else
-		FindZeroCrossings(sddin, edges);
+		return 0;
+}
 
-	//We need at least one full cycle of the waveform to have a meaningful frequency
-	if(edges.size() < 2)
+void main()
+{
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	for(uint i=gl_GlobalInvocationID.x; i < len; i += numThreads)
 	{
-		SetData(NULL, 0);
-		return;
+		float a = din[i];
+		float b = din[i+1];
+
+		//No transition = logic 0
+		if(GetState(a) == GetState(b) )
+			dout[i] = uint8_t(0);
+
+		//Transition = logic 1
+		else
+			dout[i] = uint8_t(1);
 	}
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-
-	size_t elen = edges.size();
-	for(size_t i=0; i < (elen - 2); i+= 2)
-	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
-
-		int64_t delta = end - start;
-
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(round(delta));
-		cap->m_samples.push_back(delta);
-	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-
-	//For the scalar average output, find the total number of zero crossings and divide by the spacing
-	//(excluding partial cycles at start and end).
-	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
-	double ncycles = elen - 1;
-	double interval = edges[elen-1] - edges[0];
-	m_streams[1].m_value = (2 * interval) / ncycles;
 }

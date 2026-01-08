@@ -68,16 +68,16 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 			make_shared<ComputePipeline>("shaders/FillSquarewaveAndDurations.spv", 3, sizeof(uint32_t));
 	}
 
-	if(g_hasShaderInt64)
+	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
 		m_firstPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FirstPass.spv", 3, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FirstPass.spv", 3, sizeof(ClockRecoveryConstants));
 
 		m_secondPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_SecondPass.spv", 5, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_SecondPass.spv", 5, sizeof(ClockRecoveryConstants));
 
 		m_finalPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FinalPass.spv", 5, sizeof(uint32_t));
+			make_shared<ComputePipeline>("shaders/ClockRecoveryPLL_FinalPass.spv", 9, sizeof(ClockRecoveryConstants));
 
 		//Set up GPU temporary buffers
 		m_firstPassTimestamps.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
@@ -132,6 +132,10 @@ void ClockRecoveryFilter::Refresh(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("ClockRecoveryFilter::Refresh");
+	#endif
+
 	//Require a data signal, but not necessarily a gate
 	if(!VerifyInputOK(0))
 	{
@@ -203,11 +207,17 @@ void ClockRecoveryFilter::Refresh(
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	cap->m_offsets.reserve(edges.size());
 
+	//If no output data yet, set scales
+	if(GetData(1) == nullptr)
+	{
+		SetVoltageRange(GetInput(0).GetVoltageRange(), 1);
+		SetOffset(GetInput(0).GetOffset(), 1);
+	}
+
 	//Create analog output waveform for sampled data
 	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
 	scap->m_triggerPhase = 0;
 	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
-	scap->PrepareForCpuAccess();
 
 	//Get timestamp of the last sample
 	int64_t tend;
@@ -229,10 +239,12 @@ void ClockRecoveryFilter::Refresh(
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
+	bool generatedSquarewaveOnGPU = false;
 	if(gate)
 	{
 		edges.PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
+		scap->PrepareForCpuAccess();
 		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 		cap->m_offsets.MarkModifiedFromCpu();
 	}
@@ -242,11 +254,14 @@ void ClockRecoveryFilter::Refresh(
 		int64_t expectedNumEdges = (tend / initialPeriod);
 
 		//We need a fair number of edges in each thread block for the PLL to lock and not overlap too much
-		if(g_hasShaderInt64 && (expectedNumEdges > 100000) && (m_mtMode.GetIntVal() == MT_GPU) )
+		//For now we assume input is uniformly sampled and fall back if not
+		if(	g_hasShaderInt64 && g_hasShaderInt8 &&
+			(expectedNumEdges > 100000) && (m_mtMode.GetIntVal() == MT_GPU) &&
+			uadin)
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
 			//TODO: do we need to tune numThreads to lock well to short waveforms?
-			const uint64_t numThreads = 2048;
+			const uint64_t numThreads = 4096;
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
 			const uint64_t maxEdges = din->size() / 2;
@@ -264,13 +279,16 @@ void ClockRecoveryFilter::Refresh(
 
 			cmdBuf.begin({});
 
-			//Constants for first pass
+			//Constants shared by all passes
 			ClockRecoveryConstants cfg;
 			cfg.nedges = nedges;
 			cfg.fnyquist = fnyquist;
 			cfg.maxOffsetsPerThread = maxEdges / numThreads;
 			cfg.initialPeriod = initialPeriod;
 			cfg.tend = tend;
+			cfg.timescale = din->m_timescale;
+			cfg.triggerPhase = din->m_triggerPhase;
+			cfg.maxInputSamples = din->size();
 
 			//Run the first pass
 			m_firstPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
@@ -294,29 +312,46 @@ void ClockRecoveryFilter::Refresh(
 			m_secondPassTimestamps.MarkModifiedFromGpu();
 			m_secondPassState.MarkModifiedFromGpu();
 
-			//Run the final pass
+			scap->m_samples.resize(maxEdges);
+
+			//Run the final pass.
+			//This also generates the squarewave output and the sample data
 			m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassState, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(2, m_secondPassTimestamps, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(3, m_secondPassState, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(7, scap->m_samples, cmdBuf);
+			//this assumes input is uniformly sampled for now
+			m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
 			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
-			cap->m_offsets.MarkModifiedFromGpu();
+			m_firstPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_secondPassState.PrepareForCpuAccessNonblocking(cmdBuf);
 
 			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
 
 			//Figure out how many edges we ended up with
 			//TODO: can we avoid this readback?
-			m_firstPassState.PrepareForCpuAccess();
-			m_secondPassState.PrepareForCpuAccess();
 			uint64_t numSamples = m_firstPassState[0];
 			for(uint64_t i=0; i<numThreads; i++)
 				numSamples += m_secondPassState[i*2];
 
-			//Get final edge count
+			//Output was entirely created on the GPU, no need to touch the CPU for that
+			cap->MarkModifiedFromGpu();
+			scap->MarkModifiedFromGpu();
+			generatedSquarewaveOnGPU = true;
+
+			//Resize to final edge count
 			cap->Resize(numSamples);
+			scap->Resize(numSamples);
+
+			//Copy the offsets and durations from the sampled data
+			scap->m_offsets.CopyFrom(cap->m_offsets, false);
+			scap->m_durations.CopyFrom(cap->m_durations, false);
 		}
 
 		else
@@ -329,7 +364,12 @@ void ClockRecoveryFilter::Refresh(
 	}
 
 	//Generate the squarewave and duration values to match the calculated timestamps
-	if(g_hasShaderInt8 && g_hasShaderInt64)
+	if(generatedSquarewaveOnGPU)
+	{
+		//already done because inner loop was in a shader
+	}
+
+	else if(g_hasShaderInt8 && g_hasShaderInt64)
 	{
 		//Allocate output buffers as needed
 		size_t len = cap->m_offsets.size();
@@ -357,7 +397,6 @@ void ClockRecoveryFilter::Refresh(
 		cap->MarkModifiedFromGpu();
 	}
 
-	//TODO: GPU this?
 	//Important to FillDurations() after FillSquarewave() since FillDurations() expects to use sample size
 	#ifdef __x86_64__
 	else if(g_hasAvx2)
@@ -378,8 +417,15 @@ void ClockRecoveryFilter::Refresh(
 		cap->MarkModifiedFromCpu();
 	}
 
-	//TODO do stuff here
-	scap->MarkModifiedFromCpu();
+	//Generate sampled analog output if not already done GPU side
+	if(!generatedSquarewaveOnGPU)
+	{
+		//TODO: GPU this where possible and don't do a separate sampling pass
+		if(uadin)
+			SampleOnAnyEdges(uadin, cap, *scap, false);
+		else if(sadin)
+			SampleOnAnyEdges(sadin, cap, *scap, false);
+	}
 }
 
 /**

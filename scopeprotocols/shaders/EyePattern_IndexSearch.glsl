@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,112 +27,82 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "PeriodMeasurement.h"
+#version 430
+#pragma shader_stage(compute)
+#extension GL_ARB_gpu_shader_int64 : require
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PeriodMeasurement::PeriodMeasurement(const string& color)
-	: Filter(color, CAT_MEASUREMENT)
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	int64_t din[];
+};
 
-	//Set up channels
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict writeonly buffer buf_results
 {
-	if(stream.m_channel == NULL)
-		return false;
+	uint results[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string PeriodMeasurement::GetProtocolName()
+layout(std430, push_constant) uniform constants
 {
-	return "Period";
-}
+	int64_t	timescale;
+	int64_t	triggerPhase;
+	uint	len;
+	uint	numSamplesPerThread;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-void PeriodMeasurement::Refresh()
+void main()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	//Get timestamp of the first sample in this thread's block
+	int64_t target = int64_t(gl_GlobalInvocationID.x * numSamplesPerThread) * timescale + triggerPhase;
+
+	//Binary search for the first clock edge after this sample
+	uint pos = len/2;
+	uint last_lo = 0;
+	uint last_hi = len-1;
+	uint iclk = 0;
+	if(len > 0)
 	{
-		SetData(NULL, 0);
-		return;
+		//Clip if out of range
+		if(din[0] >= target)
+			iclk = 0;
+		else if(din[last_hi] < target)
+			iclk = len-1;
+
+		//Main loop
+		else
+		{
+			while(true)
+			{
+				//Stop if we've bracketed the target
+				if( (last_hi - last_lo) <= 1)
+				{
+					iclk = last_lo;
+					break;
+				}
+
+				//Move down
+				if(din[pos] > target)
+				{
+					uint delta = pos - last_lo;
+					last_hi = pos;
+					pos = last_lo + delta/2;
+				}
+
+				//Move up
+				else
+				{
+					uint delta = last_hi - pos;
+					last_lo = pos;
+					pos = last_hi - delta/2;
+				}
+			}
+		}
 	}
 
-	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
-	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
-	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
-	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
+	//We actually want the clock edge before this one, so decrement it
+	if(iclk > 0)
+		iclk --;
 
-	//Auto-threshold analog signals at 50% of full scale range
-	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
-
-	//Just find edges in digital signals
-	else if(uddin)
-		FindZeroCrossings(uddin, edges);
-	else
-		FindZeroCrossings(sddin, edges);
-
-	//We need at least one full cycle of the waveform to have a meaningful frequency
-	if(edges.size() < 2)
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-
-	size_t elen = edges.size();
-	for(size_t i=0; i < (elen - 2); i+= 2)
-	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
-
-		int64_t delta = end - start;
-
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(round(delta));
-		cap->m_samples.push_back(delta);
-	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-
-	//For the scalar average output, find the total number of zero crossings and divide by the spacing
-	//(excluding partial cycles at start and end).
-	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
-	double ncycles = elen - 1;
-	double interval = edges[elen-1] - edges[0];
-	m_streams[1].m_value = (2 * interval) / ncycles;
+	results[gl_GlobalInvocationID.x] = iclk;
 }

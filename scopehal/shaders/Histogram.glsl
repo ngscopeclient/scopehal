@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeexports                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,101 +27,57 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of CSVExportWizard
- */
+#version 460
+#pragma shader_stage(compute)
 
-#ifndef CSVExportWizard_h
-#define CSVExportWizard_h
+#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_shader_atomic_int64 : require
 
-/**
-	@brief Select reference channel
- */
-class CSVExportReferenceChannelSelectionPage
+layout(std430, binding=0) restrict readonly buffer buf_pin
 {
-public:
-	CSVExportReferenceChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels);
-
-	Gtk::Grid m_grid;
-		Gtk::Label m_captionLabel;
-		Gtk::Label m_referenceLabel;
-		Gtk::ComboBoxText m_referenceBox;
-
-	StreamDescriptor GetActiveChannel() const
-	{ return m_streams[m_referenceBox.get_active_row_number()]; }
-
-	const std::vector<StreamDescriptor>& GetStreams() const
-	{ return m_streams; }
-
-protected:
-	std::vector<StreamDescriptor> m_streams;
+	float pin[];
 };
 
-/**
-	@brief Select other channels
- */
-class CSVExportOtherChannelSelectionPage
+layout(std430, binding=1) restrict buffer buf_pout
 {
-public:
-	CSVExportOtherChannelSelectionPage(const CSVExportReferenceChannelSelectionPage& ref);
-
-	Gtk::Grid m_grid;
-		Gtk::Frame m_selectedFrame;
-			Gtk::ListViewText m_selectedChannels;
-		Gtk::Frame m_availableFrame;
-			Gtk::ListViewText m_availableChannels;
-
-		Gtk::Button m_removeButton;
-		Gtk::Button m_addButton;
-
-	void UpdateChannelList();
-
-	std::map<std::string, StreamDescriptor> m_targets;
-
-protected:
-	const CSVExportReferenceChannelSelectionPage& m_ref;
-
-	void OnAddChannel();
-	void OnRemoveChannel();
+	uint64_t pout[];
 };
 
-/**
-	@brief Final configuration and output path
- */
-class CSVExportFinalPage
+layout(std430, push_constant) uniform constants
 {
-public:
-	CSVExportFinalPage();
-	virtual ~CSVExportFinalPage();
-
-	Gtk::Grid m_grid;
-		Gtk::FileChooserWidget m_chooser;
-
-protected:
+	uint	size;
+	uint	bins;
+	float	nmin;
+	float	nmax;
 };
 
-/**
-	@brief CSV exporter
- */
-class CSVExportWizard : public ExportWizard
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	CSVExportWizard(const std::vector<OscilloscopeChannel*>& channels);
-	virtual ~CSVExportWizard();
+	//Divide work up into blocks
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint nthread = gl_GlobalInvocationID.x;
+	uint samplesPerThread = size / numThreads;
 
-	static std::string GetExportName();
+	//Find our thread's block
+	uint istart = nthread * samplesPerThread;
+	uint iend = istart + samplesPerThread;
+	if(nthread == numThreads - 1)
+		iend = size;
 
-	EXPORT_WIZARD_INITPROC(CSVExportWizard)
+	float delta = nmax - nmin;
+	float fbins = float(bins);
+	for(uint i=istart+1; i < iend; i ++)
+	{
+		float fbin = (pin[i] - nmin) / delta;
 
-protected:
-	virtual void on_prepare(Gtk::Widget* page);
-	virtual void on_apply();
+		uint bin = uint(floor(fbin * fbins));
+		if(fbin < 0)
+			bin = 0;
+		else
+			bin = min(bin, bins - 1);
 
-	CSVExportReferenceChannelSelectionPage m_referenceSelectionPage;
-	CSVExportOtherChannelSelectionPage m_otherChannelSelectionPage;
-	CSVExportFinalPage m_finalPage;
-};
-
-#endif
+		atomicAdd(pout[bin], 1);
+	}
+}

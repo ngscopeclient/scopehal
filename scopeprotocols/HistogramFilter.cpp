@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,11 +36,12 @@ using namespace std;
 // Construction / destruction
 
 HistogramFilter::HistogramFilter(const string& color)
-	: Filter(color, CAT_MATH),
-	  m_autorangeName("Autorange?"),
-	  m_minName("Min Value"),
-	  m_maxName("Max Value"),
-	  m_binSizeName("Bin Size")
+	: Filter(color, CAT_MATH)
+	, m_autorangeName("Autorange?")
+	, m_minName("Min Value")
+	, m_maxName("Max Value")
+	, m_binSizeName("Bin Size")
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_COUNTS_SCI), "data", Stream::STREAM_TYPE_ANALOG);
 
@@ -68,6 +69,14 @@ HistogramFilter::HistogramFilter(const string& color)
 	m_range = 1;
 
 	ClearSweeps();
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +111,12 @@ string HistogramFilter::GetProtocolName()
 	return "Histogram";
 }
 
+Filter::DataLocation HistogramFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 float HistogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
@@ -133,8 +148,12 @@ void HistogramFilter::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-void HistogramFilter::Refresh()
+void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nvrange("HistogramFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
@@ -143,7 +162,6 @@ void HistogramFilter::Refresh()
 	}
 
 	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
@@ -161,9 +179,13 @@ void HistogramFilter::Refresh()
 	m_parameters[m_maxName].SetUnit(xunit);
 	m_parameters[m_binSizeName].SetUnit(m_xAxisUnit);
 
-	//Calculate min/max of the input data
-	float nmin = GetMinVoltage(sdin, udin);
-	float nmax = GetMaxVoltage(sdin, udin);
+	//GPU side min/max
+	float nmin;
+	float nmax;
+	if(sdin)
+		GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, sdin, nmin, nmax);
+	else
+		GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, udin, nmin, nmax);
 	LogTrace("nmin = %s, nmax = %s\n", xunit.PrettyPrint(nmin).c_str(), xunit.PrettyPrint(nmax).c_str());
 
 	//Calculate bin count
@@ -232,21 +254,14 @@ void HistogramFilter::Refresh()
 	}
 	LogTrace("Final configuration: %zu bins of %s\n", bins, xunit.PrettyPrint(binsize).c_str());
 
-	//Calculate histogram for our incoming data
-	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
-
-	//Reallocate the histogram if we changed it
+	//Reallocate the histogram if we changed configuration
 	if(reallocate)
 	{
 		//Reallocate our waveform
-		cap = new UniformAnalogWaveform;
+		cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 		cap->m_timescale = binsize;
-		cap->m_startTimestamp = din->m_startTimestamp;
-		cap->m_startFemtoseconds = din->m_startFemtoseconds;
 		cap->m_triggerPhase = m_min * scale;
 		cap->m_flags = 0; // Updated at end
-		SetData(cap, 0);
-
 		cap->Resize(bins);
 		cap->PrepareForCpuAccess();
 
@@ -255,12 +270,44 @@ void HistogramFilter::Refresh()
 			m_histogram.push_back(0);
 	}
 
-	//Update histogram
+	//Calculate histogram for our incoming data
 	size_t vmax = 0;
-	for(size_t i=0; i<bins; i++)
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
-		m_histogram[i] += data[i];
-		vmax = max(vmax, m_histogram[i]);
+		//GPU side histogram calculation
+		if(sdin)
+			MakeHistogram(cmdBuf, queue, *m_histogramPipeline, sdin, m_histogramBuf, m_min, m_max, bins);
+		else
+			MakeHistogram(cmdBuf, queue, *m_histogramPipeline, udin, m_histogramBuf, m_min, m_max, bins);
+
+		m_histogramBuf.PrepareForCpuAccess();
+
+		//Update histogram
+		for(size_t i=0; i<bins; i++)
+		{
+			m_histogram[i] += m_histogramBuf[i];
+			vmax = max(vmax, m_histogram[i]);
+		}
+	}
+	else
+	{
+		//CPU side fallback
+		cmdBuf.begin({});
+		if(sdin)
+			sdin->m_samples.PrepareForCpuAccessNonblocking(cmdBuf);
+		else
+			udin->m_samples.PrepareForCpuAccessNonblocking(cmdBuf);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
+
+		//Update histogram
+		for(size_t i=0; i<bins; i++)
+		{
+			m_histogram[i] += data[i];
+			vmax = max(vmax, m_histogram[i]);
+		}
 	}
 
 	//Generate output
