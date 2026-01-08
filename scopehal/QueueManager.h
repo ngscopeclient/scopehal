@@ -98,6 +98,8 @@ protected:
 	std::shared_ptr<vk::raii::Device> m_device;
 	std::unique_ptr<vk::raii::Queue> m_queue;
 	std::unique_ptr<vk::raii::Fence> m_fence;
+
+	bool m_fenceBusy;
 };
 
 

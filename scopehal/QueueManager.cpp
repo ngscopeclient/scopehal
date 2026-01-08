@@ -45,15 +45,25 @@ extern bool g_hasDebugUtils;
 
 
 QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, string name)
-: m_family(family)
-, m_index(index)
-, m_mutex()
-, m_name()
-, m_device(device)
-, m_queue(make_unique<vk::raii::Queue>(*device, family, index))
-, m_fence(nullptr)
+	: m_family(family)
+	, m_index(index)
+	, m_mutex()
+	, m_name()
+	, m_device(device)
+	, m_queue(make_unique<vk::raii::Queue>(*device, family, index))
+	, m_fence(make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo()))
+	, m_fenceBusy(false)
 {
 	AddName(name);
+
+	if(g_hasDebugUtils)
+	{
+		m_device->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eFence,
+				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
+				m_name.c_str()));
+	}
 }
 
 QueueHandle::~QueueHandle()
@@ -88,16 +98,9 @@ void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 
 	_waitFence();
 
+	m_fenceBusy = true;
+
 	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_fence = make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo());
-	if(g_hasDebugUtils)
-	{
-		m_device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eFence,
-				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
-				m_name.c_str()));
-	}
 	m_queue->submit(info, **m_fence);
 }
 
@@ -107,16 +110,9 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 
 	_waitFence();
 
+	m_fenceBusy = true;
+
 	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_fence = make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo());
-	if(g_hasDebugUtils)
-	{
-		m_device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eFence,
-				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
-				m_name.c_str()));
-	}
 	m_queue->submit(info, **m_fence);
 	_waitFence();
 }
@@ -128,8 +124,8 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
  */
 bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
 {
-	//No fence? Already idle
-	if(!m_fence)
+	//Not busy? Return immediately
+	if(!m_fenceBusy)
 		return true;
 
 	//Wait exactly once for the submit, time out if not finished
@@ -137,20 +133,23 @@ bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
 		return false;
 
 	//If we get here, the most recent wait was the one that finished
-	m_fence = nullptr;
+	m_fenceBusy = false;
+	m_device->resetFences(**m_fence);
 	return true;
 }
 
 void QueueHandle::_waitFence()
 {
-	if(!m_fence)
+	//Not busy? Return immediately
+	if(!m_fenceBusy)
 		return;
 
 	//Wait for any previous submit to finish
 	while(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
 	{}
 
-	m_fence = nullptr;
+	m_fenceBusy = false;
+	m_device->resetFences(**m_fence);
 }
 
 
