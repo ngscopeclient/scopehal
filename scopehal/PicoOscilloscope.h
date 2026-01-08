@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,6 +64,7 @@ public:
 	virtual double GetChannelAttenuation(size_t i) override;
 	virtual void SetChannelAttenuation(size_t i, double atten) override;
 	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual bool CanEnableChannel(size_t i) override;
@@ -138,23 +139,50 @@ public:
 	virtual float GetDigitalThreshold(size_t channel) override;
 	virtual void SetDigitalHysteresis(size_t channel, float level) override;
 	virtual void SetDigitalThreshold(size_t channel, float level) override;
-
-	enum Series
+/*
+	enum Series //TODO
 	{
+		SERIES_2205MSO,
+		SERIES_2205AMSO,
+		SERIES_2x0x,
+		SERIES_2x0xA,
+		SERIES_2x0xB,
+		SERIES_2x0xBMSO,
 		SERIES_3x0xD,   //3000 series (first x=2 or 4 Chan, 2nd x is BW)
 		SERIES_3x0xDMSO,//3000 series+16bits MSO(first x=2 or 4 Chan, 2nd x is BW)
+		SERIES_3x1xE,
+		SERIES_3x1xEMSO,
+		SERIES_4xx4,
+		SERIES_4xx4A,
+		SERIES_5x4xA,
+		SERIES_5x4xB,
+		SERIES_5x4xD,
+		SERIES_5x4xDMSO,
 		SERIES_6403E,	//Lowest end 6000E model has less ADCs
 		SERIES_6x0xE,	//6000 series with 8 bit resolution only
 		SERIES_6x2xE,	//6000 series with FlexRes
 
 		SERIES_UNKNOWN	//unknown or invalid model name
 	};
-
-	enum ADCMode
+	*/
+	
+	enum Series //TODO
 	{
-		ADC_MODE_8BIT	= 0,
-		ADC_MODE_10BIT	= 1,
-		ADC_MODE_12BIT	= 2
+		SERIES_2000A,
+		SERIES_2000AMSO,
+		SERIES_3000D,   //3000 series (first x=2 or 4 Chan, 2nd x is BW)
+		SERIES_3000DMSO,//3000 series+16bits MSO(first x=2 or 4 Chan, 2nd x is BW)
+		SERIES_3000E,
+		SERIES_3000EMSO,
+		SERIES_4000A,
+		SERIES_5000A,
+		SERIES_5000B,
+		SERIES_5000D,
+		SERIES_5000DMSO,
+		SERIES_6x0xE,	//6000 series with 8 bit resolution only
+		SERIES_6x2xE,	//6000 series with FlexRes
+
+		SERIES_UNKNOWN	//unknown or invalid model name
 	};
 
 	bool IsDigitalPodPresent(size_t npod);
@@ -171,6 +199,9 @@ protected:
 	//Helpers for determining legal configurations
 	bool Is10BitModeAvailable();
 	bool Is12BitModeAvailable();
+	bool Is14BitModeAvailable();
+	bool Is15BitModeAvailable();
+	bool Is16BitModeAvailable();
 	size_t GetEnabledAnalogChannelCount();
 	size_t GetEnabledDigitalPodCount();
 
@@ -192,6 +223,16 @@ protected:
 	bool CanEnableChannel6000Series8Bit(size_t i);
 	bool CanEnableChannel6000Series10Bit(size_t i);
 	bool CanEnableChannel6000Series12Bit(size_t i);
+	bool CanEnableChannel5000Series8Bit(size_t i);
+	bool CanEnableChannel5000Series12Bit(size_t i);
+	bool CanEnableChannel5000Series14Bit(size_t i);
+	bool CanEnableChannel5000Series15Bit(size_t i);
+	bool CanEnableChannel5000Series16Bit(size_t i);
+	bool CanEnableChannel4000Series12Bit(size_t i);
+	bool CanEnableChannel4000Series14Bit(size_t i);
+	bool CanEnableChannel3000Series8Bit(size_t i);
+	bool CanEnableChannel3000Series10Bit(size_t i);
+	bool CanEnableChannel2000Series8Bit(size_t i);
 
 	std::string GetChannelColor(size_t i);
 
@@ -206,7 +247,6 @@ protected:
 	//Most Pico API calls are write only, so we have to maintain all state clientside.
 	//This isn't strictly a cache anymore since it's never flushed!
 	std::map<size_t, double> m_channelAttenuations;
-	ADCMode m_adcMode;
 	std::map<int, bool> m_digitalBankPresent;
 	std::map<int, float> m_digitalThresholds;
 	std::map<int, float> m_digitalHysteresis;
@@ -219,6 +259,17 @@ protected:
 	float m_awgFrequency;
 	FunctionGenerator::WaveShape m_awgShape;
 	FunctionGenerator::OutputImpedance m_awgImpedance;
+	uint32_t m_awgBufferSize;
+
+	//Scope features
+	int m_adcBits;
+	int m_picoSeries;
+	bool m_picoHas50ohm;
+	bool m_picoHasAwg;
+	bool m_picoHasExttrig;
+	bool m_picoHasBwlimiter;
+	std::vector<int> m_adcModes;
+	std::vector<unsigned int> m_BandwidthLimits;
 
 	Series m_series;
 
