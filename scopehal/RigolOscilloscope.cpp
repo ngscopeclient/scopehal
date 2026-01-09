@@ -2204,7 +2204,7 @@ bool RigolOscilloscope::AcquireData()
 		}
 
 		auto ts_channel_download_end = chrono::steady_clock::now();
-		LogTrace("Channel %s download took %ld ms\n", GetChannel(channelIdx)->GetDisplayName().c_str(), chrono::duration_cast<chrono::milliseconds>(ts_channel_download_end - ts_channel_download_start).count());
+		LogTrace("Channel %s download took %" PRIi64 " ms\n", GetChannel(channelIdx)->GetDisplayName().c_str(), int64_t(chrono::duration_cast<chrono::milliseconds>(ts_channel_download_end - ts_channel_download_start).count()));
 
 		// Notify about end of download for this channel
 		ChannelsDownloadStatusUpdate(channelIdx, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
@@ -2436,7 +2436,7 @@ bool RigolOscilloscope::AcquireData()
 		}
 
 		auto ts_bank_download_end = chrono::steady_clock::now();
-		LogTrace("Digital bank %zd download took %ld ms\n", bankIdx, chrono::duration_cast<chrono::milliseconds>(ts_bank_download_end - ts_bank_download_start).count());
+		LogTrace("Digital bank %zd download took %" PRIi64 " ms\n", bankIdx, int64_t(chrono::duration_cast<chrono::milliseconds>(ts_bank_download_end - ts_bank_download_start).count()));
 
 		// download finished
 		for (auto& channel : bankChannels)
@@ -2460,7 +2460,7 @@ bool RigolOscilloscope::AcquireData()
 	}
 
 	auto ts_download_end = chrono::steady_clock::now();
-	LogTrace("Whole download took %ld ms\n", chrono::duration_cast<chrono::milliseconds>(ts_download_end - ts_download_start).count());
+	LogTrace("Whole download took %" PRIi64 " ms\n", int64_t(chrono::duration_cast<chrono::milliseconds>(ts_download_end - ts_download_start).count()));
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	{
@@ -3205,7 +3205,7 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 		case Series::MSO5000:
 		{
 			//TODO: consoder defining available time scales and do lookup of closes one (equal or lower) then we get from formula
-			LogTrace("setting target samplerate %lu\n", rate);
+			LogTrace("setting target samplerate %" PRIu64 "\n", rate);
 			switch (rate)
 			{
 				// 4 Gpss result in 25 us, but the scope's native step is 20 us, anything above results in 
