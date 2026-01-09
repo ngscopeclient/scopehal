@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -154,6 +154,10 @@ void CSVImportFilter::OnFileNameChanged()
 			}
 		}
 		pbuf += slen;
+
+		//Skip blank lines (we hit this in files with \r\n line endings)
+		if(slen <= 1)
+			continue;
 
 		//If the line starts with a #, it's a comment. Discard it, but save timestamp metadata if present
 		if(pline[0] == '#')
