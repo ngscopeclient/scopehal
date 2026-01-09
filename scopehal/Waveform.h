@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -217,6 +217,13 @@ public:
 		This ensures the GPU-side copy of the data is coherent with the most recently modified (CPU or GPU side) copy.
 	 */
 	virtual void PrepareForGpuAccess() =0;
+
+	/**
+		@brief Indicates that this waveform is going to be used by the CPU in the near future.
+
+		This ensures the GPU-side copy of the data is coherent with the most recently modified (CPU or GPU side) copy.
+	 */
+	virtual void PrepareForGpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) =0;
 
 	/**
 		@brief Indicates that this waveform's sample data has been modified on the CPU and the GPU-side copy is no longer coherent
@@ -451,6 +458,9 @@ public:
 	virtual void PrepareForGpuAccess() override
 	{ m_samples.PrepareForGpuAccess(); }
 
+	virtual void PrepareForGpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{ m_samples.PrepareForGpuAccessNonblocking(false, cmdBuf); }
+
 	virtual void MarkSamplesModifiedFromCpu() override
 	{ m_samples.MarkModifiedFromCpu(); }
 
@@ -601,6 +611,13 @@ public:
 		m_offsets.PrepareForGpuAccess();
 		m_durations.PrepareForGpuAccess();
 		m_samples.PrepareForGpuAccess();
+	}
+
+	virtual void PrepareForGpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{
+		m_samples.PrepareForGpuAccessNonblocking(false, cmdBuf);
+		m_offsets.PrepareForGpuAccessNonblocking(false, cmdBuf);
+		m_durations.PrepareForGpuAccessNonblocking(false, cmdBuf);
 	}
 
 	virtual void MarkSamplesModifiedFromCpu() override
