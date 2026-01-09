@@ -173,15 +173,40 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	{
 		case 2:
 		{
-			SetSampleRate(62500000L);
-			SetSampleDepth(10000);
+			if(m_model == "2205MSO")
+			{
+				//50 Msps is the highest rate the 2205MSO supports with all channels, including MSO, active.
+				SetSampleRate(50000000L);
+				SetSampleDepth(10000);
+			}
+			else
+			{
+				//125 Msps is the highest rate the 2000 series supports with all channels, including MSO, active.
+				SetSampleRate(125000000L);
+				SetSampleDepth(10000);
+			}
 			break;
 		}
 		case 3:
+		{
+			if(m_model[4] == 'E')
+			{
+				//625 Msps is the highest rate the 3000E series supports with all channels, including MSO, active.
+				SetSampleRate(625000000L);
+				SetSampleDepth(1000000);
+			}
+			else
+			{
+				//125 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
+				SetSampleRate(125000000L);
+				SetSampleDepth(100000);
+			}
+			break;
+		}
 		case 5:
 		{
-			//62.5 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
-			SetSampleRate(62500000L);
+			//125 Msps is the highest rate the 5000 series supports with all channels, including MSO, active.
+			SetSampleRate(125000000L);
 			SetSampleDepth(100000);
 			break;
 		}
