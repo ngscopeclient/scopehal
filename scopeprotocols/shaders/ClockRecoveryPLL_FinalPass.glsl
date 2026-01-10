@@ -90,36 +90,55 @@ layout(std430, push_constant) uniform constants
 	uint	maxInputSamples;
 };
 
-#define X_SIZE 1
+#define X_SIZE 8
+#define Y_SIZE 64
 
-layout(local_size_x=X_SIZE, local_size_y=64, local_size_z=1) in;
+layout(local_size_x=X_SIZE, local_size_y=Y_SIZE, local_size_z=1) in;
+
+shared int64_t prefetchBlock[Y_SIZE][X_SIZE + 1];
 
 void main()
 {
 	//If this is the first thread, special case since we copy from the first block
 	if(gl_GlobalInvocationID.y == 0)
 	{
-		//if(gl_GlobalInvocationID.x != 0)
-		//	return;
-
 		uint count = uint(stateFirstPass[0]);
-		for(uint i=1; i<count; i++)
+
+		//Copy samples
+		for(uint i=1; i<count; i += X_SIZE)
 		{
-			uint iout = i - 1;
-			int64_t lastOffset = offsetsFirstPass[i-1];
-			int64_t nextOffset = offsetsFirstPass[i];
-			int64_t delta = nextOffset - lastOffset;
+			//Prefetch
+			prefetchBlock[gl_LocalInvocationID.y][gl_LocalInvocationID.x + 1] =
+				offsetsFirstPass[i + gl_LocalInvocationID.x];
+			barrier();
+			memoryBarrierShared();
 
-			//Generate the squarewave output
-			int64_t tout = lastOffset;
-			offsets[iout] = tout;
-			squarewave[iout] = uint8_t(iout & 1);
-			durations[iout] = delta;
+			if(gl_GlobalInvocationID.x != 0)
+				continue;
 
-			//Generate sampled data output
-			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
-			ssamples[iout] = isamples[nsample];
+			//Load the 0th entry
+			prefetchBlock[gl_LocalInvocationID.y][0] = offsetsFirstPass[i - 1];
+
+			for(uint j=0; j<X_SIZE && (i+j) < count; j++)
+			{
+				uint iout = i + j - 1;
+				int64_t lastOffset = prefetchBlock[gl_LocalInvocationID.y][j];
+				int64_t nextOffset = prefetchBlock[gl_LocalInvocationID.y][j+1];
+				squarewave[iout] = uint8_t(iout & 1);
+
+				//Generate the squarewave output
+				uint nsample = min(uint((lastOffset - triggerPhase) / timescale), maxInputSamples-1);
+				float sampledData = isamples[nsample];
+				offsets[iout] = lastOffset;
+				durations[iout] = nextOffset - lastOffset;
+
+				//Generate sampled data output
+				ssamples[iout] = sampledData;
+			}
 		}
+
+		if(gl_GlobalInvocationID.x != 0)
+			return;
 
 		//Last sample
 		int64_t lastOffset = offsetsFirstPass[count-1];
@@ -138,36 +157,49 @@ void main()
 	//Everything else copies from subsequent blocks
 	else
 	{
-		//if(gl_GlobalInvocationID.x != 0)
-		//	return;
-
 		//Find starting sample index
 		uint writebase = uint(stateFirstPass[0]);
 		for(uint i=1; i<gl_GlobalInvocationID.y; i++)
 			writebase += uint(stateSecondPass[(i-1)*3]);
 
-		//Copy samples
 		uint count = uint(stateSecondPass[(gl_GlobalInvocationID.y - 1)*3]);
 		uint readbase = (gl_GlobalInvocationID.y - 1) * maxOffsetsPerThread;
-		for(uint i=1; i<count; i++)
+
+		//Copy samples
+		for(uint i=1; i<count; i += X_SIZE)
 		{
-			uint iout = writebase + i - 1;
-			int64_t lastOffset = offsetsSecondPass[readbase + i - 1];
-			int64_t nextOffset = offsetsSecondPass[readbase + i];
-			squarewave[iout] = uint8_t(iout & 1);
+			//Prefetch
+			prefetchBlock[gl_LocalInvocationID.y][gl_LocalInvocationID.x + 1] =
+				offsetsSecondPass[readbase + i + gl_LocalInvocationID.x];
+			barrier();
+			memoryBarrierShared();
 
-			int64_t delta = nextOffset - lastOffset;
-			int64_t tout = lastOffset;
+			if(gl_GlobalInvocationID.x != 0)
+				continue;
 
-			//Generate the squarewave output
-			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
-			float sampledData = isamples[nsample];
-			offsets[iout] = tout;
-			durations[iout] = delta;
+			//Load the 0th entry
+			prefetchBlock[gl_LocalInvocationID.y][0] = offsetsSecondPass[readbase + i - 1];
 
-			//Generate sampled data output
-			ssamples[iout] = sampledData;
+			for(uint j=0; j<X_SIZE && (i+j) < count; j++)
+			{
+				uint iout = writebase + i + j - 1;
+				int64_t lastOffset = prefetchBlock[gl_LocalInvocationID.y][j];
+				int64_t nextOffset = prefetchBlock[gl_LocalInvocationID.y][j+1];
+				squarewave[iout] = uint8_t(iout & 1);
+
+				//Generate the squarewave output
+				uint nsample = min(uint((lastOffset - triggerPhase) / timescale), maxInputSamples-1);
+				float sampledData = isamples[nsample];
+				offsets[iout] = lastOffset;
+				durations[iout] = nextOffset - lastOffset;
+
+				//Generate sampled data output
+				ssamples[iout] = sampledData;
+			}
 		}
+
+		if(gl_GlobalInvocationID.x != 0)
+			return;
 
 		//Last sample (if needed)
 		uint iout = writebase + count - 1;

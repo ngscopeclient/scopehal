@@ -234,7 +234,7 @@ float EyeMask::CalculateHitRate(
 {
 	//TODO: GPU this?
 	//For now, we're running on the CPU though. Make sure the data is here when we need it
-	cap->GetAccumBuffer().PrepareForCpuAccess();
+	cap->PrepareForCpuAccess();
 
 	if(!m_canvas || (m_width != width) || (m_height != height))
 	{
