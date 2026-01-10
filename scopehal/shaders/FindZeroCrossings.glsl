@@ -52,14 +52,9 @@ layout(std430, push_constant) uniform constants
 	float threshold;
 };
 
-#define X_SIZE 8
-#define Y_SIZE 64
-
-layout(local_size_x=X_SIZE, local_size_y=Y_SIZE, local_size_z=1) in;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 float InterpolateTime(float fa, float fb, float voltage);
-
-shared float ftmp[Y_SIZE][X_SIZE];
 
 /**
 	@brief First-pass zero crossing detection
@@ -70,7 +65,7 @@ shared float ftmp[Y_SIZE][X_SIZE];
 void main()
 {
 	//Find our block of inputs
-	uint nthread = (gl_GlobalInvocationID.z * gl_NumWorkGroups.y * gl_WorkGroupSize.y) + gl_GlobalInvocationID.y;
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 	uint instart = nthread * inputPerThread;
 	uint inend = instart + inputPerThread;
 	if(inend > inputSize)
@@ -84,45 +79,25 @@ void main()
 	float fscale = float(timescale);
 
 	//Search for level crossings within our block
-	float prev = pin[instart];
-	for(uint i=instart+1; i<inend; i += X_SIZE)
+	for(uint i=instart; i<inend; i++)
 	{
-		//Prefetch inputs
-		uint iprefetch = i + gl_LocalInvocationID.x;
-		if(i < inend)
-			ftmp[gl_LocalInvocationID.y][gl_LocalInvocationID.x] = pin[iprefetch];
-		barrier();
-		memoryBarrierShared();
-
 		//If this is the first sample, we can't find an edge by definition
 		if(i == 0)
 			continue;
 
-		//All of this only happens in first thread of block
-		if(gl_LocalInvocationID.x == 0)
+		float fa = pin[i-1];
+		float fb = pin[i];
+
+		bool prevValue = fa > threshold;
+		bool currentValue = fb > threshold;
+
+		if(currentValue != prevValue)
 		{
-			for(uint j=0; j<X_SIZE; j++)
-			{
-				uint nsample = i + j;
-				if(nsample >= inend)
-					break;
+			float tfrac = fscale * InterpolateTime(fa, fb, threshold);
 
-				float fa = prev;
-				float fb = ftmp[gl_LocalInvocationID.y][j];
-				prev = fb;
-
-				bool prevValue = fa > threshold;
-				bool currentValue = fb > threshold;
-
-				if(currentValue != prevValue)
-				{
-					float tfrac = fscale * InterpolateTime(fa, fb, threshold);
-
-					pout[iout] = triggerPhase + timescale*int64_t(nsample-1) + int64_t(tfrac);
-					iout ++;
-					nouts ++;
-				}
-			}
+			pout[iout] = triggerPhase + timescale*int64_t(i-1) + int64_t(tfrac);
+			iout ++;
+			nouts ++;
 		}
 	}
 

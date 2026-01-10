@@ -115,7 +115,6 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	m_zeroCrossingPipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
 	const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
 	m_zeroCrossingPipeline->Dispatch(cmdBuf, zpush,
-		1,
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
 
