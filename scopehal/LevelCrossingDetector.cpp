@@ -115,6 +115,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	m_zeroCrossingPipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
 	const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
 	m_zeroCrossingPipeline->Dispatch(cmdBuf, zpush,
+		1,
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
 
@@ -130,7 +131,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 
 	m_preGatherPipeline->BindBufferNonblocking(0, m_gatherIndexes, cmdBuf, true);
 	m_preGatherPipeline->BindBufferNonblocking(1, m_temporaryResults, cmdBuf);
-	m_preGatherPipeline->Dispatch(cmdBuf, ppush, numThreads+1, 1);
+	m_preGatherPipeline->Dispatch(cmdBuf, ppush, GetComputeBlockCount(numThreads+1, 64), 1);
 
 	m_gatherIndexes.MarkModifiedFromGpu();
 	m_preGatherPipeline->AddComputeMemoryBarrier(cmdBuf);
@@ -144,7 +145,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	m_gatherPipeline->BindBufferNonblocking(0, m_outbuf, cmdBuf, true);
 	m_gatherPipeline->BindBufferNonblocking(1, m_temporaryResults, cmdBuf);
 	m_gatherPipeline->BindBufferNonblocking(2, m_gatherIndexes, cmdBuf);
-	m_gatherPipeline->Dispatch(cmdBuf, gpush, numThreads, 1);
+	m_gatherPipeline->Dispatch(cmdBuf, gpush, GetComputeBlockCount(numThreads, 64), 1);
 
 	m_outbuf.MarkModifiedFromGpu();
 
