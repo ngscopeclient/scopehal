@@ -79,14 +79,16 @@ void main()
 	float fscale = float(timescale);
 
 	//Search for level crossings within our block
-	for(uint i=instart; i<inend; i++)
+	float prev = pin[instart];
+	for(uint i=instart+1; i<inend; i++)
 	{
 		//If this is the first sample, we can't find an edge by definition
 		if(i == 0)
 			continue;
 
-		float fa = pin[i-1];
+		float fa = prev;
 		float fb = pin[i];
+		prev = fb;
 
 		bool prevValue = fa > threshold;
 		bool currentValue = fb > threshold;

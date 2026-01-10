@@ -261,7 +261,7 @@ void ClockRecoveryFilter::Refresh(
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
 			//TODO: do we need to tune numThreads to lock well to short waveforms?
-			const uint64_t numThreads = 4096;
+			uint64_t numThreads = 4096;
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
 			const uint64_t maxEdges = din->size() / 2;
@@ -271,6 +271,7 @@ void ClockRecoveryFilter::Refresh(
 			m_firstPassTimestamps.resize(maxEdges);
 			m_secondPassTimestamps.resize(maxEdges);
 			cap->Resize(maxEdges);
+			scap->Resize(maxEdges);
 
 			//Allocate thread output buffers
 			const uint64_t numStateValuesPerThread = 2;
@@ -312,8 +313,6 @@ void ClockRecoveryFilter::Refresh(
 			m_secondPassTimestamps.MarkModifiedFromGpu();
 			m_secondPassState.MarkModifiedFromGpu();
 
-			scap->m_samples.resize(maxEdges);
-
 			//Run the final pass.
 			//This also generates the squarewave output and the sample data
 			m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
@@ -327,9 +326,19 @@ void ClockRecoveryFilter::Refresh(
 			//this assumes input is uniformly sampled for now
 			m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
 			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+			m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 			m_firstPassState.PrepareForCpuAccessNonblocking(cmdBuf);
 			m_secondPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+
+			//Output was entirely created on the GPU, no need to touch the CPU for that
+			cap->MarkModifiedFromGpu();
+			scap->MarkModifiedFromGpu();
+			generatedSquarewaveOnGPU = true;
+
+			//Copy the offsets and durations from the sampled data
+			scap->m_offsets.CopyFromNonblocking(cmdBuf, cap->m_offsets, false);
+			scap->m_durations.CopyFromNonblocking(cmdBuf, cap->m_durations, false);
 
 			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
@@ -340,18 +349,9 @@ void ClockRecoveryFilter::Refresh(
 			for(uint64_t i=0; i<numThreads; i++)
 				numSamples += m_secondPassState[i*2];
 
-			//Output was entirely created on the GPU, no need to touch the CPU for that
-			cap->MarkModifiedFromGpu();
-			scap->MarkModifiedFromGpu();
-			generatedSquarewaveOnGPU = true;
-
 			//Resize to final edge count
 			cap->Resize(numSamples);
 			scap->Resize(numSamples);
-
-			//Copy the offsets and durations from the sampled data
-			scap->m_offsets.CopyFrom(cap->m_offsets, false);
-			scap->m_durations.CopyFrom(cap->m_durations, false);
 		}
 
 		else

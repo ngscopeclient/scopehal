@@ -552,6 +552,46 @@ public:
 		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
 	}
 
+	/**
+		@brief Copies our content from another AcceleratorBuffer
+	 */
+	 __attribute__((noinline))
+	void CopyFromNonblocking(
+		vk::raii::CommandBuffer& cmdBuf,
+		const AcceleratorBuffer<T>& rhs,
+		bool reallocateToMatch = true)
+	{
+		//Copy placement hints from the other instance, then resize to match
+		SetCpuAccessHint(rhs.m_cpuAccessHint);
+		SetGpuAccessHint(rhs.m_gpuAccessHint, reallocateToMatch);
+		resize(rhs.m_size);
+
+		//Valid data CPU side? Copy it to here
+		if(rhs.HasCpuBuffer() && !rhs.m_cpuPhysMemIsStale)
+		{
+			//non-trivially-copyable types have to be copied one at a time
+			if(!std::is_trivially_copyable<T>::value)
+			{
+				for(size_t i=0; i<m_size; i++)
+					m_cpuPtr[i] = rhs.m_cpuPtr[i];
+			}
+
+			//Trivially copyable types can be done more efficiently in a block
+			else
+				memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+		}
+		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
+
+		//Valid data GPU side? Copy it to here
+		if(rhs.HasGpuBuffer() && !rhs.m_gpuPhysMemIsStale)
+		{
+			//Make the transfer request
+			vk::BufferCopy region(0, 0, m_size * sizeof(T));
+			cmdBuf.copyBuffer(**rhs.m_gpuBuffer, **m_gpuBuffer, {region});
+		}
+		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
+	}
+
 protected:
 
 	/**
