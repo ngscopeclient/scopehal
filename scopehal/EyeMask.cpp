@@ -79,6 +79,7 @@ bool EyeMask::Load(string path)
 	m_hitrate = 0;
 	m_timebaseIsRelative = false;
 	m_maskname = "";
+	m_bitmapDirty = true;
 
 	try
 	{
@@ -191,6 +192,8 @@ void EyeMask::RenderForAnalysis(
 		float yoff,
 		float height) const
 {
+	LogTrace("Rendering mask for testing\n");
+
 	//clear background to blank
 	m_canvas->clear_rectangle(0, 0, m_width, m_height);
 
@@ -234,9 +237,7 @@ float EyeMask::CalculateHitRate(
 {
 	//TODO: GPU this?
 	//For now, we're running on the CPU though. Make sure the data is here when we need it
-	cap->PrepareForCpuAccess();
-
-	if(!m_canvas || (m_width != width) || (m_height != height))
+	if(!m_canvas || (m_width != width) || (m_height != height) || m_bitmapDirty)
 	{
 		m_width = width;
 		m_height = height;
@@ -251,6 +252,8 @@ float EyeMask::CalculateHitRate(
 			yscale,
 			0,
 			height);
+
+		m_bitmapDirty = false;
 	}
 
 	//Test each pixel of the eye pattern against the mask
@@ -260,6 +263,7 @@ float EyeMask::CalculateHitRate(
 
 	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
 	{
+		cap->GetAccumBuffer().PrepareForCpuAccess();
 		auto accum = cap->GetAccumData();
 		size_t nhits = 0;
 
@@ -279,11 +283,12 @@ float EyeMask::CalculateHitRate(
 			}
 		}
 
-		//LogTrace("Total %zu hits out of %zu samples\n", nhits / EYE_ACCUM_SCALE, cap->GetTotalSamples());
+		LogTrace("Total %zu hits out of %zu samples\n", nhits / EYE_ACCUM_SCALE, cap->GetTotalSamples());
 		return nhits * 1.0 / (cap->GetTotalSamples() * EYE_ACCUM_SCALE);
 	}
 	else //if(cap->GetType() == EyeWaveform::EYE_BER)
 	{
+		cap->GetOutData().PrepareForCpuAccess();
 		auto accum = cap->GetData();
 		float nmax = 0;
 
