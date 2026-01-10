@@ -99,8 +99,10 @@ void main()
 	//If this is the first thread, special case since we copy from the first block
 	if(gl_GlobalInvocationID.y == 0)
 	{
+		//if(gl_GlobalInvocationID.x != 0)
+		//	return;
+
 		uint count = uint(stateFirstPass[0]);
-		//int64_t lastOffset = offsetsFirstPass[0];
 		for(uint i=1; i<count; i++)
 		{
 			uint iout = i - 1;
@@ -109,7 +111,7 @@ void main()
 			int64_t delta = nextOffset - lastOffset;
 
 			//Generate the squarewave output
-			int64_t tout = lastOffset + delta/2;	//90 degree phase shift
+			int64_t tout = lastOffset;
 			offsets[iout] = tout;
 			squarewave[iout] = uint8_t(iout & 1);
 			durations[iout] = delta;
@@ -117,15 +119,13 @@ void main()
 			//Generate sampled data output
 			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
 			ssamples[iout] = isamples[nsample];
-
-			//lastOffset = nextOffset;
 		}
 
-		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
+		//Last sample
 		int64_t lastOffset = offsetsFirstPass[count-1];
 		uint iout = count - 1;
 		int64_t lastPeriod = stateFirstPass[1];
-		int64_t tout = lastOffset + lastPeriod/2;
+		int64_t tout = lastOffset;
 		offsets[iout] = tout;
 		squarewave[iout] = uint8_t(iout & 1);
 		durations[iout] = lastPeriod;
@@ -138,15 +138,17 @@ void main()
 	//Everything else copies from subsequent blocks
 	else
 	{
+		//if(gl_GlobalInvocationID.x != 0)
+		//	return;
+
 		//Find starting sample index
 		uint writebase = uint(stateFirstPass[0]);
 		for(uint i=1; i<gl_GlobalInvocationID.y; i++)
-			writebase += uint(stateSecondPass[(i-1)*2]);
+			writebase += uint(stateSecondPass[(i-1)*3]);
 
 		//Copy samples
-		uint count = uint(stateSecondPass[(gl_GlobalInvocationID.y - 1)*2]);
+		uint count = uint(stateSecondPass[(gl_GlobalInvocationID.y - 1)*3]);
 		uint readbase = (gl_GlobalInvocationID.y - 1) * maxOffsetsPerThread;
-		//int64_t lastOffset = offsetsSecondPass[readbase];
 		for(uint i=1; i<count; i++)
 		{
 			uint iout = writebase + i - 1;
@@ -155,8 +157,7 @@ void main()
 			squarewave[iout] = uint8_t(iout & 1);
 
 			int64_t delta = nextOffset - lastOffset;
-			int64_t tout = lastOffset + delta/2;	//90 degree phase shift
-			//lastOffset = nextOffset;
+			int64_t tout = lastOffset;
 
 			//Generate the squarewave output
 			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
@@ -168,11 +169,11 @@ void main()
 			ssamples[iout] = sampledData;
 		}
 
-		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
+		//Last sample (if needed)
 		uint iout = writebase + count - 1;
-		int64_t lastOffset = offsetsSecondPass[readbase + count - 1];
-		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.y - 1)*2 + 1];
-		int64_t tout = lastOffset + lastPeriod/2;
+		int64_t lastOffset = offsetsSecondPass[readbase + count-1];
+		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.y - 1)*3 + 1];
+		int64_t tout = lastOffset;
 		offsets[iout] = tout;
 		squarewave[iout] = uint8_t(iout & 1);
 		durations[iout] = lastPeriod;

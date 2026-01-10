@@ -142,9 +142,10 @@ protected:
 	/**
 		@brief Output status buffer for first PLL pass
 
-		2 int64s per thread:
+		3 int64s per thread:
 			Number of samples written
 			Ending period
+			Final edge position
 	 */
 	AcceleratorBuffer<int64_t> m_firstPassState;
 
@@ -154,9 +155,10 @@ protected:
 	/**
 		@brief Output status buffer for second PLL pass
 
-		2 int64s per thread:
+		3 int64s per thread:
 			Number of samples written
 			Ending period
+			Final edge position
 	 */
 	AcceleratorBuffer<int64_t> m_secondPassState;
 };

@@ -274,7 +274,7 @@ void ClockRecoveryFilter::Refresh(
 			scap->Resize(maxEdges);
 
 			//Allocate thread output buffers
-			const uint64_t numStateValuesPerThread = 2;
+			const uint64_t numStateValuesPerThread = 3;
 			m_firstPassState.resize(numThreads * numStateValuesPerThread);
 			m_secondPassState.resize(numThreads * numStateValuesPerThread);
 
@@ -347,7 +347,7 @@ void ClockRecoveryFilter::Refresh(
 			//TODO: can we avoid this readback?
 			uint64_t numSamples = m_firstPassState[0];
 			for(uint64_t i=0; i<numThreads; i++)
-				numSamples += m_secondPassState[i*2];
+				numSamples += m_secondPassState[i*3];
 
 			//Resize to final edge count
 			cap->Resize(numSamples);

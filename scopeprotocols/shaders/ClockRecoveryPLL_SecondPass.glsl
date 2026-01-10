@@ -79,8 +79,9 @@ void main()
 	bool lastThread = (gl_GlobalInvocationID.x == (numThreads - 1));
 	if(lastThread)
 	{
-		stateSecondPass[gl_GlobalInvocationID.x*2]	 	= 0;
-		stateSecondPass[gl_GlobalInvocationID.x*2 + 1]	= 0;
+		stateSecondPass[gl_GlobalInvocationID.x*3]	 	= 0;
+		stateSecondPass[gl_GlobalInvocationID.x*3 + 1]	= 0;
+		stateSecondPass[gl_GlobalInvocationID.x*3 + 2]	= 0;
 		return;
 	}
 	lastThread = (gl_GlobalInvocationID.x == (numThreads - 2));
@@ -92,21 +93,17 @@ void main()
 		nedge = nedges-1;
 
 	//Don't actually start at this edge! Start at the NCO phase from the previous pass
-	uint numPreviousEdges = uint(stateFirstPass[gl_GlobalInvocationID.x*2]);
+	uint numPreviousEdges = uint(stateFirstPass[gl_GlobalInvocationID.x*3]);
 	if(numPreviousEdges > 0)
 		numPreviousEdges --;
-	int64_t edgepos = offsetsFirstPass[(gl_GlobalInvocationID.x * maxOffsetsPerThread) + numPreviousEdges];
+	int64_t edgepos = stateFirstPass[gl_GlobalInvocationID.x*3 + 2];
 
 	//Starting frequency
-	int64_t secondPassInitialPeriod = stateFirstPass[gl_GlobalInvocationID.x*2 + 1];
+	int64_t secondPassInitialPeriod = stateFirstPass[gl_GlobalInvocationID.x*3 + 1];
 	int64_t halfPeriod = secondPassInitialPeriod / 2;
 	float initialFrequency = 1.0 / float(secondPassInitialPeriod);
 	float glitchCutoff = float(secondPassInitialPeriod / 10);
 	float fHalfPeriod = float(halfPeriod);
-
-	//Advance by one NCO period so we don't double up the edge at the end of the previous pass
-	//We want to start one cycle later with no feedback correction
-	edgepos += secondPassInitialPeriod;
 
 	//End timestamp and edge index for this thread
 	int64_t tThreadEnd;
@@ -122,15 +119,10 @@ void main()
 
 		//For the second pass: our ending timestamp should actually be the timestamp of the first pass's last edge
 		//since that's where the next block started phase 2 from
-		uint numPrev = uint(stateFirstPass[(gl_GlobalInvocationID.x + 1)*2]);
+		uint numPrev = uint(stateFirstPass[(gl_GlobalInvocationID.x + 1)*3]);
 		if(numPrev > 0)
 			numPrev --;
 		tThreadEnd = offsetsFirstPass[((gl_GlobalInvocationID.x + 1) * maxOffsetsPerThread) + numPrev];
-
-		//Move end point halfway to the next UI to provide a bit of jitter margin
-		//but be well before the next block starts
-		int64_t uiLen = stateFirstPass[(gl_GlobalInvocationID.x + 1)*2 + 1];
-		tThreadEnd += uiLen / 2;
 	}
 
 	//Output buffer pointers
@@ -200,8 +192,8 @@ void main()
 			tnext = edges[++nedge];
 		}
 
-		//Add the sample (no phase offset)
-		offsetsSecondPass[outputBase + iout] = edgepos;
+		//90 deg phase offset for center-of-eye sampling
+		offsetsSecondPass[outputBase + iout] = edgepos + center;
 		iout ++;
 
 		//Bail if we've run out of places to store output (should never happen, just to be safe)
@@ -212,6 +204,7 @@ void main()
 	}
 
 	//Save final stats
-	stateSecondPass[gl_GlobalInvocationID.x*2]	 	= int64_t(iout);
-	stateSecondPass[gl_GlobalInvocationID.x*2 + 1]	= iperiod;
+	stateSecondPass[gl_GlobalInvocationID.x*3]	 	= int64_t(iout);
+	stateSecondPass[gl_GlobalInvocationID.x*3 + 1]	= iperiod;
+	stateSecondPass[gl_GlobalInvocationID.x*3 + 2]	= edgepos;
 }

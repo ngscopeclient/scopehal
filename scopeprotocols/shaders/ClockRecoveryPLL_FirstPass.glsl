@@ -158,8 +158,8 @@ void main()
 			tnext = edges[++nedge];
 		}
 
-		//Add the sample (no phase offset)
-		offsets[outputBase + iout] = edgepos;
+		//90 deg phase offset for center-of-eye sampling
+		offsets[outputBase + iout] = edgepos + center;
 		iout ++;
 
 		//Bail if we've run out of places to store output (should never happen, just to be safe)
@@ -168,6 +168,7 @@ void main()
 	}
 
 	//Save final stats
-	stateOut[gl_GlobalInvocationID.x*2] 	= int64_t(iout);
-	stateOut[gl_GlobalInvocationID.x*2 + 1] = iperiod;
+	stateOut[gl_GlobalInvocationID.x*3] 	= int64_t(iout);
+	stateOut[gl_GlobalInvocationID.x*3 + 1] = iperiod;
+	stateOut[gl_GlobalInvocationID.x*3 + 2] = edgepos;
 }
