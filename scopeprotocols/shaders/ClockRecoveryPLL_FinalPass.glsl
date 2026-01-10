@@ -90,12 +90,14 @@ layout(std430, push_constant) uniform constants
 	uint	maxInputSamples;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define X_SIZE 1
+
+layout(local_size_x=X_SIZE, local_size_y=64, local_size_z=1) in;
 
 void main()
 {
 	//If this is the first thread, special case since we copy from the first block
-	if(gl_GlobalInvocationID.x == 0)
+	if(gl_GlobalInvocationID.y == 0)
 	{
 		uint count = uint(stateFirstPass[0]);
 		int64_t lastOffset = offsetsFirstPass[0];
@@ -136,12 +138,12 @@ void main()
 	{
 		//Find starting sample index
 		uint writebase = uint(stateFirstPass[0]);
-		for(uint i=1; i<gl_GlobalInvocationID.x; i++)
+		for(uint i=1; i<gl_GlobalInvocationID.y; i++)
 			writebase += uint(stateSecondPass[(i-1)*2]);
 
 		//Copy samples
-		uint count = uint(stateSecondPass[(gl_GlobalInvocationID.x - 1)*2]);
-		uint readbase = (gl_GlobalInvocationID.x - 1) * maxOffsetsPerThread;
+		uint count = uint(stateSecondPass[(gl_GlobalInvocationID.y - 1)*2]);
+		uint readbase = (gl_GlobalInvocationID.y - 1) * maxOffsetsPerThread;
 		int64_t lastOffset = offsetsSecondPass[readbase];
 		for(uint i=1; i<count; i++)
 		{
@@ -165,7 +167,7 @@ void main()
 
 		//We don't have a next sample to compare to, so phase shift by the 90 degrees WRT the final NCO phase
 		uint iout = writebase + count - 1;
-		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.x - 1)*2 + 1];
+		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.y - 1)*2 + 1];
 		int64_t tout = lastOffset + lastPeriod/2;
 		offsets[iout] = tout;
 		squarewave[iout] = uint8_t(iout & 1);
