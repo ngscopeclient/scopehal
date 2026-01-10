@@ -81,7 +81,7 @@ void FrequencyMeasurement::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 

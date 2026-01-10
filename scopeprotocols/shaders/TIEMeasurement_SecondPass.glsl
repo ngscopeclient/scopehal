@@ -76,6 +76,7 @@ shared uint startingSum;
 void main()
 {
 	//Initialize shared variables
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 	if(gl_LocalInvocationID.x == 0)
 	{
 		startingSum = 0;
@@ -86,7 +87,7 @@ void main()
 
 	//Find starting sample index for the block
 	uint tmp = 0;
-	for(uint i=0; i < blockbase; i += BLOCK_SIZE)
+	for(uint i=gl_LocalInvocationID.x; i < blockbase; i += BLOCK_SIZE)
 		tmp += uint(firstPassOutput[i * blockBufferSize]);
 	atomicAdd(startingSum, tmp);
 	barrier();
@@ -116,12 +117,22 @@ void main()
 		iout ++;
 	}
 
-	//Set final duration to 1
+	//Last sample needs special handling
 	if(iout > 0)
-		durations[iout - 1] = 1;
+	{
+		//If this is the very last sample of the entire waveform, set final duration to 1
+		if(gl_GlobalInvocationID.x == numThreads-1)
+			durations[iout - 1] = 1;
+
+		//Otherwise, set duration based on the timestamp of the next block's first sample
+		else
+		{
+			int64_t tnext = firstPassOutput[(gl_GlobalInvocationID.x + 1) * blockBufferSize + 1];
+			durations[iout - 1] = tnext - lastOffset;
+		}
+	}
 
 	//If we're the last thread, save the final sample count
-	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 	if(gl_GlobalInvocationID.x == (numThreads - 1) )
 		nsamplesOut = int64_t(iout);
 }
