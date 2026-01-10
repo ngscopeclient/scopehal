@@ -178,7 +178,7 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		const uint32_t numThreads = 16384;
 		const uint32_t threadsPerBlock = 64;
 		const uint32_t numBlocks = numThreads / threadsPerBlock;
-		const uint32_t maxEdgesPerThread = (m_clockEdgesMuxed->size() | (numThreads-1)) / numThreads;
+		const uint32_t maxEdgesPerThread = GetComputeBlockCount(m_clockEdgesMuxed->size(), numThreads);
 		const uint32_t blockBufferSize = 2*maxEdgesPerThread + 1;
 		m_firstPassOutput.resize(blockBufferSize * numThreads);
 
