@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -74,6 +74,8 @@ public:
 	virtual bool AcquireData() override;
 	virtual bool IsTriggerArmed() override;
 	virtual void PushTrigger() override;
+	bool DoAcquireData(bool keep);
+	virtual void Stop() override;
 
 	//Timebase
 	virtual bool CanInterleave() override;
@@ -165,7 +167,7 @@ public:
 		SERIES_UNKNOWN	//unknown or invalid model name
 	};
 	*/
-	
+
 	enum Series //TODO
 	{
 		SERIES_2000A,
@@ -272,6 +274,12 @@ protected:
 	std::vector<unsigned int> m_BandwidthLimits;
 
 	Series m_series;
+
+	///@brief Most recently received sequence number
+	uint32_t m_lastSeq;
+
+	///@brief Sequence number to drop until (if we get stale data after stopping the trigger)
+	uint32_t m_dropUntilSeq;
 
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
