@@ -813,6 +813,10 @@ bool PicoOscilloscope::AcquireData()
 
 bool PicoOscilloscope::DoAcquireData(bool keep)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("PicoOscilloscope::DoAcquireData");
+	#endif
+
 	#pragma pack(push, 1)
 	struct
 	{
@@ -859,6 +863,10 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			return false;
 		chnum = tmp[0];
 		memdepth = tmp[1];
+
+		#ifdef HAVE_NVTX
+			nvtx3::scoped_range range2(string("Channel ") + to_string(chnum));
+		#endif
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
