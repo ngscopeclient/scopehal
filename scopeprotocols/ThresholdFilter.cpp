@@ -111,19 +111,49 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 	if(sdin)
 	{
 		auto cap = SetupSparseDigitalOutputWaveform(sdin, 0, 0, 0);
-		din->PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
 
 		//Threshold all of our samples
 		//Optimized inner loop if no hysteresis
 		if(hys == 0)
 		{
-			#pragma omp parallel for
-			for(size_t i=0; i<len; i++)
-				cap->m_samples[i] = sdin->m_samples[i] > midpoint;
+			if(g_hasShaderInt8)
+			{
+				cmdBuf.begin({});
+
+				ThresholdPushConstants tpush;
+				tpush.numSamples	= sdin->m_samples.size();
+				tpush.threshold		= midpoint;
+
+				m_computePipeline->BindBufferNonblocking(0, cap->m_samples, cmdBuf, true);
+				m_computePipeline->BindBufferNonblocking(1, sdin->m_samples, cmdBuf);
+
+				const uint32_t compute_block_count = GetComputeBlockCount(tpush.numSamples, 64);
+				m_computePipeline->Dispatch(cmdBuf, tpush,
+					min(compute_block_count, 32768u),
+					compute_block_count / 32768 + 1);
+
+				cmdBuf.end();
+				queue->SubmitAndBlock(cmdBuf);
+
+				cap->MarkModifiedFromGpu();
+			}
+			else
+			{
+				din->PrepareForCpuAccess();
+				cap->PrepareForCpuAccess();
+
+				#pragma omp parallel for
+				for(size_t i=0; i<len; i++)
+					cap->m_samples[i] = sdin->m_samples[i] > midpoint;
+
+				cap->MarkModifiedFromCpu();
+			}
 		}
 		else
 		{
+			din->PrepareForCpuAccess();
+			cap->PrepareForCpuAccess();
+
 			bool cur = sdin->m_samples[0] > midpoint;
 			float thresh_rising = midpoint + hys/2;
 			float thresh_falling = midpoint - hys/2;
@@ -137,9 +167,9 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 					cur = true;
 				cap->m_samples[i] = cur;
 			}
-		}
 
-		cap->MarkModifiedFromCpu();
+			cap->MarkModifiedFromCpu();
+		}
 	}
 	else
 	{

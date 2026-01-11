@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -1257,12 +1257,23 @@ SparseDigitalWaveform* Filter::SetupSparseDigitalOutputWaveform(SparseWaveformBa
 
 	size_t len = din->m_offsets.size() - (skipstart + skipend);
 	cap->Resize(len);
-	cap->PrepareForCpuAccess();
 
-	memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
-	memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
+	//GPU side copy if possible
+	//TODO: be more efficient about this and do GPU copy always?
+	if(skipstart == 0)
+	{
+		cap->m_offsets.CopyFrom(din->m_offsets, false);
+		cap->m_durations.CopyFrom(din->m_durations, false);
+	}
 
-	cap->MarkTimestampsModifiedFromCpu();
+	//CPU side copy
+	else
+	{
+		cap->PrepareForCpuAccess();
+		memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
+		memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
+		cap->MarkTimestampsModifiedFromCpu();
+	}
 
 	return cap;
 }
