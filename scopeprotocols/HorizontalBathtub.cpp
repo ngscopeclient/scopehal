@@ -154,6 +154,30 @@ void HorizontalBathtub::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 			cap->m_samples[i] = log10(ber);
 	}
 
+	//Avoid spikes: if a point has high BER then everything outside it must too
+	//TODO: is this better to fix in GetBERAtPoint?
+	float vmax = cap->m_samples[quartlen];
+	for(size_t i=quartlen+1; i<halflen; i++)
+	{
+		//Find the highest value we've seen so far
+		vmax = max(cap->m_samples[i], vmax);
+
+		//and make sure this sample is no less than that
+		cap->m_samples[i] = vmax;
+	}
+	vmax = cap->m_samples[quartlen];
+	for(size_t i=quartlen; ; i--)
+	{
+		//Find the highest value we've seen so far
+		vmax = max(cap->m_samples[i], vmax);
+
+		//and make sure this sample is no less than that
+		cap->m_samples[i] = vmax;
+
+		if(i == 0)
+			break;
+	}
+
 	//TODO: dual dirac extrapolation
 
 	SetData(cap, 0);
