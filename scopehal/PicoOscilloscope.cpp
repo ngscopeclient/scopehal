@@ -63,6 +63,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	, RemoteBridgeOscilloscope(transport)
 	, m_lastSeq(0)
 	, m_dropUntilSeq(0)
+	, m_nextWaveformWriteBuffer(0)
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 
@@ -284,7 +285,8 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	SetTriggerOffset(10 * 1000L * 1000L);
 
 	//Initialize waveform buffers
-	for(size_t i=0; i<m_analogChannelCount; i++)
+	//(allocate an extra so we can have conversion running in the background as we download data)
+	for(size_t i=0; i<m_analogChannelCount + 1; i++)
 	{
 		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
 		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
@@ -721,16 +723,57 @@ void PicoOscilloscope::Stop()
 	RemoteBridgeOscilloscope::Stop();
 
 	//Wait for any previous in-progress waveforms to finish processing
-	/*{
+	{
 		lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
 		while(!m_wipWaveforms.empty())
 			PushPendingWaveformsIfReady();
-	}*/
+	}
 
 	//Ask the server what the last waveform it sent was
 	m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
 	LogTrace("Trigger stopped after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
 		(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+}
+
+void PicoOscilloscope::BackgroundProcessing()
+{
+	//Call the base class to flush the transport etc
+	RemoteBridgeOscilloscope::BackgroundProcessing();
+
+	//Push any previously acquired waveforms to the RX buffer if we have them
+	lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
+	PushPendingWaveformsIfReady();
+}
+
+/**
+	@brief Wait for waveform conversion to finish, then push it to the pending waveforms buffer
+ */
+void PicoOscilloscope::PushPendingWaveformsIfReady()
+{
+	if(m_wipWaveforms.empty())
+		return;
+
+	//Wait up to 1ms for GPU side conversion to finish and return if it's not done
+	if(!m_queue->WaitIdleWithTimeout(1000 * 1000))
+		return;
+
+	//Save the waveforms to our queue
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(m_wipWaveforms);
+
+	//If we got backed up, drop the extra waveforms
+	while (m_pendingWaveforms.size() > 2)
+	{
+		LogTrace("Dropping waveform due to excessive pend queue depth\n");
+
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+			AddWaveformToAnalogPool(it.second);
+		m_pendingWaveforms.pop_front();
+	}
+
+	m_pendingWaveformsMutex.unlock();
+	m_wipWaveforms.clear();
 }
 
 Oscilloscope::TriggerMode PicoOscilloscope::PollTrigger()
@@ -799,16 +842,14 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 	size_t chnum;
 	size_t memdepth;
 	float config[3];
-	SequenceSet s;
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Analog channels get processed separately
 	vector<UniformAnalogWaveform*> awfms;
-	vector<size_t> achans;
-	vector<float> scales;
-	vector<float> offsets;
+	lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
 
+	bool processedWaveformsOnGPU = false;
 	for(size_t i=0; i<numChannels; i++)
 	{
 		size_t tmp[2];
@@ -822,10 +863,10 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 		//Analog channels
 		if(chnum < m_analogChannelCount)
 		{
-			auto& abuf = m_analogRawWaveformBuffers[chnum];
+			auto& abuf = m_analogRawWaveformBuffers[m_nextWaveformWriteBuffer];
+			m_nextWaveformWriteBuffer = (m_nextWaveformWriteBuffer + 1) % m_analogRawWaveformBuffers.size();
 			abuf->resize(memdepth);
 			abuf->PrepareForCpuAccess();
-			achans.push_back(chnum);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
@@ -852,11 +893,51 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			cap->m_startTimestamp = time(NULL);
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
-			awfms.push_back(cap);
-			scales.push_back(scale);
-			offsets.push_back(offset);
 
-			s[GetOscilloscopeChannel(chnum)] = cap;
+			//Clear out any previously pending waveforms before we queue up this one
+			if(i == 0)
+				PushPendingWaveformsIfReady();
+
+			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
+
+			if(g_hasShaderInt16)
+			{
+				m_queue->WaitIdle();
+				m_cmdBuf->begin({});
+
+				m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+				m_conversionPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
+
+				ConvertRawSamplesShaderArgs args;
+				args.size = cap->size();
+				args.gain = scale;
+				args.offset = -offset;
+
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+				m_conversionPipeline->Dispatch(
+					*m_cmdBuf, args,
+					min(compute_block_count, 32768u),
+					compute_block_count / 32768 + 1);
+
+				cap->MarkModifiedFromGpu();
+
+				m_cmdBuf->end();
+				m_queue->Submit(*m_cmdBuf);
+
+				processedWaveformsOnGPU = true;
+			}
+			else
+			{
+				cap->PrepareForCpuAccess();
+				Convert16BitSamples(
+					cap->m_samples.GetCpuPointer(),
+					abuf->GetCpuPointer(),
+					scale,
+					-offset,
+					cap->size());
+
+				cap->MarkSamplesModifiedFromCpu();
+			}
 		}
 
 		//Digital pod
@@ -888,7 +969,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			{
 				auto nchan = m_digitalChannelBase + 8*podnum + j;
 				caps[j] = AllocateDigitalWaveform(m_nickname + "." + GetOscilloscopeChannel(nchan)->GetHwname());
-				s[GetOscilloscopeChannel(nchan) ] = caps[j];
+				m_wipWaveforms[GetOscilloscopeChannel(nchan) ] = caps[j];
 			}
 
 			//Now that we have the waveform data, unpack it into individual channels
@@ -955,65 +1036,9 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 	if(!keep)
 		return true;
 
-	//If we have GPU support for int16, we can do the conversion on the card
-	//But only do this if we also have push-descriptor support, because doing N separate dispatches is likely
-	//to be slower than a parallel CPU-side conversion
-	//Note also that a strict benchmarking here may be slower than the CPU version due to transfer latency,
-	//but having the waveform on the GPU now means we don't have to do *that* later.
-	if(g_hasShaderInt16 && g_hasPushDescriptor)
-	{
-		m_cmdBuf->begin({});
-
-		m_conversionPipeline->Bind(*m_cmdBuf);
-
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-
-			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
-
-			ConvertRawSamplesShaderArgs args;
-			args.size = cap->size();
-			args.gain = scales[i];
-			args.offset = -offsets[i];
-
-			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-			m_conversionPipeline->DispatchNoRebind(
-				*m_cmdBuf, args,
-				min(compute_block_count, 32768u),
-				compute_block_count / 32768 + 1);
-
-			cap->MarkModifiedFromGpu();
-		}
-
-		m_cmdBuf->end();
-		m_queue->SubmitAndBlock(*m_cmdBuf);
-	}
-	else
-	{
-		//Fallback path
-		//Process analog captures in parallel
-		#pragma omp parallel for
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-			cap->PrepareForCpuAccess();
-			Convert16BitSamples(
-				cap->m_samples.GetCpuPointer(),
-				m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				-offsets[i],
-				cap->size());
-
-			cap->MarkSamplesModifiedFromCpu();
-		}
-	}
-
-	//Save the waveforms to our queue
-	m_pendingWaveformsMutex.lock();
-	m_pendingWaveforms.push_back(s);
-	m_pendingWaveformsMutex.unlock();
+	//If we did CPU side conversion, push the waveforms to our queue now
+	if(!processedWaveformsOnGPU)
+		PushPendingWaveformsIfReady();
 
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)

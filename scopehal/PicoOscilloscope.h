@@ -70,6 +70,7 @@ public:
 	virtual bool CanEnableChannel(size_t i) override;
 
 	//Triggering
+	virtual void BackgroundProcessing() override;
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
 	virtual bool AcquireData() override;
 	virtual bool IsTriggerArmed() override;
@@ -198,6 +199,8 @@ public:
 protected:
 	void IdentifyHardware();
 
+	void PushPendingWaveformsIfReady();
+
 	//Helpers for determining legal configurations
 	bool Is10BitModeAvailable();
 	bool Is12BitModeAvailable();
@@ -284,11 +287,20 @@ protected:
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
 
+	///@brief Index of next buffer from m_analogRawWaveformBuffers to use
+	unsigned int m_nextWaveformWriteBuffer;
+
 	//Vulkan waveform conversion
 	std::shared_ptr<QueueHandle> m_queue;
 	std::unique_ptr<vk::raii::CommandPool> m_pool;
 	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 	std::unique_ptr<ComputePipeline> m_conversionPipeline;
+
+	///@brief Mutex for m_wipWaveforms
+	std::recursive_mutex m_wipWaveformMutex;
+
+	///@brief Waveforms actively being downloaded and processed but not ready to push to the filter graph yet
+	SequenceSet m_wipWaveforms;
 
 public:
 
