@@ -773,6 +773,7 @@ bool VulkanInit(bool skipGLFW)
 						LogDebug("Enabling 32-bit atomic float support for SSBOs\n");
 
 						featuresAtomicFloat.shaderBufferFloat32Atomics = true;
+						featuresAtomicFloat.shaderBufferFloat32AtomicAdd = true;
 						featuresAtomicFloat.pNext = pNext;
 						pNext = &featuresAtomicFloat;
 					}
