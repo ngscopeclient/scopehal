@@ -39,7 +39,6 @@ using namespace std;
 FFTFilter::FFTFilter(const string& color)
 	: PeakDetectionFilter(color, CAT_RF)
 	, m_windowName("Window")
-	, m_roundingName("Length Rounding")
 	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
@@ -66,11 +65,6 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_windowName].AddEnumValue("Hann", WINDOW_HANN);
 	m_parameters[m_windowName].AddEnumValue("Rectangular", WINDOW_RECTANGULAR);
 	m_parameters[m_windowName].SetIntVal(WINDOW_HAMMING);
-
-	m_parameters[m_roundingName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_roundingName].AddEnumValue("Down (Truncate)", ROUND_TRUNCATE);
-	m_parameters[m_roundingName].AddEnumValue("Up (Zero Pad)", ROUND_ZERO_PAD);
-	m_parameters[m_roundingName].SetIntVal(ROUND_TRUNCATE);
 }
 
 FFTFilter::~FFTFilter()
@@ -163,20 +157,14 @@ void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	}
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
-	const size_t npoints_raw = din->size();
-	size_t npoints;
-	if(m_parameters[m_roundingName].GetIntVal() == ROUND_TRUNCATE)
-		npoints = prev_pow2(npoints_raw);
-	else
-		npoints = next_pow2(npoints_raw);
-	LogTrace("FFTFilter: processing %zu raw points\n", npoints_raw);
-	LogTrace("Rounded to %zu\n", npoints);
+	const size_t npoints = din->size();
+	LogTrace("FFTFilter: processing %zu input samples\n", npoints);
 
 	//Reallocate buffers if size has changed
 	const size_t nouts = npoints/2 + 1;
 	m_cachedNumOuts = nouts;
-	if(m_cachedNumPoints != npoints_raw)
-		ReallocateBuffers(npoints_raw, npoints, nouts);
+	if(m_cachedNumPoints != npoints)
+		ReallocateBuffers(npoints, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
 	DoRefresh(din, din->m_samples, din->m_timescale, npoints, nouts, true, cmdBuf, queue);
@@ -194,7 +182,7 @@ void FFTFilter::DoRefresh(
 {
 	//Look up some parameters
 	double sample_ghz = 1e6 / fs_per_sample;
-	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
+	double bin_hz = round(0.5f * sample_ghz * 1e9f / nouts);
 	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
 	LogTrace("bin_hz: %f\n", bin_hz);
 

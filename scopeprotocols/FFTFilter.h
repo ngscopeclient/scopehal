@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -71,12 +71,6 @@ public:
 		WINDOW_BLACKMAN_HARRIS
 	};
 
-	enum RoundingMode
-	{
-		ROUND_TRUNCATE,
-		ROUND_ZERO_PAD
-	};
-
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 	void SetWindowFunction(WindowFunction f)
@@ -115,7 +109,6 @@ protected:
 	float m_offset;
 
 	std::string m_windowName;
-	std::string m_roundingName;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
 
