@@ -51,7 +51,8 @@ layout(std430, push_constant) uniform constants
 	float	nmax;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define Y_SIZE 64
+layout(local_size_x=8, local_size_y=Y_SIZE, local_size_z=1) in;
 
 void main()
 {
@@ -68,7 +69,7 @@ void main()
 
 	float delta = nmax - nmin;
 	float fbins = float(bins);
-	for(uint i=istart+1; i < iend; i ++)
+	for(uint i=istart+1+gl_LocalInvocationID.y; i < iend; i += Y_SIZE)
 	{
 		float fbin = (pin[i] - nmin) / delta;
 

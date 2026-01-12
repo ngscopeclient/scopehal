@@ -770,7 +770,7 @@ public:
 			return;
 
 		const uint32_t nthreads = 4096;
-		const uint32_t threadsPerBlock = 64;
+		const uint32_t threadsPerBlock = 8;
 
 		//Fill the input histogram with zeroes CPU side for now
 		//TODO: GPU side fill
