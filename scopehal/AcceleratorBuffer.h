@@ -983,6 +983,26 @@ public:
 	}
 
 	/**
+		@brief Prepares the buffer to be accessed from the CPU, but does not copy GPU-side data to the CPU.
+
+		This function can be used instead of PrepareForCpuAccess() for improved performance if you intend to
+		completely overwrite the buffer contents on the CPU, and thus do not need to copy GPU_side data back.
+	 */
+	void PrepareForCpuAccessIgnoringGpuData()
+	{
+		//Early out if no content
+		if(m_size == 0)
+			return;
+
+		//If there's no buffer at all on the CPU, allocate one
+		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
+			AllocateCpuBuffer(m_capacity);
+
+		m_gpuPhysMemIsStale = true;
+		m_cpuPhysMemIsStale = false;
+	}
+
+	/**
 		@brief Prepares the buffer to be accessed from the CPU, without blocking
 
 		This MUST be called prior to accessing the CPU-side buffer to ensure that m_cpuPtr is valid and up to date.

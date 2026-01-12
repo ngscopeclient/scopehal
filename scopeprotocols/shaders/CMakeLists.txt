@@ -43,6 +43,7 @@ add_compute_shaders(
 		ComplexToLogMagnitude.glsl
 		ComplexToMagnitude.glsl
 		CosineSumWindow.glsl
+		DDJMeasurement.glsl
 		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
 		Ethernet100BaseTX_4b5bDecode.glsl
