@@ -53,7 +53,7 @@ void main()
 {
 	//Search interleaved for more efficient memory accesses
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	uint end = len - 10;
+	uint end = len - 11;
 	bool found = false;
 	for(uint i=gl_GlobalInvocationID.x; i < end; i += numThreads)
 	{

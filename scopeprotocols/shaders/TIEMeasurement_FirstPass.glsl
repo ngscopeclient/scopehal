@@ -64,6 +64,8 @@ void main()
 	//Get the timestamp of our first edge
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 	uint i = gl_GlobalInvocationID.x * maxEdgesPerThread;
+	if(i > nedges)
+		return;
 	int64_t target = clockEdges[i];
 
 	//Binary search for the first golden clock edge after this sample

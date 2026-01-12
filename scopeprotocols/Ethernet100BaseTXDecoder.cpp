@@ -286,8 +286,6 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 		m_findSSDOutput.resize(numThreads);
 
-		size_t ilen = din->size();
-
 		cmdBuf.begin({});
 
 		//Descramble
@@ -296,7 +294,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		//Look for SSD
 		m_findSSDComputePipeline->BindBufferNonblocking(0, m_descrambledBits, cmdBuf);
 		m_findSSDComputePipeline->BindBufferNonblocking(1, m_findSSDOutput, cmdBuf, true);
-		m_findSSDComputePipeline->Dispatch(cmdBuf, (uint32_t)ilen, numBlocks);
+		m_findSSDComputePipeline->Dispatch(cmdBuf, (uint32_t)m_descrambledBits.size(), numBlocks);
 		m_findSSDOutput.MarkModifiedFromGpu();
 		m_findSSDOutput.PrepareForCpuAccessNonblocking(cmdBuf);
 

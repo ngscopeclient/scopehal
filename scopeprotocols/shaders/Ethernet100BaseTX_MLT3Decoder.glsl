@@ -62,7 +62,8 @@ int GetState(float voltage)
 void main()
 {
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	for(uint i=gl_GlobalInvocationID.x; i < len; i += numThreads)
+	uint end = len - 1;
+	for(uint i=gl_GlobalInvocationID.x; i < end; i += numThreads)
 	{
 		float a = din[i];
 		float b = din[i+1];
