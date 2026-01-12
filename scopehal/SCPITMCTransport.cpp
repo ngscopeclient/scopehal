@@ -168,7 +168,7 @@ void SCPITMCTransport::SendRawData(size_t len, const unsigned char* buf)
 	write(m_handle, (const char *)buf, len);
 }
 
-size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
+size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress)
 {
 	// Data in the staging buffer is assumed to always be a consequence of a SendCommand request.
 	// Since we fetch all the reply data in one go, once all this data has been fetched, we mark
@@ -180,35 +180,53 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf, std::functi
 
 	if (!m_data_depleted)
 	{
-		if (m_data_in_staging_buf == 0)
+		if (m_data_in_staging_buf == 0 || (m_data_in_staging_buf - m_data_offset) < (int)len)
 		{
 
+			if (m_data_in_staging_buf == 0)
+				m_data_offset = 0;
 #if 0
 			// This is what we'd use if we could be sure that the installed Linux kernel had
 			// usbtmc driver v2.
-			m_data_in_staging_buf = read(m_handle, (char *)m_staging_buf, m_staging_buf_size);
+			int packet = 0;
+			do
+			{
+				m_data_in_staging_buf += read(m_handle, (char *)m_staging_buf + m_data_in_staging_buf, m_staging_buf_size - m_data_in_staging_buf);
+
+				if (progress && packet > 0)
+					progress((float)(m_data_in_staging_buf - m_data_offset) / (float)len);
+				packet += 1;
+			} while((m_data_in_staging_buf - m_data_offset) < (int)len);
 #else
 			// Split up one potentially large read into a bunch of smaller ones.
 			// The performance impact of this is pretty small.
 			const int max_bytes_per_req = 2032;
-			int i = 0;
+			int i = m_data_in_staging_buf;
 			int bytes_fetched, bytes_requested;
+			int packet = 0;
 
 			do
 			{
-				if(m_fix_buggy_driver == false)
+				do
 				{
-				    bytes_requested = (max_bytes_per_req < len) ? max_bytes_per_req : len;
-				    bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_staging_buf_size);
-				}
-				else
-				{
-					// limit each request to m_transfer_size
-					bytes_requested = m_transfer_size;
-				    bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_transfer_size);
-				}
-				i += bytes_fetched;
-			} while(bytes_fetched == bytes_requested);
+					if(m_fix_buggy_driver == false)
+					{
+						bytes_requested = (max_bytes_per_req < len) ? max_bytes_per_req : len;
+						bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_staging_buf_size - i);
+					}
+					else
+					{
+						// limit each request to m_transfer_size
+						bytes_requested = m_transfer_size;
+						bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_transfer_size);
+					}
+					i += bytes_fetched;
+				} while(bytes_fetched == bytes_requested);
+
+				if (progress && packet > 0)
+					progress((float)(i - m_data_offset) / (float)len);
+				packet += 1;
+			} while((i - m_data_offset) < (int)len);
 
 			m_data_in_staging_buf = i;
 #endif
@@ -229,7 +247,9 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf, std::functi
 		}
 
 		if (m_data_offset == m_data_in_staging_buf)
+		{
 			m_data_depleted = true;
+		}
 	}
 	else
 	{
