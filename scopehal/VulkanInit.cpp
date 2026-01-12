@@ -768,12 +768,14 @@ bool VulkanInit(bool skipGLFW)
 					auto atomicFloatFeatures = std::get<4>(features2);
 
 					//Atomic float on shared memory is core, but SSBOs is an extension
-					if(atomicFloatFeatures.shaderBufferFloat32Atomics)
+					if(atomicFloatFeatures.shaderBufferFloat32Atomics && atomicFloatFeatures.shaderSharedFloat32Atomics)
 					{
-						LogDebug("Enabling 32-bit atomic float support for SSBOs\n");
+						LogDebug("Enabling 32-bit atomic float support for SSBOs and shared memory\n");
 
 						featuresAtomicFloat.shaderBufferFloat32Atomics = true;
 						featuresAtomicFloat.shaderBufferFloat32AtomicAdd = true;
+						featuresAtomicFloat.shaderSharedFloat32Atomics = true;
+						featuresAtomicFloat.shaderSharedFloat32AtomicAdd = true;
 						featuresAtomicFloat.pNext = pNext;
 						pNext = &featuresAtomicFloat;
 					}
