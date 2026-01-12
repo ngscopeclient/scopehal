@@ -52,13 +52,27 @@ public:
 	float GetLevel()
 	{ return m_level.GetFloatVal(); }
 
+	float GetUpperLevel()
+	{ return m_level.GetFloatVal(); }
+
 	/**
 		@brief Sets the trigger level
 
 		@param level	Trigger level
 	 */
 	void SetLevel(float level)
-	{ m_level.SetFloatVal(level); }
+	{
+		m_level.SetFloatVal(level);
+		m_triggerLevel.SetFloatVal(level);
+		m_upperLevel.SetFloatVal(level);
+	}
+
+	void SetUpperLevel(float level)
+	{
+		m_level.SetFloatVal(level);
+		m_triggerLevel.SetFloatVal(level);
+		m_upperLevel.SetFloatVal(level);
+	}
 
 	///@brief Gets the scope this trigger is attached to
 	Oscilloscope* GetScope()
@@ -102,6 +116,8 @@ protected:
 
 	///@brief "Trigger level" parameter
 	FilterParameter& m_level;
+	FilterParameter& m_triggerLevel;
+	FilterParameter& m_upperLevel;
 
 public:
 	virtual std::string GetTriggerDisplayName() =0;

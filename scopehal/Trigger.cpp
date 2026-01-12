@@ -51,8 +51,17 @@ Trigger::CreateMapType Trigger::m_createprocs;
 Trigger::Trigger(Oscilloscope* scope)
 	: m_scope(scope)
 	, m_level(m_parameters["Lower Level"])
+	, m_triggerLevel(m_parameters["Level Trigger"])
+	, m_upperLevel(m_parameters["Level Upper"])
 {
 	m_level = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+
+	//Trigger and Upper Level are copies of Level and contain the same value.
+	//They differ only in name. They are used in the R&S RTB2k driver.
+	m_triggerLevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_triggerLevel.MarkHidden();
+	m_upperLevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_upperLevel.MarkHidden();
 }
 
 Trigger::~Trigger()

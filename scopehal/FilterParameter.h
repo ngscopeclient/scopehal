@@ -219,8 +219,8 @@ public:
 		calculates coefficients or other configuration based on user input. The coefficients are no longer direct user
 		inputs, so they should be marked hidden to avoid confusing the user.
 	 */
-	void MarkHidden()
-	{ m_hidden = true; }
+	void MarkHidden(bool hidden = true)
+	{ m_hidden = hidden; }
 
 	/**
 		@brief Checks if this parameter should be hidden in the GUI.
