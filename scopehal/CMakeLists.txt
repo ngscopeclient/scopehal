@@ -107,6 +107,14 @@ set(SCOPEHAL_SOURCES
 	UartTrigger.cpp
 	WindowTrigger.cpp
 
+	RSRTB2kEdgeTrigger.cpp
+	RSRTB2kLineTrigger.cpp
+	RSRTB2kRiseTimeTrigger.cpp
+	RSRTB2kRuntTrigger.cpp
+	RSRTB2kTimeoutTrigger.cpp
+	RSRTB2kVideoTrigger.cpp
+	RSRTB2kWidthTrigger.cpp
+
 	Instrument.cpp
 	InstrumentChannel.cpp
 	BERT.cpp
@@ -181,6 +189,7 @@ set(SCOPEHAL_SOURCES
 	PicoVNA.cpp
 	RigolFunctionGenerator.cpp
 	RigolOscilloscope.cpp
+	RSRTB2kOscilloscope.cpp
 	SiglentLoad.cpp
 	SiglentFunctionGenerator.cpp
 	SiglentPowerSupply.cpp

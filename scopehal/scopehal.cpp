@@ -53,6 +53,7 @@
 #include "PicoOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
+#include "RSRTB2kOscilloscope.h"
 #include "RSRTO6Oscilloscope.h"
 #include "SCPIPowerSupply.h"
 #include "SiglentSCPIOscilloscope.h"
@@ -107,6 +108,14 @@
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
+
+#include "RSRTB2kEdgeTrigger.h"
+#include "RSRTB2kLineTrigger.h"
+#include "RSRTB2kRiseTimeTrigger.h"
+#include "RSRTB2kRuntTrigger.h"
+#include "RSRTB2kTimeoutTrigger.h"
+#include "RSRTB2kVideoTrigger.h"
+#include "RSRTB2kWidthTrigger.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -247,6 +256,7 @@ void DriverStaticInit()
 	AddDriverClass(PicoOscilloscope);
 	AddDriverClass(RigolOscilloscope);
 	AddDriverClass(RohdeSchwarzOscilloscope);
+	AddDriverClass(RSRTB2kOscilloscope);
 	AddDriverClass(RSRTO6Oscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(LeCroyFWPOscilloscope);
@@ -304,6 +314,14 @@ void DriverStaticInit()
 	AddTriggerClass(SlewRateTrigger);
 	AddTriggerClass(UartTrigger);
 	AddTriggerClass(WindowTrigger);
+
+	AddTriggerClass(RSRTB2kEdgeTrigger);
+	AddTriggerClass(RSRTB2kLineTrigger);
+	AddTriggerClass(RSRTB2kRiseTimeTrigger);
+	AddTriggerClass(RSRTB2kRuntTrigger);
+	AddTriggerClass(RSRTB2kTimeoutTrigger);
+	AddTriggerClass(RSRTB2kVideoTrigger);
+	AddTriggerClass(RSRTB2kWidthTrigger);
 }
 
 string GetDefaultChannelColor(int i)
