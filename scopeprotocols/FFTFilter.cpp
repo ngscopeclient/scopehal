@@ -45,7 +45,7 @@ FFTFilter::FFTFilter(const string& color)
 	, m_complexToMagnitudeComputePipeline("shaders/ComplexToMagnitude.spv", 2, sizeof(ComplexToMagnitudeArgs))
 	, m_complexToLogMagnitudeComputePipeline("shaders/ComplexToLogMagnitude.spv", 2, sizeof(ComplexToMagnitudeArgs))
 {
-	m_xAxisUnit = Unit(Unit::UNIT_HZ);
+	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
@@ -157,6 +157,9 @@ void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	}
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
+	//Force unit to uHz at this point, because legacy scopesessions with unit of Hz need to be converted
+	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
+
 	const size_t npoints = din->size();
 	LogTrace("FFTFilter: processing %zu input samples\n", npoints);
 
@@ -182,14 +185,16 @@ void FFTFilter::DoRefresh(
 {
 	//Look up some parameters
 	double sample_ghz = 1e6 / fs_per_sample;
-	double bin_hz = round(0.5f * sample_ghz * 1e9f / nouts);
+	double bin_uhz_raw = 0.5f * sample_ghz * 1e15f / nouts;
+	LogTrace("sample_ghz = %f, bin_uhz_raw = %f\n", sample_ghz, bin_uhz_raw);
+	int64_t bin_uhz = round(bin_uhz_raw);
 	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
-	LogTrace("bin_hz: %f\n", bin_hz);
+	LogTrace("bin_uhz: %" PRIi64 " (%s)\n", bin_uhz, Unit(Unit::UNIT_MICROHZ).PrettyPrint(bin_uhz).c_str());
 
 	//Set up output and copy time scales / configuration
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_triggerPhase = 0;	//first peak is DC
-	cap->m_timescale = bin_hz;
+	cap->m_timescale = bin_uhz;
 	cap->Resize(nouts);
 
 	//If we have too big a FFT at low sample rate we can run below 1 Hz resolution and bork

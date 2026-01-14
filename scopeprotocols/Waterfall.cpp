@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,7 +62,7 @@ Waterfall::Waterfall(const string& color)
 	, m_computePipeline("shaders/WaterfallFilter.spv", 3, sizeof(WaterfallFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_WATERFALL);
-	m_xAxisUnit = Unit(Unit::UNIT_HZ);
+	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
 
 	m_parameters[m_maxwidth] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_maxwidth].SetIntVal(131072);
@@ -81,7 +81,7 @@ bool Waterfall::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if( (i == 0) &&
 		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-		(stream.m_channel->GetXAxisUnits() == Unit::UNIT_HZ)
+		(stream.m_channel->GetXAxisUnits() == Unit::UNIT_MICROHZ)
 		)
 	{
 		return true;
@@ -121,9 +121,12 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
+
+	//Force unit to uHz at this point, because legacy scopesessions with unit of Hz need to be converted
+	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
 
 	//Get the input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
