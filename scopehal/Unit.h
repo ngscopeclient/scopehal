@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -92,6 +92,7 @@ public:
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 		UNIT_MICROVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 		UNIT_VOLT_SEC,      //Hack needed to measure area under the curve in terms of volt-seconds
+		UNIT_MICROHZ,		//Hack needed for accurate timing in FFT filter
 
 		UNIT_BYTES,			//used mostly for displaying memory usage
 

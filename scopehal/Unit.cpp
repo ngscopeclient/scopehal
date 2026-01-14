@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -113,6 +113,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_W_M2;
 	else if(rhs == "μA")
 		m_type = UNIT_MICROAMPS;
+	else if(rhs == "μHz")
+		m_type = UNIT_MICROHZ;
 	else if(rhs == "F")
 		m_type = UNIT_FARADS;
 	else
@@ -215,6 +217,9 @@ string Unit::ToString() const
 
 		case UNIT_MICROAMPS:
 			return "μA";
+
+		case UNIT_MICROHZ:
+			return "μHz";
 
 		case UNIT_VOLT_SEC:
 			return "Vs";
@@ -404,6 +409,43 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			suffix = "A";
 
 			if(fabs(num) >= 1e12)
+			{
+				scaleFactor = 1e-12;
+				prefix = "M";
+			}
+			else if(fabs(num) >= 1e9)
+			{
+				scaleFactor = 1e-9;
+				prefix = "k";
+			}
+			else if(fabs(num) >= 1e6)
+			{
+				scaleFactor = 1e-6;
+				prefix = "";
+			}
+			else if(fabs(num) >= 1e3)
+			{
+				scaleFactor = 1e-3;
+				prefix = "m";
+			}
+			else
+			{
+				scaleFactor = 1;
+				prefix = "μ";
+			}
+
+			break;
+
+		//uHz is not a SI base unit either
+		case UNIT_MICROHZ:
+			suffix = "Hz";
+
+			if(fabs(num) >= 1e15)
+			{
+				scaleFactor = 1e-15;
+				prefix = "G";
+			}
+			else if(fabs(num) >= 1e12)
 			{
 				scaleFactor = 1e-12;
 				prefix = "M";
@@ -1060,6 +1102,7 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 				break;
 
 			case Unit::UNIT_MICROVOLTS:
+			case Unit::UNIT_MICROHZ:
 				ret *= 1e6;
 				break;
 
@@ -1121,6 +1164,7 @@ int64_t Unit::ParseStringInt64(const string& str, bool useDisplayLocale)
 				break;
 
 			case Unit::UNIT_MICROVOLTS:
+			case Unit::UNIT_MICROHZ:
 				mulscale = 1e6;
 				break;
 
