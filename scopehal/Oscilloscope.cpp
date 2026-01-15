@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -550,9 +550,9 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 		}
 	}
 	if(node["rate"])
-		SetSampleRate(node["rate"].as<unsigned long>());
+		SetSampleRate(node["rate"].as<uint64_t>());
 	if(node["depth"])
-		SetSampleDepth(node["depth"].as<unsigned long>());
+		SetSampleDepth(node["depth"].as<uint64_t>());
 	if(node["samplemode"])
 	{
 		if(node["samplemode"].as<string>() == "equivalent")
@@ -562,9 +562,9 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 
 		//Set rate and depth again after setting sampling mode since this sometimes causes them to change
 		if(node["rate"])
-			SetSampleRate(node["rate"].as<unsigned long>());
+			SetSampleRate(node["rate"].as<uint64_t>());
 		if(node["depth"])
-			SetSampleDepth(node["depth"].as<unsigned long>());
+			SetSampleDepth(node["depth"].as<uint64_t>());
 	}
 	if(node["triggerpos"])
 		SetTriggerOffset(node["triggerpos"].as<int64_t>());
