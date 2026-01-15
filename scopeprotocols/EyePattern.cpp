@@ -190,11 +190,19 @@ void EyePattern::Refresh(
 	#endif
 
 	LogIndenter li;
+	ClearErrors();
 
 	if(!VerifyAllInputsOK())
 	{
 		//if input goes momentarily bad, don't delete output - just stop updating
 		//SetData(NULL, 0);
+
+		m_errorTitle = "Missing inputs";
+		if(!GetInput(0))
+			m_errorLog += "No signal input connected\n";
+		if(!GetInput(1))
+			m_errorLog += "No clock input connected\n";
+
 		return;
 	}
 
@@ -257,7 +265,9 @@ void EyePattern::Refresh(
 				break;
 
 			default:
-				LogWarning("Don't know how to find midpoints for %zu-level eye\n", cap->m_numLevels);
+				m_errorTitle = "Unimplemented modulation order";
+				m_errorLog += string("Don't know how to find midpoints for ") +
+					to_string(cap->m_numLevels) + " level eye\n";
 				break;
 		}
 	}
@@ -310,7 +320,11 @@ void EyePattern::Refresh(
 
 	//If no clock edges, don't change anything
 	if(m_clockEdgesMuxed->empty())
+	{
+		m_errorTitle = "No clock edges";
+		m_errorLog += "The clock signal does not have any toggles\n";
 		return;
+	}
 
 	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)

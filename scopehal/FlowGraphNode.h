@@ -145,11 +145,15 @@ public:
 
 	///@brief Checks if this graph node reported any errors the last time it was refreshed
 	bool HasErrors()
-	{ return !m_errorLog.empty(); }
+	{ return !m_errorTitle.empty(); }
 
 	///@brief Returns the error log from this filter block, if any
 	const std::string& GetErrorLog()
 	{ return m_errorLog; }
+
+	///@brief Returns the error message title from this filter block, if any
+	const std::string& GetErrorTitle()
+	{ return m_errorTitle; }
 
 	//Input handling helpers
 protected:
@@ -212,11 +216,21 @@ public:
 
 protected:
 
+	///@brief Remove any error messages left over from the last graph refresh
+	void ClearErrors()
+	{
+		m_errorTitle = "";
+		m_errorLog = "";
+	}
+
 	///@brief Signal emitted when the set of parameters changes
 	sigc::signal<void()> m_parametersChangedSignal;
 
 	///@brief Signal emitted when the set of inputs changes
 	sigc::signal<void()> m_inputsChangedSignal;
+
+	///@brief Title / summary of error messages from the most recent filter refresh
+	std::string m_errorTitle;
 
 	///@brief Log of error messages from the most recent filter refresh
 	std::string m_errorLog;
