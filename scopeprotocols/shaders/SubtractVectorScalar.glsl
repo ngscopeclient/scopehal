@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,74 +27,33 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@brief Declaration of Averager
- */
+#version 430
+#pragma shader_stage(compute)
 
-#ifndef Averager_h
-#define Averager_h
-
-struct __attribute__((packed)) ReductionSumPushConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	uint32_t numSamples;
-	uint32_t numThreads;
-	uint32_t samplesPerThread;
+	float din[];
 };
 
-/**
-	@brief Helper for GPU accelerated waveform averaging
- */
-class Averager
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	Averager();
-
-	template<class T>
-	__attribute__((noinline))
-	float Average(
-		T* wfm,
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue)
-	{
-		AssertTypeIsAnalogWaveform(wfm);
-
-		//This value experimentally gives the best speedup for an NVIDIA 2080 Ti vs an Intel Xeon Gold 6144
-		//Maybe consider dynamic tuning in the future at initialization?
-		const uint64_t numThreads = 16384;
-
-		cmdBuf.begin({});
-
-		//Do the reduction summation
-		size_t depth = wfm->size();
-		ReductionSumPushConstants push;
-		push.numSamples = depth;
-		push.numThreads = numThreads;
-		push.samplesPerThread = (depth + numThreads) / numThreads;
-		m_temporaryResults.resize(numThreads);
-
-		m_computePipeline->BindBufferNonblocking(0, m_temporaryResults, cmdBuf, true);
-		m_computePipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
-		m_computePipeline->Dispatch(cmdBuf, push, numThreads, 1);
-
-		m_temporaryResults.MarkModifiedFromGpu();
-
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-
-		//Do the final summation
-		m_temporaryResults.PrepareForCpuAccess();
-		float finalSum = 0;
-		for(uint64_t i=0; i<numThreads; i++)
-			finalSum += m_temporaryResults[i];
-
-		return finalSum / depth;
-	}
-
-protected:
-	std::unique_ptr<ComputePipeline> m_computePipeline;
-
-	AcceleratorBuffer<float> m_temporaryResults;
+	float dout[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	float delta;
+	uint offsetIn;
+	uint size;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
+		return;
+
+	dout[i] = din[i + offsetIn] - delta;
+}

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,41 +46,4 @@ Averager::Averager()
 	//we need this readable from the CPU to do the final summation
 	m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-}
-
-float Averager::Average(
-	UniformAnalogWaveform* wfm,
-	vk::raii::CommandBuffer& cmdBuf,
-	shared_ptr<QueueHandle> queue)
-{
-	//This value experimentally gives the best speedup for an NVIDIA 2080 Ti vs an Intel Xeon Gold 6144
-	//Maybe consider dynamic tuning in the future at initialization?
-	const uint64_t numThreads = 16384;
-
-	cmdBuf.begin({});
-
-	//Do the reduction summation
-	size_t depth = wfm->size();
-	ReductionSumPushConstants push;
-	push.numSamples = depth;
-	push.numThreads = numThreads;
-	push.samplesPerThread = (depth + numThreads) / numThreads;
-	m_temporaryResults.resize(numThreads);
-
-	m_computePipeline->BindBufferNonblocking(0, m_temporaryResults, cmdBuf, true);
-	m_computePipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
-	m_computePipeline->Dispatch(cmdBuf, push, numThreads, 1);
-
-	m_temporaryResults.MarkModifiedFromGpu();
-
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
-	//Do the final summation
-	m_temporaryResults.PrepareForCpuAccess();
-	float finalSum = 0;
-	for(uint64_t i=0; i<numThreads; i++)
-		finalSum += m_temporaryResults[i];
-
-	return finalSum / depth;
 }

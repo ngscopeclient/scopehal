@@ -59,6 +59,7 @@ add_compute_shaders(
 		SubtractFilter.glsl
 		SubtractInPlace.glsl
 		SubtractOutOfPlace.glsl
+		SubtractVectorScalar.glsl
 		TIEMeasurement_FirstPass.glsl
 		TIEMeasurement_SecondPass.glsl
 		Threshold.glsl
