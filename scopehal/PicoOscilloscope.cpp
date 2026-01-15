@@ -1334,12 +1334,29 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 vector<Oscilloscope::DigitalBank> PicoOscilloscope::GetDigitalBanks()
 {
 	vector<DigitalBank> banks;
-	for(size_t i=0; i<m_digitalChannelCount; i++)
+
+	if(m_picoSeries == 6)
 	{
-		DigitalBank bank;
-		bank.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
-		banks.push_back(bank);
+		for(size_t i=0; i<m_digitalChannelCount; i++)
+		{
+			DigitalBank bank;
+			bank.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
+			banks.push_back(bank);
+		}
 	}
+	else if(m_model.find("MSO") != string::npos)
+	{
+		DigitalBank bank1;
+		DigitalBank bank2;
+		for(size_t i=0; i<8; i++)
+		{
+			bank1.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
+			bank2.push_back(GetOscilloscopeChannel(m_digitalChannelBase + 8 + i));
+		}
+		banks.push_back(bank1);
+		banks.push_back(bank2);
+	}
+
 	return banks;
 }
 
