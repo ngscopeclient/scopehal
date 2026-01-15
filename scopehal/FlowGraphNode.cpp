@@ -99,7 +99,13 @@ void FlowGraphNode::Refresh()
  */
 void FlowGraphNode::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wdeprecated"
+
+	//This is the deprecated legacy method signature, but we don't want to warn on this call to it
 	Refresh();
+
+	#pragma GCC diagnostic pop
 }
 
 /**
