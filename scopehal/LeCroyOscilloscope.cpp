@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -3083,7 +3083,7 @@ void LeCroyOscilloscope::ForceTrigger()
 float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 0;
 
 	{
@@ -3110,7 +3110,7 @@ float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return;
 
 	char tmp[128];
@@ -3127,7 +3127,7 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float off
 float LeCroyOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 1;
 
 	{
@@ -3724,7 +3724,7 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 		return 1;
 
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 1;
 
 	{
@@ -3749,7 +3749,7 @@ void LeCroyOscilloscope::SetNumAverages(size_t i, size_t navg)
 		return;
 
 	//not meaningful for trigger or digital channels
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return;
 
 	m_transport->SendCommandQueued(
