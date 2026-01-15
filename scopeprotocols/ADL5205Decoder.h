@@ -71,7 +71,7 @@ class ADL5205Decoder : public Filter
 public:
 	ADL5205Decoder(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
