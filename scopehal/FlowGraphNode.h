@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -131,11 +131,25 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Filter evaluation
+
+	//Legacy prototype that isn't GPU capable
 	[[deprecated]]
 	virtual void Refresh();
 
 	//Filter evaluation (GPU accelerated)
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Error detection and reporting
+public:
+
+	///@brief Checks if this graph node reported any errors the last time it was refreshed
+	bool HasErrors()
+	{ return !m_errorLog.empty(); }
+
+	///@brief Returns the error log from this filter block, if any
+	const std::string& GetErrorLog()
+	{ return m_errorLog; }
 
 	//Input handling helpers
 protected:
@@ -203,6 +217,9 @@ protected:
 
 	///@brief Signal emitted when the set of inputs changes
 	sigc::signal<void()> m_inputsChangedSignal;
+
+	///@brief Log of error messages from the most recent filter refresh
+	std::string m_errorLog;
 };
 
 #endif
