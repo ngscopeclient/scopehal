@@ -480,6 +480,8 @@ public:
 		float& vmax
 		)
 	{
+		AssertTypeIsAnalogWaveform(cap);
+
 		//GPU side min/max
 		const uint32_t nthreads = 4096;
 		const uint32_t threadsPerBlock = 64;
