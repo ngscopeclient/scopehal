@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -70,14 +70,20 @@ BusHeatmapFilter::~BusHeatmapFilter()
 
 bool BusHeatmapFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//for now only support canbus
-	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
+}
+
+Filter::DataLocation BusHeatmapFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,25 +97,34 @@ string BusHeatmapFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-FlowGraphNode::DataLocation BusHeatmapFilter::GetInputLocation()
+void BusHeatmapFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	return LOC_DONTCARE;
-}
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("BusHeatmapFilter::Refresh");
+	#endif
 
-void BusHeatmapFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
-{
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
 	auto din = dynamic_cast<CANWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
+		AddErrorMessage("Missing inputs", "No waveform available at input");
 		SetData(nullptr, 0);
 		return;
 	}
+	din->PrepareForCpuAccess();
 
 	//Extract parameters for density scaling
 	int64_t xscale = m_parameters[m_xBinSize].GetIntVal();
@@ -117,6 +132,7 @@ void BusHeatmapFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Q
 	int64_t maxy = m_parameters[m_maxAddress].GetIntVal();
 	if( (xscale == 0) || (yscale == 0) )
 	{
+		AddErrorMessage("Bad scale", "X and Y scale must be nonzero");
 		SetData(nullptr, 0);
 		return;
 	}
