@@ -51,6 +51,19 @@ BaseMeasurement::BaseMeasurement(const string& color)
 
 		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
 	}
+
+	if(g_hasShaderInt64)
+	{
+		m_firstPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/BaseMeasurement_FirstPass.spv", 3, sizeof(BasePushConstants));
+		m_finalPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/BaseMeasurement_FinalPass.spv", 6, sizeof(BasePushConstants));
+
+		m_firstPassOffsets.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_firstPassSamples.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+		m_finalSampleCount.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,7 +118,6 @@ void BaseMeasurement::Refresh(
 		return;
 	}
 	size_t len = in->size();
-	PrepareForCpuAccess(sin, uin);
 
 	//Copy input unit to output
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
@@ -132,6 +144,7 @@ void BaseMeasurement::Refresh(
 	//CPU fallback
 	else
 	{
+		PrepareForCpuAccess(sin, uin);
 		m_histogramBuf.PrepareForCpuAccess();
 
 		auto hist = MakeHistogram(sin, uin, vmin, vmax, nbins);
@@ -160,15 +173,81 @@ void BaseMeasurement::Refresh(
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(in, 0, true);
 	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
+
+	//GPU side inner loop
+	//TODO: support sparse
+	if(g_hasShaderInt64 && uin)
+	{
+		float range = (vmax - vmin);
+
+		const uint32_t nthreads = 4096;
+
+		BasePushConstants cfg;
+		cfg.len = len;
+		cfg.vmin = vmin;
+		cfg.mid = range/2 + vmin;
+		cfg.global_base = fbin*range + vmin;
+		cfg.bufferPerThread = GetComputeBlockCount(len/2, nthreads) + 1;
+		cfg.timescale = in->m_timescale;
+		cfg.triggerPhase = in->m_triggerPhase;
+		cfg.range = range;
+
+		cmdBuf.begin({});
+
+		//Resize scratch buffers assuming we have (at most) one sample per two input edges
+		//(Offset buffer also needs one entry per thread for size output)
+		//We can get away with slightly less sample buffer but this keeps indexing math simple
+		m_firstPassOffsets.resize(cfg.bufferPerThread * nthreads);
+		m_firstPassSamples.resize(cfg.bufferPerThread * nthreads);
+
+		//First pass: look for edges in each block
+		m_firstPassComputePipeline->BindBufferNonblocking(0, uin->m_samples, cmdBuf);
+		m_firstPassComputePipeline->BindBufferNonblocking(1, m_firstPassOffsets, cmdBuf, true);
+		m_firstPassComputePipeline->BindBufferNonblocking(2, m_firstPassSamples, cmdBuf, true);
+		m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(nthreads, 64));
+		m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_firstPassOffsets.MarkModifiedFromGpu();
+		m_firstPassSamples.MarkModifiedFromGpu();
+
+		//Second pass: coalesce outputs into one
+		cap->Resize(len/2);
+		m_finalSampleCount.resize(1);
+
+		m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassOffsets, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassSamples, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(2, cap->m_offsets, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_durations, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(5, m_finalSampleCount, cmdBuf, true);
+		m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(nthreads, 64));
+		m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		cap->MarkModifiedFromGpu();
+		m_finalSampleCount.MarkModifiedFromGpu();
+
+		m_finalSampleCount.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		//Done
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Update size
+		cap->Resize(m_finalSampleCount[0]);
+
+		//Fallback: if no samples found, maybe the frequency was too low for the GPU version. Use the CPU instead?
+		//TODO: make the shader able to handle frequencies lower than one cycle per thread
+	}
 
 	//CPU side inner loop
-	if(sin)
+	else if(sin)
 		InnerLoop(sin, cap, len, vmin, vmax, fbin);
 	else
 		InnerLoop(uin, cap, len, vmin, vmax, fbin);
 
 	//Compute average of all
+	//TODO: do this GPU side too
+	cap->PrepareForCpuAccess();
 	double sum = 0;
 	for(auto f : cap->m_samples)
 		sum += f;

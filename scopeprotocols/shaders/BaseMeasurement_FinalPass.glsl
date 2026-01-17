@@ -27,142 +27,94 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of BaseMeasurement
- */
-#ifndef BaseMeasurement_h
-#define BaseMeasurement_h
+#version 460
+#pragma shader_stage(compute)
 
-class BasePushConstants
+#extension GL_ARB_gpu_shader_int64 : require
+
+layout(std430, binding=0) restrict readonly buffer buf_offsetsFirstIn
 {
-public:
-	int64_t		timescale;
-	int64_t		triggerPhase;
-	uint32_t	bufferPerThread;
-	uint32_t	len;
-	float		vmin;
-	float		mid;
-	float		range;
-	float		global_base;
+	int64_t offsetsIn[];
 };
 
-class BaseMeasurement : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_samplesIn
 {
-public:
-	BaseMeasurement(const std::string& color);
+	float samplesIn[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+layout(std430, binding=2) restrict writeonly buffer buf_offsets
+{
+	int64_t offsets[];
+};
 
-	static std::string GetProtocolName();
+layout(std430, binding=3) restrict writeonly buffer buf_samplesOut
+{
+	float samplesOut[];
+};
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+layout(std430, binding=4) restrict writeonly buffer buf_durations
+{
+	int64_t durations[];
+};
 
-	PROTOCOL_DECODER_INITPROC(BaseMeasurement)
+layout(std430, binding=5) restrict writeonly buffer buf_finalCount
+{
+	int64_t finalCount[];
+};
 
-protected:
+layout(std430, push_constant) uniform constants
+{
+	int64_t	timescale;
+	int64_t	triggerPhase;
+	uint	bufferPerThread;
+	uint 	len;
+	float 	vmin;
+	float 	mid;
+	float	range;
+	float	global_base;
+};
 
-	//Minmax calculation
-	ComputePipeline m_minmaxPipeline;
-	AcceleratorBuffer<float> m_minbuf;
-	AcceleratorBuffer<float> m_maxbuf;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	//Histogram calculation
-	std::shared_ptr<ComputePipeline> m_histogramPipeline;
-	AcceleratorBuffer<uint64_t> m_histogramBuf;
+void main()
+{
+	//Initial starting sample indexes for this thread
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint nLastThread = numThreads - 1;
 
-	//Base calculation
-	std::shared_ptr<ComputePipeline> m_firstPassComputePipeline;
-	AcceleratorBuffer<int64_t> m_firstPassOffsets;
-	AcceleratorBuffer<float> m_firstPassSamples;
-	AcceleratorBuffer<int64_t> m_finalSampleCount;
-	std::shared_ptr<ComputePipeline> m_finalPassComputePipeline;
+	//Get starting input and output indexes
+	uint writebase = 0;
+	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
+		writebase += uint(offsetsIn[i * bufferPerThread]);
+	uint readbase = gl_GlobalInvocationID.x * bufferPerThread + 1;
 
-	template<class T>
-	void InnerLoop(
-		T* din,
-		SparseAnalogWaveform* cap,
-		size_t len,
-		float vmin,
-		float vmax,
-		float fbin)
+	//See how many samples this block is copying
+	uint count = uint(offsetsIn[readbase - 1]);
+
+	//Copy samples
+	for(uint i=0; i<count; i ++)
 	{
-		cap->PrepareForCpuAccess();
-		din->PrepareForCpuAccess();
+		uint iin = readbase + i;
+		uint iout = writebase + i;
+		int64_t offset = offsetsIn[iin];
+		offsets[iout] = offset;
+		samplesOut[iout] = samplesIn[iin];
 
-		//Set temporary midpoint and range
-		float range = (vmax - vmin);
-		float mid = range/2 + vmin;
-		float global_base = fbin*range + vmin;
+		//Is there a sample after this one? Use it for duration
+		if(i+1 < count)
+			durations[iout] = offsetsIn[iin + 1] - offset;
 
-		std::vector<float> samples;
-		bool first = true;
-		float delta = range * 0.1;
-		int64_t tfall = 0;
-		float last = vmin;
+		//No sample, but another block?
+		//TODO: this presumes there is at least one sample in the subsequent block
+		else if(gl_GlobalInvocationID.x != nLastThread)
+			durations[iout] = offsetsIn[(gl_GlobalInvocationID.x + 1) * bufferPerThread + 1] - offset;
 
-		for(size_t i=0; i < len; i++)
-		{
-			//Wait for a rising edge (end of the low period)
-			auto cur = din->m_samples[i];
-			auto tnow = GetOffsetScaled(din, i);
-
-			//Find falling edge
-			if( (cur < mid) && (last >= mid) )
-				tfall = tnow;
-
-			//Find rising edge
-			if( (cur > mid) && (last <= mid) )
-			{
-				//Done, add the sample
-				if(!samples.empty())
-				{
-					if(first)
-						first = false;
-
-					else
-					{
-						//Average the middle 50% of the samples.
-						//Discard beginning and end as they include parts of the edge
-						float sum = 0;
-						int64_t count = 0;
-						size_t start = samples.size()/4;
-						size_t end = samples.size() - start;
-						for(size_t j=start; j<=end; j++)
-						{
-							sum += samples[j];
-							count ++;
-						}
-
-						float vavg = sum / count;
-
-						int64_t tmid = (tnow + tfall) / 2;
-
-						//Update duration for last sample
-						size_t n = cap->m_samples.size();
-						if(n)
-							cap->m_durations[n-1] = tmid - cap->m_offsets[n-1];
-
-						cap->m_offsets.push_back(tmid);
-						cap->m_durations.push_back(1);
-						cap->m_samples.push_back(vavg);
-					}
-
-					samples.clear();
-				}
-			}
-
-			//If the value is fairly close to the calculated base, average it
-			if(fabs(cur - global_base) < delta)
-				samples.push_back(cur);
-
-			last = cur;
-		}
-
-		cap->MarkModifiedFromCpu();
+		//Last block?
+		else
+			durations[iout] = 1;
 	}
-};
 
-#endif
+	//Save final block index
+	if(gl_GlobalInvocationID.x == nLastThread)
+		finalCount[0] = int64_t(writebase + count);
+}

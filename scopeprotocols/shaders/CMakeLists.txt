@@ -32,6 +32,8 @@ add_compute_shaders(
 		AddFilter.glsl
 		ACRMS.glsl
 		ACRMS_Trend.glsl
+		BaseMeasurement_FirstPass.glsl
+		BaseMeasurement_FinalPass.glsl
 		BlackmanHarrisWindow.glsl
 		ClockRecoveryPLL_FirstPass.glsl
 		ClockRecoveryPLL_SecondPass.glsl
