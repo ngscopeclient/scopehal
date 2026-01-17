@@ -102,6 +102,11 @@ string Instrument::GetChannelDisplayName(size_t i)
 	return m_channels[i]->GetHwname();
 }
 
+bool Instrument::IsOffline()
+{
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
