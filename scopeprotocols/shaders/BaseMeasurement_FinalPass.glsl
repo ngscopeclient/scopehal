@@ -62,6 +62,11 @@ layout(std430, binding=5) restrict writeonly buffer buf_finalCount
 	int64_t finalCount[];
 };
 
+layout(std430, binding=6) restrict writeonly buffer buf_finalSum
+{
+	float finalSum[];
+};
+
 layout(std430, push_constant) uniform constants
 {
 	int64_t	timescale;
@@ -91,23 +96,56 @@ void main()
 	//See how many samples this block is copying
 	uint count = uint(offsetsIn[readbase - 1]);
 
+	//Temporaries for Kahan summation
+	float partialSum = 0;
+	float c = 0;
+
 	//Copy samples
 	for(uint i=0; i<count; i ++)
 	{
+		//Read input
 		uint iin = readbase + i;
 		uint iout = writebase + i;
 		int64_t offset = offsetsIn[iin];
+		float fin = samplesIn[iin];
+
+		//Kahan sum the output values
+		float y = fin - c;
+		float t = partialSum + y;
+		c = (t - partialSum) - y;
+		partialSum = t;
+
+		//Copy to output
 		offsets[iout] = offset;
-		samplesOut[iout] = samplesIn[iin];
+		samplesOut[iout] = fin;
 
 		//Is there a sample after this one? Use it for duration
 		if(i+1 < count)
 			durations[iout] = offsetsIn[iin + 1] - offset;
 
 		//No sample, but another block?
-		//TODO: this presumes there is at least one sample in the subsequent block
 		else if(gl_GlobalInvocationID.x != nLastThread)
-			durations[iout] = offsetsIn[(gl_GlobalInvocationID.x + 1) * bufferPerThread + 1] - offset;
+		{
+			bool found = false;
+			for(uint nblock=gl_GlobalInvocationID.x; nblock < numThreads; nblock ++)
+			{
+				//Make sure the subsequent thread has samples
+				uint nextbase = (gl_GlobalInvocationID.x + 1) * bufferPerThread;
+				uint nextCount = uint(offsetsIn[nextbase]);
+				if(nextCount == 0)
+					continue;
+
+				//We're good, use this duration
+				int64_t nextOffset = offsetsIn[nextbase + 1];
+				durations[iout] = nextOffset - offset;
+				found = true;
+				break;
+			}
+
+			//No more samples? Tie it off
+			if(!found)
+				durations[iout] = 1;
+		}
 
 		//Last block?
 		else
@@ -117,4 +155,7 @@ void main()
 	//Save final block index
 	if(gl_GlobalInvocationID.x == nLastThread)
 		finalCount[0] = int64_t(writebase + count);
+
+	//Save partial sum for this block
+	finalSum[gl_GlobalInvocationID.x] = partialSum;
 }

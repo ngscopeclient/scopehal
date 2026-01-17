@@ -57,12 +57,13 @@ BaseMeasurement::BaseMeasurement(const string& color)
 		m_firstPassComputePipeline =
 			make_shared<ComputePipeline>("shaders/BaseMeasurement_FirstPass.spv", 3, sizeof(BasePushConstants));
 		m_finalPassComputePipeline =
-			make_shared<ComputePipeline>("shaders/BaseMeasurement_FinalPass.spv", 6, sizeof(BasePushConstants));
+			make_shared<ComputePipeline>("shaders/BaseMeasurement_FinalPass.spv", 7, sizeof(BasePushConstants));
 
 		m_firstPassOffsets.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_firstPassSamples.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 		m_finalSampleCount.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_partialSums.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	}
 }
 
@@ -101,6 +102,10 @@ void BaseMeasurement::Refresh(
 	vk::raii::CommandBuffer& cmdBuf,
 	std::shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("BaseMeasurement::Refresh");
+	#endif
+
 	ClearErrors();
 
 	//Set up input
@@ -176,11 +181,10 @@ void BaseMeasurement::Refresh(
 
 	//GPU side inner loop
 	//TODO: support sparse
+	const uint32_t nthreads = 4096;
 	if(g_hasShaderInt64 && uin)
 	{
 		float range = (vmax - vmin);
-
-		const uint32_t nthreads = 4096;
 
 		BasePushConstants cfg;
 		cfg.len = len;
@@ -213,6 +217,7 @@ void BaseMeasurement::Refresh(
 		//Second pass: coalesce outputs into one
 		cap->Resize(len/2);
 		m_finalSampleCount.resize(1);
+		m_partialSums.resize(nthreads);
 
 		m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassOffsets, cmdBuf);
 		m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassSamples, cmdBuf);
@@ -220,13 +225,16 @@ void BaseMeasurement::Refresh(
 		m_finalPassComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
 		m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_durations, cmdBuf, true);
 		m_finalPassComputePipeline->BindBufferNonblocking(5, m_finalSampleCount, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(6, m_partialSums, cmdBuf, true);
 		m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(nthreads, 64));
 		m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 		cap->MarkModifiedFromGpu();
 		m_finalSampleCount.MarkModifiedFromGpu();
+		m_partialSums.MarkModifiedFromGpu();
 
 		m_finalSampleCount.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_partialSums.PrepareForCpuAccessNonblocking(cmdBuf);
 
 		//Done
 		cmdBuf.end();
@@ -234,9 +242,6 @@ void BaseMeasurement::Refresh(
 
 		//Update size
 		cap->Resize(m_finalSampleCount[0]);
-
-		//Fallback: if no samples found, maybe the frequency was too low for the GPU version. Use the CPU instead?
-		//TODO: make the shader able to handle frequencies lower than one cycle per thread
 	}
 
 	//CPU side inner loop
@@ -245,11 +250,22 @@ void BaseMeasurement::Refresh(
 	else
 		InnerLoop(uin, cap, len, vmin, vmax, fbin);
 
-	//Compute average of all
-	//TODO: do this GPU side too
-	cap->PrepareForCpuAccess();
-	double sum = 0;
-	for(auto f : cap->m_samples)
-		sum += f;
-	m_streams[1].m_value = sum / cap->m_samples.size();
+	//GPU average postprocessing
+	if(g_hasShaderInt64 && uin)
+	{
+		double sum = 0;
+		for(size_t i=0; i<nthreads; i++)
+			sum += m_partialSums[i];
+		m_streams[1].m_value = sum / cap->m_samples.size();
+	}
+
+	else
+	{
+		//TODO: do this GPU side too
+		cap->PrepareForCpuAccess();
+		double sum = 0;
+		for(auto f : cap->m_samples)
+			sum += f;
+		m_streams[1].m_value = sum / cap->m_samples.size();
+	}
 }

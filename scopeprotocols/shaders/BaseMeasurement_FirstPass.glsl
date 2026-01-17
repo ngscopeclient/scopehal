@@ -31,7 +31,6 @@
 #pragma shader_stage(compute)
 
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_debug_printf : enable
 
 layout(std430, binding=0) restrict readonly buffer buf_samplesIn
 {
@@ -69,18 +68,27 @@ void main()
 	uint numSamplesPerThread = len / numThreads;
 	uint startpos = gl_GlobalInvocationID.x * numSamplesPerThread;
 
+	uint outbase = bufferPerThread * gl_GlobalInvocationID.x;
+
 	//Adjust starting position to the left until we find a rising edge,
 	//the start of the waveform, or the start of a previous block
-	uint minpos;
-	if(gl_GlobalInvocationID.x == 0)
-		minpos = 0;
-	else
-		minpos = startpos - numSamplesPerThread;
-
-	for(; startpos > minpos; startpos --)
+	if(gl_GlobalInvocationID.x != 0)
 	{
-		if(samplesIn[startpos] > mid)
-			break;
+		uint minpos = startpos - numSamplesPerThread;
+
+		for(; startpos > minpos; startpos --)
+		{
+			if(samplesIn[startpos] > mid)
+				break;
+		}
+
+		//If we hit the edge of the previous block, we had no edges at all for this thread.
+		//Stop and do nothing.
+		if(startpos == minpos)
+		{
+			offsetsOut[outbase] = 0;
+			return;
+		}
 	}
 
 	//Ending position
@@ -94,7 +102,6 @@ void main()
 	int64_t tfall = 0;
 
 	uint numOutputSamples = 0;
-	uint outbase = bufferPerThread * gl_GlobalInvocationID.x;
 
 	//Use samplesOut as a scratchpad buffer for averaging
 	uint averageBufferStart = 0;
@@ -102,15 +109,15 @@ void main()
 	uint averageBufferEnd = outbase + bufferPerThread;
 
 	bool first = (gl_GlobalInvocationID.x == 0);
-
-	if(gl_GlobalInvocationID.x == 0)
-	{
-		debugPrintfEXT("global_base = %f, delta = %f\n", global_base, delta);
-	}
-
 	float last = samplesIn[startpos];
-	for(uint i=startpos + 1; i < endpos; i++)
+	for(uint i=startpos + 1; i < len; i++)
 	{
+		//If we hit the end of our thread block and found at least one sample, stop
+		//We're allowed to keep running if we haven't found anything, so that we can handle waveforms with periods
+		//slower than the thread block size
+		if( (i >= endpos) && (numOutputSamples > 0) )
+			break;
+
 		//Wait for a rising edge (end of the low period)
 		float cur = samplesIn[i];
 		int64_t tnow = int64_t(i) * timescale + triggerPhase;

@@ -79,6 +79,7 @@ protected:
 	AcceleratorBuffer<float> m_firstPassSamples;
 	AcceleratorBuffer<int64_t> m_finalSampleCount;
 	std::shared_ptr<ComputePipeline> m_finalPassComputePipeline;
+	AcceleratorBuffer<float> m_partialSums;
 
 	template<class T>
 	void InnerLoop(
