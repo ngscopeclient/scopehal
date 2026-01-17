@@ -126,6 +126,7 @@ set(SCOPEHAL_SOURCES
 	FunctionGeneratorChannel.cpp
 	Load.cpp
 	LoadChannel.cpp
+	MockInstrument.cpp
 	Multimeter.cpp
 	MultimeterChannel.cpp
 	Oscilloscope.cpp
@@ -173,6 +174,7 @@ set(SCOPEHAL_SOURCES
 	LeCroyFWPOscilloscope.cpp
 	MagnovaOscilloscope.cpp
 	MockOscilloscope.cpp
+	MockPowerSupply.cpp
 	MultiLaneBERT.cpp
 	NanoVNA.cpp
 	OwonXDGFunctionGenerator.cpp

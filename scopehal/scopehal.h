@@ -170,6 +170,7 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "RFSignalGenerator.h"
 #include "RFSignalGeneratorChannel.h"
 #include "SCPIInstrument.h"
+#include "MockInstrument.h"
 #include "HIDInstrument.h"
 #include "ModbusInstrument.h"
 #include "SCPIBERT.h"
