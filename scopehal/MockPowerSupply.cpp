@@ -148,6 +148,7 @@ bool MockPowerSupply::IsPowerConstantCurrent(int chan)
 
 double MockPowerSupply::GetPowerVoltageActual(int chan)
 {
+	if(!GetPowerChannelActive(chan)) return 0;
 	return m_voltagesActual[chan];
 }
 
@@ -158,6 +159,7 @@ double MockPowerSupply::GetPowerVoltageNominal(int chan)
 
 double MockPowerSupply::GetPowerCurrentActual(int chan)
 {
+	if(!GetPowerChannelActive(chan)) return 0;
 	return m_currentsActual[chan];
 }
 
@@ -190,12 +192,14 @@ void MockPowerSupply::SetPowerVoltage(int chan, double volts)
 {
 	m_voltagesNominal[chan] = volts;
 	m_voltageSetPoints[chan] = volts;
+	m_voltagesActual[chan] = volts;
 }
 
 void MockPowerSupply::SetPowerCurrent(int chan, double amps)
 {
 	m_currentsNominal[chan] = amps;
 	m_currentSetPoints[chan] = amps;
+	m_currentsActual[chan] = amps;
 }
 
 void MockPowerSupply::SetPowerChannelActive(int chan, bool on)
