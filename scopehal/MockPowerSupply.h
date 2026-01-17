@@ -82,7 +82,7 @@ public:
 	void SetMasterPowerEnable(bool enable) override;
 
 	// Serialization
-	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 
 	// SCPI
 	virtual void BackgroundProcessing() override {}

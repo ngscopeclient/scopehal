@@ -59,7 +59,7 @@ MockOscilloscope::MockOscilloscope(
 	, m_args(args)
 {
 	//Need to run this loader prior to the main Oscilloscope loader
-	m_loaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoLoadConfiguration));
+	m_preloaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoPreLoadConfiguration));
 
 	m_serializers.push_back(sigc::mem_fun(*this, &MockOscilloscope::DoSerializeConfiguration));
 }
@@ -172,7 +172,7 @@ void MockOscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& /*tab
 	node["driver"] = GetDriverName();
 }
 
-void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table)
+void MockOscilloscope::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
 {
 	//Load the channels
 	auto& chans = node["channels"];

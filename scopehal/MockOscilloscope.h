@@ -126,7 +126,7 @@ public:
 
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
-	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 
 protected:

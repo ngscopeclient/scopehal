@@ -55,28 +55,26 @@ MockPowerSupply::MockPowerSupply(const string& name,
 	const std::string& args) : SCPIDevice(nullptr, false), SCPIInstrument(nullptr, false), MockInstrument(name, vendor, serial, transport, driver, args)
 {
 	//Need to run this loader prior to the main Oscilloscope loader
-	m_loaders.push_front(sigc::mem_fun(*this, &MockPowerSupply::DoLoadConfiguration));
+	m_preloaders.push_front(sigc::mem_fun(*this, &MockPowerSupply::DoPreLoadConfiguration));
 }
 
 MockPowerSupply::~MockPowerSupply()
 {
-
+	LogError("Destroying Mock Power Supply !\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void MockPowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table)
+void MockPowerSupply::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
 {
+	LogError("Loading PSU configuration...\n");
 	//Load the channels
 	auto& chans = node["channels"];
 	for(auto it : chans)
 	{
+		LogError("Loading PSU channel...\n");
 		auto& cnode = it.second;
-
-		//if no type, it's probably not a psu channel. skip it
-		if(!cnode["type"])
-			continue;
 
 		//Allocate channel space if we didn't have it yet
 		size_t index = cnode["index"].as<int>();
@@ -137,7 +135,7 @@ bool MockPowerSupply::SupportsOvercurrentShutdown()
 
 uint32_t MockPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
-	return Instrument::INST_OSCILLOSCOPE;
+	return Instrument::INST_PSU;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
