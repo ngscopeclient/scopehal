@@ -62,6 +62,10 @@ protected:
 
 	FilterParameter& m_order;
 	FilterParameter& m_baud;
+
+	AcceleratorBuffer<uint32_t> m_edgeIndexes;
+	AcceleratorBuffer<uint8_t> m_edgeStates;
+	AcceleratorBuffer<uint8_t> m_edgeRising;
 };
 
 #endif

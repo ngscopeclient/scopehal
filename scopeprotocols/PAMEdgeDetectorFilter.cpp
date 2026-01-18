@@ -49,6 +49,13 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 
 	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
 	m_baud.SetIntVal(1250000000);	//1.25 Gbps
+
+	if(g_hasShaderInt64 && g_hasShaderInt8)
+	{
+		m_edgeIndexes.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_edgeStates.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_edgeRising.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,13 +155,14 @@ void PAMEdgeDetectorFilter::Refresh(
 
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
-	struct edge_t
-	{
-		size_t index;
-		size_t value;
-		bool rising;
-	};
-	vector<edge_t> levelCrossings;
+	m_edgeIndexes.clear();
+	m_edgeStates.clear();
+	m_edgeRising.clear();
+
+	m_edgeIndexes.reserve(len);
+	m_edgeStates.reserve(len);
+	m_edgeRising.reserve(len);
+
 	for(size_t i=1; i<len-1; i++)
 	{
 		//Check against each threshold for both rising and falling edges
@@ -162,9 +170,6 @@ void PAMEdgeDetectorFilter::Refresh(
 		float cur = din->m_samples[i];
 
 		//Prepare to make a new edge
-		edge_t edge;
-		edge.index = i;
-
 		for(size_t j=0; j<sthresholds.size(); j++)
 		{
 			float t = sthresholds[j];
@@ -172,41 +177,41 @@ void PAMEdgeDetectorFilter::Refresh(
 			//Check for rising edge
 			if( (prev <= t) && (cur > t) )
 			{
-				edge.rising = true;
-				edge.value = j+1;
-				levelCrossings.push_back(edge);
+				m_edgeIndexes.push_back(i);
+				m_edgeRising.push_back(1);
+				m_edgeStates.push_back(j+1);
 				break;
 			}
 
 			//Check for falling edge
 			else if( (prev >= t) && (cur < t) )
 			{
-				edge.rising = false;
-				edge.value = j;
-				levelCrossings.push_back(edge);
+				m_edgeIndexes.push_back(i);
+				m_edgeRising.push_back(0);
+				m_edgeStates.push_back(j);
 				break;
 			}
 
 			//else not a level crossing
 		}
 	}
-	LogTrace("First pass: Found %zu level crossings\n", levelCrossings.size());
+	LogTrace("First pass: Found %zu level crossings\n", m_edgeIndexes.size());
 
 	//Loop over level crossings and figure out what they are
 	int64_t halfui = ui / 2;
 	bool nextValue = true;
-	for(size_t i=0; i<levelCrossings.size(); i++)
+	for(size_t i=0; i<m_edgeIndexes.size(); i++)
 	{
-		size_t istart = levelCrossings[i].index - 1;
-		size_t iend = levelCrossings[i].index + 1;
+		size_t istart = m_edgeIndexes[i] - 1;
+		size_t iend = m_edgeIndexes[i] + 1;
 		size_t symstart;
-		size_t symend = levelCrossings[i].value;
+		size_t symend = m_edgeStates[i];
 
 		//If our first sample occurs too early in the waveform, we can't interpolate. Skip it.
 		if(istart == 0)
 			continue;
 
-		if(levelCrossings[i].rising)
+		if(m_edgeRising[i])
 			symstart = symend - 1;
 		else
 			symstart = symend + 1;
@@ -219,13 +224,13 @@ void PAMEdgeDetectorFilter::Refresh(
 			if(i <= lookback)
 				break;
 
-			int64_t delta = (levelCrossings[i].index - levelCrossings[i-lookback].index) * din->m_timescale;
-			if( (levelCrossings[i-lookback].rising == levelCrossings[i].rising) && (delta < halfui) )
+			int64_t delta = (m_edgeIndexes[i] - m_edgeIndexes[i-lookback]) * din->m_timescale;
+			if( (m_edgeRising[i-lookback] == m_edgeRising[i]) && (delta < halfui) )
 			{
 				merging = true;
-				istart = levelCrossings[i-lookback].index-1;
+				istart = m_edgeIndexes[i-lookback]-1;
 
-				if(levelCrossings[i].rising)
+				if(m_edgeRising[i])
 					symstart = symend - (lookback+1);
 				else
 					symstart = symend + (lookback+1);
