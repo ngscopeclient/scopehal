@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -58,12 +58,17 @@ string BINImportFilter::GetProtocolName()
 
 void BINImportFilter::OnFileNameChanged()
 {
+	ClearErrors();
+
 	//Wipe anything we may have had in the past
 	ClearStreams();
 
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
+	{
+		AddErrorMessage("Missing inputs", "No file name specified");
 		return;
+	}
 
 	//Set waveform timestamp to file timestamp
 	time_t timestamp = 0;
@@ -71,6 +76,12 @@ void BINImportFilter::OnFileNameChanged()
 	GetTimestampOfFile(fname, timestamp, fs);
 
 	string f = ReadFile(fname);
+	if(f.empty())
+	{
+		AddErrorMessage("Missing inputs", string("File ") + f + " is empty or does not exist");
+		return;
+	}
+
 	uint32_t fpos = 0;
 
 	FileHeader fh;

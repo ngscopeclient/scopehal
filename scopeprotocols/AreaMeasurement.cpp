@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -84,11 +84,20 @@ string AreaMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void AreaMeasurement::Refresh()
+void AreaMeasurement::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		m_streams[1].m_value = std::numeric_limits<float>::quiet_NaN();
 		return;
@@ -164,6 +173,10 @@ void AreaMeasurement::Refresh()
 		//We need at least one full cycle of the waveform
 		if(edges.size() < 2)
 		{
+			AddErrorMessage(
+				"No zero crossings",
+				"Cannot perform this measurement on a signal shorter than one full cycle");
+
 			SetData(nullptr, 0);
 			m_streams[1].m_value = std::numeric_limits<float>::quiet_NaN();
 			return;
