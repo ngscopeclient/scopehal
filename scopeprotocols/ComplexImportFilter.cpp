@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,9 +76,13 @@ string ComplexImportFilter::GetProtocolName()
 
 void ComplexImportFilter::Reload()
 {
+	ClearErrors();
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
+	{
+		AddErrorMessage("Missing inputs", "No file name specified");
 		return;
+	}
 
 	//Set waveform timestamp to file timestamp
 	time_t timestamp = 0;
@@ -89,7 +93,7 @@ void ComplexImportFilter::Reload()
 	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
-		LogError("Couldn't open complex file \"%s\"\n", fname.c_str());
+		AddErrorMessage("Missing inputs", string("File ") + fname + " could not be opened");
 		return;
 	}
 	fseek(fp, 0, SEEK_END);
@@ -98,7 +102,7 @@ void ComplexImportFilter::Reload()
 	uint8_t* buf = new uint8_t[len_bytes];
 	if(len_bytes != fread(buf, 1, len_bytes, fp))
 	{
-		LogError("Failed to read complex data\n");
+		AddErrorMessage("Read failure", "Failed to read complex data from file");
 		fclose(fp);
 		delete[] buf;
 		return;
@@ -110,26 +114,25 @@ void ComplexImportFilter::Reload()
 	int64_t samplerate = m_parameters[m_sratename].GetIntVal();
 	if(samplerate == 0)
 	{
+		AddErrorMessage("Invalid sample rate", "Sample rate is zero");
 		delete[] buf;
 		return;
 	}
 	int64_t interval = FS_PER_SECOND / samplerate;
 
-	auto iwfm = new UniformAnalogWaveform;
+	auto iwfm = SetupEmptyWaveform<UniformAnalogWaveform>(nullptr, 0);
 	iwfm->m_timescale = interval;
 	iwfm->m_startTimestamp = timestamp;
 	iwfm->m_startFemtoseconds = fs;
 	iwfm->m_triggerPhase = 0;
 	iwfm->PrepareForCpuAccess();
-	SetData(iwfm, 0);
 
-	auto qwfm = new UniformAnalogWaveform;
+	auto qwfm = SetupEmptyWaveform<UniformAnalogWaveform>(nullptr, 1);
 	qwfm->m_timescale = interval;
 	qwfm->m_startTimestamp = timestamp;
 	qwfm->m_startFemtoseconds = fs;
 	qwfm->m_triggerPhase = 0;
 	qwfm->PrepareForCpuAccess();
-	SetData(qwfm, 1);
 
 	//Figure out actual data element size
 	auto fmt = static_cast<Format>(m_parameters[m_formatname].GetIntVal());

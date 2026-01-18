@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -118,6 +118,12 @@ float ConstellationFilter::GetOffset(size_t /*stream*/)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+Filter::DataLocation ConstellationFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 void ConstellationFilter::ClearSweeps()
 {
 	SetData(nullptr, 0);
@@ -129,9 +135,26 @@ void ConstellationFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
 		//if input goes momentarily bad, don't delete output - just stop updating
+
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No I signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at I input");
+
+		if(!GetInput(1))
+			AddErrorMessage("Missing inputs", "No Q signal input connected");
+		else if(!GetInputWaveform(1))
+			AddErrorMessage("Missing inputs", "No waveform available at Q input");
+
+		if(!GetInput(2))
+			AddErrorMessage("Missing inputs", "No clock signal input connected");
+		else if(!GetInputWaveform(2))
+			AddErrorMessage("Missing inputs", "No waveform available at clock input");
+
 		return;
 	}
 
