@@ -55,6 +55,15 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 		m_edgeIndexes.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 		m_edgeStates.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_edgeRising.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+
+		m_edgeIndexesScratch.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_edgeStatesScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_edgeRisingScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+
+		m_thresholds.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+		m_firstPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_LevelCrossings.spv", 5, sizeof(PAMEdgeDetectorConstants));
 	}
 }
 
@@ -155,47 +164,183 @@ void PAMEdgeDetectorFilter::Refresh(
 
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
-	m_edgeIndexes.clear();
-	m_edgeStates.clear();
-	m_edgeRising.clear();
-
-	m_edgeIndexes.reserve(len);
-	m_edgeStates.reserve(len);
-	m_edgeRising.reserve(len);
-
-	for(size_t i=1; i<len-1; i++)
+	//TODO: does this actually depend on int64??
+	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
-		//Check against each threshold for both rising and falling edges
-		float prev = din->m_samples[i-1];
-		float cur = din->m_samples[i];
+		//Prepare thresholds for GPU
+		//TODO: only if changed
+		m_thresholds.PrepareForCpuAccess();
+		m_thresholds.resize(order-1);
+		for(size_t i=0; i<sthresholds.size(); i++)
+			m_thresholds[i] = sthresholds[i];
+		m_thresholds.MarkModifiedFromCpu();
 
-		//Prepare to make a new edge
-		for(size_t j=0; j<sthresholds.size(); j++)
+		//Allocate output space
+		m_edgeIndexesScratch.resize(len);
+		m_edgeStatesScratch.resize(len);
+		m_edgeRisingScratch.resize(len);
+
+		cmdBuf.begin({});
+
+		uint64_t numThreads = 4096;
+		const uint64_t blockSize = 64;
+		const uint64_t numBlocks = numThreads / blockSize;
+
+		//Constants shared by all passes
+		PAMEdgeDetectorConstants cfg;
+		cfg.len = len;
+		cfg.order = order;
+		cfg.inputPerThread = len / numThreads;
+		cfg.outputPerThread = len / numThreads;
+
+		//Run the first pass
+		m_firstPassComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_firstPassComputePipeline->BindBufferNonblocking(1, m_thresholds, cmdBuf);
+		m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
+		m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
+		m_firstPassComputePipeline->BindBufferNonblocking(4, m_edgeRisingScratch, cmdBuf, true);
+		m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_edgeIndexesScratch.MarkModifiedFromGpu();
+		m_edgeStatesScratch.MarkModifiedFromGpu();
+		m_edgeRisingScratch.MarkModifiedFromGpu();
+
+		/*
+		//Run the second pass
+		m_secondPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(1, m_firstPassTimestamps, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(2, m_firstPassState, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(3, m_secondPassTimestamps, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassState, cmdBuf);
+		m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_secondPassTimestamps.MarkModifiedFromGpu();
+		m_secondPassState.MarkModifiedFromGpu();
+
+		//Run the final pass.
+		//This also generates the squarewave output and the sample data
+		m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassState, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(2, m_secondPassTimestamps, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(3, m_secondPassState, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(7, scap->m_samples, cmdBuf);
+		//this assumes input is uniformly sampled for now
+		m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
+		m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
+		m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_firstPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_secondPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		//Output was entirely created on the GPU, no need to touch the CPU for that
+		cap->MarkModifiedFromGpu();
+		scap->MarkModifiedFromGpu();
+		generatedSquarewaveOnGPU = true;
+
+		//Copy the offsets and durations from the sampled data
+		scap->m_offsets.CopyFromNonblocking(cmdBuf, cap->m_offsets, false);
+		scap->m_durations.CopyFromNonblocking(cmdBuf, cap->m_durations, false);
+		*/
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//DEBUG: CPU side merge
+		m_edgeIndexesScratch.PrepareForCpuAccess();
+		m_edgeStatesScratch.PrepareForCpuAccess();
+		m_edgeRisingScratch.PrepareForCpuAccess();
+
+		//Figure out how many edges we ended up with
+		uint64_t numSamples = 0;
+		for(uint64_t i=0; i<numThreads; i++)
+			numSamples += m_edgeIndexesScratch[i*cfg.outputPerThread];
+		LogDebug("GPU found %ld edges\n", numSamples);
+
+		m_edgeIndexes.resize(numSamples);
+		m_edgeStates.resize(numSamples);
+		m_edgeRising.resize(numSamples);
+		m_edgeIndexes.PrepareForCpuAccess();
+		m_edgeStates.PrepareForCpuAccess();
+		m_edgeRising.PrepareForCpuAccess();
+		uint32_t iout = 0;
+		for(uint32_t i=0; i<numThreads; i++)
 		{
-			float t = sthresholds[j];
-
-			//Check for rising edge
-			if( (prev <= t) && (cur > t) )
+			uint32_t rdbase = i*cfg.outputPerThread;
+			uint32_t nread = m_edgeIndexesScratch[rdbase];
+			for(uint32_t j=0; j<nread; j++)
 			{
-				m_edgeIndexes.push_back(i);
-				m_edgeRising.push_back(1);
-				m_edgeStates.push_back(j+1);
-				break;
+				m_edgeIndexes[iout] = m_edgeIndexesScratch[rdbase + j + 1];
+				m_edgeStates[iout] = m_edgeStatesScratch[rdbase + j + 1];
+				m_edgeRising[iout] = m_edgeRisingScratch[rdbase + j + 1];
+				iout ++;
 			}
-
-			//Check for falling edge
-			else if( (prev >= t) && (cur < t) )
-			{
-				m_edgeIndexes.push_back(i);
-				m_edgeRising.push_back(0);
-				m_edgeStates.push_back(j);
-				break;
-			}
-
-			//else not a level crossing
 		}
+		m_edgeIndexes.MarkModifiedFromCpu();
+		m_edgeStates.MarkModifiedFromCpu();
+		m_edgeRising.MarkModifiedFromCpu();
 	}
+
+	else
+	{
+		m_edgeIndexes.clear();
+		m_edgeStates.clear();
+		m_edgeRising.clear();
+
+		m_edgeIndexes.reserve(len);
+		m_edgeStates.reserve(len);
+		m_edgeRising.reserve(len);
+
+		m_edgeIndexes.PrepareForCpuAccess();
+		m_edgeStates.PrepareForCpuAccess();
+		m_edgeRising.PrepareForCpuAccess();
+
+		for(size_t i=1; i<len-1; i++)
+		{
+			//Check against each threshold for both rising and falling edges
+			float prev = din->m_samples[i-1];
+			float cur = din->m_samples[i];
+
+			//Prepare to make a new edge
+			for(size_t j=0; j<sthresholds.size(); j++)
+			{
+				float t = sthresholds[j];
+
+				//Check for rising edge
+				if( (prev <= t) && (cur > t) )
+				{
+					m_edgeIndexes.push_back(i);
+					m_edgeRising.push_back(1);
+					m_edgeStates.push_back(j+1);
+					break;
+				}
+
+				//Check for falling edge
+				else if( (prev >= t) && (cur < t) )
+				{
+					m_edgeIndexes.push_back(i);
+					m_edgeRising.push_back(0);
+					m_edgeStates.push_back(j);
+					break;
+				}
+
+				//else not a level crossing
+			}
+		}
+
+		m_edgeIndexes.MarkModifiedFromCpu();
+		m_edgeStates.MarkModifiedFromCpu();
+		m_edgeRising.MarkModifiedFromCpu();
+	}
+
 	LogTrace("First pass: Found %zu level crossings\n", m_edgeIndexes.size());
+
+	m_edgeIndexes.PrepareForCpuAccess();
+	m_edgeStates.PrepareForCpuAccess();
+	m_edgeRising.PrepareForCpuAccess();
 
 	//Loop over level crossings and figure out what they are
 	int64_t halfui = ui / 2;

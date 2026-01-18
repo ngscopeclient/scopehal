@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,63 +27,106 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#version 460
+#pragma shader_stage(compute)
+
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(std430, binding=0) restrict readonly buffer buf_pin
+{
+	float samples[];
+};
+
+layout(std430, binding=1) restrict readonly buffer buf_thresholds
+{
+	float thresholds[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_indexes
+{
+	uint idx[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_states
+{
+	uint8_t states[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_rising
+{
+	uint8_t rising[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+	uint order;
+	uint inputPerThread;
+	uint outputPerThread;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PAMEdgeDetectorFilter
+	@brief First-pass zero crossing detection
+
+	Each thread independently processes a block of inputPerThread samples and outputs a variable-length block, from
+	0 to outputPerThread-1 in size, of samples
  */
-#ifndef PAMEdgeDetectorFilter_h
-#define PAMEdgeDetectorFilter_h
-
-#include <cinttypes>
-#include "../scopehal/ActionProvider.h"
-
-class PAMEdgeDetectorConstants
+void main()
 {
-public:
-	uint32_t len;
-	uint32_t order;
-	uint32_t inputPerThread;
-	uint32_t outputPerThread;
-};
+	//Find our block of inputs
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint instart = gl_GlobalInvocationID.x * inputPerThread;
+	uint inend = instart + inputPerThread;
+	if(gl_GlobalInvocationID.x == (numThreads - 1))
+		inend = len;
 
-class PAMEdgeDetectorFilter
-	: public Filter
-	, public ActionProvider
-{
-public:
-	PAMEdgeDetectorFilter(const std::string& color);
+	//Block of outputs
+	uint nouts = 0;
+	uint outbase = gl_GlobalInvocationID.x * outputPerThread;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+	if(instart == 0)
+		instart ++;
 
-	static std::string GetProtocolName();
+	uint numThresholds = order-1;
+	uint maxOuts = outputPerThread - 1;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	for(uint i = instart; (i < inend) && (nouts < maxOuts); i ++)
+	{
+		//Check against each threshold for both rising and falling edges
+		float prev = samples[i-1];
+		float cur = samples[i];
 
-	virtual std::vector<std::string> EnumActions() override;
-	virtual bool PerformAction(const std::string& id) override;
+		//Prepare to make a new edge
+		for(uint j=0; j<numThresholds; j++)
+		{
+			float t = thresholds[j];
+			uint iout = outbase + nouts + 1;
 
-	PROTOCOL_DECODER_INITPROC(PAMEdgeDetectorFilter)
+			//Check for rising edge
+			if( (prev <= t) && (cur > t) )
+			{
+				idx[iout] = i;
+				rising[iout] = uint8_t(1);
+				states[iout] = uint8_t(j+1);
+				nouts ++;
+				break;
+			}
 
-protected:
-	void AutoLevel(UniformAnalogWaveform* din);
+			//Check for falling edge
+			else if( (prev >= t) && (cur < t) )
+			{
+				idx[iout] = i;
+				rising[iout] = uint8_t(0);
+				states[iout] = uint8_t(j);
+				nouts ++;
+				break;
+			}
+			//else not a level crossing
+		}
+	}
 
-	FilterParameter& m_order;
-	FilterParameter& m_baud;
-
-	AcceleratorBuffer<uint32_t> m_edgeIndexes;
-	AcceleratorBuffer<uint8_t> m_edgeStates;
-	AcceleratorBuffer<uint8_t> m_edgeRising;
-
-	AcceleratorBuffer<uint32_t> m_edgeIndexesScratch;
-	AcceleratorBuffer<uint8_t> m_edgeStatesScratch;
-	AcceleratorBuffer<uint8_t> m_edgeRisingScratch;
-
-	AcceleratorBuffer<float> m_thresholds;
-
-	///@brief Compute pipeline for first edge detection pass
-	std::shared_ptr<ComputePipeline> m_firstPassComputePipeline;
-};
-
-#endif
+	//Save number of outputs we found
+	idx[outbase] = nouts;
+}

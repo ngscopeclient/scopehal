@@ -58,6 +58,7 @@ add_compute_shaders(
 		EyePattern_IndexSearch.glsl
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
+		PAMEdgeDetector_LevelCrossings.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl
