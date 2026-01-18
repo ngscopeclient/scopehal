@@ -87,7 +87,7 @@ protected:
 	std::map<size_t, std::string> m_names;
 
 public:
-	virtual std::string GetDriverName() const
+	virtual std::string GetDriverName() const override
 	{ return m_driver; }
 };
 
