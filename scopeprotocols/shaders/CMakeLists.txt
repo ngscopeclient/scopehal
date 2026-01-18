@@ -35,6 +35,7 @@ add_compute_shaders(
 		BaseMeasurement_FirstPass.glsl
 		BaseMeasurement_FinalPass.glsl
 		BlackmanHarrisWindow.glsl
+		ClipFilter.glsl
 		ClockRecoveryPLL_FirstPass.glsl
 		ClockRecoveryPLL_SecondPass.glsl
 		ClockRecoveryPLL_FinalPass.glsl

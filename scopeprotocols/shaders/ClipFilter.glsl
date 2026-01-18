@@ -27,34 +27,40 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of CandumpImportFilter
- */
-#ifndef CandumpImportFilter_h
-#define CandumpImportFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class CandumpImportFilter : public PacketDecoder
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	CandumpImportFilter(const std::string& color);
-
-	std::vector<std::string> GetHeaders() override;
-	virtual void SetDefaultName() override;
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	static std::string GetProtocolName();
-
-	PROTOCOL_DECODER_INITPROC(CandumpImportFilter)
-
-protected:
-	std::string m_fpname;
-	std::string m_datarate;
-
-	void OnFileNameChanged();
+	float din[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+	uint clipAbove;
+	float level;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= len)
+		return;
+
+	float f = din[i];
+
+	if((clipAbove == 1) && (f > level) )
+		dout[i] = level;
+	else if( (clipAbove != 1) && (f < level) )
+		dout[i] = level;
+	else
+		dout[i] = f;
+}
