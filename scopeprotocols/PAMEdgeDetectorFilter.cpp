@@ -37,18 +37,18 @@ using namespace std;
 
 PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
-	, m_order("PAM Order")
-	, m_baudname("Symbol rate")
+	, m_order(m_parameters["PAM Order"])
+	, m_baud(m_parameters["Symbol rate"])
 {
 	AddDigitalStream("data");
 
 	CreateInput("din");
 
-	m_parameters[m_order] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_order].SetIntVal(3);
+	m_order = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_order.SetIntVal(3);
 
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_baudname].SetIntVal(1250000000);	//1.25 Gbps
+	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_baud.SetIntVal(1250000000);	//1.25 Gbps
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 
 bool PAMEdgeDetectorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -73,6 +73,12 @@ string PAMEdgeDetectorFilter::GetProtocolName()
 	return "PAM Edge Detector";
 }
 
+Filter::DataLocation PAMEdgeDetectorFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -80,8 +86,14 @@ void PAMEdgeDetectorFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -90,14 +102,15 @@ void PAMEdgeDetectorFilter::Refresh(
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
+		AddErrorMessage("Missing inputs", "No uniform analog waveform available at input");
 		SetData(nullptr, 0);
 		return;
 	}
 	din->PrepareForCpuAccess();
 	auto len = din->size();
 
-	int64_t ui = round(FS_PER_SECOND / m_parameters[m_baudname].GetIntVal());
-	size_t order = m_parameters[m_order].GetIntVal();
+	int64_t ui = round(FS_PER_SECOND / m_baud.GetIntVal());
+	size_t order = m_order.GetIntVal();
 
 	//Extract parameter values for input thresholds
 	vector<float> levels;
@@ -188,6 +201,10 @@ void PAMEdgeDetectorFilter::Refresh(
 		size_t iend = levelCrossings[i].index + 1;
 		size_t symstart;
 		size_t symend = levelCrossings[i].value;
+
+		//If our first sample occurs too early in the waveform, we can't interpolate. Skip it.
+		if(istart == 0)
+			continue;
 
 		if(levelCrossings[i].rising)
 			symstart = symend - 1;
@@ -286,7 +303,7 @@ bool PAMEdgeDetectorFilter::PerformAction(const string& id)
 
 void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
 {
-	size_t order = m_parameters[m_order].GetIntVal();
+	size_t order = m_order.GetIntVal();
 
 	float vmin, vmax;
 	GetMinMaxVoltage(din, vmin, vmax);
