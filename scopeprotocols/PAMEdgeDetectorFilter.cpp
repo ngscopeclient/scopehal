@@ -50,7 +50,7 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
 	m_baud.SetIntVal(1250000000);	//1.25 Gbps
 
-	if(g_hasShaderInt64 && g_hasShaderInt8)
+	if(g_hasShaderInt8)
 	{
 		m_edgeIndexes.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 		m_edgeStates.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
@@ -60,10 +60,16 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 		m_edgeStatesScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_edgeRisingScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 
+		m_edgeCount.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_edgeCount.resize(1);
+
 		m_thresholds.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 		m_firstPassComputePipeline =
 			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_LevelCrossings.spv", 5, sizeof(PAMEdgeDetectorConstants));
+
+		m_secondPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_MergeCrossings.spv", 7, sizeof(PAMEdgeDetectorConstants));
 	}
 }
 
@@ -165,7 +171,7 @@ void PAMEdgeDetectorFilter::Refresh(
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
 	//TODO: does this actually depend on int64??
-	if(g_hasShaderInt64 && g_hasShaderInt8)
+	if(g_hasShaderInt8)
 	{
 		//Prepare thresholds for GPU
 		//TODO: only if changed
@@ -179,6 +185,10 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_edgeIndexesScratch.resize(len);
 		m_edgeStatesScratch.resize(len);
 		m_edgeRisingScratch.resize(len);
+
+		m_edgeIndexes.resize(len);
+		m_edgeStates.resize(len);
+		m_edgeRising.resize(len);
 
 		cmdBuf.begin({});
 
@@ -206,82 +216,36 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_edgeStatesScratch.MarkModifiedFromGpu();
 		m_edgeRisingScratch.MarkModifiedFromGpu();
 
-		/*
 		//Run the second pass
-		m_secondPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(1, m_firstPassTimestamps, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(2, m_firstPassState, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(3, m_secondPassTimestamps, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassState, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(0, m_edgeIndexesScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(1, m_edgeStatesScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(2, m_edgeRisingScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(3, m_edgeIndexes, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(4, m_edgeStates, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(5, m_edgeRising, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(6, m_edgeCount, cmdBuf, true);
 		m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 		m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
-		m_secondPassTimestamps.MarkModifiedFromGpu();
-		m_secondPassState.MarkModifiedFromGpu();
+		m_edgeIndexes.MarkModifiedFromGpu();
+		m_edgeStates.MarkModifiedFromGpu();
+		m_edgeRising.MarkModifiedFromGpu();
+		m_edgeCount.MarkModifiedFromGpu();
 
-		//Run the final pass.
-		//This also generates the squarewave output and the sample data
-		m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassState, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(2, m_secondPassTimestamps, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(3, m_secondPassState, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
-		m_finalPassComputePipeline->BindBufferNonblocking(7, scap->m_samples, cmdBuf);
-		//this assumes input is uniformly sampled for now
-		m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
-		m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
-		m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
 
-		m_firstPassState.PrepareForCpuAccessNonblocking(cmdBuf);
-		m_secondPassState.PrepareForCpuAccessNonblocking(cmdBuf);
+		//Until we get the rest of the stuff processed on GPU - pull these  too
+		m_edgeIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_edgeStates.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_edgeRising.PrepareForCpuAccessNonblocking(cmdBuf);
 
-		//Output was entirely created on the GPU, no need to touch the CPU for that
-		cap->MarkModifiedFromGpu();
-		scap->MarkModifiedFromGpu();
-		generatedSquarewaveOnGPU = true;
-
-		//Copy the offsets and durations from the sampled data
-		scap->m_offsets.CopyFromNonblocking(cmdBuf, cap->m_offsets, false);
-		scap->m_durations.CopyFromNonblocking(cmdBuf, cap->m_durations, false);
-		*/
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
-		//DEBUG: CPU side merge
-		m_edgeIndexesScratch.PrepareForCpuAccess();
-		m_edgeStatesScratch.PrepareForCpuAccess();
-		m_edgeRisingScratch.PrepareForCpuAccess();
-
-		//Figure out how many edges we ended up with
-		uint64_t numSamples = 0;
-		for(uint64_t i=0; i<numThreads; i++)
-			numSamples += m_edgeIndexesScratch[i*cfg.outputPerThread];
-		LogDebug("GPU found %ld edges\n", numSamples);
-
+		uint numSamples = m_edgeCount[0];
 		m_edgeIndexes.resize(numSamples);
 		m_edgeStates.resize(numSamples);
 		m_edgeRising.resize(numSamples);
-		m_edgeIndexes.PrepareForCpuAccess();
-		m_edgeStates.PrepareForCpuAccess();
-		m_edgeRising.PrepareForCpuAccess();
-		uint32_t iout = 0;
-		for(uint32_t i=0; i<numThreads; i++)
-		{
-			uint32_t rdbase = i*cfg.outputPerThread;
-			uint32_t nread = m_edgeIndexesScratch[rdbase];
-			for(uint32_t j=0; j<nread; j++)
-			{
-				m_edgeIndexes[iout] = m_edgeIndexesScratch[rdbase + j + 1];
-				m_edgeStates[iout] = m_edgeStatesScratch[rdbase + j + 1];
-				m_edgeRising[iout] = m_edgeRisingScratch[rdbase + j + 1];
-				iout ++;
-			}
-		}
-		m_edgeIndexes.MarkModifiedFromCpu();
-		m_edgeStates.MarkModifiedFromCpu();
-		m_edgeRising.MarkModifiedFromCpu();
 	}
 
 	else

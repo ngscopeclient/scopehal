@@ -59,6 +59,7 @@ add_compute_shaders(
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
 		PAMEdgeDetector_LevelCrossings.glsl
+		PAMEdgeDetector_MergeCrossings.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl

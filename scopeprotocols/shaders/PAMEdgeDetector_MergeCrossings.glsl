@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,68 +27,84 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#version 460
+#pragma shader_stage(compute)
+
+#extension GL_EXT_shader_8bit_storage : require
+
+layout(std430, binding=0) restrict readonly buffer buf_indexesIn
+{
+	uint idxIn[];
+};
+
+layout(std430, binding=1) restrict readonly buffer buf_statesIn
+{
+	uint8_t statesIn[];
+};
+
+layout(std430, binding=2) restrict readonly buffer buf_risingIn
+{
+	uint8_t risingIn[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_indexesOut
+{
+	uint idxOut[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_statesOut
+{
+	uint8_t statesOut[];
+};
+
+layout(std430, binding=5) restrict writeonly buffer buf_risingOut
+{
+	uint8_t risingOut[];
+};
+
+layout(std430, binding=6) restrict writeonly buffer buf_finalCount
+{
+	uint finalCount;
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+	uint order;
+	uint inputPerThread;
+	uint outputPerThread;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PAMEdgeDetectorFilter
+	@brief Second-pass zero crossing detection
+
+	Merge the output from the first-pass shader
  */
-#ifndef PAMEdgeDetectorFilter_h
-#define PAMEdgeDetectorFilter_h
-
-#include <cinttypes>
-#include "../scopehal/ActionProvider.h"
-
-class PAMEdgeDetectorConstants
+void main()
 {
-public:
-	uint32_t len;
-	uint32_t order;
-	uint32_t inputPerThread;
-	uint32_t outputPerThread;
-};
+	//Find our block of inputs
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 
-class PAMEdgeDetectorFilter
-	: public Filter
-	, public ActionProvider
-{
-public:
-	PAMEdgeDetectorFilter(const std::string& color);
+	//Find starting sample index
+	uint writebase = 0;
+	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
+		writebase += idxIn[i * outputPerThread];
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+	//Find number of samples to copy
+	uint readbase = gl_GlobalInvocationID.x * outputPerThread;
+	uint numSamples = idxIn[readbase];
+	readbase ++;	//skip the size value at position 0
 
-	static std::string GetProtocolName();
+	//Actually do the copy
+	for(uint i=0; i<numSamples; i++)
+	{
+		idxOut[writebase + i] = idxIn[readbase + i];
+		statesOut[writebase + i] = statesIn[readbase + i];
+		risingOut[writebase + i] = risingIn[readbase + i];
+	}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	virtual std::vector<std::string> EnumActions() override;
-	virtual bool PerformAction(const std::string& id) override;
-
-	PROTOCOL_DECODER_INITPROC(PAMEdgeDetectorFilter)
-
-protected:
-	void AutoLevel(UniformAnalogWaveform* din);
-
-	FilterParameter& m_order;
-	FilterParameter& m_baud;
-
-	AcceleratorBuffer<uint32_t> m_edgeIndexes;
-	AcceleratorBuffer<uint8_t> m_edgeStates;
-	AcceleratorBuffer<uint8_t> m_edgeRising;
-
-	AcceleratorBuffer<uint32_t> m_edgeCount;
-
-	AcceleratorBuffer<uint32_t> m_edgeIndexesScratch;
-	AcceleratorBuffer<uint8_t> m_edgeStatesScratch;
-	AcceleratorBuffer<uint8_t> m_edgeRisingScratch;
-
-	AcceleratorBuffer<float> m_thresholds;
-
-	///@brief Compute pipeline for first edge detection pass
-	std::shared_ptr<ComputePipeline> m_firstPassComputePipeline;
-
-	///@brief Compute pipeline for second (merge) edge detection pass
-	std::shared_ptr<ComputePipeline> m_secondPassComputePipeline;
-};
-
-#endif
+	if(gl_GlobalInvocationID.x == (numThreads - 1) )
+		finalCount = writebase + numSamples;
+}
