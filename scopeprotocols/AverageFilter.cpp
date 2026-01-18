@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,11 +52,16 @@ AverageFilter::~AverageFilter()
 {
 }
 
-void AverageFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void AverageFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
+
 	auto din = GetInput(0);
 	if(!din)
+	{
+		AddErrorMessage("Missing inputs", "No signal input connected");
 		return;
+	}
 
 	//Copy units to output streams
 	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
@@ -81,24 +86,24 @@ void AverageFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 		auto data = din.GetData();
 		if(!data)
 		{
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 			SetData(nullptr, 0);
 			return;
 		}
 		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
 		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
-		double total = 0;
 		size_t len = data->size();
 
+		float avg;
 		if(udata)
-		{
-			for(auto sample : udata->m_samples)
-				total += sample;
-		}
-		else if(sdata)
-		{
-			for(auto sample : sdata->m_samples)
-				total += sample;
-		}
+			avg = m_averager.Average(udata, cmdBuf, queue);
+		else
+			avg = m_averager.Average(sdata, cmdBuf, queue);
+
+		//TODO: make Averager output the total as an option?
+		float total = avg * len;
+
 		m_pastCount += len;
 		m_pastSum += total;
 
@@ -111,7 +116,8 @@ void AverageFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 
 Filter::DataLocation AverageFilter::GetInputLocation()
 {
-	return LOC_CPU;
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }
 
 string AverageFilter::GetProtocolName()

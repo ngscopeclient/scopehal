@@ -27,98 +27,33 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "AutocorrelationFilter.h"
+#version 430
+#pragma shader_stage(compute)
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-AutocorrelationFilter::AutocorrelationFilter(const string& color)
-	: Filter(color, CAT_MATH)
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	float din[];
+};
 
-	m_maxDeltaName = "Max offset";
-	m_parameters[m_maxDeltaName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_maxDeltaName].SetIntVal(1000);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool AutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-	if(stream.m_channel == nullptr)
-		return false;
+	float dout[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string AutocorrelationFilter::GetProtocolName()
+layout(std430, push_constant) uniform constants
 {
-	return "Autocorrelation";
-}
+	float delta;
+	uint offsetIn;
+	uint size;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-void AutocorrelationFilter::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+void main()
 {
-	ClearErrors();
-	if(!VerifyAllInputsOKAndUniformAnalog())
-	{
-		if(!GetInput(0))
-			AddErrorMessage("Missing inputs", "No signal input connected");
-		else if(!GetInputWaveform(0))
-			AddErrorMessage("Missing inputs", "No waveform available at input");
-
-		SetData(nullptr, 0);
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
 		return;
-	}
 
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto len = din->size();
-
-	//Copy the units
-	SetYAxisUnits(m_inputs[0].m_channel->GetYAxisUnits(0), 0);
-
-	//Sanity check range
-	size_t range = m_parameters[m_maxDeltaName].GetIntVal();
-	if( len <= range)
-	{
-		if(!GetInput(0))
-			AddErrorMessage("Waveform too small", "Requested correlation length exceeds waveform size");
-
-		SetData(nullptr, 0);
-		return;
-	}
-
-	//Set up the output waveform
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
-	cap->PrepareForCpuAccess();
-	din->PrepareForCpuAccess();
-
-	size_t end = len - range;
-	for(size_t delta=1; delta <= range; delta ++)
-	{
-		double total = 0;
-		for(size_t i=0; i<end; i++)
-			total += din->m_samples[i] * din->m_samples[i+delta];
-
-		cap->m_samples.push_back(total / end);
-	}
-
-	cap->MarkSamplesModifiedFromCpu();
-	SetData(cap, 0);
+	dout[i] = din[i + offsetIn] - delta;
 }

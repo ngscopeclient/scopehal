@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -65,6 +65,12 @@ vector<string> CANAnalyzerFilter::GetHeaders()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+Filter::DataLocation CANAnalyzerFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 bool CANAnalyzerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == nullptr)
@@ -76,10 +82,18 @@ bool CANAnalyzerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
-void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
+void CANAnalyzerFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -88,15 +102,11 @@ void CANAnalyzerFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared
 	auto len = din->size();
 
 	//copy input to output
-	auto cap = new CANWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
+	auto cap = SetupEmptyWaveform<CANWaveform>(din, 0, true);
 	cap->m_offsets.CopyFrom(din->m_offsets);
 	cap->m_durations.CopyFrom(din->m_durations);
 	cap->m_samples.CopyFrom(din->m_samples);
-	SetData(cap, 0);
+	cap->PrepareForCpuAccess();
 
 	ClearPackets();
 

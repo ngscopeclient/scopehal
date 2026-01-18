@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,6 +37,7 @@ using namespace std;
 
 ACCoupleFilter::ACCoupleFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_computePipeline("shaders/SubtractVectorScalar.spv", 2, sizeof(SubtractVectorScalarConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
@@ -47,7 +48,7 @@ ACCoupleFilter::ACCoupleFilter(const string& color)
 
 bool ACCoupleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -64,15 +65,27 @@ string ACCoupleFilter::GetProtocolName()
 	return "AC Couple";
 }
 
+Filter::DataLocation ACCoupleFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACCoupleFilter::Refresh()
+void ACCoupleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -81,34 +94,43 @@ void ACCoupleFilter::Refresh()
 	auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
 
 	//Find the average of our samples (assume data is DC balanced)
-	float average = GetAvgVoltage(sdata, udata);
+	float average;
+	if(sdata)
+		average = m_averager.Average(sdata, cmdBuf, queue);
+	else
+		average = m_averager.Average(udata, cmdBuf, queue);
+
 	auto len = data->size();
+	SubtractVectorScalarConstants cfg;
+	cfg.offsetIn = 0;
+	cfg.delta = average;
+	cfg.size = len;
+
+	cmdBuf.begin({});
 
 	//Set up waveforms
-	float* fsrc;
-	float* fdst;
 	if(sdata)
 	{
 		auto cap = SetupSparseOutputWaveform(sdata, 0, 0, 0);
-		fsrc = sdata->m_samples.GetCpuPointer();
-		fdst = cap->m_samples.GetCpuPointer();
-
-		cap->PrepareForCpuAccess();
-		cap->MarkSamplesModifiedFromCpu();
-		cap->MarkTimestampsModifiedFromCpu();
+		m_computePipeline.BindBufferNonblocking(0, sdata->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->MarkSamplesModifiedFromGpu();
 	}
 	else
 	{
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(udata, 0);
 		cap->Resize(len);
-		fsrc = udata->m_samples.GetCpuPointer();
-		fdst = cap->m_samples.GetCpuPointer();
-
-		cap->PrepareForCpuAccess();
-		cap->MarkSamplesModifiedFromCpu();
+		m_computePipeline.BindBufferNonblocking(0, udata->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->MarkSamplesModifiedFromGpu();
 	}
 
 	//Do the actual subtraction
-	for(size_t i=0; i<len; i++)
-		fdst[i] = fsrc[i] - average;
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }

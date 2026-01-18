@@ -223,6 +223,21 @@ protected:
 		m_errorLog = "";
 	}
 
+	///@brief Add a new error message
+	void AddErrorMessage(const std::string& err)
+	{ m_errorLog += std::string("• ") + err + "\n"; }
+
+	/**
+		@brief Add a new error message with a title
+
+		The title replaces any previous title, if set
+	 */
+	void AddErrorMessage(const std::string& title, const std::string& err)
+	{
+		m_errorTitle = title;
+		AddErrorMessage(err);
+	}
+
 	///@brief Signal emitted when the set of parameters changes
 	sigc::signal<void()> m_parametersChangedSignal;
 

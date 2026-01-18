@@ -32,7 +32,10 @@ add_compute_shaders(
 		AddFilter.glsl
 		ACRMS.glsl
 		ACRMS_Trend.glsl
+		BaseMeasurement_FirstPass.glsl
+		BaseMeasurement_FinalPass.glsl
 		BlackmanHarrisWindow.glsl
+		ClipFilter.glsl
 		ClockRecoveryPLL_FirstPass.glsl
 		ClockRecoveryPLL_SecondPass.glsl
 		ClockRecoveryPLL_FinalPass.glsl
@@ -59,6 +62,7 @@ add_compute_shaders(
 		SubtractFilter.glsl
 		SubtractInPlace.glsl
 		SubtractOutOfPlace.glsl
+		SubtractVectorScalar.glsl
 		TIEMeasurement_FirstPass.glsl
 		TIEMeasurement_SecondPass.glsl
 		Threshold.glsl

@@ -360,17 +360,20 @@ protected:
 	{
 		//Create the waveform, but only if necessary
 		auto cap = dynamic_cast<T*>(GetData(stream));
-		if(cap == NULL)
+		if(cap == nullptr)
 		{
 			cap = new T;
 			SetData(cap, stream);
 		}
 
 		//Copy configuration
-		cap->m_startTimestamp 		= din->m_startTimestamp;
-		cap->m_startFemtoseconds	= din->m_startFemtoseconds;
-		cap->m_triggerPhase			= din->m_triggerPhase;
-		cap->m_timescale			= din->m_timescale;
+		if(din != nullptr)
+		{
+			cap->m_startTimestamp 		= din->m_startTimestamp;
+			cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+			cap->m_triggerPhase			= din->m_triggerPhase;
+			cap->m_timescale			= din->m_timescale;
+		}
 
 		//Bump rev number
 		cap->m_revision ++;
@@ -480,6 +483,8 @@ public:
 		float& vmax
 		)
 	{
+		AssertTypeIsAnalogWaveform(cap);
+
 		//GPU side min/max
 		const uint32_t nthreads = 4096;
 		const uint32_t threadsPerBlock = 64;

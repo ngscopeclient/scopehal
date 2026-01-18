@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,7 +53,7 @@ AddFilter::~AddFilter()
 
 bool AddFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i >= 2)
@@ -78,6 +78,8 @@ string AddFilter::GetProtocolName()
 
 void AddFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
+
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
@@ -110,6 +112,11 @@ void AddFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 	auto din = GetInputWaveform(iVector);
 	if(!din)
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -154,7 +161,12 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0) || !GetInput(1))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0) || !GetInputWaveform(1))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -172,7 +184,8 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
 		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Inconsistent units", "The inputs have different X or Y axis units");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -193,7 +206,8 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	//Mixed sparse/uniform not allowed
 	else
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Inconsistent types", "This block does not support mixing sparse and uniform waveforms");
+		SetData(nullptr, 0);
 		return;
 	}
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,19 +37,20 @@ using namespace std;
 
 ClipFilter::ClipFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_clipAboveName("Behavior")
-	, m_clipLevelName("Level")
+	, m_clipAbove(m_parameters["Behavior"])
+	, m_clipLevel(m_parameters["Level"])
+	, m_computePipeline("shaders/ClipFilter.spv", 2, sizeof(ClipFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_parameters[m_clipAboveName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_clipAboveName].AddEnumValue("Clip Above", 1);
-	m_parameters[m_clipAboveName].AddEnumValue("Clip Below", 0);
-	m_parameters[m_clipAboveName].SetIntVal(0);
+	m_clipAbove = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_clipAbove.AddEnumValue("Clip Above", 1);
+	m_clipAbove.AddEnumValue("Clip Below", 0);
+	m_clipAbove.SetIntVal(0);
 
-	m_parameters[m_clipLevelName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_clipLevelName].SetFloatVal(0);
+	m_clipLevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_clipLevel.SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,70 +75,72 @@ string ClipFilter::GetProtocolName()
 	return "Clip";
 }
 
+Filter::DataLocation ClipFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ClipFilter::Refresh()
+void ClipFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
 	auto din = GetInputWaveform(0);
-	size_t len = din->size();
-
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	if(!sdin && !udin)
+	{
+		AddErrorMessage("Missing inputs", "No waveform available at input");
+		SetData(nullptr, 0);
+		return;
+	}
 
-	bool clipAbove = m_parameters[m_clipAboveName].GetIntVal();
-	float clipLevel = m_parameters[m_clipLevelName].GetFloatVal();
+	cmdBuf.begin({});
 
+	//Push constants
+	size_t len = din->size();
+	ClipFilterConstants cfg;
+	cfg.len = len;
+	cfg.clipAbove = m_clipAbove.GetIntVal();
+	cfg.level = m_clipLevel.GetFloatVal();
+
+	//Set up output waveform and bind buffers
 	if(sdin)
 	{
-		//Negate each sample
 		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
-		cap->PrepareForCpuAccess();
-		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-		float* a = (float*)__builtin_assume_aligned(&sdin->m_samples[0], 16);
-		for(size_t i=0; i<len; i++)
-		{
-			float d = a[i];
-
-			if (( clipAbove && d > clipLevel) ||
-				(!clipAbove && d < clipLevel))
-			{
-				d = clipLevel;
-			}
-
-			out[i] = d;
-		}
-
-		cap->MarkModifiedFromCpu();
+		m_computePipeline.BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->MarkSamplesModifiedFromGpu();
 	}
 	else if(udin)
 	{
-		//Negate each sample
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
-		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-		float* a = (float*)__builtin_assume_aligned(&udin->m_samples[0], 16);
-		for(size_t i=0; i<len; i++)
-		{
-			float d = a[i];
-			
-			if (( clipAbove && d > clipLevel) ||
-				(!clipAbove && d < clipLevel))
-			{
-				d = clipLevel;
-			}
-			
-			out[i] = d;
-		}
-
-		cap->MarkModifiedFromCpu();
+		m_computePipeline.BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->MarkSamplesModifiedFromGpu();
 	}
+
+	//Do the actual clipping
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }

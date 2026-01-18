@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -70,6 +70,12 @@ vector<string> CandumpImportFilter::GetHeaders()
 	return ret;
 }
 
+Filter::DataLocation CandumpImportFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -85,11 +91,15 @@ void CandumpImportFilter::SetDefaultName()
 
 void CandumpImportFilter::OnFileNameChanged()
 {
+	ClearErrors();
 	ClearPackets();
 
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
+	{
+		AddErrorMessage("Missing inputs", "No file name specified");
 		return;
+	}
 
 	//Set unit
 	SetXAxisUnits(Unit(Unit::UNIT_FS));
@@ -98,16 +108,15 @@ void CandumpImportFilter::OnFileNameChanged()
 	FILE* fp = fopen(fname.c_str(), "r");
 	if(!fp)
 	{
-		LogError("Couldn't open candump file \"%s\"\n", fname.c_str());
+		AddErrorMessage("Missing inputs", string("File ") + fname + " could not be opened");
 		return;
 	}
 
 	//Create output waveform
-	auto cap = new CANWaveform;
+	auto cap = SetupEmptyWaveform<CANWaveform>(nullptr, 0);
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	//Calculate length of a single bit on the bus
 	int64_t baud = m_parameters[m_datarate].GetIntVal();
@@ -231,13 +240,17 @@ void CandumpImportFilter::OnFileNameChanged()
 	fclose(fp);
 }
 
-bool CandumpImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool CandumpImportFilter::ValidateChannel(
+	[[maybe_unused]] size_t i,
+	[[maybe_unused]] StreamDescriptor stream)
 {
 	//no inputs allowed
 	return false;
 }
 
-void CandumpImportFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
+void CandumpImportFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	//no-op, everything happens in OnFileNameChanged
 }
