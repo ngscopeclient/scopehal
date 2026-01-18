@@ -101,7 +101,7 @@ void CSVImportFilter::OnFileNameChanged()
 	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
-		AddErrorMessage("Bad file", string("Failed to open file ") + f;
+		AddErrorMessage("Bad file", string("Failed to open file ") + fname);
 		return;
 	}
 	fseek(fp, 0, SEEK_END);
@@ -110,7 +110,7 @@ void CSVImportFilter::OnFileNameChanged()
 	char* buf = new char[flen+1];
 	if(flen != fread(buf, 1, flen, fp))
 	{
-		AddErrorMessage("Bad file", string("Failed to read contents of file ") + f;
+		AddErrorMessage("Bad file", string("Failed to read contents of file ") + fname);
 		return;
 	}
 	buf[flen] = '\0';	//guarantee null termination at end of file
@@ -332,7 +332,7 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			AddErrorMessage("Malformed file",
 				string("Line ") + to_string(nrow) + " contains " + to_string(ncol) + " fields, but file started with " +
-				to_string(ncols) + " fields";
+				to_string(ncols) + " fields");
 			return;
 		}
 	}
