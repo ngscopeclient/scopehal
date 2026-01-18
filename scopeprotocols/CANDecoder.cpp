@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,7 +56,7 @@ CANDecoder::CANDecoder(const string& color)
 
 bool CANDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -70,17 +70,31 @@ string CANDecoder::GetProtocolName()
 	return "CAN";
 }
 
+Filter::DataLocation CANDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void CANDecoder::Refresh()
+void CANDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	ClearErrors();
 	ClearPackets();
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -91,11 +105,7 @@ void CANDecoder::Refresh()
 	auto sdiff = dynamic_cast<SparseDigitalWaveform*>(din);
 
 	//Create the capture
-	auto cap = new CANWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
+	auto cap = SetupEmptyWaveform<CANWaveform>(din, 0, true);
 	cap->PrepareForCpuAccess();
 
 	//Calculate some time scale values
@@ -128,7 +138,7 @@ void CANDecoder::Refresh()
 	//LogDebug("Starting CAN decode\n");
 	//LogIndenter li;
 
-	Packet* pack = NULL;
+	Packet* pack = nullptr;
 
 	size_t len = din->size();
 	int64_t tbitstart = 0;
@@ -536,8 +546,6 @@ void CANDecoder::Refresh()
 			sampled = false;
 		}
 	}
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }
