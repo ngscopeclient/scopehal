@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -116,6 +116,10 @@ void CTLEFilter::InterpolateSparameters(float bin_hz, bool /*invert*/, size_t no
 
 void CTLEFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("CTLEFilter::Refresh");
+	#endif
+
 	//Pull out our settings
 	float dcgain_db = m_parameters[m_dcGainName].GetFloatVal();
 	float zfreq = m_parameters[m_zeroFreqName].GetFloatVal();
