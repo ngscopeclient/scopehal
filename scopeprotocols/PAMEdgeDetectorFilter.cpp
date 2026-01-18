@@ -108,6 +108,10 @@ void PAMEdgeDetectorFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PAMEdgeDetectorFilter::Refresh");
+	#endif
+
 	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{

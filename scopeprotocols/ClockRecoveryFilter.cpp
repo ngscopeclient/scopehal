@@ -137,8 +137,14 @@ void ClockRecoveryFilter::Refresh(
 	#endif
 
 	//Require a data signal, but not necessarily a gate
+	ClearErrors();
 	if(!VerifyInputOK(0))
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -160,6 +166,8 @@ void ClockRecoveryFilter::Refresh(
 	int64_t fnyquist = 2*din->m_timescale;
 	if( initialPeriod < fnyquist)
 	{
+		AddErrorMessage("Invalid frequency", "Requested frequency is higher than Nyquist of the input signal");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -194,6 +202,7 @@ void ClockRecoveryFilter::Refresh(
 	}
 	if(nedges == 0)
 	{
+		AddErrorMessage("No edges found", "No zero crossings were found on the input");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -602,7 +611,7 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 
 					if(period < fnyquist)
 					{
-						LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
+						AddErrorMessage("Unable to lock", "PLL attempted to lock to frequency near or above Nyquist\n");
 						nedge = nedges;
 						break;
 					}
@@ -697,7 +706,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 
 				if(iperiod < fnyquist)
 				{
-					LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
+					AddErrorMessage("Unable to lock", "PLL attempted to lock to frequency near or above Nyquist\n");
 					nedge = nedges;
 					break;
 				}

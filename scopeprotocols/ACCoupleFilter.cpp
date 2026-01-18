@@ -76,6 +76,10 @@ Filter::DataLocation ACCoupleFilter::GetInputLocation()
 
 void ACCoupleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ACCoupleFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
 	ClearErrors();
 	if(!VerifyAllInputsOK())

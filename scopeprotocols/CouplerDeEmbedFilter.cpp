@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -143,10 +143,17 @@ Filter::DataLocation CouplerDeEmbedFilter::GetInputLocation()
 
 void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("CouplerDeEmbedFilter::Refresh");
+	#endif
+
 	//TODO: implement fallback
 	if(!g_hasPushDescriptor)
 	{
-		LogError("CouplerDeEmbedFilter requires VK_KHR_push_descriptor\n");
+		AddErrorMessage(
+			"Missing GPU support",
+			"This filter requires a GPU with VK_KHR_push_descriptor support and does not currently have a fallback implementation");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -154,6 +161,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -163,6 +175,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	auto dinRev = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
 	if(!dinFwd || !dinRev)
 	{
+		if(!dinFwd)
+			AddErrorMessage("Missing inputs", "No waveform on forward input)");
+		if(!dinRev)
+			AddErrorMessage("Missing inputs", "No waveform on reverse input)");
+
 		SetData(nullptr, 0);
 		return;
 	}
