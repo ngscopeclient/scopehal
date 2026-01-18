@@ -64,12 +64,20 @@ MockInstrument::MockInstrument(const string& name,
 	// Use a null transport
 	m_transport = new SCPINullTransport(args);
 
+	//Clear warnings after preload for mock instruments
+	m_preloaders.push_back(sigc::mem_fun(*this, &MockInstrument::ClearWarnings));
+
 	m_serializers.push_back(sigc::mem_fun(*this, &MockInstrument::DoSerializeConfiguration));
 }
 
 MockInstrument::~MockInstrument()
 {
 
+}
+
+void MockInstrument::ClearWarnings(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& warnings)
+{	// No warnings necessary for Mock instruments
+	warnings.m_warnings.erase(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

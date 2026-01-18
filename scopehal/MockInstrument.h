@@ -65,6 +65,7 @@ public:
 
 	// Serialization
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+	void ClearWarnings(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 
 	// SCPI
 	virtual void BackgroundProcessing() override {}
