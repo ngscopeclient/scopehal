@@ -246,7 +246,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
-		uint numSamples = m_edgeCount[0];
+		uint32_t numSamples = m_edgeCount[0];
 		m_edgeIndexes.resize(numSamples);
 		m_edgeStates.resize(numSamples);
 		m_edgeRising.resize(numSamples);
