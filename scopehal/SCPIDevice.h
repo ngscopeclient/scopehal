@@ -36,7 +36,7 @@
 class SCPIDevice
 {
 public:
-	SCPIDevice(SCPITransport* transport, bool identify = true);
+	SCPIDevice(SCPITransport* transport, bool identify = true, unsigned int identify_timeout_us = 5000000);
 	virtual ~SCPIDevice();
 
 	SCPITransport* GetTransport() const
