@@ -92,6 +92,7 @@ public:
 protected:
 
 	bool m_masterEnabled;
+	std::map<size_t, bool> m_enabled;
 	std::map<size_t, bool> m_constantCurrent;
 	std::map<size_t, bool> m_overcurrentShutdown;
 	std::map<size_t, bool> m_overcurrentTripped;

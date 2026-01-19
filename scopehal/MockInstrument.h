@@ -57,6 +57,7 @@ public:
 	virtual bool IsOffline() override;
 
 	virtual std::string GetTransportConnectionString() override;
+	virtual void SetTransportConnectionString(const std::string& args);
 	virtual std::string GetTransportName() override;
 
 	virtual std::string GetName() const override;
@@ -82,9 +83,6 @@ protected:
 	std::string m_transportName;
 	std::string m_driver;
 	std::string m_args;
-
-	std::map<size_t, bool> m_enabled;
-	std::map<size_t, std::string> m_names;
 
 public:
 	virtual std::string GetDriverName() const override

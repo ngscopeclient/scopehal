@@ -98,6 +98,11 @@ string MockInstrument::GetTransportConnectionString()
 	return m_args;
 }
 
+void MockInstrument::SetTransportConnectionString(const string& args)
+{
+	m_args = args;
+}
+
 string MockInstrument::GetName() const
 {
 	return m_name;

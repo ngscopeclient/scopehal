@@ -41,7 +41,7 @@
 	@brief Fake oscilloscope driver used for offline waveform analysis
 	@ingroup scopedrivers
  */
-class MockOscilloscope : public Oscilloscope
+class MockOscilloscope : public MockInstrument, public Oscilloscope
 {
 public:
 	MockOscilloscope(
@@ -53,8 +53,6 @@ public:
 		const std::string& args
 		);
 	virtual ~MockOscilloscope();
-
-	virtual bool IsOffline() override;
 
 	Unit::UnitType units[7] = {
 		Unit::UNIT_COUNTS,	//Unused
@@ -74,13 +72,6 @@ public:
 	{ m_channels.push_back(chan); }
 
 	virtual std::string IDPing() override;
-
-	virtual std::string GetTransportConnectionString() override;
-	virtual std::string GetTransportName() override;
-
-	virtual std::string GetName() const override;
-	virtual std::string GetVendor() const override;
-	virtual std::string GetSerial() const override;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i) override;
@@ -133,12 +124,6 @@ protected:
 
 	void ArmTrigger();
 
-	//standard *IDN? fields
-	std::string m_name;
-	std::string m_vendor;
-	std::string m_serial;
-	std::string m_fwVersion;
-
 	OscilloscopeChannel* m_extTrigger;
 
 	std::map<size_t, bool> m_channelsEnabled;
@@ -150,18 +135,8 @@ protected:
 
 	void AutoscaleVertical();
 
-	//Simulated transport information
-	std::string m_transport;
-	std::string m_driver;
-	std::string m_args;
-
 	uint64_t m_sampleRate;
 	uint64_t m_sampleDepth;
-
-public:
-
-	virtual std::string GetDriverName()
-	{ return m_driver; }
 };
 
 #endif

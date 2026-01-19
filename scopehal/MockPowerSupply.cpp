@@ -60,7 +60,6 @@ MockPowerSupply::MockPowerSupply(const string& name,
 
 MockPowerSupply::~MockPowerSupply()
 {
-	LogError("Destroying Mock Power Supply !\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,12 +67,10 @@ MockPowerSupply::~MockPowerSupply()
 
 void MockPowerSupply::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
 {
-	LogError("Loading PSU configuration...\n");
 	//Load the channels
 	auto& chans = node["channels"];
 	for(auto it : chans)
 	{
-		LogError("Loading PSU channel...\n");
 		auto& cnode = it.second;
 
 		//Allocate channel space if we didn't have it yet
@@ -90,7 +87,6 @@ void MockPowerSupply::DoPreLoadConfiguration(int /*version*/, const YAML::Node& 
 
 		//Create the channel ID
 		table.emplace(cnode["id"].as<int>(), chan);
-		LogError("Added PSU channel with id %d\n",cnode["id"].as<int>());
 	}
 
 	//If any of our channels are null, we're missing configuration for them in the file

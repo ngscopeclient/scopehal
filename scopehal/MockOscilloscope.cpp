@@ -49,19 +49,10 @@ MockOscilloscope::MockOscilloscope(
 	const string& serial,
 	const std::string& transport,
 	const std::string& driver,
-	const std::string& args)
-	: m_name(name)
-	, m_vendor(vendor)
-	, m_serial(serial)
-	, m_extTrigger(NULL)
-	, m_transport(transport)
-	, m_driver(driver)
-	, m_args(args)
+	const std::string& args) : SCPIDevice(nullptr, false), SCPIInstrument(nullptr, false), MockInstrument(name, vendor, serial, transport, driver, args)
 {
 	//Need to run this loader prior to the main Oscilloscope loader
 	m_preloaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoPreLoadConfiguration));
-
-	m_serializers.push_back(sigc::mem_fun(*this, &MockOscilloscope::DoSerializeConfiguration));
 }
 
 MockOscilloscope::~MockOscilloscope()
@@ -72,24 +63,9 @@ MockOscilloscope::~MockOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
 
-bool MockOscilloscope::IsOffline()
-{
-	return true;
-}
-
 string MockOscilloscope::IDPing()
 {
 	return "";
-}
-
-string MockOscilloscope::GetTransportName()
-{
-	return m_transport;
-}
-
-string MockOscilloscope::GetTransportConnectionString()
-{
-	return m_args;
 }
 
 unsigned int MockOscilloscope::GetInstrumentTypes() const
@@ -100,21 +76,6 @@ unsigned int MockOscilloscope::GetInstrumentTypes() const
 uint32_t MockOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
-}
-
-string MockOscilloscope::GetName() const
-{
-	return m_name;
-}
-
-string MockOscilloscope::GetVendor() const
-{
-	return m_vendor;
-}
-
-string MockOscilloscope::GetSerial() const
-{
-	return m_serial;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,13 +125,6 @@ bool MockOscilloscope::IsTriggerArmed()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
-
-void MockOscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
-{
-	node["transport"] = GetTransportName();
-	node["args"] = GetTransportConnectionString();
-	node["driver"] = GetDriverName();
-}
 
 void MockOscilloscope::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
 {
