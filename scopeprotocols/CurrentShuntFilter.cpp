@@ -80,7 +80,7 @@ Filter::DataLocation CurrentShuntFilter::GetInputLocation()
 }
 
 void CurrentShuntFilter::Refresh(
-	vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
