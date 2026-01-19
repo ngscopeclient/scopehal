@@ -44,8 +44,6 @@ using namespace std;
 
 /**
 	@brief Initialize the driver
-
-	@param transport	SCPINullTransport object (this driver does not connect to real hardware)
  */
 MockPowerSupply::MockPowerSupply(const string& name,
 	const string& vendor,
