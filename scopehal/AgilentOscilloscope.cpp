@@ -52,7 +52,7 @@ using namespace std;
 	@param transport	SCPITransport connected to the scope
  */
 AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
-	: SCPIDevice(transport)
+	: SCPIDevice(transport, true, 30000000) //Some models (DSOX2024A at least) take ~10 seconds to respond after network connection
 	, SCPIInstrument(transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -155,7 +155,11 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	// If the MSO option is enabled, add digital channels
 	if (options.find("MSO") != options.end())
 	{
-		m_digitalChannelCount = nchans * 4;
+		// MSO-X 2000 series has fixed 8 digital channels regardless of analog channel count
+		if (model_number.find("20") == 0)
+			m_digitalChannelCount = 8;
+		else
+			m_digitalChannelCount = nchans * 4;
 		m_digitalChannelBase = m_channels.size();
 		for(unsigned int i = 0; i < m_digitalChannelCount; i++)
 		{
@@ -416,6 +420,9 @@ void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coup
 
 double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 {
+	if (i >= m_analogChannelCount)
+		return 1;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelAttenuations.find(i) != m_channelAttenuations.end())
@@ -453,6 +460,9 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
+	if (i >= m_analogChannelCount)
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
