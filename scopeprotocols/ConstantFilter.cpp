@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,7 +56,7 @@ ConstantFilter::ConstantFilter(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ConstantFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool ConstantFilter::ValidateChannel([[maybe_unused]] size_t i, [[maybe_unused]] StreamDescriptor stream)
 {
 	//no inputs
 	return false;
@@ -79,7 +79,9 @@ void ConstantFilter::OnUnitChanged()
 	m_parameters[m_value] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
 }
 
-void ConstantFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void ConstantFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	SetYAxisUnits(static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal()), 0);
 	m_streams[0].m_value = m_parameters[m_value].GetFloatVal();

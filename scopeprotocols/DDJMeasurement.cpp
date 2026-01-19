@@ -103,8 +103,19 @@ void DDJMeasurement::Refresh(
 		nvtx3::scoped_range range("DDJMeasurement::Refresh");
 	#endif
 
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal connected to TIE input");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at TIE input");
+
+		if(!GetInput(1))
+			AddErrorMessage("Missing inputs", "No signal connected to threshold input");
+		else if(!GetInputWaveform(1))
+			AddErrorMessage("Missing inputs", "No waveform available at threshold input");
+
 		m_streams[0].m_value = NAN;
 		return;
 	}
@@ -114,6 +125,8 @@ void DDJMeasurement::Refresh(
 	auto sampledData = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(1));
 	if(!tie || !sampledData)
 	{
+		AddErrorMessage("Missing inputs", "Invalid or missing waveform input");
+
 		m_streams[0].m_value = NAN;
 		return;
 	}

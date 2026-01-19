@@ -279,6 +279,7 @@ void EyePattern::Refresh(
 		//slow path
 		case CLOCK_RISING:
 			{
+				clock->PrepareForCpuAccess();
 				vector<int64_t> clock_edges;
 				FindRisingEdges(sclk, uclk, clock_edges);
 				m_clockEdges.CopyFrom(clock_edges);
@@ -289,6 +290,7 @@ void EyePattern::Refresh(
 		//slow path
 		case CLOCK_FALLING:
 			{
+				clock->PrepareForCpuAccess();
 				vector<int64_t> clock_edges;
 				FindFallingEdges(sclk, uclk, clock_edges);
 				m_clockEdges.CopyFrom(clock_edges);
@@ -307,6 +309,7 @@ void EyePattern::Refresh(
 				//slow path
 				else
 				{
+					clock->PrepareForCpuAccess();
 					vector<int64_t> clock_edges;
 					FindZeroCrossings(sclk, uclk, clock_edges);
 					m_clockEdges.CopyFrom(clock_edges);

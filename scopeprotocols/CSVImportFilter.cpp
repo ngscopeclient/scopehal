@@ -69,9 +69,17 @@ string CSVImportFilter::GetProtocolName()
 
 void CSVImportFilter::OnFileNameChanged()
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("CSVImportFilter::OnFileNameChanged");
+	#endif
+
+	ClearErrors();
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
+	{
+		AddErrorMessage("Missing inputs", "No file name specified");
 		return;
+	}
 
 	LogTrace("Loading CSV file %s\n", fname.c_str());
 	LogIndenter li;
@@ -93,7 +101,7 @@ void CSVImportFilter::OnFileNameChanged()
 	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
-		LogError("Couldn't open CSV file \"%s\"\n", fname.c_str());
+		AddErrorMessage("Bad file", string("Failed to open file ") + fname);
 		return;
 	}
 	fseek(fp, 0, SEEK_END);
@@ -102,7 +110,7 @@ void CSVImportFilter::OnFileNameChanged()
 	char* buf = new char[flen+1];
 	if(flen != fread(buf, 1, flen, fp))
 	{
-		LogError("file read error\n");
+		AddErrorMessage("Bad file", string("Failed to read contents of file ") + fname);
 		return;
 	}
 	buf[flen] = '\0';	//guarantee null termination at end of file
@@ -322,8 +330,9 @@ void CSVImportFilter::OnFileNameChanged()
 			ncols = ncol;
 		else if(ncol != ncols)
 		{
-			LogError("Malformed file (line %zu contains %zu fields, but file started with %zu fields)\n",
-				nrow, ncol, ncols);
+			AddErrorMessage("Malformed file",
+				string("Line ") + to_string(nrow) + " contains " + to_string(ncol) + " fields, but file started with " +
+				to_string(ncols) + " fields");
 			return;
 		}
 	}

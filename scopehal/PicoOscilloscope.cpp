@@ -472,6 +472,17 @@ void PicoOscilloscope::IdentifyHardware()
 
 		case 5:
 		{
+			if(m_model[1] == '2')	//Old API
+			{
+				m_picoHasBwlimiter = true;
+				m_picoHasAwg = true;
+				m_awgBufferSize = 8192;
+				m_digitalChannelCount = 0;
+				m_picoHasExttrig = true;
+				m_adcModes = {8};
+				break;
+			}
+
 			m_picoHasBwlimiter = true;
 			m_BandwidthLimits.push_back(20);
 			if(m_model[4] == 'A')
@@ -1232,7 +1243,10 @@ bool PicoOscilloscope::IsADCModeConfigurable()
 			break;
 
 		case 5:
-			return true;
+			if(m_model[2] == '0')
+				return false;
+			else
+				return true;
 			break;
 
 		case 6:
@@ -1334,12 +1348,29 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 vector<Oscilloscope::DigitalBank> PicoOscilloscope::GetDigitalBanks()
 {
 	vector<DigitalBank> banks;
-	for(size_t i=0; i<m_digitalChannelCount; i++)
+
+	if(m_picoSeries == 6)
 	{
-		DigitalBank bank;
-		bank.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
-		banks.push_back(bank);
+		for(size_t i=0; i<m_digitalChannelCount; i++)
+		{
+			DigitalBank bank;
+			bank.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
+			banks.push_back(bank);
+		}
 	}
+	else if(m_model.find("MSO") != string::npos)
+	{
+		DigitalBank bank1;
+		DigitalBank bank2;
+		for(size_t i=0; i<8; i++)
+		{
+			bank1.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
+			bank2.push_back(GetOscilloscopeChannel(m_digitalChannelBase + 8 + i));
+		}
+		banks.push_back(bank1);
+		banks.push_back(bank2);
+	}
+
 	return banks;
 }
 
@@ -2179,6 +2210,9 @@ bool PicoOscilloscope::Is12BitModeAvailable()
 			return true;
 
 		case 5:
+			//12 bit mode not available for older models
+			if(m_model[2] == '0')
+				return false;
 			//12 bit mode only available at 500 Msps and below
 			if(rate > RATE_500MSPS)
 				return false;

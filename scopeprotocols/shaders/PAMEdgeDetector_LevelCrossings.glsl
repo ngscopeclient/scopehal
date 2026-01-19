@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,36 +27,106 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ComplexSpectrogramFilter
- */
-#ifndef ComplexSpectrogramFilter_h
-#define ComplexSpectrogramFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-#include "VulkanFFTPlan.h"
+#extension GL_EXT_shader_8bit_storage : require
 
-#include "../scopehal/DensityFunctionWaveform.h"
-#include "SpectrogramFilter.h"
-
-class ComplexSpectrogramFilter : public SpectrogramFilter
+layout(std430, binding=0) restrict readonly buffer buf_pin
 {
-public:
-	ComplexSpectrogramFilter(const std::string& color);
-	virtual ~ComplexSpectrogramFilter();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	PROTOCOL_DECODER_INITPROC(ComplexSpectrogramFilter)
-
-protected:
-
-	virtual void ReallocateBuffers(size_t fftlen, size_t nblocks) override;
+	float samples[];
 };
 
-#endif
+layout(std430, binding=1) restrict readonly buffer buf_thresholds
+{
+	float thresholds[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_indexes
+{
+	uint idx[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_states
+{
+	uint8_t states[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_rising
+{
+	uint8_t rising[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+	uint order;
+	uint inputPerThread;
+	uint outputPerThread;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+/**
+	@brief First-pass zero crossing detection
+
+	Each thread independently processes a block of inputPerThread samples and outputs a variable-length block, from
+	0 to outputPerThread-1 in size, of samples
+ */
+void main()
+{
+	//Find our block of inputs
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint instart = gl_GlobalInvocationID.x * inputPerThread;
+	uint inend = instart + inputPerThread;
+	if(gl_GlobalInvocationID.x == (numThreads - 1))
+		inend = len;
+
+	//Block of outputs
+	uint nouts = 0;
+	uint outbase = gl_GlobalInvocationID.x * outputPerThread;
+
+	if(instart == 0)
+		instart ++;
+
+	uint numThresholds = order-1;
+	uint maxOuts = outputPerThread - 1;
+
+	for(uint i = instart; (i < inend) && (nouts < maxOuts); i ++)
+	{
+		//Check against each threshold for both rising and falling edges
+		float prev = samples[i-1];
+		float cur = samples[i];
+
+		//Prepare to make a new edge
+		for(uint j=0; j<numThresholds; j++)
+		{
+			float t = thresholds[j];
+			uint iout = outbase + nouts + 1;
+
+			//Check for rising edge
+			if( (prev <= t) && (cur > t) )
+			{
+				idx[iout] = i;
+				rising[iout] = uint8_t(1);
+				states[iout] = uint8_t(j+1);
+				nouts ++;
+				break;
+			}
+
+			//Check for falling edge
+			else if( (prev >= t) && (cur < t) )
+			{
+				idx[iout] = i;
+				rising[iout] = uint8_t(0);
+				states[iout] = uint8_t(j);
+				nouts ++;
+				break;
+			}
+			//else not a level crossing
+		}
+	}
+
+	//Save number of outputs we found
+	idx[outbase] = nouts;
+}

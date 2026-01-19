@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,6 +38,15 @@
 #include <cinttypes>
 #include "../scopehal/ActionProvider.h"
 
+class PAMEdgeDetectorConstants
+{
+public:
+	uint32_t len;
+	uint32_t order;
+	uint32_t inputPerThread;
+	uint32_t outputPerThread;
+};
+
 class PAMEdgeDetectorFilter
 	: public Filter
 	, public ActionProvider
@@ -46,6 +55,7 @@ public:
 	PAMEdgeDetectorFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -59,8 +69,26 @@ public:
 protected:
 	void AutoLevel(UniformAnalogWaveform* din);
 
-	std::string m_order;
-	std::string m_baudname;
+	FilterParameter& m_order;
+	FilterParameter& m_baud;
+
+	AcceleratorBuffer<uint32_t> m_edgeIndexes;
+	AcceleratorBuffer<uint8_t> m_edgeStates;
+	AcceleratorBuffer<uint8_t> m_edgeRising;
+
+	AcceleratorBuffer<uint32_t> m_edgeCount;
+
+	AcceleratorBuffer<uint32_t> m_edgeIndexesScratch;
+	AcceleratorBuffer<uint8_t> m_edgeStatesScratch;
+	AcceleratorBuffer<uint8_t> m_edgeRisingScratch;
+
+	AcceleratorBuffer<float> m_thresholds;
+
+	///@brief Compute pipeline for first edge detection pass
+	std::shared_ptr<ComputePipeline> m_firstPassComputePipeline;
+
+	///@brief Compute pipeline for second (merge) edge detection pass
+	std::shared_ptr<ComputePipeline> m_secondPassComputePipeline;
 };
 
 #endif

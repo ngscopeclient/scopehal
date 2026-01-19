@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,7 +54,7 @@ CSVExportFilter::CSVExportFilter(const string& color)
 
 bool CSVExportFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//Reject invalid port indexes
@@ -95,8 +95,16 @@ string CSVExportFilter::GetProtocolName()
 
 void CSVExportFilter::Export()
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("CSVExportFilter::Export");
+	#endif
+
+	ClearErrors();
 	if(!VerifyAllInputsOK())
+	{
+		AddErrorMessage("Missing inputs", "One or more input ports are not connected");
 		return;
+	}
 
 	//If file is not open, open it and write a header row
 	Unit xunit = GetInput(0).GetXAxisUnits();
@@ -216,6 +224,9 @@ void CSVExportFilter::Export()
 		for(size_t i=0; i<GetInputCount(); i++)
 			AdvanceToTimestampScaled(sparse[i], uniform[i], indexes[i], lens[i], timestamp);
 	}
+
+	fclose(m_fp);
+	m_fp = nullptr;
 }
 
 void CSVExportFilter::OnColumnCountChanged()

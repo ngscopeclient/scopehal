@@ -34,11 +34,18 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify)
+SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify, unsigned int identify_timeout_us)
 	: m_transport(transport)
 {
 	if(identify)
 	{
+		auto* sock_transport = dynamic_cast<SCPISocketTransport*>(m_transport);
+		if(sock_transport)
+		{
+			LogTrace("Setting identify timeout to %u us\n", identify_timeout_us);
+			sock_transport->SetTimeouts(identify_timeout_us, identify_timeout_us);
+		}
+
 		bool succeeded = false;
 		for (int retry = 0; retry < 3; retry++)
 		{
@@ -63,6 +70,12 @@ SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify)
 			succeeded = true;
 			m_transport->FlushRXBuffer(); // In case our *IDNs got queued behind each other (Tek...)
 			break; // success
+		}
+
+		if(sock_transport)
+		{
+			// Return to reasonable default timeouts
+			sock_transport->SetTimeouts(5000000, 5000000);
 		}
 
 		if (!succeeded)

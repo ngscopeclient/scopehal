@@ -37,18 +37,40 @@ using namespace std;
 
 PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
-	, m_order("PAM Order")
-	, m_baudname("Symbol rate")
+	, m_order(m_parameters["PAM Order"])
+	, m_baud(m_parameters["Symbol rate"])
 {
 	AddDigitalStream("data");
 
 	CreateInput("din");
 
-	m_parameters[m_order] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_order].SetIntVal(3);
+	m_order = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_order.SetIntVal(3);
 
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_baudname].SetIntVal(1250000000);	//1.25 Gbps
+	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_baud.SetIntVal(1250000000);	//1.25 Gbps
+
+	if(g_hasShaderInt8)
+	{
+		m_edgeIndexes.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_edgeStates.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_edgeRising.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+
+		m_edgeIndexesScratch.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_edgeStatesScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_edgeRisingScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+
+		m_edgeCount.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_edgeCount.resize(1);
+
+		m_thresholds.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+		m_firstPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_LevelCrossings.spv", 5, sizeof(PAMEdgeDetectorConstants));
+
+		m_secondPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_MergeCrossings.spv", 7, sizeof(PAMEdgeDetectorConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +78,7 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 
 bool PAMEdgeDetectorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -73,6 +95,12 @@ string PAMEdgeDetectorFilter::GetProtocolName()
 	return "PAM Edge Detector";
 }
 
+Filter::DataLocation PAMEdgeDetectorFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -80,8 +108,18 @@ void PAMEdgeDetectorFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PAMEdgeDetectorFilter::Refresh");
+	#endif
+
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -90,14 +128,15 @@ void PAMEdgeDetectorFilter::Refresh(
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
+		AddErrorMessage("Missing inputs", "No uniform analog waveform available at input");
 		SetData(nullptr, 0);
 		return;
 	}
 	din->PrepareForCpuAccess();
 	auto len = din->size();
 
-	int64_t ui = round(FS_PER_SECOND / m_parameters[m_baudname].GetIntVal());
-	size_t order = m_parameters[m_order].GetIntVal();
+	int64_t ui = round(FS_PER_SECOND / m_baud.GetIntVal());
+	size_t order = m_order.GetIntVal();
 
 	//Extract parameter values for input thresholds
 	vector<float> levels;
@@ -135,61 +174,157 @@ void PAMEdgeDetectorFilter::Refresh(
 
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
-	struct edge_t
+	//TODO: does this actually depend on int64??
+	if(g_hasShaderInt8)
 	{
-		size_t index;
-		size_t value;
-		bool rising;
-	};
-	vector<edge_t> levelCrossings;
-	for(size_t i=1; i<len-1; i++)
-	{
-		//Check against each threshold for both rising and falling edges
-		float prev = din->m_samples[i-1];
-		float cur = din->m_samples[i];
+		//Prepare thresholds for GPU
+		//TODO: only if changed
+		m_thresholds.PrepareForCpuAccess();
+		m_thresholds.resize(order-1);
+		for(size_t i=0; i<sthresholds.size(); i++)
+			m_thresholds[i] = sthresholds[i];
+		m_thresholds.MarkModifiedFromCpu();
 
-		//Prepare to make a new edge
-		edge_t edge;
-		edge.index = i;
+		//Allocate output space
+		m_edgeIndexesScratch.resize(len);
+		m_edgeStatesScratch.resize(len);
+		m_edgeRisingScratch.resize(len);
 
-		for(size_t j=0; j<sthresholds.size(); j++)
-		{
-			float t = sthresholds[j];
+		m_edgeIndexes.resize(len);
+		m_edgeStates.resize(len);
+		m_edgeRising.resize(len);
 
-			//Check for rising edge
-			if( (prev <= t) && (cur > t) )
-			{
-				edge.rising = true;
-				edge.value = j+1;
-				levelCrossings.push_back(edge);
-				break;
-			}
+		cmdBuf.begin({});
 
-			//Check for falling edge
-			else if( (prev >= t) && (cur < t) )
-			{
-				edge.rising = false;
-				edge.value = j;
-				levelCrossings.push_back(edge);
-				break;
-			}
+		uint64_t numThreads = 4096;
+		const uint64_t blockSize = 64;
+		const uint64_t numBlocks = numThreads / blockSize;
 
-			//else not a level crossing
-		}
+		//Constants shared by all passes
+		PAMEdgeDetectorConstants cfg;
+		cfg.len = len;
+		cfg.order = order;
+		cfg.inputPerThread = len / numThreads;
+		cfg.outputPerThread = len / numThreads;
+
+		//Run the first pass
+		m_firstPassComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_firstPassComputePipeline->BindBufferNonblocking(1, m_thresholds, cmdBuf);
+		m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
+		m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
+		m_firstPassComputePipeline->BindBufferNonblocking(4, m_edgeRisingScratch, cmdBuf, true);
+		m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_edgeIndexesScratch.MarkModifiedFromGpu();
+		m_edgeStatesScratch.MarkModifiedFromGpu();
+		m_edgeRisingScratch.MarkModifiedFromGpu();
+
+		//Run the second pass
+		m_secondPassComputePipeline->BindBufferNonblocking(0, m_edgeIndexesScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(1, m_edgeStatesScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(2, m_edgeRisingScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(3, m_edgeIndexes, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(4, m_edgeStates, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(5, m_edgeRising, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(6, m_edgeCount, cmdBuf, true);
+		m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_edgeIndexes.MarkModifiedFromGpu();
+		m_edgeStates.MarkModifiedFromGpu();
+		m_edgeRising.MarkModifiedFromGpu();
+		m_edgeCount.MarkModifiedFromGpu();
+
+		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		//Until we get the rest of the stuff processed on GPU - pull these  too
+		m_edgeIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_edgeStates.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_edgeRising.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		uint32_t numSamples = m_edgeCount[0];
+		m_edgeIndexes.resize(numSamples);
+		m_edgeStates.resize(numSamples);
+		m_edgeRising.resize(numSamples);
 	}
-	LogTrace("First pass: Found %zu level crossings\n", levelCrossings.size());
+
+	else
+	{
+		m_edgeIndexes.clear();
+		m_edgeStates.clear();
+		m_edgeRising.clear();
+
+		m_edgeIndexes.reserve(len);
+		m_edgeStates.reserve(len);
+		m_edgeRising.reserve(len);
+
+		m_edgeIndexes.PrepareForCpuAccess();
+		m_edgeStates.PrepareForCpuAccess();
+		m_edgeRising.PrepareForCpuAccess();
+
+		for(size_t i=1; i<len-1; i++)
+		{
+			//Check against each threshold for both rising and falling edges
+			float prev = din->m_samples[i-1];
+			float cur = din->m_samples[i];
+
+			//Prepare to make a new edge
+			for(size_t j=0; j<sthresholds.size(); j++)
+			{
+				float t = sthresholds[j];
+
+				//Check for rising edge
+				if( (prev <= t) && (cur > t) )
+				{
+					m_edgeIndexes.push_back(i);
+					m_edgeRising.push_back(1);
+					m_edgeStates.push_back(j+1);
+					break;
+				}
+
+				//Check for falling edge
+				else if( (prev >= t) && (cur < t) )
+				{
+					m_edgeIndexes.push_back(i);
+					m_edgeRising.push_back(0);
+					m_edgeStates.push_back(j);
+					break;
+				}
+
+				//else not a level crossing
+			}
+		}
+
+		m_edgeIndexes.MarkModifiedFromCpu();
+		m_edgeStates.MarkModifiedFromCpu();
+		m_edgeRising.MarkModifiedFromCpu();
+	}
+
+	LogTrace("First pass: Found %zu level crossings\n", m_edgeIndexes.size());
+
+	m_edgeIndexes.PrepareForCpuAccess();
+	m_edgeStates.PrepareForCpuAccess();
+	m_edgeRising.PrepareForCpuAccess();
 
 	//Loop over level crossings and figure out what they are
 	int64_t halfui = ui / 2;
 	bool nextValue = true;
-	for(size_t i=0; i<levelCrossings.size(); i++)
+	for(size_t i=0; i<m_edgeIndexes.size(); i++)
 	{
-		size_t istart = levelCrossings[i].index - 1;
-		size_t iend = levelCrossings[i].index + 1;
+		size_t istart = m_edgeIndexes[i] - 1;
+		size_t iend = m_edgeIndexes[i] + 1;
 		size_t symstart;
-		size_t symend = levelCrossings[i].value;
+		size_t symend = m_edgeStates[i];
 
-		if(levelCrossings[i].rising)
+		//If our first sample occurs too early in the waveform, we can't interpolate. Skip it.
+		if(istart == 0)
+			continue;
+
+		if(m_edgeRising[i])
 			symstart = symend - 1;
 		else
 			symstart = symend + 1;
@@ -202,13 +337,13 @@ void PAMEdgeDetectorFilter::Refresh(
 			if(i <= lookback)
 				break;
 
-			int64_t delta = (levelCrossings[i].index - levelCrossings[i-lookback].index) * din->m_timescale;
-			if( (levelCrossings[i-lookback].rising == levelCrossings[i].rising) && (delta < halfui) )
+			int64_t delta = (m_edgeIndexes[i] - m_edgeIndexes[i-lookback]) * din->m_timescale;
+			if( (m_edgeRising[i-lookback] == m_edgeRising[i]) && (delta < halfui) )
 			{
 				merging = true;
-				istart = levelCrossings[i-lookback].index-1;
+				istart = m_edgeIndexes[i-lookback]-1;
 
-				if(levelCrossings[i].rising)
+				if(m_edgeRising[i])
 					symstart = symend - (lookback+1);
 				else
 					symstart = symend + (lookback+1);
@@ -286,7 +421,7 @@ bool PAMEdgeDetectorFilter::PerformAction(const string& id)
 
 void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
 {
-	size_t order = m_parameters[m_order].GetIntVal();
+	size_t order = m_order.GetIntVal();
 
 	float vmin, vmax;
 	GetMinMaxVoltage(din, vmin, vmax);
