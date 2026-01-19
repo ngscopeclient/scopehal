@@ -65,6 +65,13 @@ MockPowerSupply::~MockPowerSupply()
 
 void MockPowerSupply::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
 {
+	// Load caps
+	auto& caps = node["capabilities"];
+	m_hasIndividualOutputSwitching = caps["individualSwitching"].as<bool>();
+	m_hasMasterOutputSwitching = caps["globalSwitch"].as<bool>();
+	m_hasOvercurrentShutdown = caps["overcurrentShutdown"].as<bool>();
+	m_hasSoftStart = caps["softstart"].as<bool>();
+
 	//Load the channels
 	auto& chans = node["channels"];
 	for(auto it : chans)
@@ -109,22 +116,22 @@ void MockPowerSupply::DoPreLoadConfiguration(int /*version*/, const YAML::Node& 
 
 bool MockPowerSupply::SupportsSoftStart()
 {
-	return false;
+	return m_hasSoftStart;
 }
 
 bool MockPowerSupply::SupportsIndividualOutputSwitching()
 {
-	return true;
+	return m_hasIndividualOutputSwitching;
 }
 
 bool MockPowerSupply::SupportsMasterOutputSwitching()
 {
-	return true;
+	return m_hasMasterOutputSwitching;
 }
 
 bool MockPowerSupply::SupportsOvercurrentShutdown()
 {
-	return true;
+	return m_hasOvercurrentShutdown;
 }
 
 uint32_t MockPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const

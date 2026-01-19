@@ -92,6 +92,10 @@ public:
 protected:
 
 	bool m_masterEnabled;
+	bool m_hasSoftStart;
+	bool m_hasIndividualOutputSwitching;
+	bool m_hasMasterOutputSwitching;
+	bool m_hasOvercurrentShutdown;
 	std::map<size_t, bool> m_enabled;
 	std::map<size_t, bool> m_constantCurrent;
 	std::map<size_t, bool> m_overcurrentShutdown;
