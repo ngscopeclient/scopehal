@@ -775,14 +775,19 @@ void VulkanCreateDevice(
 		//Atomic float on shared memory is core, but SSBOs is an extension
 		if(atomicFloatFeatures.shaderBufferFloat32Atomics && atomicFloatFeatures.shaderSharedFloat32Atomics)
 		{
-			LogDebug("Enabling 32-bit atomic float support for SSBOs and shared memory\n");
+			if(atomicFloatFeatures.shaderBufferFloat32AtomicAdd && atomicFloatFeatures.shaderSharedFloat32AtomicAdd)
+			{
+				LogDebug("Enabling 32-bit atomic float support for SSBOs and shared memory\n");
 
-			featuresAtomicFloat.shaderBufferFloat32Atomics = true;
-			featuresAtomicFloat.shaderBufferFloat32AtomicAdd = true;
-			featuresAtomicFloat.shaderSharedFloat32Atomics = true;
-			featuresAtomicFloat.shaderSharedFloat32AtomicAdd = true;
-			featuresAtomicFloat.pNext = pNext;
-			pNext = &featuresAtomicFloat;
+				featuresAtomicFloat.shaderBufferFloat32Atomics = true;
+				featuresAtomicFloat.shaderBufferFloat32AtomicAdd = true;
+				featuresAtomicFloat.shaderSharedFloat32Atomics = true;
+				featuresAtomicFloat.shaderSharedFloat32AtomicAdd = true;
+				featuresAtomicFloat.pNext = pNext;
+				pNext = &featuresAtomicFloat;
+			}
+			else
+				LogDebug("Partial atomic float support found, but missing shaderBufferFloat32AtomicAdd and/or shaderSharedFloat32AtomicAdd so not useful to us\n");
 		}
 
 		//Enable 16 bit SSBOs
