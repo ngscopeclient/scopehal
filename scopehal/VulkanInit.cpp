@@ -254,6 +254,148 @@ bool g_vulkanDeviceIsMoltenVK = false;
 
 void VulkanCleanup();
 
+bool VulkanInitInstance(
+	bool skipGLFW,
+	bool& vulkan11Available,
+	bool& vulkan12Available,
+	bool& hasPhysicalDeviceProperties2);
+
+/**
+	@brief Do context-level Vulkan initialization
+	@ingroup vksupport
+
+	@param skipGLFW Do not initialize GLFW
+ */
+bool VulkanInitInstance(
+	bool skipGLFW,
+	bool& vulkan11Available,
+	bool& vulkan12Available,
+	bool& hasPhysicalDeviceProperties2)
+{
+	//Get info about the Vulkan instance / loader as a whole
+	auto extensions = g_vkContext.enumerateInstanceExtensionProperties();
+	hasPhysicalDeviceProperties2 = false;
+	bool hasXlibSurface = false;
+	bool hasXcbSurface = false;
+	for(auto e : extensions)
+	{
+		if(!strcmp((char*)e.extensionName, "VK_KHR_get_physical_device_properties2"))
+		{
+			LogDebug("VK_KHR_get_physical_device_properties2: supported\n");
+			hasPhysicalDeviceProperties2 = true;
+		}
+		if(!strcmp((char*)e.extensionName, "VK_EXT_debug_utils"))
+		{
+			LogDebug("VK_EXT_debug_utils: supported\n");
+			g_hasDebugUtils = true;
+		}
+		if(!strcmp((char*)e.extensionName, "VK_KHR_xcb_surface"))
+		{
+			LogDebug("VK_KHR_xcb_surface: supported\n");
+			hasXcbSurface = true;
+		}
+		if(!strcmp((char*)e.extensionName, "VK_KHR_xlib_surface"))
+		{
+			LogDebug("VK_KHR_xlib_surface: supported\n");
+			hasXlibSurface = true;
+		}
+	}
+
+	//Vulkan 1.1 is the highest version supported on all targeted platforms (limited mostly by MoltenVK)
+	//But if Vulkan 1.2 is available, request it.
+	//TODO: If we want to support llvmpipe, we need to stick to 1.0
+	auto apiVersion = VK_API_VERSION_1_1;
+	auto availableVersion = g_vkContext.enumerateInstanceVersion();
+	uint32_t loader_major = VK_VERSION_MAJOR(availableVersion);
+	uint32_t loader_minor = VK_VERSION_MINOR(availableVersion);
+	vulkan11Available = false;
+	vulkan12Available = false;
+	LogDebug("Loader/API support available for Vulkan %d.%d\n", loader_major, loader_minor);
+	if( (loader_major >= 1) || ( (loader_major == 1) && (loader_minor >= 2) ) )
+	{
+		apiVersion = VK_API_VERSION_1_2;
+		vulkan12Available = true;
+		vulkan11Available = true;
+		LogDebug("Vulkan 1.2 support available, requesting it\n");
+	}
+	else
+		LogDebug("Vulkan 1.2 support not available\n");
+
+	if(skipGLFW)
+		LogDebug("Skipping GLFW init to work around gtk gl/vulkan interop bug\n");
+	else
+	{
+		//Log glfw version
+		LogDebug("Initializing glfw %s\n", glfwGetVersionString());
+
+		//Initialize glfw
+		glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
+		glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
+		if(!glfwInit())
+		{
+			LogError("glfw init failed\n");
+			return false;
+		}
+		if(!glfwVulkanSupported())
+		{
+			LogError("glfw vulkan support not available\n");
+			return false;
+		}
+	}
+
+	//Request VK_KHR_get_physical_device_properties2 if available, plus all extensions needed by glfw
+	vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, apiVersion);
+	vector<const char*> extensionsToUse;
+	if(hasPhysicalDeviceProperties2)
+		extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
+	if(hasXlibSurface)
+		extensionsToUse.push_back("VK_KHR_xlib_surface");
+	if(hasXcbSurface)
+		extensionsToUse.push_back("VK_KHR_xcb_surface");
+	extensionsToUse.push_back("VK_KHR_surface");
+
+	//Request debug utilities if available
+	if(g_hasDebugUtils)
+		extensionsToUse.push_back("VK_EXT_debug_utils");
+
+	//Required for MoltenVK
+	#ifdef __APPLE__
+	extensionsToUse.push_back("VK_KHR_portability_enumeration");
+	#endif
+
+	//See what extensions are required
+	if(!skipGLFW)
+	{
+		uint32_t glfwRequiredCount = 0;
+		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
+		if(glfwExtensions == nullptr)
+		{
+			const char* err = nullptr;
+			auto code = glfwGetError(&err);
+			LogError("glfwGetRequiredInstanceExtensions failed, code %d (%s)\n", code, err);
+			return false;
+		}
+		LogDebug("GLFW required extensions:\n");
+		for(size_t i=0; i<glfwRequiredCount; i++)
+		{
+			LogIndenter li2;
+			LogDebug("%s\n", glfwExtensions[i]);
+			extensionsToUse.push_back(glfwExtensions[i]);
+		}
+	}
+
+	//Create the instance
+	vk::InstanceCreateFlags flags = {};
+	#ifdef __APPLE__
+	flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+	#endif
+	vk::InstanceCreateInfo instanceInfo(flags, &appInfo, {}, extensionsToUse);
+	g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
+
+	//ALl good if we get here
+	return true;
+}
+
 /**
 	@brief Initialize a Vulkan context for compute
 	@ingroup vksupport
@@ -268,124 +410,12 @@ bool VulkanInit(bool skipGLFW)
 
 	try
 	{
-		auto extensions = g_vkContext.enumerateInstanceExtensionProperties();
-		bool hasPhysicalDeviceProperties2 = false;
-		bool hasXlibSurface = false;
-		bool hasXcbSurface = false;
-		for(auto e : extensions)
-		{
-			if(!strcmp((char*)e.extensionName, "VK_KHR_get_physical_device_properties2"))
-			{
-				LogDebug("VK_KHR_get_physical_device_properties2: supported\n");
-				hasPhysicalDeviceProperties2 = true;
-			}
-			if(!strcmp((char*)e.extensionName, "VK_EXT_debug_utils"))
-			{
-				LogDebug("VK_EXT_debug_utils: supported\n");
-				g_hasDebugUtils = true;
-			}
-			if(!strcmp((char*)e.extensionName, "VK_KHR_xcb_surface"))
-			{
-				LogDebug("VK_KHR_xcb_surface: supported\n");
-				hasXcbSurface = true;
-			}
-			if(!strcmp((char*)e.extensionName, "VK_KHR_xlib_surface"))
-			{
-				LogDebug("VK_KHR_xlib_surface: supported\n");
-				hasXlibSurface = true;
-			}
-		}
-
-		//Vulkan 1.1 is the highest version supported on all targeted platforms (limited mostly by MoltenVK)
-		//But if Vulkan 1.2 is available, request it.
-		//TODO: If we want to support llvmpipe, we need to stick to 1.0
-		auto apiVersion = VK_API_VERSION_1_1;
-		auto availableVersion = g_vkContext.enumerateInstanceVersion();
-		uint32_t loader_major = VK_VERSION_MAJOR(availableVersion);
-		uint32_t loader_minor = VK_VERSION_MINOR(availableVersion);
-		bool vulkan11Available = false;
-		bool vulkan12Available = false;
-		LogDebug("Loader/API support available for Vulkan %d.%d\n", loader_major, loader_minor);
-		if( (loader_major >= 1) || ( (loader_major == 1) && (loader_minor >= 2) ) )
-		{
-			apiVersion = VK_API_VERSION_1_2;
-			vulkan12Available = true;
-			vulkan11Available = true;
-			LogDebug("Vulkan 1.2 support available, requesting it\n");
-		}
-		else
-			LogDebug("Vulkan 1.2 support not available\n");
-
-		if(skipGLFW)
-			LogDebug("Skipping GLFW init to work around gtk gl/vulkan interop bug\n");
-		else
-		{
-			//Log glfw version
-			LogDebug("Initializing glfw %s\n", glfwGetVersionString());
-
-			//Initialize glfw
-			glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
-			glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
-			if(!glfwInit())
-			{
-				LogError("glfw init failed\n");
-				return false;
-			}
-			if(!glfwVulkanSupported())
-			{
-				LogError("glfw vulkan support not available\n");
-				return false;
-			}
-		}
-
-		//Request VK_KHR_get_physical_device_properties2 if available, plus all extensions needed by glfw
-		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, apiVersion);
-		vector<const char*> extensionsToUse;
-		if(hasPhysicalDeviceProperties2)
-			extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
-		if(hasXlibSurface)
-			extensionsToUse.push_back("VK_KHR_xlib_surface");
-		if(hasXcbSurface)
-			extensionsToUse.push_back("VK_KHR_xcb_surface");
-		extensionsToUse.push_back("VK_KHR_surface");
-
-		//Request debug utilities if available
-		if(g_hasDebugUtils)
-			extensionsToUse.push_back("VK_EXT_debug_utils");
-
-		//Required for MoltenVK
-		#ifdef __APPLE__
-		extensionsToUse.push_back("VK_KHR_portability_enumeration");
-		#endif
-
-		//See what extensions are required
-		if(!skipGLFW)
-		{
-			uint32_t glfwRequiredCount = 0;
-			auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
-			if(glfwExtensions == nullptr)
-			{
-				const char* err = nullptr;
-				auto code = glfwGetError(&err);
-				LogError("glfwGetRequiredInstanceExtensions failed, code %d (%s)\n", code, err);
-				return false;
-			}
-			LogDebug("GLFW required extensions:\n");
-			for(size_t i=0; i<glfwRequiredCount; i++)
-			{
-				LogIndenter li2;
-				LogDebug("%s\n", glfwExtensions[i]);
-				extensionsToUse.push_back(glfwExtensions[i]);
-			}
-		}
-
-		//Create the instance
-		vk::InstanceCreateFlags flags = {};
-		#ifdef __APPLE__
-		flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
-		#endif
-		vk::InstanceCreateInfo instanceInfo(flags, &appInfo, {}, extensionsToUse);
-		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
+		//Get instance info
+		bool vulkan11Available;
+		bool vulkan12Available;
+		bool hasPhysicalDeviceProperties2;
+		if(!VulkanInitInstance(skipGLFW, vulkan11Available, vulkan12Available, hasPhysicalDeviceProperties2))
+			return false;
 
 		//Look at our physical devices and print info out for each one
 		LogDebug("Physical devices:\n");
