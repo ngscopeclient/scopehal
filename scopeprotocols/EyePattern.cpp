@@ -399,6 +399,10 @@ void EyePattern::Refresh(
 		else
 			SparsePackedInnerLoop(swfm, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 	}
+	else
+	{
+		AddErrorMessage("Invalid X scale", "Data rate too low (calculated X axis scale is less than FLT_EPSILON)");
+	}
 
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(m_clockEdgesMuxed->size(), waveform->size());
