@@ -103,6 +103,6 @@ public:
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
-#define AddVNADriverClass(T) SCPIVNA::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+#define AddVNADriverClass(T) SCPIVNA::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance); SCPIInstrument::DoAddDriverClass(T::GetDriverNameInternal(), T::GetDriverSupportedTransports)
 
 #endif

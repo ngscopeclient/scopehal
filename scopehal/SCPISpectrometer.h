@@ -127,6 +127,6 @@ public:
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
-#define AddSpectrometerDriverClass(T) SCPISpectrometer::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+#define AddSpectrometerDriverClass(T) SCPISpectrometer::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance); SCPIInstrument::DoAddDriverClass(T::GetDriverNameInternal(), T::GetDriverSupportedTransports)
 
 #endif

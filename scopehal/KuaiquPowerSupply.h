@@ -103,6 +103,16 @@ protected:
 public:
 	static std::string GetDriverNameInternal();
 	POWER_INITPROC(KuaiquPowerSupply);
+	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	{
+		std::vector<std::pair<SCPITransportType,std::string>> result;
+	#ifdef _WIN32
+		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"COM<x>:9600"));
+	#else
+		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"/dev/ttyUSB<x>:9600"));
+	#endif
+		return result;
+	}
 };
 
 #endif

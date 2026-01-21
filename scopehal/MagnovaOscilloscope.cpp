@@ -368,6 +368,15 @@ string MagnovaOscilloscope::GetDriverNameInternal()
 	return "magnova";
 }
 
+std::vector<std::pair<SCPITransportType,std::string>> MagnovaOscilloscope::GetDriverSupportedTransports()
+{
+	std::vector<std::pair<SCPITransportType,std::string>> result;
+	result.push_back(std::pair(SCPITransportType::TRANSPORT_LAN,"<ip_address>:5025"));
+	result.push_back(std::pair(SCPITransportType::TRANSPORT_USBTMC,"/dev/usbtmc<x>"));
+	return result;
+}
+
+
 OscilloscopeChannel* MagnovaOscilloscope::GetExternalTrigger()
 {
 	return m_extTrigChannel;
@@ -679,7 +688,7 @@ double MagnovaOscilloscope::GetChannelAttenuation(size_t i)
 	{
 		protocolError("invalid channel attenuation value '%s'",reply.c_str());
 	}
-	return 1/d;
+	return d;
 }
 
 void MagnovaOscilloscope::SetChannelAttenuation(size_t i, double atten)

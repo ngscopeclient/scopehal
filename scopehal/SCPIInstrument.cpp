@@ -31,6 +31,9 @@
 
 using namespace std;
 
+SCPIInstrument::GetTransportMapType SCPIInstrument::m_getTransportProcs;
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -81,6 +84,12 @@ string SCPIInstrument::GetSerial() const
 	return m_serial;
 }
 
+void SCPIInstrument::DoAddDriverClass(string name, GetTrapsportsProcType proc)
+{
+	m_getTransportProcs[name] = proc;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
@@ -90,3 +99,22 @@ void SCPIInstrument::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table
 	node["args"] = GetTransportConnectionString();
 	node["driver"] = GetDriverName();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Static functions
+
+std::vector<std::pair<SCPITransportType,std::string>> SCPIInstrument::GetSupportedTransports(std::string driver)
+{
+	if(m_getTransportProcs.find(driver) != m_getTransportProcs.end())
+		return m_getTransportProcs[driver]();
+
+	LogError("Invalid oscilloscope driver name \"%s\"\n", driver.c_str());
+	return std::vector<std::pair<SCPITransportType,std::string>>();
+}
+
+// Default implementation returns no transport
+std::vector<std::pair<SCPITransportType,std::string>> SCPIInstrument::GetDriverSupportedTransports()
+{
+	return std::vector<std::pair<SCPITransportType,std::string>>();
+}
+

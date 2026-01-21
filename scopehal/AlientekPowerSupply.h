@@ -153,6 +153,12 @@ protected:
 public:
 	static std::string GetDriverNameInternal();
 	POWER_INITPROC(AlientekPowerSupply);
+	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	{
+		std::vector<std::pair<SCPITransportType,std::string>> result;
+		result.push_back(std::pair(SCPITransportType::TRANSPORT_HID,"2e3c:af01"));
+		return result;
+	}
 };
 
 #endif

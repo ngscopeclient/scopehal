@@ -50,6 +50,15 @@ public:
 
 	virtual void BackgroundProcessing() override;
 
+	typedef std::vector<std::pair<SCPITransportType,std::string>> (*GetTrapsportsProcType)();
+	static void DoAddDriverClass(std::string name, GetTrapsportsProcType proc);
+	static std::vector<std::pair<SCPITransportType,std::string>> GetSupportedTransports(std::string driver);
+	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports();
+
+protected:
+	typedef std::map<std::string, GetTrapsportsProcType > GetTransportMapType;
+	static GetTransportMapType m_getTransportProcs;
+
 protected:
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 };

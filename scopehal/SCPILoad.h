@@ -61,7 +61,7 @@ protected:
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
-#define AddLoadDriverClass(T) SCPILoad::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+#define AddLoadDriverClass(T) SCPILoad::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance); SCPIInstrument::DoAddDriverClass(T::GetDriverNameInternal(), T::GetDriverSupportedTransports)
 
 
 #endif
