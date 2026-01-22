@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -75,11 +75,24 @@ string DivideFilter::GetProtocolName()
 	return "Divide";
 }
 
+Filter::DataLocation DivideFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DivideFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void DivideFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DivideFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
@@ -129,6 +142,8 @@ void DivideFilter::RefreshScalarVector(size_t iScalar, size_t iVector)
 	auto din = GetInputWaveform(iVector);
 	if(!din)
 	{
+		AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -195,6 +210,14 @@ void DivideFilter::DoRefreshVectorVector()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -204,6 +227,11 @@ void DivideFilter::DoRefreshVectorVector()
 	auto b = GetInputWaveform(1);
 	if(!a || !b)
 	{
+		if(!a)
+			AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[0] );
+		if(!b)
+			AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[1] );
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -249,7 +277,7 @@ void DivideFilter::DoRefreshVectorVector()
 
 	else
 	{
-		LogWarning("[DivideFilter] Mixed sparse and uniform inputs not supported\n");
+		AddErrorMessage("Invalid waveform types", "Mixed sparse and uniform inputs not supported");
 		SetData(nullptr, 0);
 		return;
 	}
