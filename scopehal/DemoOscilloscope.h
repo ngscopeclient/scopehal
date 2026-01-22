@@ -197,8 +197,15 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
-
+	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	{
+		std::vector<std::pair<SCPITransportType,std::string>> result;
+		result.push_back(std::pair(SCPITransportType::TRANSPORT_NULL,""));
+		return result;
+	}
 	OSCILLOSCOPE_INITPROC(DemoOscilloscope)
+
+
 };
 
 #endif

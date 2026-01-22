@@ -81,6 +81,16 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	{
+		std::vector<std::pair<SCPITransportType,std::string>> result;
+	#ifdef _WIN32
+		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"COM<x>:115200"));
+	#else
+		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"/dev/ttyUSB<x>:115200"));
+	#endif
+		return result;
+	}
 	METER_INITPROC(OwonXDMMultimeter)
 };
 
