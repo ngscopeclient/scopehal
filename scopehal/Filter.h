@@ -139,7 +139,7 @@ public:
 	virtual ~Filter();
 
 	///@brief Get all currently existing filters
-	static std::set<Filter*> GetAllInstances()
+	static const std::set<Filter*>& GetAllInstances()
 	{ return m_filters; }
 
 	///@brief Get all currently existing filters
