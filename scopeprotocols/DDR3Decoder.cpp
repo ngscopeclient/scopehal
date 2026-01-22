@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,7 +59,7 @@ DDR3Decoder::DDR3Decoder(const string& color)
 
 bool DDR3Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 7) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -73,14 +73,36 @@ string DDR3Decoder::GetProtocolName()
 	return "DDR3 Command Bus";
 }
 
+Filter::DataLocation DDR3Decoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DDR3Decoder::Refresh()
+void DDR3Decoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DDR3Decoder::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<7; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -108,7 +130,7 @@ void DDR3Decoder::Refresh()
 	SampleOnRisingEdgesBase(caps[6], cclk, a10);
 
 	//Create the capture
-	auto cap = new SDRAMWaveform;
+	auto cap = SetupEmptyWaveform<SDRAMWaveform>(nullptr, 0);
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = cclk->m_startTimestamp;
 	cap->m_startFemtoseconds = 0;
@@ -174,6 +196,5 @@ void DDR3Decoder::Refresh()
 			cap->m_samples.push_back(sym);
 		}
 	}
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }

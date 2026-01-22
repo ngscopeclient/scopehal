@@ -126,7 +126,7 @@ void DDR1Decoder::Refresh(
 	SampleOnRisingEdgesBase(caps[5], cclk, a10);
 
 	//Create the capture
-	auto cap = new SDRAMWaveform;
+	auto cap = SetupEmptyWaveform<SDRAMWaveform>(nullptr, 0);
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = cclk->m_startTimestamp;
 	cap->m_startFemtoseconds = 0;
@@ -192,7 +192,6 @@ void DDR1Decoder::Refresh(
 			cap->m_samples.push_back(sym);
 		}
 	}
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }
