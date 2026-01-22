@@ -109,6 +109,18 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+	#ifdef _WIN32
+        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}},
+        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}}
+	#else
+        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}},
+        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}}
+	#endif
+        };
+	}
 	OSCILLOSCOPE_INITPROC(TinySA)
 };
 

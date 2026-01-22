@@ -493,6 +493,6 @@ private:
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(MagnovaOscilloscope)
-	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels();
 };
 #endif

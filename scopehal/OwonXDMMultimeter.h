@@ -81,15 +81,19 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
-	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
-		std::vector<std::pair<SCPITransportType,std::string>> result;
+		return {
 	#ifdef _WIN32
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"COM<x>:115200"));
+        {"Owon XDM1041", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}},
+        {"Owon XDM1241", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}},
+        {"Owon XDM2041", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}}
 	#else
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"/dev/ttyUSB<x>:115200"));
+        {"Owon XDM1041", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}},
+        {"Owon XDM1241", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}},
+        {"Owon XDM2041", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}}
 	#endif
-		return result;
+        };
 	}
 	METER_INITPROC(OwonXDMMultimeter)
 };

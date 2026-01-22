@@ -119,15 +119,15 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
-	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
-		std::vector<std::pair<SCPITransportType,std::string>> result;
+		return {
 	#ifdef _WIN32
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"COM<x>:115200:DTR"));
+        {"NanoVNA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200:DTR" }}}
 	#else
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_UART,"/dev/ttyUSB<x>:115200:DTR"));
+        {"NanoVNA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200:DTR" }}}
 	#endif
-		return result;
+        };
 	}
 	VNA_INITPROC(NanoVNA)
 };

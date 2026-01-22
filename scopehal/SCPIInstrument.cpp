@@ -103,18 +103,18 @@ void SCPIInstrument::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Static functions
 
-std::vector<std::pair<SCPITransportType,std::string>> SCPIInstrument::GetSupportedTransports(std::string driver)
+std::vector<SCPIInstrumentModel> SCPIInstrument::GetSupportedModels(std::string driver)
 {
 	if(m_getTransportProcs.find(driver) != m_getTransportProcs.end())
 		return m_getTransportProcs[driver]();
 
 	LogError("Invalid oscilloscope driver name \"%s\"\n", driver.c_str());
-	return std::vector<std::pair<SCPITransportType,std::string>>();
+	return std::vector<SCPIInstrumentModel>();
 }
 
 // Default implementation returns no transport
-std::vector<std::pair<SCPITransportType,std::string>> SCPIInstrument::GetDriverSupportedTransports()
+std::vector<SCPIInstrumentModel> SCPIInstrument::GetDriverSupportedModels()
 {
-	return std::vector<std::pair<SCPITransportType,std::string>>();
+	return std::vector<SCPIInstrumentModel>();
 }
 

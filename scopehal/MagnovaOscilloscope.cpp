@@ -368,14 +368,15 @@ string MagnovaOscilloscope::GetDriverNameInternal()
 	return "magnova";
 }
 
-std::vector<std::pair<SCPITransportType,std::string>> MagnovaOscilloscope::GetDriverSupportedTransports()
+std::vector<SCPIInstrumentModel> MagnovaOscilloscope::GetDriverSupportedModels()
 {
-	std::vector<std::pair<SCPITransportType,std::string>> result;
-	result.push_back(std::pair(SCPITransportType::TRANSPORT_LAN,"<ip_address>:5025"));
-	result.push_back(std::pair(SCPITransportType::TRANSPORT_USBTMC,"/dev/usbtmc<x>"));
-	return result;
+	return {
+	{"Magnova", {
+		{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+		{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+	}}
+	};
 }
-
 
 OscilloscopeChannel* MagnovaOscilloscope::GetExternalTrigger()
 {

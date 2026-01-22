@@ -99,11 +99,11 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
-	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
-		std::vector<std::pair<SCPITransportType,std::string>> result;
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_NULL,""));
-		return result;
+		return {
+        {"Demo PSU", {{ SCPITransportType::TRANSPORT_NULL, "" }}}
+        };
 	}
 	POWER_INITPROC(DemoPowerSupply)
 };

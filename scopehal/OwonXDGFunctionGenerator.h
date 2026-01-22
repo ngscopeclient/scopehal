@@ -81,12 +81,18 @@ public:
 
 public:
 	static std::string GetDriverNameInternal();
-	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports()
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
-		std::vector<std::pair<SCPITransportType,std::string>> result;
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_LAN,"<ip_address>:3000"));
-		result.push_back(std::pair(SCPITransportType::TRANSPORT_USBTMC,"/dev/usbtmc<x>"));
-		return result;
+		return {
+		{"Owon XDG 2000", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:3000" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Owon XDG 3000", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:3000" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}}
+		};
 	}
 	GENERATOR_INITPROC(OwonXDGFunctionGenerator)
 

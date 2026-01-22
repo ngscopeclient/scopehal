@@ -31,6 +31,24 @@
 #define SCPIInstrument_h
 
 /**
+	@brief SCPI transport information (type and connectionString)
+ */
+struct SCPITransportInfo
+{
+    SCPITransportType transportType;
+    std::string connectionString;
+};
+
+/**
+	@brief SCPI instrument model (model name and transport information)
+ */
+struct SCPIInstrumentModel
+{
+    std::string modelName;
+    std::vector<SCPITransportInfo> supportedTransports;
+};
+
+/**
 	@brief An SCPI-based oscilloscope
  */
 class SCPIInstrument 	: public virtual Instrument
@@ -50,10 +68,10 @@ public:
 
 	virtual void BackgroundProcessing() override;
 
-	typedef std::vector<std::pair<SCPITransportType,std::string>> (*GetTrapsportsProcType)();
+	typedef std::vector<SCPIInstrumentModel> (*GetTrapsportsProcType)();
 	static void DoAddDriverClass(std::string name, GetTrapsportsProcType proc);
-	static std::vector<std::pair<SCPITransportType,std::string>> GetSupportedTransports(std::string driver);
-	static std::vector<std::pair<SCPITransportType,std::string>> GetDriverSupportedTransports();
+	static std::vector<SCPIInstrumentModel> GetSupportedModels(std::string driver);
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels();
 
 protected:
 	typedef std::map<std::string, GetTrapsportsProcType > GetTransportMapType;
