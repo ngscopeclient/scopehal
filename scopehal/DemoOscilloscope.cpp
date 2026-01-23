@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ngscopeclient                                                                                                        *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -96,7 +96,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_sweepFreq = 1e9;
 
 	//Default sampling configuration
-	m_depth = 100e3;
+	m_depth = 1e6;
 	m_rate = 50e9;
 
 	m_channels[0]->SetDisplayName("Tone");
