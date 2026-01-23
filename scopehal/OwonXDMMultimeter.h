@@ -85,13 +85,13 @@ public:
 	{
 		return {
 	#ifdef _WIN32
-        {"Owon XDM1041", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}},
-        {"Owon XDM1241", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}},
-        {"Owon XDM2041", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}}
+        {"Owon XDM1041", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"Owon XDM1241", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"Owon XDM2041", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}}
 	#else
-        {"Owon XDM1041", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}},
-        {"Owon XDM1241", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}},
-        {"Owon XDM2041", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}}
+        {"Owon XDM1041", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"Owon XDM1241", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"Owon XDM2041", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}}
 	#endif
         };
 	}

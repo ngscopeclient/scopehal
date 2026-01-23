@@ -113,11 +113,11 @@ public:
 	{
 		return {
 	#ifdef _WIN32
-        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}},
-        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200" }}}
+        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}}
 	#else
-        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}},
-        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200" }}}
+        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}}
 	#endif
         };
 	}
