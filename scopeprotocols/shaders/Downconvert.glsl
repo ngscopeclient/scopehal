@@ -27,43 +27,42 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DownconvertFilter
- */
-#ifndef DownconvertFilter_h
-#define DownconvertFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-class DownconvertConstants
+layout(std430, binding=0) restrict readonly buffer buf_inIO
 {
-public:
-	uint32_t size;
+	float din[];
+};
+
+layout(std430, binding=1) restrict writeonly buffer buf_doutI
+{
+	float doutI[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_doutQ
+{
+	float doutQ[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint	size;
 	float trigger_phase_rad;
 	float lo_rad_per_sample;
 };
 
-/**
-	@brief Downconvert - generates a local oscillator in two phases and mixes it with a signal
- */
-class DownconvertFilter : public Filter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	DownconvertFilter(const std::string& color);
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
+		return;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+	float phase = trigger_phase_rad + lo_rad_per_sample * i;
+	float samp = din[i];
 
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(DownconvertFilter)
-
-protected:
-	FilterParameter& m_freq;
-
-	ComputePipeline m_computePipeline;
-};
-
-#endif
+	doutI[i] = samp * sin(phase);
+	doutQ[i] = samp * cos(phase);
+}

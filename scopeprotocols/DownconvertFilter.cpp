@@ -41,6 +41,8 @@ using namespace std;
 
 DownconvertFilter::DownconvertFilter(const string& color)
 	: Filter(color, CAT_RF)
+	, m_freq(m_parameters["LO Frequency"])
+	, m_computePipeline("shaders/Downconvert.spv", 3, sizeof(DownconvertConstants))
 {
 	//Set up channels
 	CreateInput("RF");
@@ -50,9 +52,8 @@ DownconvertFilter::DownconvertFilter(const string& color)
 	//Optional input for LO frequency (overrides parameter)
 	CreateInput("LOFrequency");
 
-	m_freqname = "LO Frequency";
-	m_parameters[m_freqname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_freqname].SetFloatVal(1e9);
+	m_freq = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_freq.SetFloatVal(1e9);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,155 +107,40 @@ void DownconvertFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 
 	//Get LO frequency
 	//(input channel overrides parameter)
-	double lo_freq = m_parameters[m_freqname].GetFloatVal();
+	double lo_freq = m_freq.GetFloatVal();
 	auto loin = GetInput(1);
 	if(loin)
 		lo_freq = loin.GetScalarValue();
 
-	//Calculate phase velocity
-	double sample_freq = FS_PER_SECOND / din->m_timescale;
-	double lo_cycles_per_sample = lo_freq / sample_freq;
-	double lo_rad_per_sample = lo_cycles_per_sample * 2 * M_PI;
-	double lo_rad_per_fs = lo_rad_per_sample / din->m_timescale;
-	double trigger_phase_rad = din->m_triggerPhase * lo_rad_per_fs;
-
-	//Do the actual mixing
+	//Set up output weaveforms
 	auto cap_i = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	auto cap_q = SetupEmptyUniformAnalogOutputWaveform(din, 1);
-	cap_i->PrepareForCpuAccess();
-	cap_q->PrepareForCpuAccess();
 	size_t len = din->size();
 	cap_i->Resize(len);
 	cap_q->Resize(len);
 
-	#ifdef __x86_64__
-	if(g_hasAvx2)
-		DoFilterKernelAVX2DensePacked(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
-	else
-	#endif
-		DoFilterKernelGeneric(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
+	//Calculate phase velocity
+	double lo_cycles_per_sample = (lo_freq * din->m_timescale) / FS_PER_SECOND;
+	double lo_rad_per_sample = lo_cycles_per_sample * 2 * M_PI;
+	DownconvertConstants cfg;
+	cfg.size = len;
+	cfg.trigger_phase_rad = din->m_triggerPhase * (lo_rad_per_sample / din->m_timescale);
+	cfg.lo_rad_per_sample = lo_rad_per_sample;
 
-	cap_i->MarkModifiedFromCpu();
-	cap_q->MarkModifiedFromCpu();
+	cmdBuf.begin({});
+
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, cap_i->m_samples, cmdBuf, true);
+	m_computePipeline.BindBufferNonblocking(2, cap_q->m_samples, cmdBuf, true);
+
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cap_i->MarkSamplesModifiedFromGpu();
+	cap_q->MarkSamplesModifiedFromGpu();
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
-
-void DownconvertFilter::DoFilterKernelGeneric(
-	UniformAnalogWaveform* din,
-	UniformAnalogWaveform* cap_i,
-	UniformAnalogWaveform* cap_q,
-	float lo_rad_per_sample,
-	float trigger_phase_rad)
-{
-	size_t len = din->size();
-
-	//Initial sample
-	double phase = lo_rad_per_sample + trigger_phase_rad;
-	float samp = din->m_samples[0];
-	cap_i->m_samples[0] 	= samp * sin(phase);
-	cap_q->m_samples[0] 	= samp * cos(phase);
-
-	//if(din->m_densePacked)
-	{
-		for(size_t i=1; i<len; i++)
-		{
-			phase += lo_rad_per_sample;
-
-			samp = din->m_samples[i];
-			cap_i->m_samples[i] 	= samp * sin(phase);
-			cap_q->m_samples[i] 	= samp * cos(phase);
-		}
-	}
-	/*
-	else
-	{
-		for(size_t i=1; i<len; i++)
-		{
-			auto dt = din->m_offsets[i] - din->m_offsets[i-1];
-			phase += (dt * lo_rad_per_sample);
-
-			samp = din->m_samples[i];
-			cap_i->m_samples[i] 	= samp * sin(phase);
-			cap_q->m_samples[i] 	= samp * cos(phase);
-		}
-	}*/
-}
-
-#ifdef __x86_64__
-__attribute__((target("avx2")))
-void DownconvertFilter::DoFilterKernelAVX2DensePacked(
-	UniformAnalogWaveform* din,
-	UniformAnalogWaveform* cap_i,
-	UniformAnalogWaveform* cap_q,
-	float lo_rad_per_sample,
-	float trigger_phase_rad)
-{
-	size_t len = din->size();
-	size_t len_rounded = len - (len % 8);
-
-	//Grab a few pointers and helpful values for the vector loop
-	auto pin		= (float*)&din->m_samples[0];
-	auto pout_i		= (float*)&cap_i->m_samples[0];
-	auto pout_q		= (float*)&cap_q->m_samples[0];
-	auto pvel 		= _mm256_set1_pd(lo_rad_per_sample * 8);
-	double threshold = 16 * M_PI;	//we can rotate up to once per sample, 8 samples per vector
-	auto vthreshold	= _mm256_set1_pd(threshold);
-
-	//Initial samples
-	double phases[8];
-	size_t i=0;
-	for(; i<8 && i<len_rounded; i++)
-	{
-		phases[i] 				= (lo_rad_per_sample * i) + trigger_phase_rad;
-
-		float samp 				= din->m_samples[i];
-		cap_i->m_samples[i] 	= samp * sin(phases[i]);
-		cap_q->m_samples[i] 	= samp * cos(phases[i]);
-	}
-	auto phase1		= _mm256_loadu_pd(&phases[0]);
-	auto phase2		= _mm256_loadu_pd(&phases[4]);
-
-	//Main vectorized loop
-	__m256 sinvec;
-	__m256 cosvec;
-	for(; i<len_rounded; i+= 8)
-	{
-		//Load sample data early so we can do phase math during the fetch latency
-		auto samp = _mm256_load_ps(pin + i);
-
-		//Increment both halves of the phase accumulator separately.
-		//We're not using AVX512 so we can't do this in a single vector
-		phase1 = _mm256_add_pd(phase1, pvel);
-		phase2 = _mm256_add_pd(phase2, pvel);
-
-		//Wrap if the first half went over the threshold
-		if(_mm256_cvtsd_f64(phase1) > threshold)
-		{
-			phase1 = _mm256_sub_pd(phase1, vthreshold);
-			phase2 = _mm256_sub_pd(phase2, vthreshold);
-		}
-
-		//Convert to single precision for the trig
-		auto phase1_sp = _mm256_cvtpd_ps(phase1);
-		auto phase2_sp = _mm256_cvtpd_ps(phase2);
-		auto phase_sp = _mm256_set_m128(phase2_sp, phase1_sp);
-
-		//Do the actual trig
-		_mm256_sincos_ps(phase_sp, &sinvec, &cosvec);
-		auto sinout = _mm256_mul_ps(samp, sinvec);
-		auto cosout = _mm256_mul_ps(samp, cosvec);
-
-		//All done, save results
-		_mm256_store_ps(pout_i + i, sinout);
-		_mm256_store_ps(pout_q + i, cosout);
-	}
-
-	//Do last few samples that didn't fit the vector loop
-	for(; i<len; i++)
-	{
-		double nphase = (lo_rad_per_sample * i) + trigger_phase_rad;
-		float samp = din->m_samples[i];
-		cap_i->m_samples[i] 	= samp * sin(nphase);
-		cap_q->m_samples[i] 	= samp * cos(nphase);
-	}
-}
-#endif /* __x86_64__ */
