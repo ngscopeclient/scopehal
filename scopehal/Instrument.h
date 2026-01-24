@@ -135,6 +135,14 @@ public:
 	 */
 	virtual std::string GetTransportName() =0;
 
+	/**
+		@brief Checks if the instrument is currently online.
+
+		@return False if the Instrument object is actively connected to a physical scope.
+				True if working offline, a file import, etc.
+	 */
+	virtual bool IsOffline();
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Channel enumeration and identification
 

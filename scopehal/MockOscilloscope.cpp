@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,19 +49,10 @@ MockOscilloscope::MockOscilloscope(
 	const string& serial,
 	const std::string& transport,
 	const std::string& driver,
-	const std::string& args)
-	: m_name(name)
-	, m_vendor(vendor)
-	, m_serial(serial)
-	, m_extTrigger(NULL)
-	, m_transport(transport)
-	, m_driver(driver)
-	, m_args(args)
+	const std::string& args) : SCPIDevice(nullptr, false), SCPIInstrument(nullptr, false), MockInstrument(name, vendor, serial, transport, driver, args)
 {
 	//Need to run this loader prior to the main Oscilloscope loader
-	m_loaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoLoadConfiguration));
-
-	m_serializers.push_back(sigc::mem_fun(*this, &MockOscilloscope::DoSerializeConfiguration));
+	m_preloaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoPreLoadConfiguration));
 }
 
 MockOscilloscope::~MockOscilloscope()
@@ -72,24 +63,9 @@ MockOscilloscope::~MockOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
 
-bool MockOscilloscope::IsOffline()
-{
-	return true;
-}
-
 string MockOscilloscope::IDPing()
 {
 	return "";
-}
-
-string MockOscilloscope::GetTransportName()
-{
-	return m_transport;
-}
-
-string MockOscilloscope::GetTransportConnectionString()
-{
-	return m_args;
 }
 
 unsigned int MockOscilloscope::GetInstrumentTypes() const
@@ -100,21 +76,6 @@ unsigned int MockOscilloscope::GetInstrumentTypes() const
 uint32_t MockOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
-}
-
-string MockOscilloscope::GetName() const
-{
-	return m_name;
-}
-
-string MockOscilloscope::GetVendor() const
-{
-	return m_vendor;
-}
-
-string MockOscilloscope::GetSerial() const
-{
-	return m_serial;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,14 +126,7 @@ bool MockOscilloscope::IsTriggerArmed()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void MockOscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
-{
-	node["transport"] = GetTransportName();
-	node["args"] = GetTransportConnectionString();
-	node["driver"] = GetDriverName();
-}
-
-void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table)
+void MockOscilloscope::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
 {
 	//Load the channels
 	auto& chans = node["channels"];

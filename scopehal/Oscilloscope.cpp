@@ -104,11 +104,6 @@ shared_ptr<Oscilloscope> Oscilloscope::CreateOscilloscope(string driver, SCPITra
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device properties
 
-bool Oscilloscope::IsOffline()
-{
-	return false;
-}
-
 bool Oscilloscope::CanEnableChannel(size_t /*i*/)
 {
 	return true;

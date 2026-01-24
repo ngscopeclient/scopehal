@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,7 +41,7 @@
 	@brief Fake oscilloscope driver used for offline waveform analysis
 	@ingroup scopedrivers
  */
-class MockOscilloscope : public Oscilloscope
+class MockOscilloscope : public MockInstrument, public Oscilloscope
 {
 public:
 	MockOscilloscope(
@@ -53,8 +53,6 @@ public:
 		const std::string& args
 		);
 	virtual ~MockOscilloscope();
-
-	virtual bool IsOffline() override;
 
 	Unit::UnitType units[7] = {
 		Unit::UNIT_COUNTS,	//Unused
@@ -74,13 +72,6 @@ public:
 	{ m_channels.push_back(chan); }
 
 	virtual std::string IDPing() override;
-
-	virtual std::string GetTransportConnectionString() override;
-	virtual std::string GetTransportName() override;
-
-	virtual std::string GetName() const override;
-	virtual std::string GetVendor() const override;
-	virtual std::string GetSerial() const override;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i) override;
@@ -126,18 +117,12 @@ public:
 
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
-	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 
 protected:
 
 	void ArmTrigger();
-
-	//standard *IDN? fields
-	std::string m_name;
-	std::string m_vendor;
-	std::string m_serial;
-	std::string m_fwVersion;
 
 	OscilloscopeChannel* m_extTrigger;
 
@@ -150,18 +135,8 @@ protected:
 
 	void AutoscaleVertical();
 
-	//Simulated transport information
-	std::string m_transport;
-	std::string m_driver;
-	std::string m_args;
-
 	uint64_t m_sampleRate;
 	uint64_t m_sampleDepth;
-
-public:
-
-	virtual std::string GetDriverName()
-	{ return m_driver; }
 };
 
 #endif
