@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,10 +49,10 @@ DPhyDataDecoder::DPhyDataDecoder(const string& color)
 
 bool DPhyDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i < 2) && (dynamic_cast<DPhySymbolDecoder*>(stream.m_channel) != NULL) )
+	if( (i < 2) && (dynamic_cast<DPhySymbolDecoder*>(stream.m_channel) != nullptr) )
 		return true;
 
 	return false;
@@ -66,25 +66,44 @@ string DPhyDataDecoder::GetProtocolName()
 	return "MIPI D-PHY Data";
 }
 
+Filter::DataLocation DPhyDataDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DPhyDataDecoder::Refresh()
+void DPhyDataDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	//Sanity check
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DPhyDataDecoder::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
+
 	auto clk = dynamic_cast<DPhySymbolWaveform*>(GetInputWaveform(0));
 	auto data = dynamic_cast<DPhySymbolWaveform*>(GetInputWaveform(1));
 
 	//Create output waveform
-	auto cap = new DPhyDataWaveform;
-	cap->m_timescale = data->m_timescale;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<DPhyDataWaveform>(data, 0);
 
 	enum
 	{
@@ -101,7 +120,7 @@ void DPhyDataDecoder::Refresh()
 
 	//If our data is a single-ended decode, we have to infer some states we can't see.
 	auto data_decoder = dynamic_cast<DPhySymbolDecoder*>(GetInput(1).m_channel);
-	bool single_ended_data = data_decoder->GetInput(1).m_channel == NULL;
+	bool single_ended_data = data_decoder->GetInput(1).m_channel == nullptr;
 
 	//Process the data
 	DPhyDataSymbol samp;
@@ -363,8 +382,6 @@ void DPhyDataDecoder::Refresh()
 		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
 		AdvanceToTimestamp(data, idata, datalen, timestamp);
 	}
-
-	SetData(cap, 0);
 }
 
 string DPhyDataWaveform::GetColor(size_t i)
