@@ -91,8 +91,27 @@ protected:
 		REGISTER_ON_OFF  = 0x12
 	};
 
+	double m_currentFactor; 
+	double m_voltageFactor; 
+
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+	#ifdef _WIN32
+        {"Riden RD60xx", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"Riden DPS30xx", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"Riden DPS50xx", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"Riden DPS80xx", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}}
+	#else
+        {"Riden RD60xx", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"Riden DPS30xx", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"Riden DPS50xx", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"Riden DPS80xx", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}}
+	#endif
+        };
+	}
 	POWER_INITPROC(RidenPowerSupply);
 };
 
