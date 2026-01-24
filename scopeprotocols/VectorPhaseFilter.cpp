@@ -37,6 +37,7 @@ using namespace std;
 
 VectorPhaseFilter::VectorPhaseFilter(const string& color)
 	: Filter(color, CAT_RF)
+	, m_computePipeline("shaders/VectorPhase.spv", 3, sizeof(VectorPhaseConstants))
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("I");
@@ -68,35 +69,67 @@ string VectorPhaseFilter::GetProtocolName()
 	return "Vector Phase";
 }
 
+Filter::DataLocation VectorPhaseFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void VectorPhaseFilter::Refresh()
+void VectorPhaseFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("VectorPhaseFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	ClearErrors();
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else
+			{
+				auto w = GetInputWaveform(i);
+				if(!w)
+					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+				else if(!dynamic_cast<UniformAnalogWaveform*>(w))
+					AddErrorMessage("Invalid input", string("Expected uniform analog waveform at input ") + m_signalNames[i] );
+			}
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
-	//Get the input data
-	auto a = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto b = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
-	a->PrepareForCpuAccess();
-	b->PrepareForCpuAccess();
-	auto len = min(a->size(), b->size());
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	size_t len = min(din_i->size(), din_q->size());
 
-	//Set up the output waveform
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(a, 0);
-	cap->PrepareForCpuAccess();
-	cap->Resize(len);
+	auto dout = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
+	dout->Resize(len);
 
-	float* fa = (float*)&a->m_samples[0];
-	float* fb = (float*)&b->m_samples[0];
-	float scale = 180 / M_PI;
-	for(size_t i=0; i<len; i++)
-		cap->m_samples[i] = atan2(fa[i], fb[i]) * scale;
+	//Calculate scaling factor for radians to degrees
+	VectorPhaseConstants cfg;
+	cfg.len = len;
+	cfg.scale = 180 / M_PI;
 
-	cap->MarkModifiedFromCpu();
+	cmdBuf.begin({});
+
+	m_computePipeline.BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, din_q->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(2, dout->m_samples, cmdBuf, true);
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	dout->m_samples.MarkModifiedFromGpu();
 }

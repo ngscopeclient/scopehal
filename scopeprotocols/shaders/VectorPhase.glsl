@@ -27,107 +27,39 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "VectorFrequencyFilter.h"
+#version 430
+#pragma shader_stage(compute)
 
-using namespace std;
+#define M_PI 3.1415926535
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-VectorFrequencyFilter::VectorFrequencyFilter(const string& color)
-	: Filter(color, CAT_RF)
-	, m_computePipeline("shaders/VectorFrequency.spv", 3, sizeof(VectorFrequencyConstants))
+layout(std430, binding=0) restrict readonly buffer buf_inI
 {
-	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("I");
-	CreateInput("Q");
-}
+	float inI[];
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool VectorFrequencyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict readonly buffer buf_inQ
 {
-	if(stream.m_channel == nullptr)
-		return false;
+	float inQ[];
+};
 
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string VectorFrequencyFilter::GetProtocolName()
+layout(std430, binding=2) restrict writeonly buffer buf_dout
 {
-	return "Vector Frequency";
-}
+	float dout[];
+};
 
-Filter::DataLocation VectorFrequencyFilter::GetInputLocation()
+layout(std430, push_constant) uniform constants
 {
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
+	uint	len;
+	float	scale;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-void VectorFrequencyFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void main()
 {
-	#ifdef HAVE_NVTX
-		nvtx3::scoped_range nrange("VectorFrequencyFilter::Refresh");
-	#endif
-
-	//Make sure we've got valid inputs
-	ClearErrors();
-	if(!VerifyAllInputsOKAndUniformAnalog())
-	{
-		for(int i=0; i<2; i++)
-		{
-			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
-			else
-			{
-				auto w = GetInputWaveform(i);
-				if(!w)
-					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
-				else if(!dynamic_cast<UniformAnalogWaveform*>(w))
-					AddErrorMessage("Invalid input", string("Expected uniform analog waveform at input ") + m_signalNames[i] );
-			}
-		}
-
-		SetData(nullptr, 0);
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= len)
 		return;
-	}
 
-	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
-	size_t len = min(din_i->size(), din_q->size());
-
-	auto dout = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
-	dout->Resize(len);
-
-	//Calculate scaling factor from rad/sample to Hz
-	float sample_hz = FS_PER_SECOND / din_i->m_timescale;
-	VectorFrequencyConstants cfg;
-	cfg.len = len - 1;	//need two samples for deltas
-	cfg.scale = sample_hz / (2 * M_PI);
-
-	cmdBuf.begin({});
-
-	m_computePipeline.BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(1, din_q->m_samples, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(2, dout->m_samples, cmdBuf, true);
-	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-	m_computePipeline.Dispatch(cmdBuf, cfg,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
-
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
-	dout->m_samples.MarkModifiedFromGpu();
+	dout[i] = atan(inQ[i], inI[i]) * scale;
 }

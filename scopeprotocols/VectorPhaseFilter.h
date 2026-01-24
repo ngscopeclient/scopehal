@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,17 +35,27 @@
 #ifndef VectorPhaseFilter_h
 #define VectorPhaseFilter_h
 
+class VectorPhaseConstants
+{
+public:
+	uint32_t	len;
+	float		scale;
+};
+
 class VectorPhaseFilter : public Filter
 {
 public:
 	VectorPhaseFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(VectorPhaseFilter)
+
+	ComputePipeline m_computePipeline;
 };
 
 #endif

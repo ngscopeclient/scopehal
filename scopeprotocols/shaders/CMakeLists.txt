@@ -70,6 +70,7 @@ add_compute_shaders(
 		Threshold.glsl
 		UpsampleFilter.glsl
 		VectorFrequency.glsl
+		VectorPhase.glsl
 		WaterfallFilter.glsl
 	)
 
