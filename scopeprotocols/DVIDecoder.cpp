@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -65,7 +65,7 @@ bool DVIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i <= 2) && (dynamic_cast<TMDSDecoder*>(stream.m_channel) != NULL ) )
+	if( (i <= 2) && (dynamic_cast<TMDSDecoder*>(stream.m_channel) != nullptr ) )
 		return true;
 
 	return false;
@@ -89,16 +89,36 @@ bool DVIDecoder::GetShowImageColumn()
 	return true;
 }
 
+Filter::DataLocation DVIDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DVIDecoder::Refresh()
+void DVIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	ClearPackets();
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DVIDecoder::Refresh");
+	#endif
 
+	ClearPackets();
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<3; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -124,7 +144,7 @@ void DVIDecoder::Refresh()
 
 	TMDSSymbol::TMDSType last_type = TMDSSymbol::TMDS_TYPE_ERROR;
 
-	VideoScanlinePacket* current_packet = NULL;
+	VideoScanlinePacket* current_packet = nullptr;
 	int current_pixels = 0;
 
 	//Decode the actual data
@@ -148,7 +168,7 @@ void DVIDecoder::Refresh()
 				m_packets.push_back(current_packet);
 
 				current_pixels = 0;
-				current_packet = NULL;
+				current_packet = nullptr;
 			}
 
 			//Extract synchronization signals from blue channel
@@ -277,7 +297,7 @@ void DVIDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-std::string DVIWaveform::GetColor(size_t i)
+string DVIWaveform::GetColor(size_t i)
 {
 	auto s = m_samples[i];
 	switch(s.m_type)
