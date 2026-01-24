@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,6 +37,7 @@ using namespace std;
 
 VectorFrequencyFilter::VectorFrequencyFilter(const string& color)
 	: Filter(color, CAT_RF)
+	, m_computePipeline("shaders/VectorFrequency.spv", 3, sizeof(VectorFrequencyConstants))
 {
 	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("I");
@@ -48,7 +49,7 @@ VectorFrequencyFilter::VectorFrequencyFilter(const string& color)
 
 bool VectorFrequencyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -65,44 +66,68 @@ string VectorFrequencyFilter::GetProtocolName()
 	return "Vector Frequency";
 }
 
+Filter::DataLocation VectorFrequencyFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void VectorFrequencyFilter::Refresh()
+void VectorFrequencyFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("VectorFrequencyFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else
+			{
+				auto w = GetInputWaveform(i);
+				if(!w)
+					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+				else if(!dynamic_cast<UniformAnalogWaveform*>(w))
+					AddErrorMessage("Invalid input", string("Expected uniform analog waveform at input ") + m_signalNames[i] );
+			}
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
 	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
 	size_t len = min(din_i->size(), din_q->size());
-	din_i->PrepareForCpuAccess();
-	din_q->PrepareForCpuAccess();
 
 	auto dout = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
-	dout->PrepareForCpuAccess();
 	dout->Resize(len);
 
 	//Calculate scaling factor from rad/sample to Hz
 	float sample_hz = FS_PER_SECOND / din_i->m_timescale;
-	float scale = sample_hz / (2 * M_PI);
-	for(size_t i=0; i<len-1; i++)
-	{
-		//TODO: this can probably be made more efficient...
-		float theta1 = atan2(din_q->m_samples[i], din_i->m_samples[i]);
-		float theta2 = atan2(din_q->m_samples[i+1], din_i->m_samples[i+1]);
-		float dphase = theta2 - theta1;
-		if(dphase < -M_PI)
-			dphase += 2*M_PI;
-		if(dphase > M_PI)
-			dphase -= 2*M_PI;
+	VectorFrequencyConstants cfg;
+	cfg.len = len - 1;	//need two samples for deltas
+	cfg.scale = sample_hz / (2 * M_PI);
 
-		dout->m_samples[i] = dphase * scale;
-	}
+	cmdBuf.begin({});
 
-	dout->MarkModifiedFromCpu();
+	m_computePipeline.BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, din_q->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(2, dout->m_samples, cmdBuf, true);
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	dout->m_samples.MarkModifiedFromGpu();
 }

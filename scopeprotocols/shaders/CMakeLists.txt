@@ -69,6 +69,7 @@ add_compute_shaders(
 		TIEMeasurement_SecondPass.glsl
 		Threshold.glsl
 		UpsampleFilter.glsl
+		VectorFrequency.glsl
 		WaterfallFilter.glsl
 	)
 

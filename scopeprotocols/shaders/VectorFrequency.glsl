@@ -27,36 +27,48 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of VectorFrequencyFilter
- */
-#ifndef VectorFrequencyFilter_h
-#define VectorFrequencyFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class VectorFrequencyConstants
+#define M_PI 3.1415926535
+
+layout(std430, binding=0) restrict readonly buffer buf_inI
 {
-public:
-	uint32_t	len;
-	float		scale;
+	float inI[];
 };
 
-class VectorFrequencyFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_inQ
 {
-public:
-	VectorFrequencyFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(VectorFrequencyFilter)
-
-	ComputePipeline m_computePipeline;
+	float inQ[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint	len;
+	float	scale;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= len)
+		return;
+
+	//TODO: can we group threads to avoid wasted arctan computations?
+	float theta1 = atan(inQ[i],   inI[i]);
+	float theta2 = atan(inQ[i+1], inI[i+1]);
+	float dphase = theta2 - theta1;
+	if(dphase < -M_PI)
+		dphase += 2*M_PI;
+	if(dphase > M_PI)
+		dphase -= 2*M_PI;
+
+	dout[i] = dphase * scale;
+}
