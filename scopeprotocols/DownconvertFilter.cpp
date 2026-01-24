@@ -79,17 +79,27 @@ string DownconvertFilter::GetProtocolName()
 	return "Downconvert";
 }
 
+Filter::DataLocation DownconvertFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void DownconvertFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DownconvertFilter::Refresh");
+	#endif
+
 	//Get the input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
-		SetData(NULL, 0);
-		SetData(NULL, 1);
+		SetData(nullptr, 0);
+		SetData(nullptr, 1);
 		return;
 	}
 	din->PrepareForCpuAccess();
