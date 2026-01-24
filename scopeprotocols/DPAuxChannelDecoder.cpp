@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -65,12 +65,18 @@ string DPAuxChannelDecoder::GetProtocolName()
 	return "DisplayPort - Aux Channel";
 }
 
+Filter::DataLocation DPAuxChannelDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 bool DPAuxChannelDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -89,14 +95,26 @@ vector<string> DPAuxChannelDecoder::GetHeaders()
 	return ret;
 }
 
-void DPAuxChannelDecoder::Refresh()
+void DPAuxChannelDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ACCoupleFilter::Refresh");
+	#endif
+
 	ClearPackets();
+	ClearErrors();
 
 	//Get the input data
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -105,19 +123,11 @@ void DPAuxChannelDecoder::Refresh()
 	din->PrepareForCpuAccess();
 
 	//Copy our time scales from the input
-	auto cap = new DPAuxWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
+	auto cap = SetupEmptyWaveform<DPAuxWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 
 	//Create a second waveform for the tunneled I2C traffic
-	auto i2ccap = new I2CWaveform;
-	i2ccap->m_timescale = din->m_timescale;
-	i2ccap->m_startTimestamp = din->m_startTimestamp;
-	i2ccap->m_startFemtoseconds = din->m_startFemtoseconds;
-	i2ccap->m_triggerPhase = din->m_triggerPhase;
+	auto i2ccap = SetupEmptyWaveform<I2CWaveform>(din, 1);
 	i2ccap->PrepareForCpuAccess();
 
 	const int64_t ui_width 		= 1e9;	//4.5e8
@@ -653,10 +663,7 @@ void DPAuxChannelDecoder::Refresh()
 		}
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
-
-	SetData(i2ccap, 1);
 	i2ccap->MarkModifiedFromCpu();
 }
 
