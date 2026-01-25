@@ -287,7 +287,7 @@ std::string to_string(SCPITransportType transportType)
 		case SCPITransportType::TRANSPORT_HID: return "hid";
 		case SCPITransportType::TRANSPORT_NULL: return "null";
 		case SCPITransportType::TRANSPORT_VICP: return "vicp";
-		case SCPITransportType::TRANSPORT_SOKETCAN: return "socketcan";
+		case SCPITransportType::TRANSPORT_SOCKETCAN: return "socketcan";
 		case SCPITransportType::TRANSPORT_LXI: return "lxi";
 	}
 	return "unknown";

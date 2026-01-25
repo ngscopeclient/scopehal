@@ -68,13 +68,13 @@ public:
 
 	virtual void BackgroundProcessing() override;
 
-	typedef std::vector<SCPIInstrumentModel> (*GetTrapsportsProcType)();
-	static void DoAddDriverClass(std::string name, GetTrapsportsProcType proc);
+	typedef std::vector<SCPIInstrumentModel> (*GetTransportsProcType)();
+	static void DoAddDriverClass(std::string name, GetTransportsProcType proc);
 	static std::vector<SCPIInstrumentModel> GetSupportedModels(std::string driver);
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels();
 
 protected:
-	typedef std::map<std::string, GetTrapsportsProcType > GetTransportMapType;
+	typedef std::map<std::string, GetTransportsProcType > GetTransportMapType;
 	static GetTransportMapType m_getTransportProcs;
 
 protected:
