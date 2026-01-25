@@ -93,11 +93,33 @@ string DramClockFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DramClockFilter::Refresh()
+Filter::DataLocation DramClockFilter::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void DramClockFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DramClockFilter::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<3; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -132,20 +154,12 @@ void DramClockFilter::Refresh()
 		FindZeroCrossings(uclk, clkedges);
 
 	//Create output waveforms
-	auto rdclk = new SparseDigitalWaveform;
-	auto wrclk = new SparseDigitalWaveform;
+	auto rdclk = SetupEmptySparseDigitalOutputWaveform(dqs, 0);
+	auto wrclk = SetupEmptySparseDigitalOutputWaveform(dqs, 1);
 	rdclk->m_timescale 			= 1;
 	wrclk->m_timescale 			= 1;
-	SetData(rdclk, 0);
-	SetData(wrclk, 1);
 	rdclk->PrepareForCpuAccess();
 	wrclk->PrepareForCpuAccess();
-
-	//Copy timestamps
-	rdclk->m_startTimestamp 	= dqs->m_startTimestamp;
-	wrclk->m_startTimestamp 	= dqs->m_startTimestamp;
-	rdclk->m_startFemtoseconds	= dqs->m_startFemtoseconds;
-	wrclk->m_startFemtoseconds	= dqs->m_startFemtoseconds;
 
 	//Create initial all-zero samples at start of both clocks
 	wrclk->m_samples.push_back(false);
