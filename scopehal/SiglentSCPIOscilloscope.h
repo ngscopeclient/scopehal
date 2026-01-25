@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -416,6 +416,51 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+		{"SDS800X HD", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS1000X HD", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS2000X HD", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS3000X HD", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS2000X+", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS1000X-E", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS2000X-E", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS5000X", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS6000A/L/Pro", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"SDS7000A", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		};
+	}
 	OSCILLOSCOPE_INITPROC(SiglentSCPIOscilloscope)
 };
 #endif

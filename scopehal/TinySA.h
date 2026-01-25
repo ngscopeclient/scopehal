@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -109,6 +109,18 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+	#ifdef _WIN32
+        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}},
+        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}}
+	#else
+        {"tinySA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}},
+        {"tinySA ULTRA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}}
+	#endif
+        };
+	}
 	OSCILLOSCOPE_INITPROC(TinySA)
 };
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -147,6 +147,39 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+		{"Rigol DHO800", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Rigol DHO900", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Rigol DHO1000", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Rigol DHO4000", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Rigol DS1100D/E", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Rigol DS1000Z", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		{"Rigol MSO5000", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
+		};
+	}
 	OSCILLOSCOPE_INITPROC(RigolOscilloscope)
 };
 

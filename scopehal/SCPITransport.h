@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -147,6 +147,21 @@ protected:
 	std::chrono::system_clock::time_point m_nextCommandReady;
 	std::chrono::milliseconds m_rateLimitingInterval;
 };
+
+enum class SCPITransportType
+{
+	TRANSPORT_LAN,
+	TRANSPORT_USBTMC,
+	TRANSPORT_UART,
+	TRANSPORT_HID,
+	TRANSPORT_NULL,
+	TRANSPORT_VICP,
+	TRANSPORT_SOKETCAN,
+	TRANSPORT_LXI
+};
+
+std::string to_string(SCPITransportType transportType);
+
 
 #define TRANSPORT_INITPROC(T) \
 	static SCPITransport* CreateInstance(const std::string& args) \

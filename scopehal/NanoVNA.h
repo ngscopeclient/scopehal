@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -119,6 +119,16 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+	#ifdef _WIN32
+        {"NanoVNA", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:115200:DTR" }}}
+	#else
+        {"NanoVNA", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:115200:DTR" }}}
+	#endif
+        };
+	}
 	VNA_INITPROC(NanoVNA)
 };
 

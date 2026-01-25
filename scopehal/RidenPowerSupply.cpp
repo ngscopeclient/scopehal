@@ -55,6 +55,38 @@ RidenPowerSupply::RidenPowerSupply(SCPITransport* transport)
 	// Read model number
 	uint16_t modelNumber = ReadRegister(REGISTER_MODEL);
 	m_model = string("RD") + to_string(modelNumber/10) +"-" + to_string(modelNumber%10);
+	// Determine current and voltage factor
+	switch(modelNumber)
+	{
+		case 3005:
+		case 5005:
+		case 8005:
+		case 60061:
+		case 60062:
+		case 60066:
+			m_currentFactor = 1000;
+			m_voltageFactor = 100;
+			break;
+		case 60065:
+			m_currentFactor = 10000;
+			m_voltageFactor = 100;
+			break;
+		case 5015:
+		case 5020:
+		case 60121:
+		case 60181:
+		case 60241:
+			m_currentFactor = 100;
+			m_voltageFactor = 100;
+			break;
+		case 60125:
+			m_currentFactor = 1000;
+			m_voltageFactor = 1000;
+			break;
+		default:
+			m_currentFactor = 1000;
+			m_voltageFactor = 100;
+	}
 	// Read serial number
 	uint16_t serialNumber = ReadRegister(REGISTER_SERIAL);
 	m_serial = to_string(serialNumber);
@@ -112,28 +144,28 @@ double RidenPowerSupply::GetPowerVoltageActual(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(REGISTER_V_OUT))/100;
+	return ((double)ReadRegister(REGISTER_V_OUT))/m_voltageFactor;
 }
 
 double RidenPowerSupply::GetPowerVoltageNominal(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(REGISTER_V_SET))/100;
+	return ((double)ReadRegister(REGISTER_V_SET))/m_voltageFactor;
 }
 
 double RidenPowerSupply::GetPowerCurrentActual(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(REGISTER_I_OUT))/1000;
+	return ((double)ReadRegister(REGISTER_I_OUT))/m_currentFactor;
 }
 
 double RidenPowerSupply::GetPowerCurrentNominal(int chan)
 {
 	if(chan != 0)
 		return 0;
-	return ((double)ReadRegister(REGISTER_I_SET))/1000;
+	return ((double)ReadRegister(REGISTER_I_SET))/m_currentFactor;
 }
 
 bool RidenPowerSupply::GetPowerChannelActive(int chan)
@@ -147,14 +179,14 @@ void RidenPowerSupply::SetPowerVoltage(int chan, double volts)
 {
 	if(chan != 0)
 		return;
-	WriteRegister(REGISTER_V_SET,(uint16_t)(volts*100));
+	WriteRegister(REGISTER_V_SET,(uint16_t)(volts*m_voltageFactor));
 }
 
 void RidenPowerSupply::SetPowerCurrent(int chan, double amps)
 {
 	if(chan != 0)
 		return;
-	WriteRegister(REGISTER_I_SET,(uint16_t)(amps*1000));
+	WriteRegister(REGISTER_I_SET,(uint16_t)(amps*m_currentFactor));
 }
 
 void RidenPowerSupply::SetPowerChannelActive(int chan, bool on)

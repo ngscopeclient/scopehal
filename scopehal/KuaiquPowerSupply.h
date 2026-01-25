@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -103,6 +103,22 @@ protected:
 public:
 	static std::string GetDriverNameInternal();
 	POWER_INITPROC(KuaiquPowerSupply);
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return {
+	#ifdef _WIN32
+        {"Kuaiqu SPPS-D", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:9600" }}},
+        {"Kuaiqu SPPS-S", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:9600" }}},
+        {"Kuaiqu SPPS*D", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:9600" }}},
+        {"Kuaiqu R-SPPS", {{ SCPITransportType::TRANSPORT_UART, "COM<x>:9600" }}}
+	#else
+        {"Kuaiqu SPPS-D", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:9600" }}},
+        {"Kuaiqu SPPS-S", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:9600" }}},
+        {"Kuaiqu SPPS*D", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:9600" }}},
+        {"Kuaiqu R-SPPS", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>:9600" }}}
+	#endif
+        };
+	}
 };
 
 #endif

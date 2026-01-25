@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -368,6 +368,16 @@ string MagnovaOscilloscope::GetDriverNameInternal()
 	return "magnova";
 }
 
+std::vector<SCPIInstrumentModel> MagnovaOscilloscope::GetDriverSupportedModels()
+{
+	return {
+	{"Magnova", {
+		{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5025" },
+		{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+	}}
+	};
+}
+
 OscilloscopeChannel* MagnovaOscilloscope::GetExternalTrigger()
 {
 	return m_extTrigChannel;
@@ -679,7 +689,7 @@ double MagnovaOscilloscope::GetChannelAttenuation(size_t i)
 	{
 		protocolError("invalid channel attenuation value '%s'",reply.c_str());
 	}
-	return 1/d;
+	return d;
 }
 
 void MagnovaOscilloscope::SetChannelAttenuation(size_t i, double atten)

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -276,3 +276,20 @@ void SCPITransport::FlushRXBuffer(void)
 {
 	LogError("SCPITransport::FlushRXBuffer is unimplemented\n");
 }
+
+std::string to_string(SCPITransportType transportType)
+{
+	switch(transportType)
+	{
+		case SCPITransportType::TRANSPORT_LAN: return "lan";
+		case SCPITransportType::TRANSPORT_USBTMC: return "usbtmc";
+		case SCPITransportType::TRANSPORT_UART: return "uart";
+		case SCPITransportType::TRANSPORT_HID: return "hid";
+		case SCPITransportType::TRANSPORT_NULL: return "null";
+		case SCPITransportType::TRANSPORT_VICP: return "vicp";
+		case SCPITransportType::TRANSPORT_SOKETCAN: return "socketcan";
+		case SCPITransportType::TRANSPORT_LXI: return "lxi";
+	}
+	return "unknown";
+}
+
