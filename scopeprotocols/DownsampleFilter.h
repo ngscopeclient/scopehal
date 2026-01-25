@@ -53,8 +53,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(DownsampleFilter)
 
 protected:
-	std::string m_factorname;
-	std::string m_aaname;
+	FilterParameter& m_decimationFactor;
+	FilterParameter& m_aaFilterEnabled;
 };
 
 #endif

@@ -37,17 +37,17 @@ using namespace std;
 
 DownsampleFilter::DownsampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_decimationFactor(m_parameters["Downsample Factor"])
+	, m_aaFilterEnabled(m_parameters["Antialiasing Filter"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("RF");
 
-	m_factorname = "Downsample Factor";
-	m_parameters[m_factorname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_factorname].SetIntVal(10);
+	m_decimationFactor = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_decimationFactor.SetIntVal(10);
 
-	m_aaname = "Antialiasing Filter";
-	m_parameters[m_aaname] = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_aaname].SetBoolVal(1);
+	m_aaFilterEnabled = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_aaFilterEnabled.SetBoolVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +55,7 @@ DownsampleFilter::DownsampleFilter(const string& color)
 
 bool DownsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -87,8 +87,14 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 		nvtx3::scoped_range nrange("DownsampleFilter::Refresh");
 	#endif
 
+	ClearErrors();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -100,24 +106,26 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 	//Propagate units
 	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
 
-	//Set up output waveform and get configuration
-	int64_t factor = m_parameters[m_factorname].GetIntVal();
-	if (factor == 0)
+	//Validate input configuration
+	int64_t factor = m_decimationFactor.GetIntVal();
+	if (factor <= 0)
 	{
-		// Occurs momentarily while editing the value sometimes in glscopeclient
+		AddErrorMessage("Invalid configuration", "No waveform available at input");
 		return;
 	}
-
 	size_t outlen = len / factor;
+
+	//Make output waveform and copy our time scales from the input
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	cap->m_timescale = din->m_timescale * factor;
 	cap->Resize(outlen);
 
-	cap->PrepareForCpuAccess();
-	din->PrepareForCpuAccess();
-
 	//Default path with antialiasing filter
-	if(m_parameters[m_aaname].GetBoolVal())
+	if(m_aaFilterEnabled.GetBoolVal())
 	{
+		cap->PrepareForCpuAccess();
+		din->PrepareForCpuAccess();
+
 		//Cut off all frequencies shorter than our decimation factor
 		float cutoff_period = factor;
 		float sigma = cutoff_period / sqrt(2 * log(2));
@@ -157,16 +165,19 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 			//Do the actual decimation
 			cap->m_samples[i] 	= conv;
 		}
+
+		cap->MarkModifiedFromCpu();
 	}
 
 	//Optimized path with no AA if the input is known to not contain any higher frequency content
 	else
 	{
+		cap->PrepareForCpuAccess();
+		din->PrepareForCpuAccess();
+
 		for(size_t i=0; i<outlen; i++)
 			cap->m_samples[i]	= din->m_samples[i*factor];
-	}
 
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale * factor;
-	cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromCpu();
+	}
 }
