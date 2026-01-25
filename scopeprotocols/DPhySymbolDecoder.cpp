@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -57,7 +57,7 @@ bool DPhySymbolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	//IN+ is required
 	if(i == 0)
 	{
-		if(stream.m_channel == NULL)
+		if(stream.m_channel == nullptr)
 			return false;
 		return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
 	}
@@ -66,7 +66,7 @@ bool DPhySymbolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	//For many common interfaces, we can get away with this and save a probe.
 	else if(i == 1)
 	{
-		if(stream.m_channel == NULL)
+		if(stream.m_channel == nullptr)
 			return true;
 		return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
 	}
@@ -85,12 +85,30 @@ string DPhySymbolDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DPhySymbolDecoder::Refresh()
+Filter::DataLocation DPhySymbolDecoder::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void DPhySymbolDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DPhySymbolDecoder::Refresh");
+	#endif
+
 	//We need D+ no matter what
+	ClearErrors();
 	if(!VerifyInputOK(0))
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No IN+ signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at IN+ input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -112,14 +130,16 @@ void DPhySymbolDecoder::Refresh()
 	auto udn = dynamic_cast<UniformAnalogWaveform*>(dn);
 
 	//Create output waveform
-	auto cap = new DPhySymbolWaveform;
-	cap->m_timescale = 1;
+	auto cap = SetupEmptyWaveform<DPhySymbolWaveform>(dp, 0);
 	cap->m_startTimestamp = dp->m_startTimestamp;
 	cap->m_startFemtoseconds = dp->m_startFemtoseconds;
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
+
 	DPhySymbol::type last_state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type nextstate = state;
-	cap->PrepareForCpuAccess();
 
 	for(size_t i=0; i<len; i++)
 	{
@@ -316,7 +336,6 @@ void DPhySymbolDecoder::Refresh()
 		last_state = state;
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
