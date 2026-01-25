@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,10 +54,10 @@ DSIFrameDecoder::DSIFrameDecoder(const string& color)
 
 bool DSIFrameDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<DSIPacketDecoder*>(stream.m_channel) != NULL ) )
+	if( (i == 0) && (dynamic_cast<DSIPacketDecoder*>(stream.m_channel) != nullptr ) )
 		return true;
 
 	return false;
@@ -81,26 +81,41 @@ bool DSIFrameDecoder::GetShowImageColumn()
 	return true;
 }
 
+Filter::DataLocation DSIFrameDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DSIFrameDecoder::Refresh()
+void DSIFrameDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DSIFrameDecoder::Refresh");
+	#endif
+
 	ClearPackets();
+	ClearErrors();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 	auto din = dynamic_cast<DSIWaveform*>(GetInputWaveform(0));
 	din->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new DSIFrameWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<DSIFrameWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 
 	enum
@@ -115,7 +130,7 @@ void DSIFrameDecoder::Refresh()
 		STATE_RGB888_BLUE
 	} state = STATE_IDLE;
 
-	VideoScanlinePacket* pack = NULL;
+	VideoScanlinePacket* pack = nullptr;
 
 	//Decode the actual data
 	size_t len = din->m_offsets.size();
@@ -263,7 +278,7 @@ void DSIFrameDecoder::Refresh()
 					m_packets.push_back(pack);
 				else
 					delete pack;
-				pack = NULL;
+				pack = nullptr;
 			}
 		}
 	}
@@ -275,10 +290,8 @@ void DSIFrameDecoder::Refresh()
 			m_packets.push_back(pack);
 		else
 			delete pack;
-		pack = NULL;
+		pack = nullptr;
 	}
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }
