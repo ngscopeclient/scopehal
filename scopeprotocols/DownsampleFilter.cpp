@@ -39,6 +39,7 @@ DownsampleFilter::DownsampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
 	, m_decimationFactor(m_parameters["Downsample Factor"])
 	, m_aaFilterEnabled(m_parameters["Antialiasing Filter"])
+	, m_noAAComputePipeline("shaders/DownsampleNoAAFilter.spv", 2, sizeof(DownsamplePushConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("RF");
@@ -120,6 +121,11 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 	cap->m_timescale = din->m_timescale * factor;
 	cap->Resize(outlen);
 
+	//Push constants for the shader
+	DownsamplePushConstants cfg;
+	cfg.outlen = outlen;
+	cfg.factor = factor;
+
 	//Default path with antialiasing filter
 	if(m_aaFilterEnabled.GetBoolVal())
 	{
@@ -172,12 +178,18 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 	//Optimized path with no AA if the input is known to not contain any higher frequency content
 	else
 	{
-		cap->PrepareForCpuAccess();
-		din->PrepareForCpuAccess();
+		cmdBuf.begin({});
 
-		for(size_t i=0; i<outlen; i++)
-			cap->m_samples[i]	= din->m_samples[i*factor];
+		m_noAAComputePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_noAAComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
+		m_noAAComputePipeline.Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
 
-		cap->MarkModifiedFromCpu();
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		cap->m_samples.MarkModifiedFromGpu();
 	}
 }

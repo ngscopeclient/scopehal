@@ -217,7 +217,7 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	}
 
 	//Special case if input units are degrees: we want to do modular arithmetic
-	//TODO: vectorized version of this
+	//TODO: vectorized/GPU version of this
 	if(GetYAxisUnits(0) == Unit::UNIT_DEGREES)
 	{
 		//Waveform data must be on CPU

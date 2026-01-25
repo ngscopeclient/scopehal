@@ -27,43 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DownsampleFilter
- */
-#ifndef DownsampleFilter_h
-#define DownsampleFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-class DownsamplePushConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t outlen;
-	uint32_t factor;
+	float din[];
 };
 
-/**
-	@brief Downsample - low-pass filter and decimate a signal
- */
-class DownsampleFilter : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	DownsampleFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(DownsampleFilter)
-
-protected:
-	FilterParameter& m_decimationFactor;
-	FilterParameter& m_aaFilterEnabled;
-
-	ComputePipeline m_noAAComputePipeline;
+	float dout[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint outlen;
+	uint factor;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= outlen)
+		return;
+
+	dout[i] = din[i*factor];
+}
