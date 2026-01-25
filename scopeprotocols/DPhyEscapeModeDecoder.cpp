@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -75,25 +75,41 @@ vector<string> DPhyEscapeModeDecoder::GetHeaders()
 	return ret;
 }
 
-void DPhyEscapeModeDecoder::Refresh()
+Filter::DataLocation DPhyEscapeModeDecoder::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void DPhyEscapeModeDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DPhyEscapeModeDecoder::Refresh");
+	#endif
+
 	ClearPackets();
+	ClearErrors();
 
 	//Sanity check
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
 	auto data = dynamic_cast<DPhySymbolWaveform*>(GetInputWaveform(0));
 
 	//Create output waveform
-	auto cap = new DPhyEscapeModeWaveform;
-	cap->m_timescale = data->m_timescale;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
-	cap->m_triggerPhase = data->m_triggerPhase;
-	SetData(cap, 0);
+	auto cap = SetupEmptyWaveform<DPhyEscapeModeWaveform>(data, 0);
+	cap->MarkModifiedFromCpu();
+
+	data->PrepareForCpuAccess();
 
 	Packet* pack = nullptr;
 
