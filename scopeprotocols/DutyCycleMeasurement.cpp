@@ -70,17 +70,34 @@ string DutyCycleMeasurement::GetProtocolName()
 	return "Duty Cycle";
 }
 
+Filter::DataLocation DutyCycleMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DutyCycleMeasurement::Refresh()
+void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DutyCycleMeasurement::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
+
 	auto din = GetInputWaveform(0);
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
@@ -89,6 +106,8 @@ void DutyCycleMeasurement::Refresh()
 	din->PrepareForCpuAccess();
 	if(din->size() < 2)
 	{
+		AddErrorMessage("Waveform too short", "Can't calculate the duty cycle of a waveform with less than two zero crossings");
+
 		SetData(nullptr, 0);
 		return;
 	}
