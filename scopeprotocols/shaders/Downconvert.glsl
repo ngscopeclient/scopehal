@@ -30,6 +30,8 @@
 #version 460
 #pragma shader_stage(compute)
 
+#define M_PI 3.1415926535
+
 layout(std430, binding=0) restrict readonly buffer buf_inIO
 {
 	float din[];
@@ -60,7 +62,11 @@ void main()
 	if(i >= size)
 		return;
 
-	float phase = trigger_phase_rad + lo_rad_per_sample * i;
+	//We get loss of precision error here if we do this naively though...
+	double base = double(lo_rad_per_sample) * double(i);
+	float frac = float(mod(base, 2*M_PI));
+
+	float phase = trigger_phase_rad + /*lo_rad_per_sample * i*/ frac;
 	float samp = din[i];
 
 	doutI[i] = samp * sin(phase);
