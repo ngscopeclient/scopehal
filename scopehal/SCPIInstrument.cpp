@@ -84,7 +84,7 @@ string SCPIInstrument::GetSerial() const
 	return m_serial;
 }
 
-void SCPIInstrument::DoAddDriverClass(string name, GetTrapsportsProcType proc)
+void SCPIInstrument::DoAddDriverClass(string name, GetTransportsProcType proc)
 {
 	m_getTransportProcs[name] = proc;
 }
