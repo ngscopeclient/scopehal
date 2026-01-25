@@ -3073,8 +3073,8 @@ void LeCroyOscilloscope::Stop()
 
 void LeCroyOscilloscope::ForceTrigger()
 {
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
+	if(!m_triggerArmed)
+		StartSingleTrigger();
 
 	m_transport->SendCommandQueued("FRTR");
 	m_transport->FlushCommandQueue();
