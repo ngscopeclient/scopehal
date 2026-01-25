@@ -80,8 +80,11 @@ SCPITransport* SCPITransport::CreateTransport(const string& transport, const str
 	@brief Pushes a command into the transmit FIFO then returns immediately.
 
 	This command will actually be sent the next time FlushCommandQueue() is called.
+
+	@param cmd         Command to be sent
+	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
  */
-void SCPITransport::SendCommandQueued(const string& cmd)
+void SCPITransport::SendCommandQueued(const string& cmd, std::chrono::milliseconds settle_time)
 {
 	lock_guard<mutex> lock(m_queueMutex);
 
@@ -117,7 +120,8 @@ void SCPITransport::SendCommandQueued(const string& cmd)
 			auto it = m_txQueue.begin();
 			while(it != m_txQueue.end())
 			{
-				tmp = *it;
+				auto pair = *it;
+				tmp = pair.first;
 
 				//Split off subject, if we have one
 				//(ignore leading colon)
@@ -143,7 +147,7 @@ void SCPITransport::SendCommandQueued(const string& cmd)
 				{
 					LogTrace("Deduplicating redundant %s command %s and pushing new command %s\n",
 						ncmd.c_str(),
-						(*it).c_str(),
+						pair.first.c_str(),
 						cmd.c_str());
 
 					auto oldit = it;
@@ -160,18 +164,35 @@ void SCPITransport::SendCommandQueued(const string& cmd)
 
 	}
 
-	m_txQueue.push_back(cmd);
+	// Create a pair with cmd and settle_time
+	std::pair<std::string, std::chrono::milliseconds> pair;
+	pair = make_pair(cmd, settle_time);
+
+	// Push to queue
+	m_txQueue.push_back(pair);
 
 	LogTrace("%zu commands now queued\n", m_txQueue.size());
 }
 
 /**
 	@brief Block until it's time to send the next command when rate limiting.
+
+	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
  */
-void SCPITransport::RateLimitingWait()
+void SCPITransport::RateLimitingWait(std::chrono::milliseconds settle_time)
 {
 	this_thread::sleep_until(m_nextCommandReady);
-	m_nextCommandReady = chrono::system_clock::now() + m_rateLimitingInterval;
+
+	if(settle_time == std::chrono::milliseconds(0))
+	{
+		// Use the configured rate limit
+		m_nextCommandReady = chrono::system_clock::now() + m_rateLimitingInterval;
+	}
+	else
+	{
+		// Use the specified settle_time
+		m_nextCommandReady = chrono::system_clock::now() + settle_time;
+	}
 }
 
 /**
@@ -180,7 +201,7 @@ void SCPITransport::RateLimitingWait()
 bool SCPITransport::FlushCommandQueue()
 {
 	//Grab the queue, then immediately release the mutex so we can do more queued sends
-	list<string> tmp;
+	std::list<std::pair<std::string, std::chrono::milliseconds>> tmp;
 	{
 		lock_guard<mutex> lock(m_queueMutex);
 		tmp = std::move(m_txQueue);
@@ -191,11 +212,11 @@ bool SCPITransport::FlushCommandQueue()
 		LogTrace("%zu commands being flushed\n", tmp.size());
 
 	lock_guard<recursive_mutex> lock(m_netMutex);
-	for(auto str : tmp)
+	for(auto pair : tmp)
 	{
 		if(m_rateLimitingEnabled)
-			RateLimitingWait();
-		SendCommand(str);
+			RateLimitingWait(pair.second);
+		SendCommand(pair.first);
 	}
 	return true;
 }
@@ -204,24 +225,34 @@ bool SCPITransport::FlushCommandQueue()
 	@brief Sends a command (flushing any pending/queued commands first), then returns the response.
 
 	This is an atomic operation requiring no mutexing at the caller side.
+
+	@param cmd         Command to be sent
+	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
+
+	@return A string with the reply
  */
-string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon)
+string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon, std::chrono::milliseconds settle_time)
 {
 	FlushCommandQueue();
-	return SendCommandImmediateWithReply(cmd, endOnSemicolon);
+	return SendCommandImmediateWithReply(cmd, endOnSemicolon, settle_time);
 }
 
 /**
 	@brief Sends a command (jumping ahead of the queue), then returns the response.
 
 	This is an atomic operation requiring no mutexing at the caller side.
+
+	@param cmd         Command to be sent
+	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
+
+	@return A string with the reply
  */
-string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemicolon)
+string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemicolon, std::chrono::milliseconds settle_time)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 
 	if(m_rateLimitingEnabled)
-		RateLimitingWait();
+		RateLimitingWait(settle_time);
 
 	SendCommand(cmd);
 
@@ -230,26 +261,35 @@ string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemico
 
 /**
 	@brief Sends a command (jumping ahead of the queue) which does not require a response.
+
+	@param cmd         Command to be sent
+	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
  */
-void SCPITransport::SendCommandImmediate(string cmd)
+void SCPITransport::SendCommandImmediate(string cmd, std::chrono::milliseconds settle_time)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 
 	if(m_rateLimitingEnabled)
-		RateLimitingWait();
+		RateLimitingWait(settle_time);
 
 	SendCommand(cmd);
 }
 
 /**
 	@brief Sends a command (jumping ahead of the queue) which reads a binary block response
+
+	@param cmd         Command to be sent
+	@param len         A reference to a size_t that will get the number of bytes received written to it.
+	@param settle_time Rate limiting time for this specific command, see `EnableRateLimiting()´
+
+	@return A pointer to the reply buffer. This will need to be deleted manually.
  */
-void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len)
+void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len, std::chrono::milliseconds settle_time)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 
 	if(m_rateLimitingEnabled)
-		RateLimitingWait();
+		RateLimitingWait(settle_time);
 	SendCommand(cmd);
 
 	//Read the length
