@@ -239,12 +239,12 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	if(m_picoHasAwg)
 	{
 		//has function generator
+		SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
 		SetFunctionChannelAmplitude(0, 0.1);
 		SetFunctionChannelShape(0, SHAPE_SQUARE);
 		SetFunctionChannelDutyCycle(0, 0.5);
 		SetFunctionChannelFrequency(0, 1e6);
 		SetFunctionChannelOffset(0, 0);
-		SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
 		SetFunctionChannelActive(0, false);
 		m_awgChannel = new FunctionGeneratorChannel(
 			this,
