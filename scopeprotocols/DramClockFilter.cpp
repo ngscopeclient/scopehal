@@ -69,10 +69,10 @@ DramClockFilter::DramClockFilter(const string& color)
 
 bool DramClockFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
+	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != nullptr ) )
 		return true;
 	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
