@@ -40,10 +40,13 @@ layout(std430, binding=1) restrict writeonly buffer buf_dout
 	float dout[];
 };
 
+//same layout as DownsampleWithAAFilter so a few unused fields here
 layout(std430, push_constant) uniform constants
 {
 	uint outlen;
+	uint len;
 	uint factor;
+	int kernel_radius;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;

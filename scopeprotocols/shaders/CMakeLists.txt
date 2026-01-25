@@ -51,6 +51,7 @@ add_compute_shaders(
 		DeEmbedNormalization.glsl
 		Downconvert.glsl
 		DownsampleNoAAFilter.glsl
+		DownsampleWithAAFilter.glsl
 		Ethernet100BaseTX_4b5bDecode.glsl
 		Ethernet100BaseTX_Descrambler.glsl
 		Ethernet100BaseTX_FindSSD.glsl

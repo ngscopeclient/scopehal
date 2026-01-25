@@ -40,6 +40,7 @@ DownsampleFilter::DownsampleFilter(const string& color)
 	, m_decimationFactor(m_parameters["Downsample Factor"])
 	, m_aaFilterEnabled(m_parameters["Antialiasing Filter"])
 	, m_noAAComputePipeline("shaders/DownsampleNoAAFilter.spv", 2, sizeof(DownsamplePushConstants))
+	, m_aaComputePipeline("shaders/DownsampleWithAAFilter.spv", 3, sizeof(DownsamplePushConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("RF");
@@ -49,6 +50,8 @@ DownsampleFilter::DownsampleFilter(const string& color)
 
 	m_aaFilterEnabled = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
 	m_aaFilterEnabled.SetBoolVal(1);
+
+	m_kernel.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,58 +124,55 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 	cap->m_timescale = din->m_timescale * factor;
 	cap->Resize(outlen);
 
+	//Antialiasing filter (if used): Cut off all frequencies shorter than our decimation factor
+	float cutoff_period = factor;
+	float sigma = cutoff_period / sqrt(2 * log(2));
+
 	//Push constants for the shader
 	DownsamplePushConstants cfg;
 	cfg.outlen = outlen;
+	cfg.len = len;
 	cfg.factor = factor;
+	cfg.kernel_radius = ceil(3*sigma);
 
 	//Default path with antialiasing filter
 	if(m_aaFilterEnabled.GetBoolVal())
 	{
-		cap->PrepareForCpuAccess();
-		din->PrepareForCpuAccess();
-
-		//Cut off all frequencies shorter than our decimation factor
-		float cutoff_period = factor;
-		float sigma = cutoff_period / sqrt(2 * log(2));
-		int kernel_radius = ceil(3*sigma);
-
-		//Generate the actual Gaussian kernel
-		int kernel_size = kernel_radius*2 + 1;
-		vector<float> kernel;
-		kernel.resize(kernel_size);
+		//Generate the normalized Gaussian kernel
+		//TODO: faster to do this GPU side??
+		int kernel_size = cfg.kernel_radius*2 + 1;
+		m_kernel.PrepareForCpuAccess();
+		m_kernel.resize(kernel_size);
 		float alpha = 1.0f / (sigma * sqrt(2*M_PI));
+		float sum = 0;
 		for(int x=0; x < kernel_size; x++)
 		{
-			int delta = (x - kernel_radius);
-			kernel[x] = alpha * exp(-delta*delta/(2*sigma));
+			int delta = (x - cfg.kernel_radius);
+			float f = alpha * exp(-delta*delta/(2*sigma));
+			m_kernel[x] = f;
+
+			//TODO: are we summing enough to want Kahan here?
+			sum += f;
 		}
-		float sum = 0;
-		for(auto k : kernel)
-			sum += k;
 		for(int i=0; i<kernel_size; i++)
-			kernel[i] /= sum;
+			m_kernel[i] /= sum;
+		m_kernel.MarkModifiedFromCpu();
 
-		//Do the actual downsampling.
-		for(size_t i=0; i<outlen; i++)
-		{
-			//Do the convolution
-			float conv = 0;
-			ssize_t base = i*factor;
-			for(ssize_t delta = -kernel_radius; delta <= kernel_radius; delta ++)
-			{
-				ssize_t pos = base + delta;
-				if( (pos < 0) || (pos >= (ssize_t)len) )
-					continue;
+		//Run the filter
+		cmdBuf.begin({});
 
-				conv += din->m_samples[pos] * kernel[delta + kernel_radius];
-			}
+		m_aaComputePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_aaComputePipeline.BindBufferNonblocking(1, m_kernel, cmdBuf);
+		m_aaComputePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+		const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
+		m_aaComputePipeline.Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
 
-			//Do the actual decimation
-			cap->m_samples[i] 	= conv;
-		}
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 
-		cap->MarkModifiedFromCpu();
+		cap->m_samples.MarkModifiedFromGpu();
 	}
 
 	//Optimized path with no AA if the input is known to not contain any higher frequency content
