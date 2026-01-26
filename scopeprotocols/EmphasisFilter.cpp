@@ -79,14 +79,30 @@ string EmphasisFilter::GetProtocolName()
 	return "Emphasis";
 }
 
+Filter::DataLocation EmphasisFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EmphasisFilter::Refresh()
+void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EmphasisFilter::Refresh");
+	#endif
+
+	ClearErrors();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -95,7 +111,9 @@ void EmphasisFilter::Refresh()
 	size_t len = din->size();
 	if(len < 8)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "The input signal must be at least 8 samples long");
+
+		SetData(nullptr, 0);
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
@@ -128,5 +146,7 @@ void EmphasisFilter::Refresh()
 	}
 
 	//Run the actual filter
+	din->PrepareForCpuAccess();
 	TappedDelayLineFilter::DoFilterKernel(tap_delay, taps, din, cap);
+	cap->MarkModifiedFromCpu();
 }
