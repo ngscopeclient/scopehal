@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "DutyCycleMeasurement.h"
-#include "KahanSummation.h"
 
 using namespace std;
 
@@ -156,9 +155,8 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	}
 
 	auto& edges = m_levelCrossing.GetResults();
-	edges.PrepareForCpuAccess();
-
-	if(edges.size() < 2)
+	size_t elen = edges.size();
+	if(elen < 2)
 	{
 		AddErrorMessage("Waveform too short", "Can't calculate the duty cycle of a waveform with less than two zero crossings");
 		SetData(nullptr, 0);
@@ -168,13 +166,15 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->m_timescale = 1;
+	size_t imax = (elen - 2);
+	size_t nouts = imax / 2;
+	cap->Resize(nouts);
 	cap->PrepareForCpuAccess();
 
 	//Find the duty cycle per cycle, then average
-	size_t elen = edges.size();
-	KahanSummation sum;
 	int64_t nedges = 0;
-	for(size_t i=0; i < (elen - 2); i+= 2)
+	edges.PrepareForCpuAccess();
+	for(size_t i=0; i < imax; i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
 		int64_t start = edges[i];
@@ -193,11 +193,10 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		else
 			duty = t2/total;
 
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(total);
-		cap->m_samples.push_back(duty);
+		cap->m_offsets[nedges] = start;
+		cap->m_durations[nedges] = total;
+		cap->m_samples[nedges] = duty;
 
-		sum += duty;
 		nedges ++;
 	}
 
@@ -205,5 +204,6 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	cap->MarkModifiedFromCpu();
 
-	m_streams[1].m_value = sum.GetSum() / nedges;
+	//Final averaging
+	m_streams[1].m_value = m_averager.Average(cap, cmdBuf, queue);
 }
