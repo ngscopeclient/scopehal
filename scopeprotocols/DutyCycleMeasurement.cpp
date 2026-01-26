@@ -43,6 +43,12 @@ DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("din");
+
+	if(g_hasShaderInt64)
+	{
+		m_computePipeline =
+			make_shared<ComputePipeline>("shaders/DutyCycleMeasurement.spv", 5, sizeof(DutyCycleConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +108,6 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
-	din->PrepareForCpuAccess();
 	if(din->size() < 2)
 	{
 		AddErrorMessage("Waveform too short", "Can't calculate the duty cycle of a waveform with less than two samples");
@@ -113,12 +118,12 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//Get timestamps of the edges
 	bool initial_polarity = false;
+	float midpoint = 0;
 	if(sdin || udin)
 	{
 		//Find average voltage of the waveform and use that as the zero crossing
 		//TODO: rather than using average, have auto calculation to find base and top and use the midpoint of that
 		//Will give more accurate threshold for non 50% duty cycle inputs
-		float midpoint;
 		if(sdin)
 			midpoint = m_averager.Average(sdin, cmdBuf, queue);
 		else
@@ -129,13 +134,12 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 			m_levelCrossing.FindZeroCrossings(sdin, midpoint, cmdBuf, queue);
 		else
 			m_levelCrossing.FindZeroCrossings(udin, midpoint, cmdBuf, queue);
-
-		//Figure out edge polarity
-		//TODO: can we make this more efficient
-		initial_polarity = (GetValue(sdin, udin, 0) > midpoint);
 	}
 	else
 	{
+		//this part runs on the CPU for now
+		din->PrepareForCpuAccess();
+
 		if(sddin)
 		{
 			m_levelCrossing.FindZeroCrossings(sddin, cmdBuf, queue);
@@ -169,40 +173,72 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	size_t imax = (elen - 2);
 	size_t nouts = imax / 2;
 	cap->Resize(nouts);
-	cap->PrepareForCpuAccess();
 
-	//Find the duty cycle per cycle, then average
-	int64_t nedges = 0;
-	edges.PrepareForCpuAccess();
-	for(size_t i=0; i < imax; i+= 2)
+	//GPU inner loop requires native int64, plus (for now) an analog input
+	if(g_hasShaderInt64 && (sdin || udin))
 	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t mid = edges[i+1];
-		int64_t end = edges[i+2];
+		cmdBuf.begin({});
 
-		float t1 = mid-start;
-		float t2 = end-mid;
-		float total = t1+t2;
-
-		float duty;
-
-		//T1 is high time
-		if(!initial_polarity)
-			duty = t1/total;
+		m_computePipeline->BindBufferNonblocking(0, edges, cmdBuf);
+		m_computePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
+		m_computePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
+		m_computePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
+		if(sdin)
+			m_computePipeline->BindBufferNonblocking(4, sdin->m_samples, cmdBuf);
 		else
-			duty = t2/total;
+			m_computePipeline->BindBufferNonblocking(4, udin->m_samples, cmdBuf);
 
-		cap->m_offsets[nedges] = start;
-		cap->m_durations[nedges] = total;
-		cap->m_samples[nedges] = duty;
+		DutyCycleConstants cfg;
+		cfg.threshold = midpoint;
+		cfg.imax = imax;
 
-		nedges ++;
+		const uint32_t compute_block_count = GetComputeBlockCount(nouts, 64);
+		m_computePipeline->Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		cap->MarkModifiedFromGpu();
 	}
 
-	SetData(cap, 0);
+	//CPU fallback for digital inputs or no int64 support
+	else
+	{
+		cap->PrepareForCpuAccess();
 
-	cap->MarkModifiedFromCpu();
+		//Find the duty cycle per cycle, then average
+		int64_t nedges = 0;
+		edges.PrepareForCpuAccess();
+		for(size_t i=0; i < imax; i+= 2)
+		{
+			//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+			int64_t start = edges[i];
+			int64_t mid = edges[i+1];
+			int64_t end = edges[i+2];
+
+			float t1 = mid-start;
+			float t2 = end-mid;
+			float total = t1+t2;
+
+			float duty;
+
+			//T1 is high time
+			if(!initial_polarity)
+				duty = t1/total;
+			else
+				duty = t2/total;
+
+			cap->m_offsets[nedges] = start;
+			cap->m_durations[nedges] = total;
+			cap->m_samples[nedges] = duty;
+
+			nedges ++;
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
 
 	//Final averaging
 	m_streams[1].m_value = m_averager.Average(cap, cmdBuf, queue);

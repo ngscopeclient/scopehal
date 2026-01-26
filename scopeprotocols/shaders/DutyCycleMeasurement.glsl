@@ -27,43 +27,70 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DutyCycleMeasurement
- */
-#ifndef DutyCycleMeasurement_h
-#define DutyCycleMeasurement_h
+#version 460
+#pragma shader_stage(compute)
 
-#include "../scopehal/Averager.h"
-#include "../scopehal/LevelCrossingDetector.h"
+#extension GL_ARB_gpu_shader_int64 : require
 
-class DutyCycleConstants
+layout(std430, binding=0) restrict readonly buffer buf_edges
 {
-public:
+	int64_t edges[];
+};
+
+layout(std430, binding=1) restrict writeonly buffer buf_offsets
+{
+	int64_t offsets[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_durations
+{
+	int64_t durations[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_samples
+{
+	float samples[];
+};
+
+layout(std430, binding=4) restrict readonly buffer buf_din
+{
+	float din[];
+};
+
+layout(std430, push_constant) uniform constants
+{
 	float threshold;
-	uint32_t	imax;
+	uint imax;
 };
 
-class DutyCycleMeasurement : public Filter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	DutyCycleMeasurement(const std::string& color);
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint iin = i * 2;
+	if(iin >= imax)
+		return;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+	bool initialPolarity = (din[0] > threshold);
 
-	static std::string GetProtocolName();
+	//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+	int64_t start = edges[iin];
+	int64_t mid = edges[iin + 1];
+	int64_t end = edges[iin + 2];
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	float t1 = float(mid - start);
+	float t2 = float(end - mid);
+	float total = t1 + t2;
+	float duty;
 
-	PROTOCOL_DECODER_INITPROC(DutyCycleMeasurement)
+	//T1 is high time
+	if(!initialPolarity)
+		duty = t1 / total;
+	else
+		duty = t2 / total;
 
-protected:
-	Averager m_averager;
-	LevelCrossingDetector m_levelCrossing;
-
-	std::shared_ptr<ComputePipeline> m_computePipeline;
-};
-
-#endif
+	offsets[i] = start;
+	durations[i] = int64_t(total);
+	samples[i] = duty;
+}
