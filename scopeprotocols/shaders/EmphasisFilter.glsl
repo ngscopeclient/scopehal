@@ -27,49 +27,34 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EmphasisFilter
- */
-#ifndef EmphasisFilter_h
-#define EmphasisFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class EmphasisFilterConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	samples_per_tap;
-	uint32_t	size;
-	float		tap0;
-	float		tap1;
+	float din[];
 };
 
-class EmphasisFilter : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	EmphasisFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(EmphasisFilter)
-
-	enum EmphasisType
-	{
-		PRE_EMPHASIS,
-		DE_EMPHASIS
-	};
-
-protected:
-	std::string m_dataRateName;
-	std::string m_emphasisTypeName;
-	std::string m_emphasisAmountName;
-
-	ComputePipeline m_computePipeline;
+	float dout[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint	samples_per_tap;
+	uint	size;
+	float	tap0;
+	float	tap1;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
+		return;
+
+	dout[i]	= (din[i] * tap0) + (din[i + samples_per_tap] * tap1);
+}

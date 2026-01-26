@@ -41,6 +41,7 @@ EmphasisFilter::EmphasisFilter(const string& color)
 	, m_dataRateName("Data Rate")
 	, m_emphasisTypeName("Emphasis Type")
 	, m_emphasisAmountName("Emphasis Amount")
+	, m_computePipeline("shaders/EmphasisFilter.spv", 2, sizeof(EmphasisFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
@@ -62,7 +63,7 @@ EmphasisFilter::EmphasisFilter(const string& color)
 
 bool EmphasisFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -109,9 +110,10 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Qu
 	//Get the input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	size_t len = din->size();
-	if(len < 8)
+	const int64_t tap_count = 2;
+	if(len < tap_count)
 	{
-		AddErrorMessage("Input too short", "The input signal must be at least 8 samples long");
+		AddErrorMessage("Input too short", "The input signal must be at least two samples long");
 
 		SetData(nullptr, 0);
 		return;
@@ -120,11 +122,11 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Qu
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
-	const int64_t tap_count = 8;
 	int64_t tap_delay = round(FS_PER_SECOND / m_parameters[m_dataRateName].GetFloatVal());
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
-	cap->Resize(len - (tap_count * samples_per_tap));
+	int64_t outlen = len - (tap_count * samples_per_tap);
+	cap->Resize(outlen);
 
 	//Calculate the tap values
 	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008
@@ -145,8 +147,24 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Qu
 			taps[i] /= emphasisLevel;
 	}
 
-	//Run the actual filter
-	din->PrepareForCpuAccess();
-	TappedDelayLineFilter::DoFilterKernel(tap_delay, taps, din, cap);
-	cap->MarkModifiedFromCpu();
+	EmphasisFilterConstants cfg;
+	cfg.samples_per_tap = samples_per_tap;
+	cfg.size = outlen;
+	cfg.tap0 = taps[0];
+	cfg.tap1 = taps[1];
+
+	cmdBuf.begin({});
+
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+
+	const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	cap->m_samples.MarkModifiedFromGpu();
 }
