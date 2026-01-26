@@ -106,50 +106,61 @@ void DutyCycleMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	din->PrepareForCpuAccess();
 	if(din->size() < 2)
 	{
-		AddErrorMessage("Waveform too short", "Can't calculate the duty cycle of a waveform with less than two zero crossings");
+		AddErrorMessage("Waveform too short", "Can't calculate the duty cycle of a waveform with less than two samples");
 
 		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get timestamps of the edges
-	//TODO: gpu accelerate
-	vector<int64_t> edges;
-
 	bool initial_polarity = false;
 	if(sdin || udin)
 	{
 		//Find average voltage of the waveform and use that as the zero crossing
-		float midpoint = GetAvgVoltage(sdin, udin);
+		//TODO: rather than using average, have auto calculation to find base and top and use the midpoint of that
+		//Will give more accurate threshold for non 50% duty cycle inputs
+		float midpoint;
 		if(sdin)
-			FindZeroCrossings(sdin, midpoint, edges);
+			midpoint = m_averager.Average(sdin, cmdBuf, queue);
 		else
-			FindZeroCrossings(udin, midpoint, edges);
+			midpoint = m_averager.Average(udin, cmdBuf, queue);
+
+		//Find the edges
+		if(sdin)
+			m_levelCrossing.FindZeroCrossings(sdin, midpoint, cmdBuf, queue);
+		else
+			m_levelCrossing.FindZeroCrossings(udin, midpoint, cmdBuf, queue);
 
 		//Figure out edge polarity
+		//TODO: can we make this more efficient
 		initial_polarity = (GetValue(sdin, udin, 0) > midpoint);
 	}
 	else
 	{
 		if(sddin)
 		{
-			FindZeroCrossings(sddin, edges);
+			m_levelCrossing.FindZeroCrossings(sddin, cmdBuf, queue);
 			initial_polarity = sddin->m_samples[0];
 		}
 		else if(uddin)
 		{
-			FindZeroCrossings(uddin, edges);
+			m_levelCrossing.FindZeroCrossings(uddin, cmdBuf, queue);
 			initial_polarity = uddin->m_samples[0];
 		}
 		else
 		{
+			AddErrorMessage("Missing inputs", "Invalid or unrecognized waveform type");
 			SetData(nullptr, 0);
 			return;
 		}
 	}
 
+	auto& edges = m_levelCrossing.GetResults();
+	edges.PrepareForCpuAccess();
+
 	if(edges.size() < 2)
 	{
+		AddErrorMessage("Waveform too short", "Can't calculate the duty cycle of a waveform with less than two zero crossings");
 		SetData(nullptr, 0);
 		return;
 	}

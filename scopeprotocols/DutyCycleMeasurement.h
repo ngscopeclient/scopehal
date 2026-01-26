@@ -35,6 +35,9 @@
 #ifndef DutyCycleMeasurement_h
 #define DutyCycleMeasurement_h
 
+#include "../scopehal/Averager.h"
+#include "../scopehal/LevelCrossingDetector.h"
+
 class DutyCycleMeasurement : public Filter
 {
 public:
@@ -48,6 +51,10 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(DutyCycleMeasurement)
+
+protected:
+	Averager m_averager;
+	LevelCrossingDetector m_levelCrossing;
 };
 
 #endif

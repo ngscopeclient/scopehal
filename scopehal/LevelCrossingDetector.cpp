@@ -159,3 +159,41 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	m_outbuf.resize(len);
 	return len;
 }
+
+int64_t LevelCrossingDetector::FindZeroCrossings(
+	SparseAnalogWaveform* wfm,
+	float threshold,
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	//TODO: GPU version
+	vector<int64_t> edges;
+	Filter::FindZeroCrossings(wfm, threshold, edges);
+	m_outbuf.CopyFrom(edges);
+	return edges.size();
+}
+
+int64_t LevelCrossingDetector::FindZeroCrossings(
+	SparseDigitalWaveform* wfm,
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	//TODO: GPU version
+	vector<int64_t> edges;
+	Filter::FindZeroCrossings(wfm, edges);
+	m_outbuf.CopyFrom(edges);
+	return edges.size();
+}
+
+
+int64_t LevelCrossingDetector::FindZeroCrossings(
+	UniformDigitalWaveform* wfm,
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	//TODO: GPU version
+	vector<int64_t> edges;
+	Filter::FindZeroCrossings(wfm, edges);
+	m_outbuf.CopyFrom(edges);
+	return edges.size();
+}

@@ -71,6 +71,22 @@ public:
 		vk::raii::CommandBuffer& cmdBuf,
 		std::shared_ptr<QueueHandle> queue);
 
+	int64_t FindZeroCrossings(
+		SparseAnalogWaveform* wfm,
+		float threshold,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue);
+
+	int64_t FindZeroCrossings(
+		SparseDigitalWaveform* wfm,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue);
+
+	int64_t FindZeroCrossings(
+		UniformDigitalWaveform* wfm,
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue);
+
 	AcceleratorBuffer<int64_t>& GetResults()
 	{ return m_outbuf; }
 
