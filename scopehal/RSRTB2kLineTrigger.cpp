@@ -30,120 +30,59 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Trigger
-	@ingroup core
+	@brief Implementation of Line trigger
+	@ingroup triggers
  */
-#ifndef Trigger_h
-#define Trigger_h
 
-#include "FlowGraphNode.h"
+#include "scopehal.h"
+#include "RSRTB2kLineTrigger.h"
+
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
 /**
-	@brief Abstract base class for oscilloscope / logic analyzer trigger inputs
-	@ingroup core
+	@brief Initialize the trigger
+
+	@param scope	The scope this trigger will be used with
  */
-class Trigger : public FlowGraphNode
+RSRTB2kLineTrigger::RSRTB2kLineTrigger(Oscilloscope* scope)
+	: Trigger(scope)
+	, m_holdofftimestate(m_parameters["Hold Off"])
+	, m_holdofftime(m_parameters["Hold Off Time"])
 {
-public:
-	Trigger(Oscilloscope* scope);
-	virtual ~Trigger();
+	CreateInput("din");
 
-	///@brief Get the trigger level
-	float GetLevel()
-	{ return m_level.GetFloatVal(); }
+	//Trigger level
+	m_level.MarkHidden();
+	m_triggerLevel.MarkHidden();
+	m_upperLevel.MarkHidden();
 
-	float GetUpperLevel()
-	{ return m_level.GetFloatVal(); }
+	//Hold off time
+	m_holdofftimestate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_holdofftime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+}
 
-	/**
-		@brief Sets the trigger level
+RSRTB2kLineTrigger::~RSRTB2kLineTrigger()
+{
+}
 
-		@param level	Trigger level
-	 */
-	void SetLevel(float level)
-	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	void SetUpperLevel(float level)
-	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
+///@brief Returns the constant trigger name "Dropout"
+string RSRTB2kLineTrigger::GetTriggerName()
+{
+	return "Line";
+}
 
-	///@brief Gets the scope this trigger is attached to
-	Oscilloscope* GetScope()
-	{ return m_scope; }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input validation
 
-	///@brief Conditions for triggers that perform logical comparisons of values
-	enum Condition
-	{
-		///@brief Match when value is equal to target
-		CONDITION_EQUAL,
+bool RSRTB2kLineTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	return true;
+}
 
-		///@brief Match when value is not equal to target
-		CONDITION_NOT_EQUAL,
 
-		///@brief Match when value is less than target
-		CONDITION_LESS,
-
-		///@brief Match when value is less than or equal to target
-		CONDITION_LESS_OR_EQUAL,
-
-		///@brief Match when value is greater than target
-		CONDITION_GREATER,
-
-		///@brief Match when value is greater than or equal to target
-		CONDITION_GREATER_OR_EQUAL,
-
-		///@brief Match when value is greater than one target but less than another
-		CONDITION_BETWEEN,
-
-		///@brief Match when value is not between two targets
-		CONDITION_NOT_BETWEEN,
-
-		///@brief Always match
-		CONDITION_ANY
-	};
-
-protected:
-
-	///@brief The scope this trigger is part of
-	Oscilloscope* m_scope;
-
-	///@brief "Trigger level" parameter
-	FilterParameter& m_level;
-	FilterParameter& m_triggerLevel;
-	FilterParameter& m_upperLevel;
-
-public:
-	virtual std::string GetTriggerDisplayName() =0;
-
-	typedef Trigger* (*CreateProcType)(Oscilloscope*);
-	static void DoAddTriggerClass(std::string name, CreateProcType proc);
-
-	static void EnumTriggers(std::vector<std::string>& names);
-	static Trigger* CreateTrigger(std::string name, Oscilloscope* scope);
-
-	virtual YAML::Node SerializeConfiguration(IDTable& table) override;
-
-protected:
-	///@brief Helper typedef for m_createprocs
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-
-	///@brief Map of trigger type names to factory methods
-	static CreateMapType m_createprocs;
-};
-
-#define TRIGGER_INITPROC(T) \
-	static Trigger* CreateInstance(Oscilloscope* scope) \
-	{ return new T(scope); } \
-	virtual std::string GetTriggerDisplayName() override \
-	{ return GetTriggerName(); }
-
-#define AddTriggerClass(T) Trigger::DoAddTriggerClass(T::GetTriggerName(), T::CreateInstance)
-
-#endif

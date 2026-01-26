@@ -30,120 +30,44 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Trigger
-	@ingroup core
+	@brief Declaration of DropoutTrigger
+	@ingroup triggers
  */
-#ifndef Trigger_h
-#define Trigger_h
-
-#include "FlowGraphNode.h"
+#ifndef RSRTB2kLineTrigger_h
+#define RSRTB2kLineTrigger_h
 
 /**
-	@brief Abstract base class for oscilloscope / logic analyzer trigger inputs
-	@ingroup core
+	@brief trigger uses the waveform of the power supply's alternating line voltage
+	@ingroup triggers
  */
-class Trigger : public FlowGraphNode
+class RSRTB2kLineTrigger : public Trigger
 {
 public:
-	Trigger(Oscilloscope* scope);
-	virtual ~Trigger();
+	RSRTB2kLineTrigger(Oscilloscope* scope);
+	virtual ~RSRTB2kLineTrigger();
 
-	///@brief Get the trigger level
-	float GetLevel()
-	{ return m_level.GetFloatVal(); }
+	void SetHoldoffTimeState(bool state)
+	{ m_holdofftimestate.SetBoolVal(state); }
 
-	float GetUpperLevel()
-	{ return m_level.GetFloatVal(); }
+	bool GetHoldoffTimeState()
+	{ return m_holdofftimestate.GetBoolVal(); }
 
-	/**
-		@brief Sets the trigger level
+	void SetHoldoffTime(uint64_t bound)
+	{ m_holdofftime.SetIntVal(bound); }
 
-		@param level	Trigger level
-	 */
-	void SetLevel(float level)
-	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
+	uint64_t GetHoldoffTime()
+	{ return m_holdofftime.GetIntVal(); }
 
-	void SetUpperLevel(float level)
-	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
 
-	///@brief Gets the scope this trigger is attached to
-	Oscilloscope* GetScope()
-	{ return m_scope; }
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	///@brief Conditions for triggers that perform logical comparisons of values
-	enum Condition
-	{
-		///@brief Match when value is equal to target
-		CONDITION_EQUAL,
-
-		///@brief Match when value is not equal to target
-		CONDITION_NOT_EQUAL,
-
-		///@brief Match when value is less than target
-		CONDITION_LESS,
-
-		///@brief Match when value is less than or equal to target
-		CONDITION_LESS_OR_EQUAL,
-
-		///@brief Match when value is greater than target
-		CONDITION_GREATER,
-
-		///@brief Match when value is greater than or equal to target
-		CONDITION_GREATER_OR_EQUAL,
-
-		///@brief Match when value is greater than one target but less than another
-		CONDITION_BETWEEN,
-
-		///@brief Match when value is not between two targets
-		CONDITION_NOT_BETWEEN,
-
-		///@brief Always match
-		CONDITION_ANY
-	};
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(RSRTB2kLineTrigger);
 
 protected:
+	FilterParameter& m_holdofftimestate;
+	FilterParameter& m_holdofftime;
 
-	///@brief The scope this trigger is part of
-	Oscilloscope* m_scope;
-
-	///@brief "Trigger level" parameter
-	FilterParameter& m_level;
-	FilterParameter& m_triggerLevel;
-	FilterParameter& m_upperLevel;
-
-public:
-	virtual std::string GetTriggerDisplayName() =0;
-
-	typedef Trigger* (*CreateProcType)(Oscilloscope*);
-	static void DoAddTriggerClass(std::string name, CreateProcType proc);
-
-	static void EnumTriggers(std::vector<std::string>& names);
-	static Trigger* CreateTrigger(std::string name, Oscilloscope* scope);
-
-	virtual YAML::Node SerializeConfiguration(IDTable& table) override;
-
-protected:
-	///@brief Helper typedef for m_createprocs
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-
-	///@brief Map of trigger type names to factory methods
-	static CreateMapType m_createprocs;
 };
-
-#define TRIGGER_INITPROC(T) \
-	static Trigger* CreateInstance(Oscilloscope* scope) \
-	{ return new T(scope); } \
-	virtual std::string GetTriggerDisplayName() override \
-	{ return GetTriggerName(); }
-
-#define AddTriggerClass(T) Trigger::DoAddTriggerClass(T::GetTriggerName(), T::CreateInstance)
 
 #endif

@@ -30,120 +30,108 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Trigger
-	@ingroup core
+	@brief Implementation of VideoTrigger
+	@ingroup triggers
  */
-#ifndef Trigger_h
-#define Trigger_h
 
-#include "FlowGraphNode.h"
+#include "scopehal.h"
+#include "RSRTB2kVideoTrigger.h"
+
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
 /**
-	@brief Abstract base class for oscilloscope / logic analyzer trigger inputs
-	@ingroup core
+	@brief Initialize the trigger
+
+	@param scope	The scope this trigger will be used with
  */
-class Trigger : public FlowGraphNode
+RSRTB2kVideoTrigger::RSRTB2kVideoTrigger(Oscilloscope* scope)
+	: Trigger(scope)
+	, m_edgetype(m_parameters["Polarity"])
+	, m_standardtype(m_parameters["Standard"])
+	, m_modetype(m_parameters["Mode"])
+	, m_linenumber(m_parameters["Line"])
+	, m_holdofftimestate(m_parameters["Hold Off"])
+	, m_holdofftime(m_parameters["Hold Off Time"])
 {
-public:
-	Trigger(Oscilloscope* scope);
-	virtual ~Trigger();
+	CreateInput("din");
 
-	///@brief Get the trigger level
-	float GetLevel()
-	{ return m_level.GetFloatVal(); }
+	//Trigger level
+	m_level.MarkHidden();
+	m_triggerLevel.MarkHidden();
+	m_upperLevel.MarkHidden();
 
-	float GetUpperLevel()
-	{ return m_level.GetFloatVal(); }
+	//Polarity
+	m_edgetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_edgetype.AddEnumValue("Positive", EDGE_RISING);
+	m_edgetype.AddEnumValue("Negative", EDGE_FALLING);
 
-	/**
-		@brief Sets the trigger level
+	//Standard
+	m_standardtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_standardtype.AddEnumValue("PAL", STANDARD_PAL);
+	m_standardtype.AddEnumValue("NTSC", STANDARD_NTSC);
+	m_standardtype.AddEnumValue("SECAM", STANDARD_SEC);
+	m_standardtype.AddEnumValue("PAL-M", STANDARD_PALM);
+	m_standardtype.AddEnumValue("SDTV 576i", STANDARD_I576);
+	m_standardtype.AddEnumValue("HDTV 720p", STANDARD_P720);
+	m_standardtype.AddEnumValue("HDTV 1080p", STANDARD_P1080);
+	m_standardtype.AddEnumValue("HDTV 1080i", STANDARD_I1080);
 
-		@param level	Trigger level
-	 */
-	void SetLevel(float level)
+	//Mode
+	m_modetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_modetype.AddEnumValue("All Frames", MODE_ALL);
+	m_modetype.AddEnumValue("Odd Frames", MODE_ODD);
+	m_modetype.AddEnumValue("Even Frames", MODE_EVEN);
+	m_modetype.AddEnumValue("All Lines", MODE_ALIN);
+	m_modetype.AddEnumValue("Line Number", MODE_LINE);
+
+	//Line
+	m_linenumber = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+
+	//Hold off time
+	m_holdofftimestate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_holdofftime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+}
+
+RSRTB2kVideoTrigger::~RSRTB2kVideoTrigger()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+///@brief Returns the constant trigger name "Video"
+string RSRTB2kVideoTrigger::GetTriggerName()
+{
+	return "Video";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input validation
+
+bool RSRTB2kVideoTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	//We only can take one input
+	if(i > 0)
+		return false;
+
+	//There has to be a signal to trigger on
+	auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
+	if(!schan)
+		return false;
+
+	//It has to be from the same instrument we're trying to trigger on
+	if(schan->GetScope() != m_scope)
+		return false;
+
+	//It has to be analog or external trigger, digital inputs make no sense
+	if((stream.GetType() != Stream::STREAM_TYPE_ANALOG) &&
+		(stream.GetType() != Stream::STREAM_TYPE_TRIGGER))
 	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
+		return false;
 	}
 
-	void SetUpperLevel(float level)
-	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
-
-	///@brief Gets the scope this trigger is attached to
-	Oscilloscope* GetScope()
-	{ return m_scope; }
-
-	///@brief Conditions for triggers that perform logical comparisons of values
-	enum Condition
-	{
-		///@brief Match when value is equal to target
-		CONDITION_EQUAL,
-
-		///@brief Match when value is not equal to target
-		CONDITION_NOT_EQUAL,
-
-		///@brief Match when value is less than target
-		CONDITION_LESS,
-
-		///@brief Match when value is less than or equal to target
-		CONDITION_LESS_OR_EQUAL,
-
-		///@brief Match when value is greater than target
-		CONDITION_GREATER,
-
-		///@brief Match when value is greater than or equal to target
-		CONDITION_GREATER_OR_EQUAL,
-
-		///@brief Match when value is greater than one target but less than another
-		CONDITION_BETWEEN,
-
-		///@brief Match when value is not between two targets
-		CONDITION_NOT_BETWEEN,
-
-		///@brief Always match
-		CONDITION_ANY
-	};
-
-protected:
-
-	///@brief The scope this trigger is part of
-	Oscilloscope* m_scope;
-
-	///@brief "Trigger level" parameter
-	FilterParameter& m_level;
-	FilterParameter& m_triggerLevel;
-	FilterParameter& m_upperLevel;
-
-public:
-	virtual std::string GetTriggerDisplayName() =0;
-
-	typedef Trigger* (*CreateProcType)(Oscilloscope*);
-	static void DoAddTriggerClass(std::string name, CreateProcType proc);
-
-	static void EnumTriggers(std::vector<std::string>& names);
-	static Trigger* CreateTrigger(std::string name, Oscilloscope* scope);
-
-	virtual YAML::Node SerializeConfiguration(IDTable& table) override;
-
-protected:
-	///@brief Helper typedef for m_createprocs
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-
-	///@brief Map of trigger type names to factory methods
-	static CreateMapType m_createprocs;
-};
-
-#define TRIGGER_INITPROC(T) \
-	static Trigger* CreateInstance(Oscilloscope* scope) \
-	{ return new T(scope); } \
-	virtual std::string GetTriggerDisplayName() override \
-	{ return GetTriggerName(); }
-
-#define AddTriggerClass(T) Trigger::DoAddTriggerClass(T::GetTriggerName(), T::CreateInstance)
-
-#endif
+	return true;
+}

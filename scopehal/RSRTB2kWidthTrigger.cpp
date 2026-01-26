@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,100 +27,96 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Implementation of Trigger
-	@ingroup core
- */
-
 #include "scopehal.h"
+#include "RSRTB2kWidthTrigger.h"
 
 using namespace std;
-
-Trigger::CreateMapType Trigger::m_createprocs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-/**
-	@brief Initialize a new trigger
-
-	@param scope	The scope this trigger is attached to
- */
-Trigger::Trigger(Oscilloscope* scope)
-	: m_scope(scope)
-	, m_level(m_parameters["Lower Level"])
-	, m_triggerLevel(m_parameters["Level Trigger"])
-	, m_upperLevel(m_parameters["Level Upper"])
+RSRTB2kWidthTrigger::RSRTB2kWidthTrigger(Oscilloscope* scope)
+	: Trigger(scope)
+	, m_edgetype(m_parameters["Polarity"])
+	, m_conditiontype(m_parameters["Comparsion"])
+	, m_widthTime(m_parameters["Time"])
+	, m_widthVariation(m_parameters["Time Variation"])
+	, m_holdofftimestate(m_parameters["Hold Off"])
+	, m_holdofftime(m_parameters["Hold Off Time"])
+	, m_hysteresistype(m_parameters["Hysteresis"])
 {
-	m_level = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	CreateInput("din");
 
-	//Trigger and Upper Level are copies of Level and contain the same value.
-	//They differ only in name. They are used in the R&S RTB2k driver.
-	m_triggerLevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_triggerLevel.MarkHidden();
-	m_upperLevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	//Trigger level
+	m_level.MarkHidden();
+	m_triggerLevel.MarkHidden(false);
 	m_upperLevel.MarkHidden();
+
+	//Slope
+	m_edgetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_edgetype.AddEnumValue("Positive", EDGE_RISING);
+	m_edgetype.AddEnumValue("Negative", EDGE_FALLING);
+
+	//Time and Variation
+	m_widthTime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_widthVariation = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+
+	//Comparsion
+	m_conditiontype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_conditiontype.AddEnumValue("Less than", CONDITION_LESS);
+	m_conditiontype.AddEnumValue("Greater than", CONDITION_GREATER);
+	m_conditiontype.AddEnumValue("Equal", CONDITION_EQUAL);
+	m_conditiontype.AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
+	//The Inside/Outside parameters are not implemented in firmware v3.000.
+	//There is no response when queried.
+	//~ m_condition.AddEnumValue("Inside", CONDITION_INSIDE);
+	//~ m_condition.AddEnumValue("Outside", CONDITION_OUTSIDE);
+
+	//Polarity
+	m_edgetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_edgetype.AddEnumValue("Positive", EDGE_RISING);
+	m_edgetype.AddEnumValue("Negative", EDGE_FALLING);
+
+	//Hold off time
+	m_holdofftimestate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_holdofftime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+
+	//Hysteresis
+	m_hysteresistype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_hysteresistype.AddEnumValue("Small", HYSTERESIS_SMALL);
+	m_hysteresistype.AddEnumValue("Medium", HYSTERESIS_MEDIUM);
+	m_hysteresistype.AddEnumValue("Large", HYSTERESIS_LARGE);
 }
 
-Trigger::~Trigger()
+RSRTB2kWidthTrigger::~RSRTB2kWidthTrigger()
 {
-
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Enumeration
-
-/**
-	@brief Register a new trigger class for dynamic creation
-
-	Do not call this function directly, use the AddTriggerClass macro
-
-	@param name		Name of the trigger class
-	@param proc		Factory method
- */
-void Trigger::DoAddTriggerClass(string name, CreateProcType proc)
-{
-	m_createprocs[name] = proc;
-}
-
-/**
-	@brief Gets a list of all registered trigger types
-
-	@param[out] names	List of known triggers
- */
-void Trigger::EnumTriggers(vector<string>& names)
-{
-	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
-		names.push_back(it->first);
-}
-
-/**
-	@brief	Creates a new trigger for an oscilloscope
-
-	@param name		Name of the desired trigger
-	@param scope	The scope to create the trigger for
-
-	@return The newly created trigger, or nullptr on failure
- */
-Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
-{
-	if(m_createprocs.find(name) != m_createprocs.end())
-		return m_createprocs[name](scope);
-
-	LogError("Invalid trigger name: %s\n", name.c_str());
-	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Serialization
+// Accessors
 
-YAML::Node Trigger::SerializeConfiguration(IDTable& table)
+string RSRTB2kWidthTrigger::GetTriggerName()
 {
-	int id = table.emplace(this);
-	YAML::Node node = FlowGraphNode::SerializeConfiguration(table);
-	node["id"] = id;
-	node["type"] = GetTriggerDisplayName();
-	return node;
+	return "Width";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input validation
+
+bool RSRTB2kWidthTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	//We only can take one input
+	if(i > 0)
+		return false;
+
+	//There has to be a signal to trigger on
+	auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
+	if(!schan)
+		return false;
+
+	//It has to be from the same instrument we're trying to trigger on
+	if(schan->GetScope() != m_scope)
+		return false;
+
+	return true;
 }

@@ -30,120 +30,83 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Trigger
-	@ingroup core
+	@brief Declaration of EdgeTrigger
+	@ingroup triggers
  */
-#ifndef Trigger_h
-#define Trigger_h
-
-#include "FlowGraphNode.h"
+#ifndef RSRTB2kEdgeTrigger_h
+#define RSRTB2kEdgeTrigger_h
 
 /**
-	@brief Abstract base class for oscilloscope / logic analyzer trigger inputs
-	@ingroup core
+	@brief Simple edge trigger
+	@ingroup triggers
  */
-class Trigger : public FlowGraphNode
+class RSRTB2kEdgeTrigger : public Trigger
 {
 public:
-	Trigger(Oscilloscope* scope);
-	virtual ~Trigger();
+	RSRTB2kEdgeTrigger(Oscilloscope* scope);
+	virtual ~RSRTB2kEdgeTrigger();
 
-	///@brief Get the trigger level
-	float GetLevel()
-	{ return m_level.GetFloatVal(); }
-
-	float GetUpperLevel()
-	{ return m_level.GetFloatVal(); }
-
-	/**
-		@brief Sets the trigger level
-
-		@param level	Trigger level
-	 */
-	void SetLevel(float level)
+	enum EdgeType
 	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
-
-	void SetUpperLevel(float level)
-	{
-		m_level.SetFloatVal(level);
-		m_triggerLevel.SetFloatVal(level);
-		m_upperLevel.SetFloatVal(level);
-	}
-
-	///@brief Gets the scope this trigger is attached to
-	Oscilloscope* GetScope()
-	{ return m_scope; }
-
-	///@brief Conditions for triggers that perform logical comparisons of values
-	enum Condition
-	{
-		///@brief Match when value is equal to target
-		CONDITION_EQUAL,
-
-		///@brief Match when value is not equal to target
-		CONDITION_NOT_EQUAL,
-
-		///@brief Match when value is less than target
-		CONDITION_LESS,
-
-		///@brief Match when value is less than or equal to target
-		CONDITION_LESS_OR_EQUAL,
-
-		///@brief Match when value is greater than target
-		CONDITION_GREATER,
-
-		///@brief Match when value is greater than or equal to target
-		CONDITION_GREATER_OR_EQUAL,
-
-		///@brief Match when value is greater than one target but less than another
-		CONDITION_BETWEEN,
-
-		///@brief Match when value is not between two targets
-		CONDITION_NOT_BETWEEN,
-
-		///@brief Always match
-		CONDITION_ANY
+		EDGE_RISING,
+		EDGE_FALLING,
+		EDGE_ANY,
 	};
 
+	void SetType(EdgeType type)
+	{ m_edgetype.SetIntVal(type); }
+
+	EdgeType GetType()
+	{ return (EdgeType) m_edgetype.GetIntVal(); }
+
+	enum CouplingType
+	{
+		COUPLING_DC,
+		COUPLING_AC,
+		COUPLING_LFREJECT
+	};
+
+	void SetCouplingType(CouplingType type)
+	{ m_couplingtype.SetIntVal(type); }
+
+	CouplingType GetCouplingType()
+	{ return (CouplingType) m_couplingtype.GetIntVal(); }
+
+	void SetHfRejectState(bool state)
+	{ m_hfrejectstate.SetBoolVal(state); }
+	void SetNoiseRejectState(bool state)
+	{ m_noiserejectstate.SetBoolVal(state); }
+
+	bool GetHfRejectState()
+	{ return m_hfrejectstate.GetBoolVal(); }
+	bool GetNoiseRejectState()
+	{ return m_noiserejectstate.GetBoolVal(); }
+
+	void SetHoldoffTimeState(bool state)
+	{ m_holdofftimestate.SetBoolVal(state); }
+
+	bool GetHoldoffTimeState()
+	{ return m_holdofftimestate.GetBoolVal(); }
+
+	void SetHoldoffTime(uint64_t bound)
+	{ m_holdofftime.SetIntVal(bound); }
+
+	uint64_t GetHoldoffTime()
+	{ return m_holdofftime.GetIntVal(); }
+
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(RSRTB2kEdgeTrigger);
+
 protected:
-
-	///@brief The scope this trigger is part of
-	Oscilloscope* m_scope;
-
-	///@brief "Trigger level" parameter
-	FilterParameter& m_level;
-	FilterParameter& m_triggerLevel;
-	FilterParameter& m_upperLevel;
-
-public:
-	virtual std::string GetTriggerDisplayName() =0;
-
-	typedef Trigger* (*CreateProcType)(Oscilloscope*);
-	static void DoAddTriggerClass(std::string name, CreateProcType proc);
-
-	static void EnumTriggers(std::vector<std::string>& names);
-	static Trigger* CreateTrigger(std::string name, Oscilloscope* scope);
-
-	virtual YAML::Node SerializeConfiguration(IDTable& table) override;
-
-protected:
-	///@brief Helper typedef for m_createprocs
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-
-	///@brief Map of trigger type names to factory methods
-	static CreateMapType m_createprocs;
+	FilterParameter& m_edgetype;
+	FilterParameter& m_couplingtype;
+	FilterParameter& m_hfrejectstate;
+	FilterParameter& m_noiserejectstate;
+	FilterParameter& m_holdofftimestate;
+	FilterParameter& m_holdofftime;
 };
-
-#define TRIGGER_INITPROC(T) \
-	static Trigger* CreateInstance(Oscilloscope* scope) \
-	{ return new T(scope); } \
-	virtual std::string GetTriggerDisplayName() override \
-	{ return GetTriggerName(); }
-
-#define AddTriggerClass(T) Trigger::DoAddTriggerClass(T::GetTriggerName(), T::CreateInstance)
 
 #endif
