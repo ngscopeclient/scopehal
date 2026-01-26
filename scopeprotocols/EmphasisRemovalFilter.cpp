@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,23 +38,24 @@ using namespace std;
 
 EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
 	: Filter(color, CAT_ANALYSIS)
-	, m_dataRateName("Data Rate")
-	, m_emphasisTypeName("Emphasis Type")
-	, m_emphasisAmountName("Emphasis Amount")
+	, m_dataRate(m_parameters["Data Rate"])
+	, m_emphasisType(m_parameters["Emphasis Type"])
+	, m_emphasisAmount(m_parameters["Emphasis Amount"])
+	, m_computePipeline("shaders/EmphasisFilter.spv", 2, sizeof(EmphasisFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
-	m_parameters[m_dataRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_dataRateName].SetIntVal(5e9);
+	m_dataRate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_dataRate.SetIntVal(1250e6);
 
-	m_parameters[m_emphasisTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_emphasisTypeName].AddEnumValue("De-emphasis", DE_EMPHASIS);
-	m_parameters[m_emphasisTypeName].AddEnumValue("Pre-emphasis", PRE_EMPHASIS);
-	m_parameters[m_emphasisTypeName].SetIntVal(DE_EMPHASIS);
+	m_emphasisType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_emphasisType.AddEnumValue("De-emphasis", DE_EMPHASIS);
+	m_emphasisType.AddEnumValue("Pre-emphasis", PRE_EMPHASIS);
+	m_emphasisType.SetIntVal(DE_EMPHASIS);
 
-	m_parameters[m_emphasisAmountName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
-	m_parameters[m_emphasisAmountName].SetFloatVal(6);
+	m_emphasisAmount = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_emphasisAmount.SetFloatVal(6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +63,7 @@ EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
 
 bool EmphasisRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -79,44 +80,63 @@ string EmphasisRemovalFilter::GetProtocolName()
 	return "Emphasis Removal";
 }
 
+Filter::DataLocation EmphasisRemovalFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EmphasisRemovalFilter::Refresh()
+void EmphasisRemovalFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EmphasisFilter::Refresh");
+	#endif
+
+	ClearErrors();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get the input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	size_t len = din->size();
-	if(len < 8)
+	const int64_t tap_count = 2;
+	if(len < tap_count)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "The input signal must be at least two samples long");
+		SetData(nullptr, 0);
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
-	const int64_t tap_count = 8;
-	auto dataRate = m_parameters[m_dataRateName].GetFloatVal();
+	auto dataRate = m_dataRate.GetFloatVal();
 	if(dataRate < 1)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid data rate", "Attempted division by zero");
+		SetData(nullptr, 0);
 		return;
 	}
 	int64_t tap_delay = round(FS_PER_SECOND / dataRate);
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
-	cap->Resize(len - (tap_count * samples_per_tap));
+	int64_t outlen = len - (tap_count * samples_per_tap);
+	cap->Resize(outlen);
 
 	//Calculate the tap values
 	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008
-	float db = m_parameters[m_emphasisAmountName].GetFloatVal();
+	float db = m_emphasisAmount.GetFloatVal();
 	float emphasisLevel = pow(10, -db/20);
 	float coeff = 0.5 * emphasisLevel;
 	float c = coeff + 0.5;
@@ -129,13 +149,32 @@ void EmphasisRemovalFilter::Refresh()
 		taps[i] = -p_over_c * taps[i-1];
 
 	//If we're doing pre-emphasis rather than de-emphasis, we need to scale everything accordingly.
-	auto type = static_cast<EmphasisType>(m_parameters[m_emphasisTypeName].GetIntVal());
+	auto type = static_cast<EmphasisType>(m_emphasisType.GetIntVal());
 	if(type == PRE_EMPHASIS)
 	{
 		for(int64_t i=0; i<tap_count; i++)
 			taps[i] *= emphasisLevel;
 	}
 
-	//Run the actual filter
-	TappedDelayLineFilter::DoFilterKernel(tap_delay, taps, din, cap);
+	//Push constants
+	EmphasisFilterConstants cfg;
+	cfg.samples_per_tap = samples_per_tap;
+	cfg.size = outlen;
+	cfg.tap0 = taps[0];
+	cfg.tap1 = taps[1];
+
+	cmdBuf.begin({});
+
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+
+	const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	cap->m_samples.MarkModifiedFromGpu();
 }
