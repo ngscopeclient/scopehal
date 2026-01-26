@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,24 +38,24 @@ using namespace std;
 
 EmphasisFilter::EmphasisFilter(const string& color)
 	: Filter(color, CAT_ANALYSIS)
-	, m_dataRateName("Data Rate")
-	, m_emphasisTypeName("Emphasis Type")
-	, m_emphasisAmountName("Emphasis Amount")
+	, m_dataRate(m_parameters["Data Rate"])
+	, m_emphasisType(m_parameters["Emphasis Type"])
+	, m_emphasisAmount(m_parameters["Emphasis Amount"])
 	, m_computePipeline("shaders/EmphasisFilter.spv", 2, sizeof(EmphasisFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
-	m_parameters[m_dataRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_dataRateName].SetIntVal(1250e6);
+	m_dataRate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_dataRate.SetIntVal(1250e6);
 
-	m_parameters[m_emphasisTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_emphasisTypeName].AddEnumValue("De-emphasis", DE_EMPHASIS);
-	m_parameters[m_emphasisTypeName].AddEnumValue("Pre-emphasis", PRE_EMPHASIS);
-	m_parameters[m_emphasisTypeName].SetIntVal(DE_EMPHASIS);
+	m_emphasisType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_emphasisType.AddEnumValue("De-emphasis", DE_EMPHASIS);
+	m_emphasisType.AddEnumValue("Pre-emphasis", PRE_EMPHASIS);
+	m_emphasisType.SetIntVal(DE_EMPHASIS);
 
-	m_parameters[m_emphasisAmountName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
-	m_parameters[m_emphasisAmountName].SetFloatVal(6);
+	m_emphasisAmount = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_emphasisAmount.SetFloatVal(6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,7 +122,7 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Qu
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
-	int64_t tap_delay = round(FS_PER_SECOND / m_parameters[m_dataRateName].GetFloatVal());
+	int64_t tap_delay = round(FS_PER_SECOND / m_dataRate.GetFloatVal());
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
 	int64_t outlen = len - (tap_count * samples_per_tap);
@@ -130,7 +130,7 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Qu
 
 	//Calculate the tap values
 	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008
-	float db = m_parameters[m_emphasisAmountName].GetFloatVal();
+	float db = m_emphasisAmount.GetFloatVal();
 	float emphasisLevel = pow(10, -db/20);
 	float coeff = 0.5 * emphasisLevel;
 	float c = coeff + 0.5;
@@ -140,7 +140,7 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Qu
 	taps[1] = p;
 
 	//If we're doing pre-emphasis rather than de-emphasis, we need to scale everything accordingly.
-	auto type = static_cast<EmphasisType>(m_parameters[m_emphasisTypeName].GetIntVal());
+	auto type = static_cast<EmphasisType>(m_emphasisType.GetIntVal());
 	if(type == PRE_EMPHASIS)
 	{
 		for(int64_t i=0; i<tap_count; i++)

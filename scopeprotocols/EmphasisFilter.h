@@ -65,9 +65,9 @@ public:
 	};
 
 protected:
-	std::string m_dataRateName;
-	std::string m_emphasisTypeName;
-	std::string m_emphasisAmountName;
+	FilterParameter& m_dataRate;
+	FilterParameter& m_emphasisType;
+	FilterParameter& m_emphasisAmount;
 
 	ComputePipeline m_computePipeline;
 };
