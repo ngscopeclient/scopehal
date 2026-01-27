@@ -392,24 +392,27 @@ void ClockRecoveryFilter::Refresh(
 		cap->m_samples.resize(len);
 		cap->m_durations.resize(len);
 
-		cmdBuf.begin({});
+		if(len != 0)
+		{
+			cmdBuf.begin({});
 
-		uint32_t cfg = len;
+			uint32_t cfg = len;
 
-		m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(0, cap->m_offsets, cmdBuf);
-		m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(1, cap->m_durations, cmdBuf);
-		m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(2, cap->m_samples, cmdBuf);
+			m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(0, cap->m_offsets, cmdBuf);
+			m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(1, cap->m_durations, cmdBuf);
+			m_fillSquarewaveAndDurationsComputePipeline->BindBufferNonblocking(2, cap->m_samples, cmdBuf);
 
-		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-		m_fillSquarewaveAndDurationsComputePipeline->Dispatch(
-			cmdBuf,
-			cfg,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+			m_fillSquarewaveAndDurationsComputePipeline->Dispatch(
+				cmdBuf,
+				cfg,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
 
-		cmdBuf.end();
+			cmdBuf.end();
 
-		queue->SubmitAndBlock(cmdBuf);
+			queue->SubmitAndBlock(cmdBuf);
+		}
 		cap->MarkModifiedFromGpu();
 	}
 
