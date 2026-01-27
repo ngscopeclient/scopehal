@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -82,6 +82,9 @@ Trigger::~Trigger()
  */
 void Trigger::DoAddTriggerClass(string name, CreateProcType proc)
 {
+	if(m_createprocs.find(name) != m_createprocs.end())
+		LogFatal("Tried to create a second trigger type called \"%s\"\n", name.c_str());
+
 	m_createprocs[name] = proc;
 }
 

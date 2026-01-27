@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -314,14 +314,14 @@ void DriverStaticInit()
 	AddTriggerClass(SlewRateTrigger);
 	AddTriggerClass(UartTrigger);
 	AddTriggerClass(WindowTrigger);
-
+/*
 	AddTriggerClass(RSRTB2kEdgeTrigger);
 	AddTriggerClass(RSRTB2kLineTrigger);
 	AddTriggerClass(RSRTB2kRiseTimeTrigger);
 	AddTriggerClass(RSRTB2kRuntTrigger);
 	AddTriggerClass(RSRTB2kTimeoutTrigger);
 	AddTriggerClass(RSRTB2kVideoTrigger);
-	AddTriggerClass(RSRTB2kWidthTrigger);
+	AddTriggerClass(RSRTB2kWidthTrigger);*/
 }
 
 string GetDefaultChannelColor(int i)
