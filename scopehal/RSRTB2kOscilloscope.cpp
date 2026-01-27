@@ -380,14 +380,7 @@ void RSRTB2kOscilloscope::DetectOptions()
 	string options = converse("*OPT?");
 	if (options.find("B1") != string::npos)
 	{
-		string probe = converse(":LOG1:PROB?");
-		if (probe == "1")
-		{
-			m_hasLA = true;
-			m_digitalChannelCount = 8;
-		}
-		probe = converse(":LOG2:PROB?");
-		if (probe == "1")
+		if ((converse(":LOG1:PROB?") == "1") || (converse(":LOG2:PROB?") == "1"))
 		{
 			m_hasLA = true;
 			m_digitalChannelCount = 16;
@@ -3038,12 +3031,22 @@ vector<Oscilloscope::DigitalBank> RSRTB2kOscilloscope::GetDigitalBanks()
 
 	if(m_hasLA)
 	{
-		for(size_t n = 0; n < 2; n++)
+		if (converse(":LOG1:PROB?") == "1")
 		{
 			DigitalBank bank;
 
 			for(size_t i = 0; i < 8; i++)
-				bank.push_back(m_digitalChannels[i + n * 8]);
+				bank.push_back(m_digitalChannels[i]);
+
+			banks.push_back(bank);
+		}
+
+		if (converse(":LOG2:PROB?") == "1")
+		{
+			DigitalBank bank;
+
+			for(size_t i = 0; i < 8; i++)
+				bank.push_back(m_digitalChannels[i + 8]);
 
 			banks.push_back(bank);
 		}
