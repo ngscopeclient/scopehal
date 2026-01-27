@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,26 +59,43 @@ string Ethernet10GBaseRDecoder::GetProtocolName()
 
 bool Ethernet10GBaseRDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<Ethernet64b66bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<Ethernet64b66bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
 }
 
+Filter::DataLocation Ethernet10GBaseRDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void Ethernet10GBaseRDecoder::Refresh()
+void Ethernet10GBaseRDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	ClearPackets();
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("Ethernet10GBaseRDecoder::Refresh");
+	#endif
 
-	//Get the input data
+	//Make sure we've got valid inputs
+	ClearErrors();
+	ClearPackets();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -86,10 +103,7 @@ void Ethernet10GBaseRDecoder::Refresh()
 	data->PrepareForCpuAccess();
 
 	//Create the output capture
-	auto cap = new EthernetWaveform;
-	cap->m_timescale = data->m_timescale;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(data, 0);
 	cap->PrepareForCpuAccess();
 
 	size_t len = data->m_samples.size();
@@ -370,6 +384,5 @@ void Ethernet10GBaseRDecoder::Refresh()
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
