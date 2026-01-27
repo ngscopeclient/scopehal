@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,12 +64,21 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 		m_edgeCount.resize(1);
 
 		m_thresholds.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+		m_levels.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 		m_firstPassComputePipeline =
 			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_LevelCrossings.spv", 5, sizeof(PAMEdgeDetectorConstants));
 
 		m_secondPassComputePipeline =
 			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_MergeCrossings.spv", 7, sizeof(PAMEdgeDetectorConstants));
+
+		if(g_hasShaderInt64)
+		{
+			m_initialMergeComputePipeline =
+				make_shared<ComputePipeline>("shaders/PAMEdgeDetector_InitialMerge.spv", 6, sizeof(PAMEdgeDetectorMergeConstants));
+
+			m_edgeOffsetsScratch.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		}
 	}
 }
 
@@ -132,24 +141,28 @@ void PAMEdgeDetectorFilter::Refresh(
 		SetData(nullptr, 0);
 		return;
 	}
-	din->PrepareForCpuAccess();
 	auto len = din->size();
 
 	int64_t ui = round(FS_PER_SECOND / m_baud.GetIntVal());
 	size_t order = m_order.GetIntVal();
 
 	//Extract parameter values for input thresholds
-	vector<float> levels;
+	m_levels.resize(0);
+	m_levels.PrepareForCpuAccess();
 	for(size_t i=0; i<order; i++)
 	{
 		//If no threshold available, autofit
 		auto pname = string("Level ") + to_string(i);
 		if(m_parameters.find(pname) == m_parameters.end())
+		{
+			din->PrepareForCpuAccess();
 			AutoLevel(din);
+		}
 
 		//Extract the level
-		levels.push_back(m_parameters[pname].GetFloatVal());
+		m_levels.push_back(m_parameters[pname].GetFloatVal());
 	}
+	m_levels.MarkModifiedFromCpu();
 
 	//Decision thresholds for initial symbol assignment
 	//This is fast so no need to cache
@@ -157,20 +170,14 @@ void PAMEdgeDetectorFilter::Refresh(
 	sthresholds.resize(order-1);
 	for(size_t i=0; i<order-1; i++)
 	{
-		float from = levels[i];
-		float to = levels[i+1];
+		float from = m_levels[i];
+		float to = m_levels[i+1];
 		sthresholds[i] = (from + to) / 2;
 	}
 
 	//Output waveform is sparse since we interpolate edge positions
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
-	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
-
-	//Add initial dummy sample at time zero
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(1);
-	cap->m_samples.push_back(0);
 
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
@@ -238,10 +245,13 @@ void PAMEdgeDetectorFilter::Refresh(
 
 		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
 
-		//Until we get the rest of the stuff processed on GPU - pull these  too
-		m_edgeIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
-		m_edgeStates.PrepareForCpuAccessNonblocking(cmdBuf);
-		m_edgeRising.PrepareForCpuAccessNonblocking(cmdBuf);
+		//Pull buffers onto the CPU if we can't do the next step on GPU
+		if(!g_hasShaderInt64)
+		{
+			m_edgeIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_edgeStates.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_edgeRising.PrepareForCpuAccessNonblocking(cmdBuf);
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
@@ -306,96 +316,168 @@ void PAMEdgeDetectorFilter::Refresh(
 
 	LogTrace("First pass: Found %zu level crossings\n", m_edgeIndexes.size());
 
-	m_edgeIndexes.PrepareForCpuAccess();
-	m_edgeStates.PrepareForCpuAccess();
-	m_edgeRising.PrepareForCpuAccess();
-
-	//Loop over level crossings and figure out what they are
-	int64_t halfui = ui / 2;
-	bool nextValue = true;
-	for(size_t i=0; i<m_edgeIndexes.size(); i++)
+	//GPU merge
+	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
-		size_t istart = m_edgeIndexes[i] - 1;
-		size_t iend = m_edgeIndexes[i] + 1;
-		size_t symstart;
-		size_t symend = m_edgeStates[i];
+		cmdBuf.begin({});
 
-		//If our first sample occurs too early in the waveform, we can't interpolate. Skip it.
-		if(istart == 0)
-			continue;
+		uint64_t numThreads = 4096;
+		const uint64_t blockSize = 64;
+		const uint64_t numBlocks = numThreads / blockSize;
 
-		if(m_edgeRising[i])
-			symstart = symend - 1;
-		else
-			symstart = symend + 1;
+		//Push constants
+		PAMEdgeDetectorMergeConstants cfg;
+		cfg.halfui = ui / 2;
+		cfg.timescale = din->m_timescale;
+		cfg.numIndexes = m_edgeIndexes.size();
+		cfg.inputPerThread = GetComputeBlockCount(cfg.numIndexes, numThreads);
+		cfg.outputPerThread = cfg.inputPerThread + 1;
+		cfg.order = order;
 
-		//If the previous edge is close to this one (< 0.5 UI)
-		//and they're both rising or falling, merge them
-		bool merging = false;
-		for(size_t lookback = 1; lookback < order-1; lookback ++)
+		m_edgeOffsetsScratch.resize(cfg.outputPerThread * numThreads);
+
+		//Run the first pass
+		m_initialMergeComputePipeline->BindBufferNonblocking(0, m_edgeIndexes, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(1, m_edgeStates, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(2, m_edgeRising, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(5, m_edgeOffsetsScratch, cmdBuf);
+		m_initialMergeComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_edgeOffsetsScratch.MarkModifiedFromGpu();
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//DEBUG
+		m_edgeOffsetsScratch.PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
+		cap->Resize(0);
+		bool nextValue = true;
+		for(uint32_t iblock = 0; iblock < numThreads; iblock ++)
 		{
-			if(i <= lookback)
-				break;
+			uint32_t ibase = iblock * cfg.outputPerThread;
+			uint32_t nsamples = m_edgeOffsetsScratch[ibase];
 
-			int64_t delta = (m_edgeIndexes[i] - m_edgeIndexes[i-lookback]) * din->m_timescale;
-			if( (m_edgeRising[i-lookback] == m_edgeRising[i]) && (delta < halfui) )
+			for(uint32_t i=0; i<nsamples; i++)
 			{
-				merging = true;
-				istart = m_edgeIndexes[i-lookback]-1;
+				//Add the samples
+				int64_t tedge = m_edgeOffsetsScratch[ibase + i + 1];
 
-				if(m_edgeRising[i])
-					symstart = symend - (lookback+1);
-				else
-					symstart = symend + (lookback+1);
-			}
-			else
-				break;
-		}
+				//Update previous duration
+				auto clen = cap->m_samples.size();
+				if(clen)
+					cap->m_durations[clen-1] = tedge - cap->m_offsets[clen-1];
 
-		//Find the midpoint (for now, fixed threshold still)
-		float target = (levels[symstart] + levels[symend]) / 2;
-		int64_t tlerp = 0;
-		for(size_t j=istart; j<iend; j++)
-		{
-			float prev = din->m_samples[j-1];
-			float cur = din->m_samples[j];
-
-			if(	( (prev <= target) && (cur > target) ) ||
-				( (prev >= target) && (cur < target) ) )
-			{
-				tlerp = j*din->m_timescale + InterpolateTime(din, j, target)*din->m_timescale;
-				break;
+				//Add the new sample
+				cap->m_offsets.push_back(tedge);
+				cap->m_durations.push_back(1);
+				cap->m_samples.push_back(nextValue);
+				nextValue = !nextValue;
 			}
 		}
-
-		//Add the symbol
-		if(!merging)
-		{
-			cap->m_offsets.push_back(tlerp);
-			cap->m_durations.push_back(1);
-			cap->m_samples.push_back(nextValue);
-
-			//Extend previous sample, if any
-			size_t outlen = cap->m_offsets.size();
-			if(outlen)
-				cap->m_durations[outlen-1] = tlerp - cap->m_offsets[outlen-1];
-
-			nextValue = !nextValue;
-		}
-
-		//Overwrite previous sample
-		else
-		{
-			size_t outlen = cap->m_offsets.size();
-			cap->m_offsets[outlen-1] = tlerp;
-
-			//Update duration of previous sample
-			if(outlen > 1)
-				cap->m_durations[outlen-2] = tlerp - cap->m_offsets[outlen-2];
-		}
+		cap->MarkModifiedFromCpu();
 	}
 
-	cap->MarkModifiedFromCpu();
+	else
+	{
+		din->PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
+
+		//Add initial dummy sample at time zero
+		cap->m_offsets.push_back(0);
+		cap->m_durations.push_back(1);
+		cap->m_samples.push_back(0);
+
+		//Loop over level crossings and figure out what they are
+		int64_t halfui = ui / 2;
+		bool nextValue = true;
+		for(size_t i=0; i<m_edgeIndexes.size(); i++)
+		{
+			size_t istart = m_edgeIndexes[i] - 1;
+			size_t iend = m_edgeIndexes[i] + 1;
+			size_t symstart;
+			size_t symend = m_edgeStates[i];
+
+			//If our first sample occurs too early in the waveform, we can't interpolate. Skip it.
+			if(istart == 0)
+				continue;
+
+			if(m_edgeRising[i])
+				symstart = symend - 1;
+			else
+				symstart = symend + 1;
+
+			//If the previous edge is close to this one (< 0.5 UI)
+			//and they're both rising or falling, merge them
+			bool merging = false;
+			for(size_t lookback = 1; lookback < order-1; lookback ++)
+			{
+				if(i <= lookback)
+					break;
+
+				int64_t delta = (m_edgeIndexes[i] - m_edgeIndexes[i-lookback]) * din->m_timescale;
+				if( (m_edgeRising[i-lookback] == m_edgeRising[i]) && (delta < halfui) )
+				{
+					merging = true;
+					istart = m_edgeIndexes[i-lookback]-1;
+
+					if(m_edgeRising[i])
+						symstart = symend - (lookback+1);
+					else
+						symstart = symend + (lookback+1);
+				}
+				else
+					break;
+			}
+
+			//Find the midpoint (for now, fixed threshold still)
+			float target = (m_levels[symstart] + m_levels[symend]) / 2;
+			int64_t tlerp = 0;
+			for(size_t j=istart; j<iend; j++)
+			{
+				float prev = din->m_samples[j-1];
+				float cur = din->m_samples[j];
+
+				if(	( (prev <= target) && (cur > target) ) ||
+					( (prev >= target) && (cur < target) ) )
+				{
+					tlerp = j*din->m_timescale + InterpolateTime(din, j, target)*din->m_timescale;
+					break;
+				}
+			}
+
+			//Add the symbol
+			if(!merging)
+			{
+				cap->m_offsets.push_back(tlerp);
+				cap->m_durations.push_back(1);
+				cap->m_samples.push_back(nextValue);
+
+				//Extend previous sample, if any
+				size_t outlen = cap->m_offsets.size();
+				if(outlen)
+					cap->m_durations[outlen-1] = tlerp - cap->m_offsets[outlen-1];
+
+				nextValue = !nextValue;
+			}
+
+			//Overwrite previous sample
+			else
+			{
+				size_t outlen = cap->m_offsets.size();
+				cap->m_offsets[outlen-1] = tlerp;
+
+				//Update duration of previous sample
+				if(outlen > 1)
+					cap->m_durations[outlen-2] = tlerp - cap->m_offsets[outlen-2];
+			}
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
 }
 
 vector<string> PAMEdgeDetectorFilter::EnumActions()
