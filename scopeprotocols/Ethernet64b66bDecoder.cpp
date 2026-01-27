@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,7 +56,7 @@ Ethernet64b66bDecoder::Ethernet64b66bDecoder(const string& color)
 
 bool Ethernet64b66bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -73,12 +73,33 @@ string Ethernet64b66bDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void Ethernet64b66bDecoder::Refresh()
+Filter::DataLocation Ethernet64b66bDecoder::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void Ethernet64b66bDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("Ethernet64b66bDecoder::Refresh");
+	#endif
+
 	//Get the input data
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 	auto din = GetInputWaveform(0);
@@ -87,10 +108,9 @@ void Ethernet64b66bDecoder::Refresh()
 	clkin->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new Ethernet64b66bWaveform;
+	auto cap = SetupEmptyWaveform<Ethernet64b66bWaveform>(din, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
 	//Record the value of the data stream at each clock edge
@@ -116,7 +136,6 @@ void Ethernet64b66bDecoder::Refresh()
 			best_errors = errors;
 		}
 	}
-
 
 	//Decode the actual data
 	bool first		= true;
@@ -178,11 +197,10 @@ void Ethernet64b66bDecoder::Refresh()
 		}
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
-std::string Ethernet64b66bWaveform::GetColor(size_t i)
+string Ethernet64b66bWaveform::GetColor(size_t i)
 {
 	const Ethernet64b66bSymbol& s = m_samples[i];
 
@@ -207,4 +225,3 @@ string Ethernet64b66bWaveform::GetText(size_t i)
 	snprintf(tmp, sizeof(tmp), "%016" PRIx64, s.m_data);
 	return string(tmp);
 }
-
