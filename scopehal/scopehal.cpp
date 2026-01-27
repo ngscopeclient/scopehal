@@ -109,7 +109,6 @@
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
 
-#include "RSRTB2kEdgeTrigger.h"
 #include "RSRTB2kLineTrigger.h"
 #include "RSRTB2kRiseTimeTrigger.h"
 #include "RSRTB2kRuntTrigger.h"
@@ -315,7 +314,6 @@ void DriverStaticInit()
 	AddTriggerClass(UartTrigger);
 	AddTriggerClass(WindowTrigger);
 /*
-	AddTriggerClass(RSRTB2kEdgeTrigger);
 	AddTriggerClass(RSRTB2kLineTrigger);
 	AddTriggerClass(RSRTB2kRiseTimeTrigger);
 	AddTriggerClass(RSRTB2kRuntTrigger);

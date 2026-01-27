@@ -107,7 +107,6 @@ set(SCOPEHAL_SOURCES
 	UartTrigger.cpp
 	WindowTrigger.cpp
 
-	RSRTB2kEdgeTrigger.cpp
 	RSRTB2kLineTrigger.cpp
 	RSRTB2kRiseTimeTrigger.cpp
 	RSRTB2kRuntTrigger.cpp

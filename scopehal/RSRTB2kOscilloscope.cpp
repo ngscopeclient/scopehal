@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,6 @@
 #include "scopehal.h"
 #include "RSRTB2kOscilloscope.h"
 
-#include "RSRTB2kEdgeTrigger.h"
 #include "RSRTB2kLineTrigger.h"
 #include "RSRTB2kRiseTimeTrigger.h"
 #include "RSRTB2kRuntTrigger.h"
@@ -1063,7 +1062,7 @@ void RSRTB2kOscilloscope::GetTriggerHysteresis(Trigger* trig, string reply)
 void RSRTB2kOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 {
 	//LogTrace("\n");
-	auto et = dynamic_cast<RSRTB2kEdgeTrigger*>(trig);
+	auto et = dynamic_cast<EdgeTrigger*>(trig);
 	auto st = dynamic_cast<RSRTB2kRiseTimeTrigger*>(trig);
 	auto rt = dynamic_cast<RSRTB2kRuntTrigger*>(trig);
 	auto tt = dynamic_cast<RSRTB2kTimeoutTrigger*>(trig);
@@ -1073,7 +1072,7 @@ void RSRTB2kOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 
 	if(reply == "POS")
 	{
-		if(et) et->SetType(RSRTB2kEdgeTrigger::EDGE_RISING);
+		if(et) et->SetType(EdgeTrigger::EDGE_RISING);
 		if(st) st->SetType(RSRTB2kRiseTimeTrigger::EDGE_RISING);
 		if(rt) rt->SetType(RSRTB2kRuntTrigger::EDGE_RISING);
 		if(tt) tt->SetType(RSRTB2kTimeoutTrigger::EDGE_RISING);
@@ -1082,7 +1081,7 @@ void RSRTB2kOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 	}
 	else if(reply == "NEG")
 	{
-		if(et) et->SetType(RSRTB2kEdgeTrigger::EDGE_FALLING);
+		if(et) et->SetType(EdgeTrigger::EDGE_FALLING);
 		if(st) st->SetType(RSRTB2kRiseTimeTrigger::EDGE_FALLING);
 		if(rt) rt->SetType(RSRTB2kRuntTrigger::EDGE_FALLING);
 		if(tt) tt->SetType(RSRTB2kTimeoutTrigger::EDGE_FALLING);
@@ -1091,7 +1090,7 @@ void RSRTB2kOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 	}
 	else if(reply == "EITH")
 	{
-		if(et) et->SetType(RSRTB2kEdgeTrigger::EDGE_ANY);
+		if(et) et->SetType(EdgeTrigger::EDGE_ANY);
 		if(st) st->SetType(RSRTB2kRiseTimeTrigger::EDGE_ANY);
 		if(rt) rt->SetType(RSRTB2kRuntTrigger::EDGE_ANY);
 		//~ if(tt) tt->SetType(RSRTB2kTimeoutTrigger::EDGE_ANY);
@@ -1108,21 +1107,21 @@ void RSRTB2kOscilloscope::GetTriggerSlope(Trigger* trig, string reply)
 void RSRTB2kOscilloscope::GetTriggerCoupling(Trigger* trig, string reply)
 {
 	//LogTrace("\n");
-	auto et = dynamic_cast<RSRTB2kEdgeTrigger*>(trig);
+	auto et = dynamic_cast<EdgeTrigger*>(trig);
 	reply = Trim(reply);
 
 
 	if(reply == "AC")
 	{
-		if(et) et->SetCouplingType(RSRTB2kEdgeTrigger::COUPLING_AC);
+		if(et) et->SetCouplingType(EdgeTrigger::COUPLING_AC);
 	}
 	else if(reply == "DC")
 	{
-		if(et) et->SetCouplingType(RSRTB2kEdgeTrigger::COUPLING_DC);
+		if(et) et->SetCouplingType(EdgeTrigger::COUPLING_DC);
 	}
 	else if(reply == "LFR")
 	{
-		if(et) et->SetCouplingType(RSRTB2kEdgeTrigger::COUPLING_LFREJECT);
+		if(et) et->SetCouplingType(EdgeTrigger::COUPLING_LFREJECT);
 	}
 	else
 		protocolError("RTB2k: Unknown trigger coupling %s\n", reply.c_str());
@@ -1331,7 +1330,7 @@ vector<string> RSRTB2kOscilloscope::GetTriggerTypes()
 {
 	//LogTrace("\n");
 	vector<string> ret;
-	ret.push_back(RSRTB2kEdgeTrigger::GetTriggerName());
+	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(RSRTB2kLineTrigger::GetTriggerName());
 	ret.push_back(RSRTB2kRiseTimeTrigger::GetTriggerName());
 	ret.push_back(RSRTB2kRuntTrigger::GetTriggerName());
@@ -1422,7 +1421,7 @@ void RSRTB2kOscilloscope::PullTriggerSource(Trigger* trig, string /* triggerMode
 void RSRTB2kOscilloscope::PushTrigger()
 {
 	//LogTrace("\n");
-	auto et = dynamic_cast<RSRTB2kEdgeTrigger*>(m_trigger);
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto lt = dynamic_cast<RSRTB2kLineTrigger*>(m_trigger);
 	auto st = dynamic_cast<RSRTB2kRiseTimeTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RSRTB2kRuntTrigger*>(m_trigger);
@@ -1485,7 +1484,7 @@ void RSRTB2kOscilloscope::PullEdgeTrigger()
 	double f;
 
 	//Clear out any triggers of the wrong type
-	if((m_trigger != NULL) && (dynamic_cast<RSRTB2kEdgeTrigger*>(m_trigger) != NULL))
+	if((m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL))
 	{
 		delete m_trigger;
 		m_trigger = NULL;
@@ -1493,8 +1492,8 @@ void RSRTB2kOscilloscope::PullEdgeTrigger()
 
 	//Create a new trigger if necessary
 	if(m_trigger == NULL)
-		m_trigger = new RSRTB2kEdgeTrigger(this);
-	RSRTB2kEdgeTrigger* et = dynamic_cast<RSRTB2kEdgeTrigger*>(m_trigger);
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	// Check for digital source
 	// Level only for analog source
@@ -1519,20 +1518,20 @@ void RSRTB2kOscilloscope::PullEdgeTrigger()
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void RSRTB2kOscilloscope::PushEdgeTrigger(RSRTB2kEdgeTrigger* trig, const std::string /* trigType */)
+void RSRTB2kOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string /* trigType */)
 {
 	//LogTrace("\n");
 	switch(trig->GetType())
 	{
-		case RSRTB2kEdgeTrigger::EDGE_RISING:
+		case EdgeTrigger::EDGE_RISING:
 			sendOnly(":TRIG:A:EDGE:SLOP POS");
 			break;
 
-		case RSRTB2kEdgeTrigger::EDGE_FALLING:
+		case EdgeTrigger::EDGE_FALLING:
 			sendOnly(":TRIG:A:EDGE:SLOP NEG");
 			break;
 
-		case RSRTB2kEdgeTrigger::EDGE_ANY:
+		case EdgeTrigger::EDGE_ANY:
 			sendOnly(":TRIG:A:EDGE:SLOP EITH");
 			break;
 
@@ -1543,14 +1542,14 @@ void RSRTB2kOscilloscope::PushEdgeTrigger(RSRTB2kEdgeTrigger* trig, const std::s
 
 	switch(trig->GetCouplingType())
 	{
-		case RSRTB2kEdgeTrigger::COUPLING_AC:
+		case EdgeTrigger::COUPLING_AC:
 			sendOnly(":TRIG:A:EDGE:COUP AC");
 			break;
 
-		case RSRTB2kEdgeTrigger::COUPLING_DC:
+		case EdgeTrigger::COUPLING_DC:
 			sendOnly(":TRIG:A:EDGE:COUP DC");
 			break;
-		case RSRTB2kEdgeTrigger::COUPLING_LFREJECT:
+		case EdgeTrigger::COUPLING_LFREJECT:
 			sendOnly(":TRIG:A:EDGE:COUP LFR");
 			break;
 

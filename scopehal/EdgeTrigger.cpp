@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,6 +37,7 @@
 #include "scopehal.h"
 #include "EdgeTrigger.h"
 #include "AgilentOscilloscope.h"
+#include "RSRTB2kOscilloscope.h"
 
 using namespace std;
 
@@ -51,6 +52,11 @@ using namespace std;
 EdgeTrigger::EdgeTrigger(Oscilloscope* scope)
 	: Trigger(scope)
 	, m_edgetype(m_parameters["Edge"])
+	, m_couplingtype(m_parameters["Coupling"])
+	, m_hfrejectstate(m_parameters["Reject HF"])
+	, m_noiserejectstate(m_parameters["Reject Noise"])
+	, m_holdofftimestate(m_parameters["Hold Off"])
+	, m_holdofftime(m_parameters["Hold Off Time"])
 {
 	CreateInput("din");
 
@@ -60,8 +66,47 @@ EdgeTrigger::EdgeTrigger(Oscilloscope* scope)
 	m_edgetype.AddEnumValue("Any", EDGE_ANY);
 
 	//Only Agilent scopes are known to support this
-	if(dynamic_cast<AgilentOscilloscope*>(scope) != NULL)
+	if(dynamic_cast<AgilentOscilloscope*>(scope) != nullptr)
 		m_edgetype.AddEnumValue("Alternating", EDGE_ALTERNATING);
+
+	//RTB2000 has a bunch of extra stuff
+	if(dynamic_cast<RSRTB2kOscilloscope*>(scope) != nullptr)
+	{
+		//Trigger level
+		m_level.MarkHidden();
+		m_triggerLevel.MarkHidden(false);
+		m_upperLevel.MarkHidden();
+
+		//Slope
+		m_edgetype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_edgetype.AddEnumValue("Rising", EDGE_RISING);
+		m_edgetype.AddEnumValue("Falling", EDGE_FALLING);
+		m_edgetype.AddEnumValue("Any", EDGE_ANY);
+
+		//Trigger coupling
+		m_couplingtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_couplingtype.AddEnumValue("DC", COUPLING_DC);
+		m_couplingtype.AddEnumValue("AC", COUPLING_AC);
+		m_couplingtype.AddEnumValue("LF Reject", COUPLING_LFREJECT);
+
+		//HF and noise reject
+		m_hfrejectstate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+		m_noiserejectstate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+
+		//Hold off time
+		m_holdofftimestate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+		m_holdofftime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	}
+
+	//Hide RTB specific stuff
+	else
+	{
+		m_couplingtype.MarkHidden();
+		m_hfrejectstate.MarkHidden();
+		m_noiserejectstate.MarkHidden();
+		m_holdofftimestate.MarkHidden();
+		m_holdofftime.MarkHidden();
+	}
 }
 
 EdgeTrigger::~EdgeTrigger()

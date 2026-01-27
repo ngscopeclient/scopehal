@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -83,10 +83,57 @@ public:
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(EdgeTrigger);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// All of these are RTB2000 specific for now
+
+	enum CouplingType
+	{
+		COUPLING_DC,
+		COUPLING_AC,
+		COUPLING_LFREJECT
+	};
+
+	void SetCouplingType(CouplingType type)
+	{ m_couplingtype.SetIntVal(type); }
+
+	CouplingType GetCouplingType()
+	{ return (CouplingType) m_couplingtype.GetIntVal(); }
+
+	void SetHfRejectState(bool state)
+	{ m_hfrejectstate.SetBoolVal(state); }
+	void SetNoiseRejectState(bool state)
+	{ m_noiserejectstate.SetBoolVal(state); }
+
+	bool GetHfRejectState()
+	{ return m_hfrejectstate.GetBoolVal(); }
+	bool GetNoiseRejectState()
+	{ return m_noiserejectstate.GetBoolVal(); }
+
+	void SetHoldoffTimeState(bool state)
+	{ m_holdofftimestate.SetBoolVal(state); }
+
+	bool GetHoldoffTimeState()
+	{ return m_holdofftimestate.GetBoolVal(); }
+
+	void SetHoldoffTime(uint64_t bound)
+	{ m_holdofftime.SetIntVal(bound); }
+
+	uint64_t GetHoldoffTime()
+	{ return m_holdofftime.GetIntVal(); }
+
 protected:
 
 	///@brief Type of edge to trigger on
 	FilterParameter& m_edgetype;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// All of these are RTB2000 specific for now
+
+	FilterParameter& m_couplingtype;
+	FilterParameter& m_hfrejectstate;
+	FilterParameter& m_noiserejectstate;
+	FilterParameter& m_holdofftimestate;
+	FilterParameter& m_holdofftime;
 };
 
 #endif

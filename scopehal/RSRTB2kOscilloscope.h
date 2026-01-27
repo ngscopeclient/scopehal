@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,7 +35,8 @@
 
  */
 
-class RSRTB2kEdgeTrigger;
+#include "EdgeTrigger.h"
+
 class RSRTB2kLineTrigger;
 class RSRTB2kRiseTimeTrigger;
 class RSRTB2kRuntTrigger;
@@ -232,7 +233,7 @@ protected:
 
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);
-	void PushEdgeTrigger(RSRTB2kEdgeTrigger* trig, const std::string trigType);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
 	void PushLineTrigger(RSRTB2kLineTrigger* trig);
 	void PushRiseTimeTrigger(RSRTB2kRiseTimeTrigger* trig);
 	void PushRuntTrigger(RSRTB2kRuntTrigger* trig);
