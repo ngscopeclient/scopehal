@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,7 +49,7 @@ EnvelopeFilter::EnvelopeFilter(const string& color)
 
 bool EnvelopeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -72,14 +72,30 @@ void EnvelopeFilter::ClearSweeps()
 	SetData(nullptr, 1);
 }
 
+Filter::DataLocation EnvelopeFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EnvelopeFilter::Refresh()
+void EnvelopeFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EnvelopeFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		ClearSweeps();
 		return;
 	}
@@ -96,6 +112,7 @@ void EnvelopeFilter::Refresh()
 	{
 		//TODO: handle sparse path iff points are the same (or nearly same) timestamps
 		ClearSweeps();
+		AddErrorMessage("Invalid input type", "Sparse waveforms not currently supported");
 		return;
 	}
 
