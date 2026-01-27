@@ -37,6 +37,7 @@ using namespace std;
 
 EnvelopeFilter::EnvelopeFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_computePipeline("shaders/EnvelopeFilter.spv", 3, sizeof(EnvelopeFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "min", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "max", Stream::STREAM_TYPE_ANALOG);
@@ -157,25 +158,27 @@ void EnvelopeFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		umax->Resize(len);
 		umin->Resize(len);
 
-		//Process overlap of old and new waveforms
-		size_t i = 0;
-		double delta = 1.0f * (umin->m_triggerPhase - udata->m_triggerPhase) / udata->m_timescale;
-		for(; i<oldlen; i++)
-		{
-			float uin = InterpolateValue(udata, i, delta);
-			umax->m_samples[i] = max(umax->m_samples[i], uin);
-			umin->m_samples[i] = min(umin->m_samples[i], uin);
-		}
+		cmdBuf.begin({});
 
-		//Copy input verbatim to new offsets
-		for(; i<len; i++)
-		{
-			float uin = InterpolateValue(udata, i, delta);
-			umax->m_samples[i] = uin;
-			umin->m_samples[i] = uin;
-		}
+		//Push constants
+		EnvelopeFilterConstants cfg;
+		cfg.oldlen = oldlen;
+		cfg.len = len;
+		cfg.delta = 1.0f * (umin->m_triggerPhase - udata->m_triggerPhase) / udata->m_timescale;
 
-		umax->MarkModifiedFromCpu();
-		umin->MarkModifiedFromCpu();
+		m_computePipeline.BindBufferNonblocking(0, udata->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, umin->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, umax->m_samples, cmdBuf);
+
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+		m_computePipeline.Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		umin->m_samples.MarkModifiedFromGpu();
+		umax->m_samples.MarkModifiedFromGpu();
 	}
 }

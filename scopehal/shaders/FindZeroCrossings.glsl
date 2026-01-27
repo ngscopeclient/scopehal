@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,7 +54,7 @@ layout(std430, push_constant) uniform constants
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-float InterpolateTime(float fa, float fb, float voltage);
+#include "InterpolateTime.h.glsl"
 
 /**
 	@brief First-pass zero crossing detection
@@ -103,18 +103,4 @@ void main()
 
 	//Save number of outputs we found
 	pout[outstart] = nouts;
-}
-
-float InterpolateTime(float fa, float fb, float voltage)
-{
-	//If the voltage isn't between the two points, abort
-	bool ag = (fa > voltage);
-	bool bg = (fb > voltage);
-	if( (ag && bg) || (!ag && !bg) )
-		return 0;
-
-	//no need to divide by time, sample spacing is normalized to 1 timebase unit
-	float slope = (fb - fa);
-	float delta = voltage - fa;
-	return delta / slope;
 }

@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,40 +27,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EnvelopeFilter
- */
-#ifndef EnvelopeFilter_h
-#define EnvelopeFilter_h
+float InterpolateTime(float fa, float fb, float voltage);
 
-class EnvelopeFilterConstants
+float InterpolateTime(float fa, float fb, float voltage)
 {
-public:
-	uint32_t oldlen;
-	uint32_t len;
-	float delta;
-};
+	//If the voltage isn't between the two points, abort
+	bool ag = (fa > voltage);
+	bool bg = (fb > voltage);
+	if( (ag && bg) || (!ag && !bg) )
+		return 0;
 
-class EnvelopeFilter : public Filter
-{
-public:
-	EnvelopeFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	virtual void ClearSweeps() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(EnvelopeFilter)
-
-protected:
-	ComputePipeline m_computePipeline;
-};
-
-#endif
+	//no need to divide by time, sample spacing is normalized to 1 timebase unit
+	float slope = (fb - fa);
+	float delta = voltage - fa;
+	return delta / slope;
+}

@@ -27,40 +27,54 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EnvelopeFilter
- */
-#ifndef EnvelopeFilter_h
-#define EnvelopeFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class EnvelopeFilterConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t oldlen;
-	uint32_t len;
+	float din[];
+};
+
+layout(std430, binding=1) restrict buffer buf_doutMin
+{
+	float doutMin[];
+};
+
+layout(std430, binding=2) restrict buffer buf_doutMax
+{
+	float doutMax[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint oldlen;
+	uint len;
 	float delta;
 };
 
-class EnvelopeFilter : public Filter
+#include "../../scopehal/shaders/InterpolateValue.h.glsl"
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	EnvelopeFilter(const std::string& color);
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= len)
+		return;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+	float f = InterpolateValue(din[i], din[i+1], delta);
 
-	virtual void ClearSweeps() override;
+	//If in overlap region, do min/max
+	if(i < oldlen)
+	{
+		doutMin[i] = min(doutMin[i], f);
+		doutMax[i] = max(doutMax[i], f);
+	}
 
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(EnvelopeFilter)
-
-protected:
-	ComputePipeline m_computePipeline;
-};
-
-#endif
+	//Extending
+	else
+	{
+		doutMin[i] = f;
+		doutMax[i] = f;
+	}
+}

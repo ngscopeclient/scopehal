@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,40 +27,9 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EnvelopeFilter
- */
-#ifndef EnvelopeFilter_h
-#define EnvelopeFilter_h
+float InterpolateValue(float fa, float fb, float frac);
 
-class EnvelopeFilterConstants
+float InterpolateValue(float fa, float fb, float frac)
 {
-public:
-	uint32_t oldlen;
-	uint32_t len;
-	float delta;
-};
-
-class EnvelopeFilter : public Filter
-{
-public:
-	EnvelopeFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	virtual void ClearSweeps() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(EnvelopeFilter)
-
-protected:
-	ComputePipeline m_computePipeline;
-};
-
-#endif
+	return fa + (fb-fa)*frac;
+}
