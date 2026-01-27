@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -61,7 +61,7 @@ ESPIDecoder::ESPIDecoder(const string& color)
 
 bool ESPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -91,17 +91,38 @@ vector<string> ESPIDecoder::GetHeaders()
 	return ret;
 }
 
+Filter::DataLocation ESPIDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ESPIDecoder::Refresh()
+void ESPIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ESPIDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<5; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -153,13 +174,8 @@ void ESPIDecoder::Refresh()
 	int64_t timestamp	= 0;
 
 	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
-	auto cap = new ESPIWaveform;
-	cap->m_timescale = clk->m_timescale;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
-	cap->m_triggerPhase = clk->m_triggerPhase;
+	auto cap = SetupEmptyWaveform<ESPIWaveform>(clk, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	ESPISymbol samp;
 	enum
@@ -213,7 +229,7 @@ void ESPIDecoder::Refresh()
 	} txn_state = TXN_STATE_IDLE;
 
 	ESPISymbol::ESpiCommand current_cmd = ESPISymbol::COMMAND_RESET;
-	Packet* pack = NULL;
+	Packet* pack = nullptr;
 
 	enum
 	{
