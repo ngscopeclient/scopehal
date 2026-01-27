@@ -107,7 +107,7 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 				(stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
 
 		case 1:
-			if(stream.m_channel == NULL)	//null is legal for gate
+			if(stream.m_channel == nullptr)	//null is legal for gate
 				return true;
 
 			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
@@ -223,8 +223,14 @@ void ClockRecoveryFilter::Refresh(
 		SetOffset(GetInput(0).GetOffset(), 1);
 	}
 
-	//Create analog output waveform for sampled data
-	auto scap = SetupEmptySparseAnalogOutputWaveform(din, 1);
+	//Create output waveform for sampled data
+	WaveformBase* scap = nullptr;
+	if(uadin)
+		scap = SetupEmptySparseAnalogOutputWaveform(uadin, 1);
+	else if(sadin)
+		scap = SetupEmptySparseAnalogOutputWaveform(sadin, 1);
+	else
+		scap = SetupEmptySparseDigitalOutputWaveform(din, 1);
 	scap->m_triggerPhase = 0;
 	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 
@@ -254,7 +260,7 @@ void ClockRecoveryFilter::Refresh(
 		edges.PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
 		scap->PrepareForCpuAccess();
-		InnerLoopWithGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
+		InnerLoopWithGating(*cap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist, gate, sgate, ugate);
 		cap->m_offsets.MarkModifiedFromCpu();
 	}
 	else
@@ -324,6 +330,7 @@ void ClockRecoveryFilter::Refresh(
 
 			//Run the final pass.
 			//This also generates the squarewave output and the sample data
+			auto sacap = dynamic_cast<SparseAnalogWaveform*>(scap);
 			m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassTimestamps, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassState, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(2, m_secondPassTimestamps, cmdBuf);
@@ -331,7 +338,7 @@ void ClockRecoveryFilter::Refresh(
 			m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf);
 			m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
-			m_finalPassComputePipeline->BindBufferNonblocking(7, scap->m_samples, cmdBuf);
+			m_finalPassComputePipeline->BindBufferNonblocking(7, sacap->m_samples, cmdBuf);
 			//this assumes input is uniformly sampled for now
 			m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
 			m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
@@ -346,8 +353,8 @@ void ClockRecoveryFilter::Refresh(
 			generatedSquarewaveOnGPU = true;
 
 			//Copy the offsets and durations from the sampled data
-			scap->m_offsets.CopyFromNonblocking(cmdBuf, cap->m_offsets, false);
-			scap->m_durations.CopyFromNonblocking(cmdBuf, cap->m_durations, false);
+			sacap->m_offsets.CopyFromNonblocking(cmdBuf, cap->m_offsets, false);
+			sacap->m_durations.CopyFromNonblocking(cmdBuf, cap->m_durations, false);
 
 			cmdBuf.end();
 			queue->SubmitAndBlock(cmdBuf);
@@ -367,7 +374,7 @@ void ClockRecoveryFilter::Refresh(
 		{
 			edges.PrepareForCpuAccess();
 			cap->PrepareForCpuAccess();
-			InnerLoopWithNoGating(*cap, *scap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
+			InnerLoopWithNoGating(*cap, edges, nedges, tend, initialPeriod, halfPeriod, fnyquist);
 			cap->m_offsets.MarkModifiedFromCpu();
 		}
 	}
@@ -431,10 +438,20 @@ void ClockRecoveryFilter::Refresh(
 	{
 		//TODO: GPU this where possible and don't do a separate sampling pass
 		if(uadin)
-			SampleOnAnyEdges(uadin, cap, *scap, false);
+			SampleOnAnyEdges(uadin, cap, *dynamic_cast<SparseAnalogWaveform*>(scap), false);
 		else if(sadin)
-			SampleOnAnyEdges(sadin, cap, *scap, false);
+			SampleOnAnyEdges(sadin, cap, *dynamic_cast<SparseAnalogWaveform*>(scap), false);
+		else if(uddin)
+			SampleOnAnyEdges(uddin, cap, *dynamic_cast<SparseDigitalWaveform*>(scap), false);
+		else if(sddin)
+			SampleOnAnyEdges(sddin, cap, *dynamic_cast<SparseDigitalWaveform*>(scap), false);
 	}
+
+	//Update output sample type
+	if(uddin || sddin)
+		m_streams[1].m_stype = Stream::STREAM_TYPE_DIGITAL;
+	else
+		m_streams[1].m_stype = Stream::STREAM_TYPE_ANALOG;
 }
 
 /**
@@ -458,7 +475,6 @@ void ClockRecoveryFilter::FillSquarewaveGeneric(SparseDigitalWaveform& cap)
  */
 void ClockRecoveryFilter::InnerLoopWithGating(
 	SparseDigitalWaveform& cap,
-	[[maybe_unused]] SparseAnalogWaveform& scap,
 	AcceleratorBuffer<int64_t>& edges,
 	size_t nedges,
 	int64_t tend,
@@ -633,7 +649,6 @@ void ClockRecoveryFilter::InnerLoopWithGating(
 
 void ClockRecoveryFilter::InnerLoopWithNoGating(
 	SparseDigitalWaveform& cap,
-	[[maybe_unused]] SparseAnalogWaveform& scap,
 	AcceleratorBuffer<int64_t>& edges,
 	size_t nedges,
 	int64_t tend,

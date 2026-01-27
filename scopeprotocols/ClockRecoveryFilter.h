@@ -77,7 +77,6 @@ protected:
 
 	void InnerLoopWithGating(
 		SparseDigitalWaveform& cap,
-		SparseAnalogWaveform& scap,
 		AcceleratorBuffer<int64_t>& edges,
 		size_t nedges,
 		int64_t tend,
@@ -90,7 +89,6 @@ protected:
 
 	void InnerLoopWithNoGating(
 		SparseDigitalWaveform& cap,
-		SparseAnalogWaveform& scap,
 		AcceleratorBuffer<int64_t>& edges,
 		size_t nedges,
 		int64_t tend,
