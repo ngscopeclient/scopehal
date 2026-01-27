@@ -444,7 +444,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				if(	( (prev <= target) && (cur > target) ) ||
 					( (prev >= target) && (cur < target) ) )
 				{
-					tlerp = j*din->m_timescale + InterpolateTime(din, j, target)*din->m_timescale;
+					tlerp = (j-1)*din->m_timescale + InterpolateTime(din, j-1, target)*din->m_timescale;
 					break;
 				}
 			}
