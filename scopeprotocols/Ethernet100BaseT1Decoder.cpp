@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -78,14 +78,34 @@ bool Ethernet100BaseT1Decoder::ValidateChannel(size_t i, StreamDescriptor stream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+Filter::DataLocation Ethernet100BaseT1Decoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 void Ethernet100BaseT1Decoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("Ethernet100BaseT1Decoder::Refresh");
+	#endif
+
 	ClearPackets();
 
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -126,12 +146,9 @@ void Ethernet100BaseT1Decoder::Refresh(
 	Unit fs(Unit::UNIT_FS);
 
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
-	auto cap = new EthernetWaveform;
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(din_i, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = isamples.m_startTimestamp;
-	cap->m_startFemtoseconds = isamples.m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	vector<uint8_t> bytes;
 	vector<uint64_t> starts;
