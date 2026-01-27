@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,7 +35,8 @@
  */
 
 #include "scopehal.h"
-#include "RSRTB2kLineTrigger.h"
+#include "LineTrigger.h"
+#include "RSRTB2kOscilloscope.h"
 
 using namespace std;
 
@@ -47,32 +48,43 @@ using namespace std;
 
 	@param scope	The scope this trigger will be used with
  */
-RSRTB2kLineTrigger::RSRTB2kLineTrigger(Oscilloscope* scope)
+LineTrigger::LineTrigger(Oscilloscope* scope)
 	: Trigger(scope)
 	, m_holdofftimestate(m_parameters["Hold Off"])
 	, m_holdofftime(m_parameters["Hold Off Time"])
 {
 	CreateInput("din");
 
-	//Trigger level
+	//Trigger levels don't apply here, hide them
 	m_level.MarkHidden();
 	m_triggerLevel.MarkHidden();
 	m_upperLevel.MarkHidden();
 
-	//Hold off time
-	m_holdofftimestate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
-	m_holdofftime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	//RTB2000 has a bunch of extra stuff
+	if(dynamic_cast<RSRTB2kOscilloscope*>(scope) != nullptr)
+	{
+		//Hold off time
+		m_holdofftimestate = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+		m_holdofftime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	}
+
+	//Hide RTB specific stuff
+	else
+	{
+		m_holdofftimestate.MarkHidden();
+		m_holdofftime.MarkHidden();
+	}
 }
 
-RSRTB2kLineTrigger::~RSRTB2kLineTrigger()
+LineTrigger::~LineTrigger()
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-///@brief Returns the constant trigger name "Dropout"
-string RSRTB2kLineTrigger::GetTriggerName()
+///@brief Returns the constant trigger name "Line"
+string LineTrigger::GetTriggerName()
 {
 	return "Line";
 }
@@ -80,9 +92,7 @@ string RSRTB2kLineTrigger::GetTriggerName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Input validation
 
-bool RSRTB2kLineTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+bool LineTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	return true;
 }
-
-

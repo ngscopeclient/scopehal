@@ -32,12 +32,11 @@
 
 /**
 	@brief R&S RTB2000/RTB2 Oscilloscope
-
  */
 
-#include "EdgeTrigger.h"
+class EdgeTrigger;
+class LineTrigger;
 
-class RSRTB2kLineTrigger;
 class RSRTB2kRiseTimeTrigger;
 class RSRTB2kRuntTrigger;
 class RSRTB2kTimeoutTrigger;
@@ -234,7 +233,7 @@ protected:
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);
 	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
-	void PushLineTrigger(RSRTB2kLineTrigger* trig);
+	void PushLineTrigger(LineTrigger* trig);
 	void PushRiseTimeTrigger(RSRTB2kRiseTimeTrigger* trig);
 	void PushRuntTrigger(RSRTB2kRuntTrigger* trig);
 	void PushTimeoutTrigger(RSRTB2kTimeoutTrigger* trig);

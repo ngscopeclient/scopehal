@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,21 +30,21 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DropoutTrigger
+	@brief Declaration of LineTrigger
 	@ingroup triggers
  */
-#ifndef RSRTB2kLineTrigger_h
-#define RSRTB2kLineTrigger_h
+#ifndef LineTrigger_h
+#define LineTrigger_h
 
 /**
 	@brief trigger uses the waveform of the power supply's alternating line voltage
 	@ingroup triggers
  */
-class RSRTB2kLineTrigger : public Trigger
+class LineTrigger : public Trigger
 {
 public:
-	RSRTB2kLineTrigger(Oscilloscope* scope);
-	virtual ~RSRTB2kLineTrigger();
+	LineTrigger(Oscilloscope* scope);
+	virtual ~LineTrigger();
 
 	void SetHoldoffTimeState(bool state)
 	{ m_holdofftimestate.SetBoolVal(state); }
@@ -62,7 +62,7 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetTriggerName();
-	TRIGGER_INITPROC(RSRTB2kLineTrigger);
+	TRIGGER_INITPROC(LineTrigger);
 
 protected:
 	FilterParameter& m_holdofftimestate;

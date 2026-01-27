@@ -98,6 +98,7 @@ set(SCOPEHAL_SOURCES
 	DropoutTrigger.cpp
 	EdgeTrigger.cpp
 	GlitchTrigger.cpp
+	LineTrigger.cpp
 	NthEdgeBurstTrigger.cpp
 	PulseWidthTrigger.cpp
 	RuntTrigger.cpp
@@ -107,7 +108,6 @@ set(SCOPEHAL_SOURCES
 	UartTrigger.cpp
 	WindowTrigger.cpp
 
-	RSRTB2kLineTrigger.cpp
 	RSRTB2kRiseTimeTrigger.cpp
 	RSRTB2kRuntTrigger.cpp
 	RSRTB2kTimeoutTrigger.cpp

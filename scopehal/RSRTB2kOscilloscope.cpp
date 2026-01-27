@@ -37,7 +37,8 @@
 #include "scopehal.h"
 #include "RSRTB2kOscilloscope.h"
 
-#include "RSRTB2kLineTrigger.h"
+#include "EdgeTrigger.h"
+#include "LineTrigger.h"
 #include "RSRTB2kRiseTimeTrigger.h"
 #include "RSRTB2kRuntTrigger.h"
 #include "RSRTB2kTimeoutTrigger.h"
@@ -1331,7 +1332,7 @@ vector<string> RSRTB2kOscilloscope::GetTriggerTypes()
 	//LogTrace("\n");
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
-	ret.push_back(RSRTB2kLineTrigger::GetTriggerName());
+	ret.push_back(LineTrigger::GetTriggerName());
 	ret.push_back(RSRTB2kRiseTimeTrigger::GetTriggerName());
 	ret.push_back(RSRTB2kRuntTrigger::GetTriggerName());
 	ret.push_back(RSRTB2kTimeoutTrigger::GetTriggerName());
@@ -1422,7 +1423,7 @@ void RSRTB2kOscilloscope::PushTrigger()
 {
 	//LogTrace("\n");
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	auto lt = dynamic_cast<RSRTB2kLineTrigger*>(m_trigger);
+	auto lt = dynamic_cast<LineTrigger*>(m_trigger);
 	auto st = dynamic_cast<RSRTB2kRiseTimeTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RSRTB2kRuntTrigger*>(m_trigger);
 	auto tt = dynamic_cast<RSRTB2kTimeoutTrigger*>(m_trigger);
@@ -2007,7 +2008,7 @@ void RSRTB2kOscilloscope::PullLineTrigger()
 	double f;
 
 	//Clear out any triggers of the wrong type
-	if((m_trigger != NULL) && (dynamic_cast<RSRTB2kLineTrigger*>(m_trigger) != NULL))
+	if((m_trigger != NULL) && (dynamic_cast<LineTrigger*>(m_trigger) != NULL))
 	{
 		delete m_trigger;
 		m_trigger = NULL;
@@ -2015,8 +2016,8 @@ void RSRTB2kOscilloscope::PullLineTrigger()
 
 	//Create a new trigger if necessary
 	if(m_trigger == NULL)
-		m_trigger = new RSRTB2kLineTrigger(this);
-	RSRTB2kLineTrigger* lt = dynamic_cast<RSRTB2kLineTrigger*>(m_trigger);
+		m_trigger = new LineTrigger(this);
+	LineTrigger* lt = dynamic_cast<LineTrigger*>(m_trigger);
 
 	//Hold off time
 	lt->SetHoldoffTimeState(Trim(converse(":TRIG:A:HOLD:MODE?")) == "TIME" ? true : false);
@@ -2027,7 +2028,7 @@ void RSRTB2kOscilloscope::PullLineTrigger()
 /**
 	@brief Pushes settings for a line trigger to the instrument
  */
-void RSRTB2kOscilloscope::PushLineTrigger(RSRTB2kLineTrigger* trig)
+void RSRTB2kOscilloscope::PushLineTrigger(LineTrigger* trig)
 {
 	//LogTrace("\n");
 	//Hold off time - follow the sequence!

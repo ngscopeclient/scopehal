@@ -102,6 +102,7 @@
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
+#include "LineTrigger.h"
 #include "NthEdgeBurstTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
@@ -109,7 +110,6 @@
 #include "UartTrigger.h"
 #include "WindowTrigger.h"
 
-#include "RSRTB2kLineTrigger.h"
 #include "RSRTB2kRiseTimeTrigger.h"
 #include "RSRTB2kRuntTrigger.h"
 #include "RSRTB2kTimeoutTrigger.h"
@@ -307,6 +307,7 @@ void DriverStaticInit()
 	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(GlitchTrigger);
+	AddTriggerClass(LineTrigger);
 	AddTriggerClass(NthEdgeBurstTrigger);
 	AddTriggerClass(PulseWidthTrigger);
 	AddTriggerClass(RuntTrigger);
@@ -314,7 +315,6 @@ void DriverStaticInit()
 	AddTriggerClass(UartTrigger);
 	AddTriggerClass(WindowTrigger);
 /*
-	AddTriggerClass(RSRTB2kLineTrigger);
 	AddTriggerClass(RSRTB2kRiseTimeTrigger);
 	AddTriggerClass(RSRTB2kRuntTrigger);
 	AddTriggerClass(RSRTB2kTimeoutTrigger);
