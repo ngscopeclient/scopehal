@@ -50,6 +50,7 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 
 	CreateInput("IN");
 	CreateInput("Gate");
+	CreateInput("Edges");
 
 	m_baudRate = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
 	m_baudRate.SetFloatVal(1250000000);	//1.25 Gbps
@@ -100,7 +101,7 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	switch(i)
 	{
 		case 0:
-			if(stream.m_channel == NULL)
+			if(stream.m_channel == nullptr)
 				return false;
 			return
 				(stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
@@ -108,6 +109,12 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 		case 1:
 			if(stream.m_channel == nullptr)	//null is legal for gate
+				return true;
+
+			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
+
+		case 2:
+			if(stream.m_channel == nullptr)	//null is legal for edge detector
 				return true;
 
 			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
@@ -158,6 +165,10 @@ void ClockRecoveryFilter::Refresh(
 	auto sgate = dynamic_cast<SparseDigitalWaveform*>(gate);
 	auto ugate = dynamic_cast<UniformDigitalWaveform*>(gate);
 
+	auto extraEdges = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(2));
+	if(GetInput(2) && !extraEdges)
+		AddErrorMessage("Invalid input configuration", "External edge detector must output a sparse digital waveform");
+
 	//Get nominal period used for the first cycle of the NCO
 	int64_t initialPeriod = round(FS_PER_SECOND / m_baudRate.GetFloatVal());
 	int64_t halfPeriod = initialPeriod / 2;
@@ -180,7 +191,9 @@ void ClockRecoveryFilter::Refresh(
 	size_t nedges = 0;
 	AcceleratorBuffer<int64_t> vedges;
 	float threshold = m_threshold.GetFloatVal();
-	if(uadin)
+	if(extraEdges)
+		nedges = extraEdges->size();
+	else if(uadin)
 		nedges = m_detector.FindZeroCrossings(uadin, threshold, cmdBuf, queue);
 	else
 	{
@@ -207,8 +220,13 @@ void ClockRecoveryFilter::Refresh(
 		return;
 	}
 
-	//Edge array
-	auto& edges = uadin ? m_detector.GetResults() : vedges;
+	//Mux the edges we want to look at
+	auto* pedges = &m_detector.GetResults();
+	if(extraEdges)
+		pedges = &extraEdges->m_offsets;
+	else if(!uadin)
+		pedges = &vedges;
+	auto& edges = *pedges;
 
 	//Create the output waveform and copy our timescales
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
