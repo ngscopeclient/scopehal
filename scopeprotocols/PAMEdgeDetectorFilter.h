@@ -53,6 +53,7 @@ public:
 	int64_t halfui;
 	int64_t timescale;
 	uint32_t numIndexes;
+	uint32_t numSamples;
 	uint32_t inputPerThread;
 	uint32_t outputPerThread;
 	uint32_t order;
@@ -106,6 +107,9 @@ protected:
 
 	///@brief Compute pipeline for first-pass merge
 	std::shared_ptr<ComputePipeline> m_initialMergeComputePipeline;
+
+	///@brief Compute pipeline for final merge pass
+	std::shared_ptr<ComputePipeline> m_finalMergeComputePipeline;
 };
 
 #endif

@@ -77,6 +77,9 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 			m_initialMergeComputePipeline =
 				make_shared<ComputePipeline>("shaders/PAMEdgeDetector_InitialMerge.spv", 6, sizeof(PAMEdgeDetectorMergeConstants));
 
+			m_finalMergeComputePipeline =
+				make_shared<ComputePipeline>("shaders/PAMEdgeDetector_FinalMerge.spv", 5, sizeof(PAMEdgeDetectorMergeConstants));
+
 			m_edgeOffsetsScratch.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		}
 	}
@@ -330,6 +333,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		cfg.halfui = ui / 2;
 		cfg.timescale = din->m_timescale;
 		cfg.numIndexes = m_edgeIndexes.size();
+		cfg.numSamples = din->size();
 		cfg.inputPerThread = GetComputeBlockCount(cfg.numIndexes, numThreads);
 		cfg.outputPerThread = cfg.inputPerThread + 1;
 		cfg.order = order;
@@ -342,43 +346,35 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_initialMergeComputePipeline->BindBufferNonblocking(2, m_edgeRising, cmdBuf);
 		m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
 		m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(5, m_edgeOffsetsScratch, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(5, m_edgeOffsetsScratch, cmdBuf, true);
 		m_initialMergeComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 		m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 		m_edgeOffsetsScratch.MarkModifiedFromGpu();
 
+		//Reserve space in the output buffer (this is an overestimate but will be corrected)
+		cap->Resize(cfg.outputPerThread * numThreads);
+
+		//Run the final pass
+		m_finalMergeComputePipeline->BindBufferNonblocking(0, m_edgeOffsetsScratch, cmdBuf);
+		m_finalMergeComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
+		m_finalMergeComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
+		m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
+		m_finalMergeComputePipeline->BindBufferNonblocking(4, m_edgeCount, cmdBuf, true);
+
+		m_finalMergeComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+		m_finalMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		cap->MarkModifiedFromGpu();
+		m_edgeCount.MarkModifiedFromGpu();
+
+		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
-		//DEBUG
-		m_edgeOffsetsScratch.PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-		cap->Resize(0);
-		bool nextValue = true;
-		for(uint32_t iblock = 0; iblock < numThreads; iblock ++)
-		{
-			uint32_t ibase = iblock * cfg.outputPerThread;
-			uint32_t nsamples = m_edgeOffsetsScratch[ibase];
-
-			for(uint32_t i=0; i<nsamples; i++)
-			{
-				//Add the samples
-				int64_t tedge = m_edgeOffsetsScratch[ibase + i + 1];
-
-				//Update previous duration
-				auto clen = cap->m_samples.size();
-				if(clen)
-					cap->m_durations[clen-1] = tedge - cap->m_offsets[clen-1];
-
-				//Add the new sample
-				cap->m_offsets.push_back(tedge);
-				cap->m_durations.push_back(1);
-				cap->m_samples.push_back(nextValue);
-				nextValue = !nextValue;
-			}
-		}
-		cap->MarkModifiedFromCpu();
+		//Get final edge count
+		cap->Resize(m_edgeCount[0]);
 	}
 
 	else

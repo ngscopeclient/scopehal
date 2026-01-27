@@ -33,82 +33,90 @@
 #extension GL_EXT_shader_8bit_storage : require
 #extension GL_ARB_gpu_shader_int64 : require
 
-/*
-layout(std430, binding=0) restrict readonly buffer buf_indexesIn
+layout(std430, binding=0) restrict readonly buffer buf_offsetsIn
 {
-	uint idxIn[];
+	int64_t offsetsIn[];
 };
 
-layout(std430, binding=1) restrict readonly buffer buf_statesIn
+layout(std430, binding=1) restrict writeonly buffer buf_offsetsOut
 {
-	uint8_t statesIn[];
+	int64_t offsetsOut[];
 };
 
-layout(std430, binding=2) restrict readonly buffer buf_risingIn
+layout(std430, binding=2) restrict writeonly buffer buf_durationsOut
 {
-	uint8_t risingIn[];
+	int64_t durationsOut[];
 };
 
-layout(std430, binding=3) restrict writeonly buffer buf_indexesOut
+layout(std430, binding=3) restrict writeonly buffer buf_samplesOut
 {
-	uint idxOut[];
+	uint8_t samplesOut[];
 };
 
-layout(std430, binding=4) restrict writeonly buffer buf_statesOut
+layout(std430, binding=4) restrict writeonly buffer buf_edgecount
 {
-	uint8_t statesOut[];
-};
-
-layout(std430, binding=5) restrict writeonly buffer buf_risingOut
-{
-	uint8_t risingOut[];
-};
-
-layout(std430, binding=6) restrict writeonly buffer buf_finalCount
-{
-	uint finalCount;
+	uint edgecount;
 };
 
 layout(std430, push_constant) uniform constants
 {
-	uint len;
-	uint order;
+	int64_t	halfui;
+	int64_t timescale;
+	uint numIndexes;
+	uint numSamples;
 	uint inputPerThread;
 	uint outputPerThread;
+	uint order;
 };
-*/
+
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 /**
-	@brief Second-pass zero crossing detection
-
-	Merge the output from the first-pass shader
+	@brief Final output merging and level crossings
  */
 void main()
 {
-	/*
-	//Find our block of inputs
+	//Figure out how many samples we had before us
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-
-	//Find starting sample index
+	bool lastBlock = (gl_GlobalInvocationID.x + 1) >= numThreads;
 	uint writebase = 0;
 	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
-		writebase += idxIn[i * outputPerThread];
-
-	//Find number of samples to copy
+		writebase += uint(offsetsIn[i * outputPerThread]);
 	uint readbase = gl_GlobalInvocationID.x * outputPerThread;
-	uint numSamples = idxIn[readbase];
-	readbase ++;	//skip the size value at position 0
+	uint numSamples = uint(offsetsIn[readbase]);
 
-	//Actually do the copy
+	//Skip the sample counter itself
+	readbase ++;
+
+	//Do the actual copy
 	for(uint i=0; i<numSamples; i++)
 	{
-		idxOut[writebase + i] = idxIn[readbase + i];
-		statesOut[writebase + i] = statesIn[readbase + i];
-		risingOut[writebase + i] = risingIn[readbase + i];
+		uint iin = readbase + i;
+		uint iout = writebase + i;
+
+		//Copy the offset
+		int64_t offin = offsetsIn[iin];
+		offsetsOut[iout] = offin;
+
+		//Generate the squarewave
+		samplesOut[iout] = uint8_t(iout % 2);
+
+		//Next sample from this block? Easy peasy
+		int64_t offNext = offin + 1;
+		if(i+1 < numSamples)
+			offNext = offsetsIn[iin + 1];
+
+		//Is there another block? Use its first sample
+		else if(!lastBlock)
+			offNext = offsetsIn[readbase + outputPerThread];
+
+		//otherwise this is the very last sample in the capture, just use the default duration of 1
+
+		//Either way, write the duration
+		durationsOut[iout] = offNext - offin;
 	}
 
-	if(gl_GlobalInvocationID.x == (numThreads - 1) )
-		finalCount = writebase + numSamples;
-	*/
+	//If this is the last block, write the number of samples
+	if(lastBlock)
+		edgecount = writebase + numSamples;
 }
