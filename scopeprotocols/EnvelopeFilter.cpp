@@ -120,7 +120,6 @@ void EnvelopeFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	else if(udata)
 	{
 		size_t len = udata->size();
-		udata->PrepareForCpuAccess();
 
 		//Find large (multiple sample) phase offset of the input
 		int64_t largeSampleShift = udata->m_triggerPhase - (udata->m_triggerPhase % udata->m_timescale);
