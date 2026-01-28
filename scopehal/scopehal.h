@@ -145,9 +145,11 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "SinkNode.h"
 #include "Instrument.h"
 #include "StreamDescriptor.h"
+#include "StreamGroupDescriptor.h"
 
 #include "OscilloscopeChannel.h"
 #include "StreamDescriptor_inlines.h"
+#include "StreamGroupDescriptor_inlines.h"
 #include "FlowGraphNode_inlines.h"
 #include "Trigger.h"
 
