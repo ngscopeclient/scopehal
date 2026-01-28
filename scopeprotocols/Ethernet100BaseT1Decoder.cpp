@@ -45,7 +45,6 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 
 	CreateInput("i");
 	CreateInput("q");
-	CreateInput("clk");
 
 	m_parameters[m_scrambler] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_scrambler].AddEnumValue("x^33 + x^13 + 1 (M)", SCRAMBLER_M_B13);
@@ -67,8 +66,6 @@ bool Ethernet100BaseT1Decoder::ValidateChannel(size_t i, StreamDescriptor stream
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -94,9 +91,15 @@ void Ethernet100BaseT1Decoder::Refresh(
 
 	ClearPackets();
 
+	//Get the input data
+	auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
+
 	//Make sure we've got valid inputs
 	ClearErrors();
-	if(!VerifyAllInputsOK())
+	if(!din_i || !din_q)
 	{
 		for(int i=0; i<2; i++)
 		{
@@ -104,30 +107,15 @@ void Ethernet100BaseT1Decoder::Refresh(
 				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
 			else if(!GetInputWaveform(i))
 				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+			else
+				AddErrorMessage("Invalid inputs", string("Expected sparse analog waveform at input ") + m_signalNames[i] );
 		}
 
 		SetData(nullptr, 0);
 		return;
 	}
 
-	//Get the input data
-	auto din_i = GetInputWaveform(0);
-	auto din_q = GetInputWaveform(1);
-	auto clk = GetInputWaveform(2);
-	din_i->PrepareForCpuAccess();
-	din_q->PrepareForCpuAccess();
-	clk->PrepareForCpuAccess();
-
-	//Sample the input on the edges of the recovered clock
-	//TODO: if this is always coming from the IQDemuxFilter we can probably optimize this part out
-	//and just iterate over i/q direct?
-	SparseAnalogWaveform isamples;
-	SparseAnalogWaveform qsamples;
-	isamples.PrepareForCpuAccess();
-	qsamples.PrepareForCpuAccess();
-	SampleOnAnyEdgesBase(din_i, clk, isamples);
-	SampleOnAnyEdgesBase(din_q, clk, qsamples);
-	size_t ilen = min(isamples.size(), qsamples.size());
+	size_t ilen = min(din_i->size(), din_q->size());
 
 	enum
 	{
@@ -172,12 +160,12 @@ void Ethernet100BaseT1Decoder::Refresh(
 
 	for(size_t i=0; i<ilen; i++)
 	{
-		int64_t tnow = isamples.m_offsets[i];
-		int64_t tlen = isamples.m_durations[i];
+		int64_t tnow = din_i->m_offsets[i];
+		int64_t tlen = din_i->m_durations[i];
 
 		//Decode raw symbols to 3-level constellation coordinates
-		float fi = isamples.m_samples[i];
-		float fq = qsamples.m_samples[i];
+		float fi = din_i->m_samples[i];
+		float fq = din_q->m_samples[i];
 		int ci = 0;
 		int cq = 0;
 		if(fi > cutp)
@@ -274,7 +262,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 							scramblerErrors ++;
 
 							LogTrace("Scrambler error at %s (%zu recently)\n",
-								fs.PrettyPrint(isamples.m_offsets[i]).c_str(), scramblerErrors);
+								fs.PrettyPrint(din_i->m_offsets[i]).c_str(), scramblerErrors);
 
 							if(scramblerErrors > 16)
 							{
@@ -294,7 +282,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 					//Declare lock after 256 error-free idles
 					if( (idlesMatched > 256) && !scramblerLocked)
 					{
-						LogTrace("Scrambler locked at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+						LogTrace("Scrambler locked at %s\n", fs.PrettyPrint(din_i->m_offsets[i]).c_str());
 						scramblerLocked = true;
 						scramblerErrors = 0;
 						lastScramblerError = i;
@@ -317,7 +305,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 
 					if(scramblerLocked)
 					{
-						LogTrace("Found SSD at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+						LogTrace("Found SSD at %s\n", fs.PrettyPrint(din_i->m_offsets[i]).c_str());
 
 						//Add the fake preamble byte
 						bytes.push_back(0x55);
@@ -337,7 +325,7 @@ void Ethernet100BaseT1Decoder::Refresh(
 						//TODO: can we go back in time once we achieve lock
 						//and predict what the scrambler value had been to decode from the start of the waveform?
 						LogTrace("Found SSD at %s, but can't decode because no scrambler lock\n",
-							fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+							fs.PrettyPrint(din_i->m_offsets[i]).c_str());
 					}
 				}
 				else
