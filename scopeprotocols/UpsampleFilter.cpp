@@ -120,7 +120,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	size_t kernel = window*upsample_factor;
 	if(upsample_factor <= 0)
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
