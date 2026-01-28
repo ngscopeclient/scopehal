@@ -27,45 +27,84 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of IQDemuxFilter
- */
-#ifndef IQDemuxFilter_h
-#define IQDemuxFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class IQDemuxConstants
+#extension GL_ARB_gpu_shader_int64 : require
+
+layout(std430, binding=0) restrict readonly buffer buf_inSamples
 {
-public:
-	uint32_t istart;
-	uint32_t outlen;
+	float inSamples[];
 };
 
-class IQDemuxFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_inOffsets
 {
-public:
-	IQDemuxFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	enum AlignmentType
-	{
-		ALIGN_NONE,
-		ALIGN_100BASET1
-	};
-
-	PROTOCOL_DECODER_INITPROC(IQDemuxFilter)
-
-protected:
-	FilterParameter& m_alignment;
-
-	std::shared_ptr<ComputePipeline> m_demuxComputePipeline;
+	int64_t inOffsets[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_iSamples
+{
+	float iSamples[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_iOffsets
+{
+	int64_t iOffsets[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_iDurations
+{
+	int64_t iDurations[];
+};
+
+layout(std430, binding=5) restrict writeonly buffer buf_qSamples
+{
+	float qSamples[];
+};
+
+layout(std430, binding=6) restrict writeonly buffer buf_qOffsets
+{
+	int64_t qOffsets[];
+};
+
+layout(std430, binding=7) restrict writeonly buffer buf_qDurations
+{
+	int64_t qDurations[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint istart;
+	uint outlen;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= outlen)
+		return;
+
+	uint iin = i*2 + istart;
+	uint iout = i;
+
+	//Copy I/Q outputs to output stream
+	iSamples[iout] = inSamples[iin];
+	qSamples[iout] = inSamples[iin + 1];
+
+	//Copy timestamps
+	int64_t tnow = inOffsets[iin];
+	iOffsets[iout] = tnow;
+	qOffsets[iout] = tnow;
+
+	//Duration
+	int64_t len;
+	if(i+1 >= outlen)
+		len = 1;
+	else
+		len = inOffsets[iin + 2] - tnow;
+
+	iDurations[iout] = len;
+	qDurations[iout] = len;
+}

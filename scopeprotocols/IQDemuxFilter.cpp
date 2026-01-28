@@ -37,17 +37,23 @@ using namespace std;
 
 IQDemuxFilter::IQDemuxFilter(const string& color)
 	: Filter(color, CAT_RF)
-	, m_alignment("Alignment")
+	, m_alignment(m_parameters["Alignment"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
 	CreateInput("sampledData");
 
-	m_parameters[m_alignment] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_alignment].AddEnumValue("None", ALIGN_NONE);
-	m_parameters[m_alignment].AddEnumValue("100Base-T1", ALIGN_100BASET1);
-	m_parameters[m_alignment].SetIntVal(ALIGN_NONE);
+	m_alignment = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_alignment.AddEnumValue("None", ALIGN_NONE);
+	m_alignment.AddEnumValue("100Base-T1", ALIGN_100BASET1);
+	m_alignment.SetIntVal(ALIGN_NONE);
+
+	if(g_hasShaderInt64)
+	{
+		m_demuxComputePipeline =
+			make_shared<ComputePipeline>("shaders/IQDemuxFilter.spv", 8, sizeof(IQDemuxConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,20 +111,13 @@ void IQDemuxFilter::Refresh(
 		return;
 	}
 
-	//Make output waveforms
-	auto iout = SetupEmptySparseAnalogOutputWaveform(din, 0);
-	auto qout = SetupEmptySparseAnalogOutputWaveform(din, 1);
-
-	din->PrepareForCpuAccess();
-	iout->PrepareForCpuAccess();
-	qout->PrepareForCpuAccess();
-
 	size_t len = din->m_samples.size();
 	LogTrace("%zu sampled data points\n", len);
 
 	//Figure out the proper I-vs-Q alignment (even/odd is not specified)
-	auto align = static_cast<AlignmentType>(m_parameters[m_alignment].GetIntVal());
+	auto align = static_cast<AlignmentType>(m_alignment.GetIntVal());
 	size_t istart = 0;
+	din->PrepareForCpuAccess();
 	if(align == ALIGN_100BASET1)
 	{
 		//Look at a fixed window in the start of the waveform and see which one has the least (0,0) symbols
@@ -157,34 +156,79 @@ void IQDemuxFilter::Refresh(
 		}
 	}
 
-	//Synthesize the output
-	bool clkval = false;
-	for(size_t i=istart; i+1 < len; i += 2)
+	//Make output waveforms
+	auto iout = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	auto qout = SetupEmptySparseAnalogOutputWaveform(din, 1);
+	size_t outlen = (len - istart) / 2;
+	iout->Resize(outlen);
+	qout->Resize(outlen);
+
+	if(g_hasShaderInt64)
 	{
-		int64_t tnow = din->m_offsets[i];
+		cmdBuf.begin({});
 
-		//Extend previous sample, if any
-		size_t outlen = iout->m_offsets.size();
-		if(outlen)
-		{
-			int64_t dur = tnow - iout->m_offsets[outlen-1];
-			iout->m_durations[outlen-1] = dur;
-			qout->m_durations[outlen-1] = dur;
-		}
+		IQDemuxConstants cfg;
+		cfg.istart = istart;
+		cfg.outlen = outlen;
 
-		//Add this sample
-		iout->m_offsets.push_back(tnow);
-		qout->m_offsets.push_back(tnow);
+		uint64_t numThreads = outlen;
+		const uint64_t blockSize = 64;
+		const uint64_t numBlocks = GetComputeBlockCount(numThreads, blockSize);
 
-		iout->m_durations.push_back(1);
-		qout->m_durations.push_back(1);
+		//Do the demux
+		m_demuxComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_demuxComputePipeline->BindBufferNonblocking(1, din->m_offsets, cmdBuf);
+		m_demuxComputePipeline->BindBufferNonblocking(2, iout->m_samples, cmdBuf, true);
+		m_demuxComputePipeline->BindBufferNonblocking(3, iout->m_offsets, cmdBuf, true);
+		m_demuxComputePipeline->BindBufferNonblocking(4, iout->m_durations, cmdBuf, true);
+		m_demuxComputePipeline->BindBufferNonblocking(5, qout->m_samples, cmdBuf, true);
+		m_demuxComputePipeline->BindBufferNonblocking(6, qout->m_offsets, cmdBuf, true);
+		m_demuxComputePipeline->BindBufferNonblocking(7, qout->m_durations, cmdBuf, true);
+		m_demuxComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
-		iout->m_samples.push_back(din->m_samples[i]);
-		qout->m_samples.push_back(din->m_samples[i+1]);
+		iout->MarkModifiedFromGpu();
+		qout->MarkModifiedFromGpu();
 
-		clkval = !clkval;
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 	}
 
-	iout->MarkModifiedFromCpu();
-	qout->MarkModifiedFromCpu();
+	else
+	{
+		iout->PrepareForCpuAccess();
+		qout->PrepareForCpuAccess();
+
+		//Synthesize the output
+		bool clkval = false;
+		size_t nout = 0;
+		for(size_t i=istart; i+1 < len; i += 2)
+		{
+			int64_t tnow = din->m_offsets[i];
+
+			//Extend previous sample, if any
+			if(nout)
+			{
+				int64_t dur = tnow - iout->m_offsets[nout-1];
+				iout->m_durations[nout-1] = dur;
+				qout->m_durations[nout-1] = dur;
+			}
+
+			//Add this sample
+			iout->m_offsets[nout] = tnow;
+			qout->m_offsets[nout] = tnow;
+
+			iout->m_durations[nout] = 1;
+			qout->m_durations[nout] = 1;
+
+			iout->m_samples[nout] = din->m_samples[i];
+			qout->m_samples[nout] = din->m_samples[i+1];
+
+			clkval = !clkval;
+
+			nout ++;
+		}
+
+		iout->MarkModifiedFromCpu();
+		qout->MarkModifiedFromCpu();
+	}
 }
