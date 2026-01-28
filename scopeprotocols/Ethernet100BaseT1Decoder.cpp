@@ -94,8 +94,6 @@ void Ethernet100BaseT1Decoder::Refresh(
 	//Get the input data
 	auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
-	din_i->PrepareForCpuAccess();
-	din_q->PrepareForCpuAccess();
 
 	//Make sure we've got valid inputs
 	ClearErrors();
@@ -114,6 +112,9 @@ void Ethernet100BaseT1Decoder::Refresh(
 		SetData(nullptr, 0);
 		return;
 	}
+
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
 
 	size_t ilen = min(din_i->size(), din_q->size());
 
