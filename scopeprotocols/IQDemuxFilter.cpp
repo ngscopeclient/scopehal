@@ -41,7 +41,6 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_COUNTS), "clk", Stream::STREAM_TYPE_DIGITAL);
 
 	CreateInput("sampledData");
 
@@ -103,19 +102,16 @@ void IQDemuxFilter::Refresh(
 
 		SetData(nullptr, 0);
 		SetData(nullptr, 1);
-		SetData(nullptr, 2);
 		return;
 	}
 
 	//Make output waveforms
 	auto iout = SetupEmptySparseAnalogOutputWaveform(din, 0);
 	auto qout = SetupEmptySparseAnalogOutputWaveform(din, 1);
-	auto clkout = SetupEmptySparseDigitalOutputWaveform(din, 2);
 
 	din->PrepareForCpuAccess();
 	iout->PrepareForCpuAccess();
 	qout->PrepareForCpuAccess();
-	clkout->PrepareForCpuAccess();
 
 	size_t len = din->m_samples.size();
 	LogTrace("%zu sampled data points\n", len);
@@ -174,26 +170,21 @@ void IQDemuxFilter::Refresh(
 			int64_t dur = tnow - iout->m_offsets[outlen-1];
 			iout->m_durations[outlen-1] = dur;
 			qout->m_durations[outlen-1] = dur;
-			clkout->m_durations[outlen-1] = dur;
 		}
 
 		//Add this sample
 		iout->m_offsets.push_back(tnow);
 		qout->m_offsets.push_back(tnow);
-		clkout->m_offsets.push_back(tnow);
 
 		iout->m_durations.push_back(1);
 		qout->m_durations.push_back(1);
-		clkout->m_durations.push_back(1);
 
 		iout->m_samples.push_back(din->m_samples[i]);
 		qout->m_samples.push_back(din->m_samples[i+1]);
-		clkout->m_samples.push_back(clkval);
 
 		clkval = !clkval;
 	}
 
 	iout->MarkModifiedFromCpu();
 	qout->MarkModifiedFromCpu();
-	clkout->MarkModifiedFromCpu();
 }
