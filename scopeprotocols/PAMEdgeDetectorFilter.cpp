@@ -492,6 +492,7 @@ bool PAMEdgeDetectorFilter::PerformAction(const string& id)
 		{
 			din->PrepareForCpuAccess();
 			AutoLevel(din);
+			return true;
 		}
 	}
 	return false;
@@ -578,5 +579,7 @@ void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
 		if(m_parameters.find(pname) == m_parameters.end())
 			m_parameters[pname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 		m_parameters[pname].SetFloatVal(levels[i]);
+
+		LogTrace("Final level %zu = %f\n", i, levels[i]);
 	}
 }
