@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,8 +43,7 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_COUNTS), "clk", Stream::STREAM_TYPE_DIGITAL);
 
-	CreateInput("din");
-	CreateInput("clk");
+	CreateInput("sampledData");
 
 	m_parameters[m_alignment] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_alignment].AddEnumValue("None", ALIGN_NONE);
@@ -57,12 +56,10 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 
 bool IQDemuxFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -76,6 +73,12 @@ string IQDemuxFilter::GetProtocolName()
 	return "IQ Demux";
 }
 
+Filter::DataLocation IQDemuxFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -83,50 +86,38 @@ void IQDemuxFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto clk = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(1));
-	if(!din || !clk)
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("IQDemuxFilter::Refresh");
+	#endif
+
+	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	ClearErrors();
+	if(!din)
 	{
-		LogTrace("no data\n");
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid inputs", "Expect a sparse analog waveform");
+
 		SetData(nullptr, 0);
 		SetData(nullptr, 1);
 		SetData(nullptr, 2);
 		return;
 	}
 
-	//Capture the inbound data
-	SparseAnalogWaveform sampled;
-	SampleOnAnyEdges(din, clk, sampled);
-
 	//Make output waveforms
-	auto iout = SetupEmptySparseAnalogOutputWaveform(&sampled, 0);
-	auto qout = SetupEmptySparseAnalogOutputWaveform(&sampled, 1);
-	auto clkout = SetupEmptySparseDigitalOutputWaveform(&sampled, 2);
-	iout->m_triggerPhase = 0;
-	qout->m_triggerPhase = 0;
-	clkout->m_triggerPhase = 0;
+	auto iout = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	auto qout = SetupEmptySparseAnalogOutputWaveform(din, 1);
+	auto clkout = SetupEmptySparseDigitalOutputWaveform(din, 2);
 
+	din->PrepareForCpuAccess();
 	iout->PrepareForCpuAccess();
 	qout->PrepareForCpuAccess();
 	clkout->PrepareForCpuAccess();
 
-	//Copy metadata except now using 1fs timesteps
-	iout->m_startTimestamp = din->m_startTimestamp;
-	iout->m_startFemtoseconds = din->m_startFemtoseconds;
-	iout->m_triggerPhase = 0;
-	iout->m_timescale = 1;
-
-	qout->m_startTimestamp = din->m_startTimestamp;
-	qout->m_startFemtoseconds = din->m_startFemtoseconds;
-	qout->m_triggerPhase = 0;
-	qout->m_timescale = 1;
-
-	clkout->m_startTimestamp = din->m_startTimestamp;
-	clkout->m_startFemtoseconds = din->m_startFemtoseconds;
-	clkout->m_triggerPhase = 0;
-	clkout->m_timescale = 1;
-
-	size_t len = sampled.size();
+	size_t len = din->m_samples.size();
 	LogTrace("%zu sampled data points\n", len);
 
 	//Figure out the proper I-vs-Q alignment (even/odd is not specified)
@@ -146,8 +137,8 @@ void IQDemuxFilter::Refresh(
 			for(size_t i=phase; i+1 < window; i += 2)
 			{
 				//For now, fixed threshold of +/- 250 mV for zero code
-				auto fi = sampled.m_samples[i];
-				auto fq = sampled.m_samples[i+1];
+				auto fi = din->m_samples[i];
+				auto fq = din->m_samples[i+1];
 
 				bool izero = fabs(fi) < 0.25;
 				bool qzero = fabs(fq) < 0.25;
@@ -174,7 +165,7 @@ void IQDemuxFilter::Refresh(
 	bool clkval = false;
 	for(size_t i=istart; i+1 < len; i += 2)
 	{
-		int64_t tnow = sampled.m_offsets[i];
+		int64_t tnow = din->m_offsets[i];
 
 		//Extend previous sample, if any
 		size_t outlen = iout->m_offsets.size();
@@ -195,8 +186,8 @@ void IQDemuxFilter::Refresh(
 		qout->m_durations.push_back(1);
 		clkout->m_durations.push_back(1);
 
-		iout->m_samples.push_back(sampled.m_samples[i]);
-		qout->m_samples.push_back(sampled.m_samples[i+1]);
+		iout->m_samples.push_back(din->m_samples[i]);
+		qout->m_samples.push_back(din->m_samples[i+1]);
 		clkout->m_samples.push_back(clkval);
 
 		clkval = !clkval;
