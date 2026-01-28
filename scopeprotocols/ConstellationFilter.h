@@ -90,7 +90,7 @@ public:
 	{
 		if(m_width != width)
 		{
-			SetData(NULL, 0);
+			SetData(nullptr, 0);
 			m_width = width;
 		}
 	}
@@ -99,7 +99,7 @@ public:
 	{
 		if(m_height != height)
 		{
-			SetData(NULL, 0);
+			SetData(nullptr, 0);
 			m_height = height;
 		}
 	}

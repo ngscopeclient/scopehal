@@ -59,7 +59,6 @@ ConstellationFilter::ConstellationFilter(const string& color)
 
 	CreateInput("i");
 	CreateInput("q");
-	CreateInput("clk");
 
 	m_parameters[m_modulation] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_modulation].AddEnumValue("None", MOD_NONE);
@@ -86,7 +85,7 @@ ConstellationFilter::ConstellationFilter(const string& color)
 
 bool ConstellationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -135,8 +134,15 @@ void ConstellationFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ConstellationFilter::Refresh");
+	#endif
+
 	ClearErrors();
-	if(!VerifyAllInputsOK())
+
+	auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
+	if(!din_i || !din_q)
 	{
 		//if input goes momentarily bad, don't delete output - just stop updating
 
@@ -144,34 +150,23 @@ void ConstellationFilter::Refresh(
 			AddErrorMessage("Missing inputs", "No I signal input connected");
 		else if(!GetInputWaveform(0))
 			AddErrorMessage("Missing inputs", "No waveform available at I input");
+		else
+			AddErrorMessage("Invalid inputs", "Expected sparse analog waveform at I input");
 
 		if(!GetInput(1))
 			AddErrorMessage("Missing inputs", "No Q signal input connected");
 		else if(!GetInputWaveform(1))
 			AddErrorMessage("Missing inputs", "No waveform available at Q input");
-
-		if(!GetInput(2))
-			AddErrorMessage("Missing inputs", "No clock signal input connected");
-		else if(!GetInputWaveform(2))
-			AddErrorMessage("Missing inputs", "No waveform available at clock input");
+		else
+			AddErrorMessage("Invalid inputs", "Expected sparse analog waveform at Q input");
 
 		return;
 	}
 
-	auto din_i = GetInputWaveform(0);
-	auto din_q = GetInputWaveform(1);
-	auto clk = GetInputWaveform(2);
-
 	//Recompute the nominal constellation point locations
 	RecomputeNominalPoints();
 
-	//Sample the I/Q input
-	SparseAnalogWaveform samples_i;
-	SparseAnalogWaveform samples_q;
-	SampleOnAnyEdgesBase(din_i, clk, samples_i);
-	SampleOnAnyEdgesBase(din_q, clk, samples_q);
-
-	size_t inlen = min(samples_i.size(), samples_q.size());
+	size_t inlen = min(din_i->size(), din_q->size());
 
 	//Generate the output waveform
 	auto cap = dynamic_cast<ConstellationWaveform*>(GetData(0));
@@ -190,8 +185,8 @@ void ConstellationFilter::Refresh(
 	auto data = cap->GetAccumData();
 	for(size_t i=0; i<inlen; i++)
 	{
-		float ival = samples_i.m_samples[i];
-		float qval = samples_q.m_samples[i];
+		float ival = din_i->m_samples[i];
+		float qval = din_q->m_samples[i];
 
 		ssize_t x = static_cast<ssize_t>(round(xmid + xscale * ival));
 		ssize_t y = static_cast<ssize_t>(round(ymid + yscale * qval));
