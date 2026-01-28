@@ -68,6 +68,7 @@ layout(std430, push_constant) uniform constants
 {
 	int64_t	halfui;
 	int64_t timescale;
+	int64_t triggerPhase;
 	uint numIndexes;
 	uint numSamples;
 	uint inputPerThread;
@@ -161,6 +162,7 @@ void main()
 			{
 				float delta = InterpolateTime(samples[j-1], samples[j], target) * float(timescale);
 				tlerp = int64_t(j-1)*timescale + int64_t(delta);
+				tlerp += triggerPhase;
 				break;
 			}
 		}

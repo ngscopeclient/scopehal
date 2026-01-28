@@ -52,6 +52,7 @@ class PAMEdgeDetectorMergeConstants
 public:
 	int64_t halfui;
 	int64_t timescale;
+	int64_t triggerPhase;
 	uint32_t numIndexes;
 	uint32_t numSamples;
 	uint32_t inputPerThread;
