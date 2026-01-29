@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -82,34 +82,46 @@ string Ethernet100BaseT1LinkTrainingDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+Filter::DataLocation Ethernet100BaseT1LinkTrainingDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	if(!VerifyAllInputsOK())
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("Ethernet100BaseT1LinkTrainingDecoder::Refresh");
+	#endif
+
+	//Get the input data
+	auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
+
+	//Make sure we've got valid inputs
+	ClearErrors();
+	if(!din_i || !din_q)
 	{
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+			else
+				AddErrorMessage("Invalid inputs", string("Expected sparse analog waveform at input ") + m_signalNames[i] );
+		}
+
 		SetData(nullptr, 0);
 		return;
 	}
 
-	//Get the input data
-	auto din_i = GetInputWaveform(0);
-	auto din_q = GetInputWaveform(1);
-	auto clk = GetInputWaveform(2);
 	din_i->PrepareForCpuAccess();
 	din_q->PrepareForCpuAccess();
-	clk->PrepareForCpuAccess();
 
-	//Sample the input on the edges of the recovered clock
-	//TODO: if this is always coming from the IQDemuxFilter we can probably optimize this part out
-	//and just iterate over i/q direct?
-	SparseAnalogWaveform isamples;
-	SparseAnalogWaveform qsamples;
-	isamples.PrepareForCpuAccess();
-	qsamples.PrepareForCpuAccess();
-	SampleOnAnyEdgesBase(din_i, clk, isamples);
-	SampleOnAnyEdgesBase(din_q, clk, qsamples);
-	size_t ilen = min(isamples.size(), qsamples.size());
+	size_t ilen = min(din_i->size(), din_q->size());
 
 	enum
 	{
@@ -125,12 +137,8 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 	float cutn = -0.35;
 
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
-	auto cap = new Ethernet100BaseT1LinkTrainingWaveform;
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = isamples.m_startTimestamp;
-	cap->m_startFemtoseconds = isamples.m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<Ethernet100BaseT1LinkTrainingWaveform>(din_i, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	bool masterMode = (m_parameters[m_scrambler].GetIntVal() == Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
 
@@ -147,13 +155,13 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 
 	for(size_t i=0; i<ilen; i++)
 	{
-		int64_t tnow = isamples.m_offsets[i];
-		int64_t tlen = isamples.m_durations[i];
+		int64_t tnow = din_i->m_offsets[i];
+		int64_t tlen = din_i->m_durations[i];
 		size_t nlast = cap->size() - 1;
 
 		//Decode raw symbols to 3-level constellation coordinates
-		float fi = isamples.m_samples[i];
-		float fq = qsamples.m_samples[i];
+		float fi = din_i->m_samples[i];
+		float fq = din_q->m_samples[i];
 		int ci = 0;
 		int cq = 0;
 		if(fi > cutp)
@@ -245,10 +253,10 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 				//But we can back up and declare the lock as beginning at that point.
 				if(idlesMatched >= minIdlesForLock)
 				{
-					//LogTrace("Scrambler locked at %s\n", fs.PrettyPrint(isamples.m_offsets[i]).c_str());
+					//LogTrace("Scrambler locked at %s\n", fs.PrettyPrint(din_i->m_offsets[i]).c_str());
 
 					//Retcon the SEND_I_UNLOCKED to end when we got our first good idle
-					int64_t tlock = isamples.m_offsets[i - idlesMatched];
+					int64_t tlock = din_i->m_offsets[i - idlesMatched];
 					cap->m_durations[nlast] = tlock - cap->m_offsets[nlast];
 
 					//We're now locked
