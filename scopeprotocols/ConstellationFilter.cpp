@@ -163,6 +163,9 @@ void ConstellationFilter::Refresh(
 		return;
 	}
 
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
+
 	//Recompute the nominal constellation point locations
 	RecomputeNominalPoints();
 
