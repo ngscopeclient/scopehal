@@ -56,5 +56,5 @@ void main()
 	if(i >= size)
 		return;
 
-	dout[i]	= (din[i] * tap0) + (din[i + samples_per_tap] * tap1);
+	dout[i]	= (din[i] * tap1) + (din[i + samples_per_tap] * tap0);
 }

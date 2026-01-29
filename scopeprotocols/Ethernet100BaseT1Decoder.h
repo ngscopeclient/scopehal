@@ -58,7 +58,12 @@ public:
 	};
 
 protected:
-	std::string m_scrambler;
+	FilterParameter& m_scrambler;
+
+	FilterParameter& m_upperThresholdI;
+	FilterParameter& m_upperThresholdQ;
+	FilterParameter& m_lowerThresholdI;
+	FilterParameter& m_lowerThresholdQ;
 };
 
 #endif

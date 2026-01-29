@@ -38,7 +38,11 @@ using namespace std;
 
 Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 	: EthernetProtocolDecoder(color)
-	, m_scrambler("Scrambler polynomial")
+	, m_scrambler(m_parameters["Scrambler polynomial"])
+	, m_upperThresholdI(m_parameters["Threshold I+"])
+	, m_upperThresholdQ(m_parameters["Threshold Q+"])
+	, m_lowerThresholdI(m_parameters["Threshold I-"])
+	, m_lowerThresholdQ(m_parameters["Threshold Q-"])
 {
 	m_signalNames.clear();
 	m_inputs.clear();
@@ -46,10 +50,20 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 	CreateInput("i");
 	CreateInput("q");
 
-	m_parameters[m_scrambler] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_scrambler].AddEnumValue("x^33 + x^13 + 1 (M)", SCRAMBLER_M_B13);
-	m_parameters[m_scrambler].AddEnumValue("x^33 + x^20 + 1 (S)", SCRAMBLER_S_B19);
-	m_parameters[m_scrambler].SetIntVal(SCRAMBLER_M_B13);
+	m_scrambler = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_scrambler.AddEnumValue("x^33 + x^13 + 1 (M)", SCRAMBLER_M_B13);
+	m_scrambler.AddEnumValue("x^33 + x^20 + 1 (S)", SCRAMBLER_S_B19);
+	m_scrambler.SetIntVal(SCRAMBLER_M_B13);
+
+	m_upperThresholdI = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_upperThresholdQ = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_lowerThresholdI = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_lowerThresholdQ = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+
+	m_upperThresholdI.SetFloatVal(0.4);
+	m_upperThresholdQ.SetFloatVal(0.4);
+	m_lowerThresholdI.SetFloatVal(-0.4);
+	m_lowerThresholdQ.SetFloatVal(-0.4);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,8 +108,6 @@ void Ethernet100BaseT1Decoder::Refresh(
 	//Get the input data
 	auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
-	din_i->PrepareForCpuAccess();
-	din_q->PrepareForCpuAccess();
 
 	//Make sure we've got valid inputs
 	ClearErrors();
@@ -115,6 +127,9 @@ void Ethernet100BaseT1Decoder::Refresh(
 		return;
 	}
 
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
+
 	size_t ilen = min(din_i->size(), din_q->size());
 
 	enum
@@ -129,8 +144,10 @@ void Ethernet100BaseT1Decoder::Refresh(
 
 	//Decision thresholds
 	//TODO: adaptive based on histogram?
-	float cutp = 0.35;
-	float cutn = -0.35;
+	float cutip = m_upperThresholdI.GetFloatVal();
+	float cutqp = m_upperThresholdQ.GetFloatVal();
+	float cutin = m_lowerThresholdI.GetFloatVal();
+	float cutqn = m_lowerThresholdQ.GetFloatVal();
 	Unit fs(Unit::UNIT_FS);
 
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
@@ -156,8 +173,9 @@ void Ethernet100BaseT1Decoder::Refresh(
 	uint8_t prevNib = 0;
 	bool phaseLow = true;
 
-	bool masterMode = (m_parameters[m_scrambler].GetIntVal() == SCRAMBLER_M_B13);
+	bool masterMode = (m_scrambler.GetIntVal() == SCRAMBLER_M_B13);
 
+	size_t totalErrorsReported = 0;
 	for(size_t i=0; i<ilen; i++)
 	{
 		int64_t tnow = din_i->m_offsets[i];
@@ -168,13 +186,13 @@ void Ethernet100BaseT1Decoder::Refresh(
 		float fq = din_q->m_samples[i];
 		int ci = 0;
 		int cq = 0;
-		if(fi > cutp)
+		if(fi > cutip)
 			ci = 1;
-		else if(fi < cutn)
+		else if(fi < cutin)
 			ci = -1;
-		if(fq > cutp)
+		if(fq > cutqp)
 			cq = 1;
-		else if(fq < cutn)
+		else if(fq < cutqn)
 			cq = -1;
 
 		//Advance the scrambler for each constellation point
@@ -260,9 +278,15 @@ void Ethernet100BaseT1Decoder::Refresh(
 						{
 							lastScramblerError = i;
 							scramblerErrors ++;
+							totalErrorsReported ++;
 
-							LogTrace("Scrambler error at %s (%zu recently)\n",
-								fs.PrettyPrint(din_i->m_offsets[i]).c_str(), scramblerErrors);
+							if(totalErrorsReported < 32)
+							{
+								LogTrace("Scrambler error at %s (%zu recently)\n",
+									fs.PrettyPrint(din_i->m_offsets[i]).c_str(), scramblerErrors);
+								if(totalErrorsReported == 31)
+									LogTrace("Not reporting any more scrambler errors\n");
+							}
 
 							if(scramblerErrors > 16)
 							{

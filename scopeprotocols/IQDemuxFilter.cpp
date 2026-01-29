@@ -54,6 +54,10 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 		m_demuxComputePipeline =
 			make_shared<ComputePipeline>("shaders/IQDemuxFilter.spv", 8, sizeof(IQDemuxConstants));
 	}
+
+	m_alignComputePipeline =
+		make_shared<ComputePipeline>("shaders/IQDemuxFilterAlignment.spv", 2, sizeof(uint32_t));
+	m_alignOut.resize(2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,43 +121,34 @@ void IQDemuxFilter::Refresh(
 	//Figure out the proper I-vs-Q alignment (even/odd is not specified)
 	auto align = static_cast<AlignmentType>(m_alignment.GetIntVal());
 	size_t istart = 0;
-	din->PrepareForCpuAccess();
+
 	if(align == ALIGN_100BASET1)
 	{
+		//We need to do this on the GPU even if it's not super time consuming, because it avoids a round trip
+		//This doesn't depend on int64 so can be done on any GPU, just normal float32 and int32 operations
+
 		//Look at a fixed window in the start of the waveform and see which one has the least (0,0) symbols
 		size_t window = min(len, (size_t)10000);
 
-		size_t leastZeros = window;
-		for(size_t phase=0; phase<2; phase++)
-		{
-			size_t numSymbols = 0;
-			size_t numZeros = 0;
+		//Do the alignment check on the GPU
+		cmdBuf.begin({});
 
-			for(size_t i=phase; i+1 < window; i += 2)
-			{
-				//For now, fixed threshold of +/- 250 mV for zero code
-				auto fi = din->m_samples[i];
-				auto fq = din->m_samples[i+1];
+		m_alignComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_alignComputePipeline->BindBufferNonblocking(1, m_alignOut, cmdBuf, true);
+		m_alignComputePipeline->Dispatch(cmdBuf, (uint32_t)window, 2);
+		m_alignComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+		m_alignOut.PrepareForCpuAccessNonblocking(cmdBuf);
 
-				bool izero = fabs(fi) < 0.25;
-				bool qzero = fabs(fq) < 0.25;
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 
-				numSymbols ++;
-				if(izero && qzero)
-					numZeros ++;
-			}
+		LogTrace("Phase 0: zeros = %u\n", m_alignOut[0]);
+		LogTrace("Phase 1: zeros = %u\n", m_alignOut[1]);
 
-			LogTrace("Phase %zu\n", phase);
-			LogIndenter li;
-			LogTrace("Symbols: %zu\n", numSymbols);
-			LogTrace("Zeros:  %zu\n", numZeros);
-
-			if(numZeros < leastZeros)
-			{
-				istart = phase;
-				leastZeros = numZeros;
-			}
-		}
+		if(m_alignOut[0] < m_alignOut[1])
+			istart = 0;
+		else
+			istart = 1;
 	}
 
 	//Make output waveforms

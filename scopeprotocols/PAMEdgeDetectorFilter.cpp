@@ -181,10 +181,10 @@ void PAMEdgeDetectorFilter::Refresh(
 	//Output waveform is sparse since we interpolate edge positions
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_timescale = 1;
+	cap->m_triggerPhase = 0;
 
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
-	//TODO: does this actually depend on int64??
 	if(g_hasShaderInt8)
 	{
 		//Prepare thresholds for GPU
@@ -279,6 +279,8 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_edgeStates.PrepareForCpuAccess();
 		m_edgeRising.PrepareForCpuAccess();
 
+		din->PrepareForCpuAccess();
+
 		for(size_t i=1; i<len-1; i++)
 		{
 			//Check against each threshold for both rising and falling edges
@@ -337,6 +339,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		cfg.inputPerThread = GetComputeBlockCount(cfg.numIndexes, numThreads);
 		cfg.outputPerThread = cfg.inputPerThread + 1;
 		cfg.order = order;
+		cfg.triggerPhase = din->m_triggerPhase;
 
 		m_edgeOffsetsScratch.resize(cfg.outputPerThread * numThreads);
 
@@ -440,10 +443,12 @@ void PAMEdgeDetectorFilter::Refresh(
 				if(	( (prev <= target) && (cur > target) ) ||
 					( (prev >= target) && (cur < target) ) )
 				{
-					tlerp = (j-1)*din->m_timescale + InterpolateTime(din, j-1, target)*din->m_timescale;
+					tlerp = (j-1)*din->m_timescale;
+					tlerp += (int64_t)(InterpolateTime(din, j-1, target)*din->m_timescale);
 					break;
 				}
 			}
+			tlerp += din->m_triggerPhase;
 
 			//Add the symbol
 			if(!merging)

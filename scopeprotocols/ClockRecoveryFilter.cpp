@@ -200,6 +200,7 @@ void ClockRecoveryFilter::Refresh(
 		din->PrepareForCpuAccess();
 
 		vector<int64_t> edges;
+
 		if(sadin)
 			FindZeroCrossings(sadin, threshold, edges);
 		else if(uddin)
@@ -209,9 +210,7 @@ void ClockRecoveryFilter::Refresh(
 		nedges = edges.size();
 
 		//Inefficient but this is a less frequently used code path
-		vedges.resize(nedges);
-		vedges.PrepareForCpuAccess();
-		memcpy(vedges.GetCpuPointer(), &edges[0], nedges*sizeof(int64_t));
+		vedges.CopyFrom(edges);
 	}
 	if(nedges == 0)
 	{

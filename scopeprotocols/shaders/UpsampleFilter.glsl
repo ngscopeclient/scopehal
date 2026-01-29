@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,6 +63,8 @@ void main()
 	if(gl_GlobalInvocationID.z >= upsample_factor)
 		return;
 
+	uint offset = i*upsample_factor;
+
 	uint start = 0;
 	uint sstart = 0;
 	if(gl_GlobalInvocationID.z > 0)
@@ -73,7 +75,7 @@ void main()
 
 	float f = 0;
 	for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
-		f += fkernel[k] * din[gl_GlobalInvocationID.x + sstart];
+		f += fkernel[k] * din[i + sstart];
 
-	dout[i*upsample_factor + gl_GlobalInvocationID.z] = f;
+	dout[offset + gl_GlobalInvocationID.z] = f;
 }

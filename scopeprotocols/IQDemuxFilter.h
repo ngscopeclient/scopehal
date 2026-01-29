@@ -66,6 +66,9 @@ protected:
 	FilterParameter& m_alignment;
 
 	std::shared_ptr<ComputePipeline> m_demuxComputePipeline;
+	std::shared_ptr<ComputePipeline> m_alignComputePipeline;
+
+	AcceleratorBuffer<uint32_t> m_alignOut;
 };
 
 #endif

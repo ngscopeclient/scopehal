@@ -62,6 +62,7 @@ layout(std430, push_constant) uniform constants
 {
 	int64_t	halfui;
 	int64_t timescale;
+	int64_t triggerPhase;
 	uint numIndexes;
 	uint numSamples;
 	uint inputPerThread;
