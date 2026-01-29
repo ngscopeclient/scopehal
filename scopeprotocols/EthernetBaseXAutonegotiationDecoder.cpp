@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,7 +53,7 @@ EthernetBaseXAutonegotiationDecoder::EthernetBaseXAutonegotiationDecoder(const s
 
 bool EthernetBaseXAutonegotiationDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.GetData()) != nullptr) )
@@ -67,31 +67,44 @@ string EthernetBaseXAutonegotiationDecoder::GetProtocolName()
 	return "Ethernet Base-X Autonegotiation";
 }
 
+Filter::DataLocation EthernetBaseXAutonegotiationDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EthernetBaseXAutonegotiationDecoder::Refresh()
+void EthernetBaseXAutonegotiationDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EthernetBaseXAutonegotiationDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Get the input data
+	//Make sure we've got valid inputs
+	ClearErrors();
 	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
 	if(!din)
+	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid input", "Expected 8B/10B waveform at input");
+
+		SetData(nullptr, 0);
 		return;
+	}
 	din->PrepareForCpuAccess();
 
 	//Create the outbound data
-	auto* cap = new EthernetBaseXAutonegotiationWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_triggerPhase = din->m_triggerPhase;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto* cap = SetupEmptyWaveform<EthernetBaseXAutonegotiationWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 
 	enum
@@ -192,7 +205,6 @@ void EthernetBaseXAutonegotiationDecoder::Refresh()
 		}
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 

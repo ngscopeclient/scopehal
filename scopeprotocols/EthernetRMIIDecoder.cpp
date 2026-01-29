@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,7 +62,7 @@ string EthernetRMIIDecoder::GetProtocolName()
 bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	auto chan = stream.m_channel;
-	if(chan == NULL)
+	if(chan == nullptr)
 		return false;
 
 	if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
@@ -74,16 +74,37 @@ bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
+Filter::DataLocation EthernetRMIIDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EthernetRMIIDecoder::Refresh()
+void EthernetRMIIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	ClearPackets();
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DDR3Decoder::Refresh");
+	#endif
 
+	//Make sure we've got valid inputs
+	ClearPackets();
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<4; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -106,16 +127,15 @@ void EthernetRMIIDecoder::Refresh()
 	len = min(len, dd1.size());
 	if(len < 100)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Not enough samples", "Input has less than 100 clock edges");
+		SetData(nullptr, 0);
 		return;
 	}
 	len -= 4;	//we read past current position to get a full byte
 
 	//Create the output capture
-	auto cap = new EthernetWaveform;
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(clk, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
 	//skip first 2 samples so we can get a full clock cycle before starting
@@ -169,6 +189,5 @@ void EthernetRMIIDecoder::Refresh()
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }

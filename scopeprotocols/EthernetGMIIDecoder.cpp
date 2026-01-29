@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,7 +62,7 @@ string EthernetGMIIDecoder::GetProtocolName()
 bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	auto chan = stream.m_channel;
-	if(chan == NULL)
+	if(chan == nullptr)
 		return false;
 
 	switch(i)
@@ -83,11 +83,22 @@ bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
+Filter::DataLocation EthernetGMIIDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EthernetGMIIDecoder::Refresh()
+void EthernetGMIIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	//TODO refresh this
+
+	/*
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
@@ -154,4 +165,5 @@ void EthernetGMIIDecoder::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+	*/
 }

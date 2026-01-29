@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -81,11 +81,22 @@ bool EthernetRGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
+Filter::DataLocation EthernetRGMIIDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EthernetRGMIIDecoder::Refresh()
+void EthernetRGMIIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	//TODO refresh
+
+	/*
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
@@ -232,4 +243,5 @@ void EthernetRGMIIDecoder::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+	*/
 }
