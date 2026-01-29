@@ -42,7 +42,7 @@ class OscilloscopeChannel;
 /**
 	@brief Descriptor for a group of streams comming from different channels (typically a channel bank)
  */
-class StreamGroupDescriptor
+class StreamGroupDescriptor : public std::enable_shared_from_this<StreamGroupDescriptor>
 {
 public:
 	StreamGroupDescriptor()
