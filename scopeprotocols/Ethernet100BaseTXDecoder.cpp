@@ -155,9 +155,14 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	#endif
 
 	ClearPackets();
-
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -166,6 +171,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
+		AddErrorMessage("Invalid input", "This filter expects a sparse analog input");
 		SetData(nullptr, 0);
 		return;
 	}
