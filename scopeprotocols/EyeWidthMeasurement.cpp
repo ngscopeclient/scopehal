@@ -61,7 +61,7 @@ EyeWidthMeasurement::EyeWidthMeasurement(const string& color)
 
 bool EyeWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
@@ -89,8 +89,19 @@ Filter::DataLocation EyeWidthMeasurement::GetInputLocation()
 
 void EyeWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	if(!VerifyAllInputsOK(true))
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EyeWidthMeasurement::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
+	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		m_streams[1].m_value = NAN;
 		return;
@@ -170,8 +181,5 @@ void EyeWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 	}
 
 	m_streams[1].m_value = fs_per_pixel * (far_right - far_left);
-
-	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
 }
