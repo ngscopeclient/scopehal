@@ -27,48 +27,59 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of IQDemuxFilter
- */
-#ifndef IQDemuxFilter_h
-#define IQDemuxFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class IQDemuxConstants
+layout(std430, binding=0) restrict readonly buffer buf_inSamples
 {
-public:
-	uint32_t istart;
-	uint32_t outlen;
+	float samples[];
 };
 
-class IQDemuxFilter : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_outZeroSymbols
 {
-public:
-	IQDemuxFilter(const std::string& color);
+	uint zeroSymbols[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+};
 
-	static std::string GetProtocolName();
+#define LOCAL_SIZE 64
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+layout(local_size_x=LOCAL_SIZE, local_size_y=1, local_size_z=1) in;
 
-	enum AlignmentType
+shared uint zerosFound[LOCAL_SIZE];
+
+void main()
+{
+	uint hits = 0;
+
+	//Starting X position
+	//Work group ID is the phase we're interested in (0 or 1)
+	//then threads work interleaved for efficiency
+	uint istart = gl_WorkGroupID.x + gl_LocalInvocationID.x*2;
+	for(uint i=istart; i+1 < len; i += 2)
 	{
-		ALIGN_NONE,
-		ALIGN_100BASET1
-	};
+		//For now, fixed threshold of +/- 250 mV for zero code
+		if( (abs(samples[i]) < 0.25) && (abs(samples[i+1]) < 0.25) )
+			hits ++;
+	}
 
-	PROTOCOL_DECODER_INITPROC(IQDemuxFilter)
+	//Write our local count to shared buffer
+	zerosFound[gl_LocalInvocationID.x] = hits;
 
-protected:
-	FilterParameter& m_alignment;
+	//wait for writes to commit
+	barrier();
+	memoryBarrierShared();
 
-	std::shared_ptr<ComputePipeline> m_demuxComputePipeline;
-	std::shared_ptr<ComputePipeline> m_alignComputePipeline;
+	//Sum final output
+	if(gl_LocalInvocationID.x == 0)
+	{
+		uint total = 0;
+		for(int i=0; i<LOCAL_SIZE; i++)
+			total += zerosFound[total];
 
-	AcceleratorBuffer<uint32_t> m_alignOut;
-};
-
-#endif
+		zeroSymbols[gl_WorkGroupID.x] = total;
+	}
+}
