@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -778,21 +778,9 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 
 	string rates = m_transport->SendCommandQueuedWithReply("ACQ:RATES?");
 
-	size_t i=0;
-	while(true)
-	{
-		size_t istart = i;
-		i = rates.find(',', i+1);
-		if(i == string::npos)
-			break;
-
-		auto block = rates.substr(istart, i-istart);
-		auto hz = stol(block);
-		ret.push_back(hz);
-
-		//skip the comma
-		i++;
-	}
+	auto split = explode(rates, ',');
+	for(auto s : split)
+		ret.push_back(stol(s));
 
 	return ret;
 }
@@ -828,19 +816,9 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleDepthsNonInterleaved()
 
 	string depths = m_transport->SendCommandQueuedWithReply("ACQ:DEPTHS?");
 
-	size_t i=0;
-	while(true)
-	{
-		size_t istart = i;
-		i = depths.find(',', i+1);
-		if(i == string::npos)
-			break;
-
-		ret.push_back(stol(depths.substr(istart, i-istart)));
-
-		//skip the comma
-		i++;
-	}
+	auto split = explode(depths, ',');
+	for(auto s : split)
+		ret.push_back(stol(s));
 
 	return ret;
 }
