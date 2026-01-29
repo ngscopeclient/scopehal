@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,14 +64,14 @@ float blackman(float x, float width)
 
 UpsampleFilter::UpsampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_factor(m_parameters["Upsample factor"])
 	, m_computePipeline("shaders/UpsampleFilter.spv", 3, sizeof(UpsampleFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_factorname = "Upsample factor";
-	m_parameters[m_factorname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_factorname].SetIntVal(10);
+	m_factor = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_factor.SetIntVal(10);
 
 	//Use pinned memory for filter kernel
 	m_filter.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -83,7 +83,7 @@ UpsampleFilter::UpsampleFilter(const string& color)
 
 bool UpsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -105,21 +105,34 @@ string UpsampleFilter::GetProtocolName()
 
 void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("UpsampleFilter::Refresh");
+	#endif
+
 	//Get the input data
 	//Current resampling implementation assumes input is uniform, fail if it's not
+	ClearErrors();
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid inputs", "Input waveform must be uniform analog");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Configuration parameters (TODO: allow window to be user specified)
-	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
+	size_t upsample_factor = m_factor.GetIntVal();
 	size_t window = 5;
 	size_t kernel = window*upsample_factor;
 	if(upsample_factor <= 0)
 	{
+		AddErrorMessage("Invalid configuration", "Upsample factor must be a positive integer");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -163,7 +176,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		m_computePipeline.Dispatch(cmdBuf, args,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1,
-			GetComputeBlockCount(upsample_factor, 1));
+			upsample_factor);
 
 		//Done, submit to the queue and wait
 		cmdBuf.end();
