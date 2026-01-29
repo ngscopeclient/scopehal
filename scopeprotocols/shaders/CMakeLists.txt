@@ -60,6 +60,7 @@ add_compute_shaders(
 		Ethernet100BaseTX_FindSSD.glsl
 		Ethernet100BaseTX_MLT3Decoder.glsl
 		Ethernet100BaseTX_TrySync.glsl
+		ExponentialMovingAverage.glsl
 		EyePattern.glsl
 		EyePattern_IndexSearch.glsl
 		FillSquarewaveAndDurations.glsl

@@ -27,44 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ExponentialMovingAverageFilter
- */
-#ifndef ExponentialMovingAverageFilter_h
-#define ExponentialMovingAverageFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class QueueHandle;
-
-class ExponentialMovingAverageConstants
+layout(std430, binding=0) restrict buffer buf_out
 {
-public:
-	uint32_t	size;
-	float		decay;
+	float dout[];
 };
 
-class ExponentialMovingAverageFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_in
 {
-public:
-	ExponentialMovingAverageFilter(const std::string& color);
-	~ExponentialMovingAverageFilter();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	virtual void ClearSweeps() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(ExponentialMovingAverageFilter)
-
-protected:
-	FilterParameter& m_halflife;
-
-	ComputePipeline m_computePipeline;
+	float din[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+	float decay;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
+		return;
+
+	dout[i] = dout[i] * decay + din[i] * (1 - decay);
+}

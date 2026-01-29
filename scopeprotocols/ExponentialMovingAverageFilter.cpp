@@ -37,13 +37,14 @@ using namespace std;
 
 ExponentialMovingAverageFilter::ExponentialMovingAverageFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_halflife("Half-life")
+	, m_halflife(m_parameters["Half-life"])
+	, m_computePipeline("shaders/ExponentialMovingAverage.spv", 2, sizeof(ExponentialMovingAverageConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_parameters[m_halflife] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_halflife].SetIntVal(8);
+	m_halflife = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_halflife.SetIntVal(8);
 }
 
 ExponentialMovingAverageFilter::~ExponentialMovingAverageFilter()
@@ -84,8 +85,8 @@ void ExponentialMovingAverageFilter::ClearSweeps()
 }
 
 void ExponentialMovingAverageFilter::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ExponentialMovingAverageFilter::Refresh");
@@ -110,12 +111,6 @@ void ExponentialMovingAverageFilter::Refresh(
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 	size_t len = din->size();
 
-	//Convert half life to decay coefficient
-	float hl = m_parameters[m_halflife].GetIntVal();
-	float decay = 1 / pow(2, 1/hl);
-
-	din->PrepareForCpuAccess();
-
 	//Set up units
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
@@ -124,8 +119,16 @@ void ExponentialMovingAverageFilter::Refresh(
 	auto cap = GetData(0);
 	auto scap = dynamic_cast<SparseAnalogWaveform*>(cap);
 	auto ucap = dynamic_cast<UniformAnalogWaveform*>(cap);
-	if(cap)
-		cap->PrepareForCpuAccess();
+
+	//Convert half life to decay coefficient
+	float hl = m_halflife.GetIntVal();
+	ExponentialMovingAverageConstants cfg;
+	cfg.size = len;
+	cfg.decay = 1 / pow(2, 1/hl);
+
+	cmdBuf.begin({});
+
+	bool skip = false;
 
 	//Sparse path
 	if(sdin)
@@ -136,18 +139,18 @@ void ExponentialMovingAverageFilter::Refresh(
 			scap = new SparseAnalogWaveform;
 			scap->Resize(din->size());
 			cap = scap;
+			SetData(cap, 0);
 
 			scap->m_samples.CopyFrom(sdin->m_samples);
+			skip = true;
 		}
 
 		//Actual filter code path
 		else
 		{
-			auto pin = sdin->m_samples.GetCpuPointer();
-			auto pout = scap->m_samples.GetCpuPointer();
-
-			for(size_t i=0; i<len; i++)
-				pout[i] = pout[i]*decay + pin[i]*(1-decay);
+			scap->Resize(din->size());
+			m_computePipeline.BindBufferNonblocking(0, scap->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(1, sdin->m_samples, cmdBuf);
 		}
 
 		//Either way we want to reuse the timestamps
@@ -163,20 +166,33 @@ void ExponentialMovingAverageFilter::Refresh(
 			ucap = new UniformAnalogWaveform;
 			ucap->Resize(din->size());
 			cap = ucap;
+			SetData(cap, 0);
 
 			ucap->m_samples.CopyFrom(udin->m_samples);
+			skip = true;
 		}
 
 		//Actual filter code path
 		else
 		{
-			auto pin = udin->m_samples.GetCpuPointer();
-			auto pout = ucap->m_samples.GetCpuPointer();
-
-			for(size_t i=0; i<len; i++)
-				pout[i] = pout[i]*decay + pin[i]*(1-decay);
+			ucap->Resize(din->size());
+			m_computePipeline.BindBufferNonblocking(0, ucap->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(1, udin->m_samples, cmdBuf);
 		}
 	}
+
+	//Run the actual decay shader
+	if(!skip)
+	{
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+		m_computePipeline.Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+	}
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+	cap->MarkModifiedFromGpu();
 
 	//Update timestamps
 	cap->m_startTimestamp 		= din->m_startTimestamp;
@@ -184,10 +200,6 @@ void ExponentialMovingAverageFilter::Refresh(
 	cap->m_triggerPhase			= din->m_triggerPhase;
 	cap->m_timescale			= din->m_timescale;
 	cap->m_revision ++;
-
-	//Done
-	SetData(cap, 0);
-	cap->MarkModifiedFromCpu();
 }
 
 Filter::DataLocation ExponentialMovingAverageFilter::GetInputLocation()
