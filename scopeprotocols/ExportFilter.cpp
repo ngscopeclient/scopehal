@@ -76,7 +76,9 @@ ExportFilter::~ExportFilter()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ExportFilter::Refresh()
+void ExportFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	auto mode = static_cast<ExportMode_t>(m_parameters[m_mode].GetIntVal());
 	switch(mode)

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -61,7 +61,7 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 
 bool EyeJitterMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
@@ -78,14 +78,33 @@ string EyeJitterMeasurement::GetProtocolName()
 	return "Eye P-P Jitter";
 }
 
+Filter::DataLocation EyeJitterMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EyeJitterMeasurement::Refresh()
+void EyeJitterMeasurement::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EyeJitterMeasurement::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK(true))
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		m_streams[1].m_value = NAN;
 		return;
 	}
@@ -171,8 +190,6 @@ void EyeJitterMeasurement::Refresh()
 	}
 
 	m_streams[1].m_value = fs_per_pixel * jitter_pp;
-
-	SetData(cap, 0);
 
 	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;

@@ -48,7 +48,7 @@ public:
 	ExportFilter(const std::string& color);
 	virtual ~ExportFilter();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	virtual std::vector<std::string> EnumActions() override;
 	virtual bool PerformAction(const std::string& id) override;

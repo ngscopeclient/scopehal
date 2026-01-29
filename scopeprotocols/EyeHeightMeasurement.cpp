@@ -65,7 +65,7 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 
 bool EyeHeightMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
@@ -93,8 +93,19 @@ Filter::DataLocation EyeHeightMeasurement::GetInputLocation()
 
 void EyeHeightMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EyeHeightMeasurement::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK(true))
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		m_streams[1].m_value = NAN;
 		return;
@@ -174,9 +185,6 @@ void EyeHeightMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		cap->m_samples.push_back(height_volts);
 	}
 
-	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
-
 	m_streams[1].m_value = minheight;
 }
