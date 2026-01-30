@@ -28,6 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
+#include "../scopehal/KahanSummation.h"
 #include "FallMeasurement.h"
 
 using namespace std;
@@ -125,13 +126,13 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	cap->m_timescale = 1;
 
 	float last = -1e20;
-	double tedge = 0;
+	int64_t tedge = 0;
 
 	int state = 0;
 	int64_t tlast = 0;
 
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
-	double sum = 0;
+	KahanSummation sum;
 	int64_t num = 0;
 	for(size_t i=0; i < len; i++)
 	{
@@ -143,7 +144,8 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 		{
 			if( (cur < vstart) && (last >= vstart) )
 			{
-				tedge = tnow - din->m_timescale + InterpolateTime(sdin, udin, i-1, vstart)*din->m_timescale;
+				int64_t xdelta = InterpolateTime(sdin, udin, i-1, vstart) * din->m_timescale;
+				tedge = tnow - din->m_timescale + xdelta;
 				state = 1;
 			}
 		}
@@ -153,7 +155,8 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 		{
 			if( (cur < vend) && (last >= vend) )
 			{
-				double dt = InterpolateTime(sdin, udin, i-1, vend)*din->m_timescale + tnow - din->m_timescale - tedge;
+				int64_t xdelta = InterpolateTime(sdin, udin, i-1, vend) * din->m_timescale;
+				int64_t dt = xdelta + tnow - din->m_timescale - tedge;
 
 				cap->m_offsets.push_back(tlast);
 				cap->m_durations.push_back(tnow - tlast);
@@ -174,5 +177,5 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 
 	cap->MarkModifiedFromCpu();
 
-	m_streams[1].m_value = sum / num;
+	m_streams[1].m_value = sum.GetSum() / num;
 }
