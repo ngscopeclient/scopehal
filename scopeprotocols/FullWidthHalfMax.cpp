@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,7 +54,7 @@ FullWidthHalfMax::FullWidthHalfMax(const string& color)
 
 bool FullWidthHalfMax::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -71,16 +71,35 @@ string FullWidthHalfMax::GetProtocolName()
 	return "Full Width Half Max";
 }
 
+Filter::DataLocation FullWidthHalfMax::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void FullWidthHalfMax::Refresh()
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("FullWidthHalfMax::Refresh");
+	#endif
+
 	auto din = GetInputWaveform(0);
 
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
+		SetData(nullptr, 1);
+		m_streams[2].m_value = NAN;
 		return;
 	}
 
@@ -194,9 +213,6 @@ void FullWidthHalfMax::Refresh()
 			sum_half_widths += fwhm;
 		}
 	}
-
-	SetData(cap, 0);
-	SetData(cap1, 1);
 
 	cap->MarkModifiedFromCpu();
 	cap1->MarkModifiedFromCpu();
