@@ -73,31 +73,49 @@ string FrequencyMeasurement::GetProtocolName()
 	return "Frequency";
 }
 
+Filter::DataLocation FrequencyMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void FrequencyMeasurement::Refresh()
+void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("FrequencyMeasurement::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
+		m_streams[1].m_value = NAN;
 		return;
 	}
 
 	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
 	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
+
+	din->PrepareForCpuAccess();
 	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at 50% of full scale range
 	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
+		FindZeroCrossings(uadin, m_averager.Average(uadin, cmdBuf, queue), edges);
 	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
+		FindZeroCrossings(sadin, m_averager.Average(sadin, cmdBuf, queue), edges);
 
 	//Just find edges in digital signals
 	else if(uddin)
@@ -108,7 +126,9 @@ void FrequencyMeasurement::Refresh()
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
+		AddErrorMessage("Input too short", "Need at least two edges for a meaningful frequency measurement");
 		SetData(nullptr, 0);
+		m_streams[1].m_value = NAN;
 		return;
 	}
 
@@ -131,8 +151,6 @@ void FrequencyMeasurement::Refresh()
 		cap->m_durations.push_back(round(delta));
 		cap->m_samples.push_back(freq);
 	}
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 
