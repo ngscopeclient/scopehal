@@ -108,23 +108,23 @@ void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
 
-	din->PrepareForCpuAccess();
-	vector<int64_t> edges;
-
 	//Auto-threshold analog signals at 50% of full scale range
 	if(uadin)
-		FindZeroCrossings(uadin, m_averager.Average(uadin, cmdBuf, queue), edges);
+		m_detector.FindZeroCrossings(uadin, m_averager.Average(uadin, cmdBuf, queue), cmdBuf, queue);
 	else if(sadin)
-		FindZeroCrossings(sadin, m_averager.Average(sadin, cmdBuf, queue), edges);
+		m_detector.FindZeroCrossings(sadin, m_averager.Average(sadin, cmdBuf, queue), cmdBuf, queue);
 
 	//Just find edges in digital signals
 	else if(uddin)
-		FindZeroCrossings(uddin, edges);
+		m_detector.FindZeroCrossings(uddin, cmdBuf, queue);
 	else
-		FindZeroCrossings(sddin, edges);
+		m_detector.FindZeroCrossings(sddin, cmdBuf, queue);
+
+	auto& edges = m_detector.GetResults();
 
 	//We need at least one full cycle of the waveform to have a meaningful frequency
-	if(edges.size() < 2)
+	size_t elen = edges.size();
+	if(elen < 2)
 	{
 		AddErrorMessage("Input too short", "Need at least two edges for a meaningful frequency measurement");
 		SetData(nullptr, 0);
@@ -135,9 +135,10 @@ void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
 
-	size_t elen = edges.size();
+	//TODO: GPU inner loop
+	cap->PrepareForCpuAccess();
+	edges.PrepareForCpuAccess();
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -151,7 +152,6 @@ void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		cap->m_durations.push_back(round(delta));
 		cap->m_samples.push_back(freq);
 	}
-
 	cap->MarkModifiedFromCpu();
 
 	//For the scalar average output, find the total number of zero crossings and divide by the spacing

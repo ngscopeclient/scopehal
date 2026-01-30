@@ -36,6 +36,7 @@
 #define FrequencyMeasurement_h
 
 #include "../scopehal/Averager.h"
+#include "../scopehal/LevelCrossingDetector.h"
 
 class FrequencyMeasurement : public Filter
 {
@@ -53,6 +54,7 @@ public:
 
 protected:
 	Averager m_averager;
+	LevelCrossingDetector m_detector;
 };
 
 #endif
