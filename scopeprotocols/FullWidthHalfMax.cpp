@@ -80,7 +80,9 @@ Filter::DataLocation FullWidthHalfMax::GetInputLocation()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void FullWidthHalfMax::Refresh()
+void FullWidthHalfMax::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("FullWidthHalfMax::Refresh");
