@@ -65,6 +65,7 @@ add_compute_shaders(
 		EyePattern_IndexSearch.glsl
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
+		FrequencyMeasurement.glsl
 		IQDemuxFilter.glsl
 		IQDemuxFilterAlignment.glsl
 		PAMEdgeDetector_InitialMerge.glsl

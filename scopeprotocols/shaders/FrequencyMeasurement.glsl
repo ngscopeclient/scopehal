@@ -27,38 +27,68 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FrequencyMeasurement
- */
-#ifndef FrequencyMeasurement_h
-#define FrequencyMeasurement_h
+#version 460
+#pragma shader_stage(compute)
 
-#include "../scopehal/Averager.h"
-#include "../scopehal/LevelCrossingDetector.h"
+#extension GL_ARB_gpu_shader_int64 : require
+#define FS_PER_SECOND 1e15
 
-class FrequencyMeasurement : public Filter
+layout(std430, binding=0) restrict readonly buffer buf_Edges
 {
-public:
-	FrequencyMeasurement(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(FrequencyMeasurement)
-
-protected:
-	Averager m_averager;
-	LevelCrossingDetector m_detector;
-
-	AcceleratorBuffer<int64_t> m_span;
-
-	std::shared_ptr<ComputePipeline> m_computePipeline;
+	int64_t edges[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_outOffsets
+{
+	int64_t offsets[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_outDurations
+{
+	int64_t durations[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_outSamples
+{
+	float samples[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_outSpan
+{
+	int64_t firstEdge;
+	int64_t lastEdge;
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint elen;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint outlen = (elen-2) / 2;
+	uint iin = i * 2;
+	uint iout = i;
+	if(iout >= outlen)
+		return;
+
+	int64_t start = edges[iin];
+	int64_t end = edges[iin + 2];
+	int64_t delta = end - start;
+
+	double freq = FS_PER_SECOND / double(delta);
+
+	offsets[i] = start;
+	durations[i] = delta;
+	samples[i] = float(round(freq));
+
+	//Copy first/last sample
+	if(i == 0)
+	{
+		firstEdge = edges[0];
+		lastEdge = edges[elen-1];
+	}
+}

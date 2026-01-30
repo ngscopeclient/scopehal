@@ -43,6 +43,11 @@ FrequencyMeasurement::FrequencyMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("din");
+
+	m_span.resize(2);
+
+	if(g_hasShaderInt64)
+		m_computePipeline = make_shared<ComputePipeline>("shaders/FrequencyMeasurement.spv", 5, sizeof(uint32_t));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,32 +139,66 @@ void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//Create the output
 	size_t outlen = (elen-2) / 2;
+	double ncycles = elen - 1;
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->m_timescale = 1;
 	cap->Resize(outlen);
 
-	//TODO: GPU inner loop
-	cap->PrepareForCpuAccess();
-	edges.PrepareForCpuAccess();
-	for(size_t i=0; i < outlen; i++)
+	//GPU inner loop
+	double interval = 0;
+	if(g_hasShaderInt64)
 	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i*2];
-		int64_t end = edges[i*2 + 2];
+		cmdBuf.begin({});
 
-		int64_t delta = end - start;
-		double freq = FS_PER_SECOND / delta;
+		m_computePipeline->BindBufferNonblocking(0, edges, cmdBuf);
+		m_computePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
+		m_computePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
+		m_computePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
+		m_computePipeline->BindBufferNonblocking(4, m_span, cmdBuf, true);
 
-		cap->m_offsets[i] = start;
-		cap->m_durations[i] = delta;
-		cap->m_samples[i] = round(freq);
+		const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
+		m_computePipeline->Dispatch(cmdBuf, (uint32_t)elen,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cap->MarkModifiedFromGpu();
+		m_span.MarkModifiedFromGpu();
+
+		//We need the span measurements host side
+		m_span.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//GPU side delta calculation
+		interval = m_span[1] - m_span[0];
 	}
-	cap->MarkModifiedFromCpu();
+
+	//CPU fallback
+	else
+	{
+		cap->PrepareForCpuAccess();
+		edges.PrepareForCpuAccess();
+		for(size_t i=0; i < outlen; i++)
+		{
+			//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+			int64_t start = edges[i*2];
+			int64_t end = edges[i*2 + 2];
+
+			int64_t delta = end - start;
+			double freq = FS_PER_SECOND / delta;
+
+			cap->m_offsets[i] = start;
+			cap->m_durations[i] = delta;
+			cap->m_samples[i] = round(freq);
+		}
+		cap->MarkModifiedFromCpu();
+
+		interval = edges[elen-1] - edges[0];
+	}
 
 	//For the scalar average output, find the total number of zero crossings and divide by the spacing
 	//(excluding partial cycles at start and end).
 	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
-	double ncycles = elen - 1;
-	double interval = edges[elen-1] - edges[0];
 	m_streams[1].m_value = ncycles / (2 * interval * SECONDS_PER_FS);
 }
