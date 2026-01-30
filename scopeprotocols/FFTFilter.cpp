@@ -149,13 +149,25 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 
 void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("FFTFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
+	ClearErrors();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid inputs", "Expect a uniform analog input");
+
 		SetData(nullptr, 0);
 		return;
 	}
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
 	//Force unit to uHz at this point, because legacy scopesessions with unit of Hz need to be converted
 	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);

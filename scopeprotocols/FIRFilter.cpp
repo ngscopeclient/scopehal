@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -78,7 +78,7 @@ FIRFilter::FIRFilter(const string& color)
 
 bool FIRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -143,15 +143,25 @@ Filter::DataLocation FIRFilter::GetInputLocation()
 
 void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Sanity check
-	if(!VerifyAllInputsOKAndUniformAnalog())
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("FIR::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid inputs", "Expect a uniform analog input");
+
+		SetData(nullptr, 0);
 		return;
 	}
-
-	//Get input data
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
 	//Assume the input is dense packed, get the sample frequency
 	int64_t fs_per_sample = din->m_timescale;
@@ -189,14 +199,16 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	//Don't choke if given an invalid filter configuration
 	if(flo == fhi)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid configuration", "Input and output frequencies are equal");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Don't allow filters with more than 4096 taps (probably means something went wrong)
 	if(filterlen > 4096)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid configuration", "Calculated filter kernel has >4096 taps");
+		SetData(nullptr, 0);
 		return;
 	}
 
