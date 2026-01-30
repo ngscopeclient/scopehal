@@ -124,7 +124,6 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	cap->m_timescale = 1;
 
 	//Get the base/top (we use these for calculating percentages)
-	double a = GetTime();
 	float base;
 	float top;
 	GetBaseAndTopVoltage(
@@ -139,24 +138,24 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 		udin,
 		base,
 		top);
-	double b = GetTime();
-	double da = b-a;
-	LogDebug("base = %f, top = %f, took %.3f ms\n", base, top, da*1000);
 
-	//TODO: GPU path
+	//Find the actual levels we use for our time gate
+	float delta = top - base;
+	float vstart = base + m_start.GetFloatVal()*delta;
+	float vend = base + m_end.GetFloatVal()*delta;
+
+	//GPU path
+	//if(g_hasShaderInt64)
 	if(false)
 	{
+		//TODO
 	}
 
+	//CPU fallback
 	else
 	{
 		din->PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
-
-		//Find the actual levels we use for our time gate
-		float delta = top - base;
-		float vstart = base + m_start.GetFloatVal()*delta;
-		float vend = base + m_end.GetFloatVal()*delta;
 
 		float last = -1e20;
 		int64_t tedge = 0;
