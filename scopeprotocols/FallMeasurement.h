@@ -50,8 +50,17 @@ public:
 	PROTOCOL_DECODER_INITPROC(FallMeasurement)
 
 protected:
-	std::string m_startname;
-	std::string m_endname;
+	FilterParameter& m_start;
+	FilterParameter& m_end;
+
+	//Minmax calculation
+	ComputePipeline m_minmaxPipeline;
+	AcceleratorBuffer<float> m_minbuf;
+	AcceleratorBuffer<float> m_maxbuf;
+
+	//Histogram calculation
+	std::shared_ptr<ComputePipeline> m_histogramPipeline;
+	AcceleratorBuffer<uint64_t> m_histogramBuf;
 };
 
 #endif

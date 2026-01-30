@@ -38,19 +38,28 @@ using namespace std;
 
 FallMeasurement::FallMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_start(m_parameters["Start Fraction"])
+	, m_end(m_parameters["End Fraction"])
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	//Set up channels
 	CreateInput("din");
 	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	m_startname = "Start Fraction";
-	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
-	m_parameters[m_startname].SetFloatVal(0.8);
+	m_start = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
+	m_start.SetFloatVal(0.8);
 
-	m_endname = "End Fraction";
-	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
-	m_parameters[m_endname].SetFloatVal(0.2);
+	m_end = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
+	m_end.SetFloatVal(0.2);
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,74 +117,144 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	auto din = GetInputWaveform(0);
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
-	din->PrepareForCpuAccess();
 	size_t len = din->size();
-
-	//Get the base/top (we use these for calculating percentages)
-	float base = GetBaseVoltage(sdin, udin);
-	float top = GetTopVoltage(sdin, udin);
-
-	//Find the actual levels we use for our time gate
-	float delta = top - base;
-	float vstart = base + m_parameters[m_startname].GetFloatVal()*delta;
-	float vend = base + m_parameters[m_endname].GetFloatVal()*delta;
 
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
 
-	float last = -1e20;
-	int64_t tedge = 0;
+	//Get the base/top (we use these for calculating percentages)
+	double a = GetTime();
+	float base;
+	float top;
+	GetBaseAndTopVoltage(
+		cmdBuf,
+		queue,
+		m_minmaxPipeline,
+		m_histogramPipeline,
+		m_minbuf,
+		m_maxbuf,
+		m_histogramBuf,
+		sdin,
+		udin,
+		base,
+		top);
+	double b = GetTime();
+	double da = b-a;
+	LogDebug("base = %f, top = %f, took %.3f ms\n", base, top, da*1000);
 
-	int state = 0;
-	int64_t tlast = 0;
-
-	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
-	KahanSummation sum;
-	int64_t num = 0;
-	for(size_t i=0; i < len; i++)
+	//TODO: GPU path
+	if(false)
 	{
-		float cur = GetValue(sdin, udin, i);
-		int64_t tnow = ::GetOffset(sdin, udin, i) * din->m_timescale;
-
-		//Find start of edge
-		if(state == 0)
-		{
-			if( (cur < vstart) && (last >= vstart) )
-			{
-				int64_t xdelta = InterpolateTime(sdin, udin, i-1, vstart) * din->m_timescale;
-				tedge = tnow - din->m_timescale + xdelta;
-				state = 1;
-			}
-		}
-
-		//Find end of edge
-		else if(state == 1)
-		{
-			if( (cur < vend) && (last >= vend) )
-			{
-				int64_t xdelta = InterpolateTime(sdin, udin, i-1, vend) * din->m_timescale;
-				int64_t dt = xdelta + tnow - din->m_timescale - tedge;
-
-				cap->m_offsets.push_back(tlast);
-				cap->m_durations.push_back(tnow - tlast);
-				cap->m_samples.push_back(dt);
-				tlast = tnow;
-
-				sum += dt;
-				num ++;
-
-				state = 0;
-			}
-		}
-
-		last = cur;
 	}
 
-	SetData(cap, 0);
+	else
+	{
+		din->PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
 
-	cap->MarkModifiedFromCpu();
+		//Find the actual levels we use for our time gate
+		float delta = top - base;
+		float vstart = base + m_start.GetFloatVal()*delta;
+		float vend = base + m_end.GetFloatVal()*delta;
 
-	m_streams[1].m_value = sum.GetSum() / num;
+		float last = -1e20;
+		int64_t tedge = 0;
+
+		int state = 0;
+		int64_t tlast = 0;
+
+		//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
+		KahanSummation sum;
+		int64_t num = 0;
+
+		//Sparse path
+		if(sdin)
+		{
+			for(size_t i=0; i < len; i++)
+			{
+				float cur = sdin->m_samples[i];
+				int64_t tnow = sdin->m_offsets[i] * din->m_timescale;
+
+				//Find start of edge
+				if(state == 0)
+				{
+					if( (cur < vstart) && (last >= vstart) )
+					{
+						int64_t xdelta = InterpolateTime(sdin, i-1, vstart) * din->m_timescale;
+						tedge = tnow - din->m_timescale + xdelta;
+						state = 1;
+					}
+				}
+
+				//Find end of edge
+				else if(state == 1)
+				{
+					if( (cur < vend) && (last >= vend) )
+					{
+						int64_t xdelta = InterpolateTime(sdin, i-1, vend) * din->m_timescale;
+						int64_t dt = xdelta + tnow - din->m_timescale - tedge;
+
+						cap->m_offsets.push_back(tlast);
+						cap->m_durations.push_back(tnow - tlast);
+						cap->m_samples.push_back(dt);
+						tlast = tnow;
+
+						sum += dt;
+						num ++;
+
+						state = 0;
+					}
+				}
+
+				last = cur;
+			}
+		}
+
+		//Uniform path
+		else
+		{
+			for(size_t i=0; i < len; i++)
+			{
+				float cur = udin->m_samples[i];
+				int64_t tnow = i * din->m_timescale;
+
+				//Find start of edge
+				if(state == 0)
+				{
+					if( (cur < vstart) && (last >= vstart) )
+					{
+						int64_t xdelta = InterpolateTime(udin, i-1, vstart) * din->m_timescale;
+						tedge = tnow - din->m_timescale + xdelta;
+						state = 1;
+					}
+				}
+
+				//Find end of edge
+				else if(state == 1)
+				{
+					if( (cur < vend) && (last >= vend) )
+					{
+						int64_t xdelta = InterpolateTime(udin, i-1, vend) * din->m_timescale;
+						int64_t dt = xdelta + tnow - din->m_timescale - tedge;
+
+						cap->m_offsets.push_back(tlast);
+						cap->m_durations.push_back(tnow - tlast);
+						cap->m_samples.push_back(dt);
+						tlast = tnow;
+
+						sum += dt;
+						num ++;
+
+						state = 0;
+					}
+				}
+
+				last = cur;
+			}
+		}
+
+		cap->MarkModifiedFromCpu();
+			m_streams[1].m_value = sum.GetSum() / num;
+	}
 }

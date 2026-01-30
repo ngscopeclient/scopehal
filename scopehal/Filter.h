@@ -580,15 +580,46 @@ public:
 		@brief Gets the base and top voltage of a waveform which may be sparse or uniform
 	 */
 	static void GetBaseAndTopVoltage(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		ComputePipeline& minmaxPipeline,
+		std::shared_ptr<ComputePipeline>& histogramPipeline,
+		AcceleratorBuffer<float>& scratchMin,
+		AcceleratorBuffer<float>& scratchMax,
+		AcceleratorBuffer<uint64_t>& hist,
 		SparseAnalogWaveform* swfm,
 		UniformAnalogWaveform* uwfm,
 		float& base,
 		float& top)
 	{
 		if(swfm)
-			GetBaseAndTopVoltage(swfm, base, top);
+		{
+			GetBaseAndTopVoltage(
+				cmdBuf,
+				queue,
+				minmaxPipeline,
+				histogramPipeline,
+				scratchMin,
+				scratchMax,
+				hist,
+				swfm,
+				base,
+				top);
+		}
 		else
-			GetBaseAndTopVoltage(uwfm, base, top);
+		{
+			GetBaseAndTopVoltage(
+				cmdBuf,
+				queue,
+				minmaxPipeline,
+				histogramPipeline,
+				scratchMin,
+				scratchMax,
+				hist,
+				uwfm,
+				base,
+				top);
+		}
 	}
 
 	/**
@@ -596,17 +627,44 @@ public:
 	 */
 	template<class T>
 	__attribute__((noinline))
-	static void GetBaseAndTopVoltage(T* cap, float& base, float& top)
+	static void GetBaseAndTopVoltage(
+		vk::raii::CommandBuffer& cmdBuf,
+		std::shared_ptr<QueueHandle> queue,
+		ComputePipeline& minmaxPipeline,
+		std::shared_ptr<ComputePipeline>& histogramPipeline,
+		AcceleratorBuffer<float>& scratchMin,
+		AcceleratorBuffer<float>& scratchMax,
+		AcceleratorBuffer<uint64_t>& hist,
+
+		T* cap, float& base, float& top)
 	{
 		AssertTypeIsAnalogWaveform(cap);
 
+		//GPU side min/max calculation
 		float vmin;
 		float vmax;
-		GetMinMaxVoltage(cap, vmin, vmax);
+		GetMinMaxVoltage(cmdBuf, queue, minmaxPipeline, scratchMin, scratchMax, cap, vmin, vmax);
 
+		//Do the histogram calculation on the GPU if possible
 		float delta = vmax - vmin;
 		const int nbins = 100;
-		auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+		if(g_hasShaderInt64 && g_hasShaderAtomicInt64 && histogramPipeline)
+		{
+			MakeHistogram(cmdBuf, queue, *histogramPipeline, cap, hist, vmin, vmax, nbins);
+			hist.PrepareForCpuAccess();
+		}
+		else
+		{
+			//CPU fallback
+			hist.resize(nbins);
+			hist.PrepareForCpuAccess();
+
+			auto tmp = MakeHistogram(cap, vmin, vmax, nbins);
+			for(int i=0; i<nbins; i++)
+				hist[i] = tmp[i];
+
+			hist.MarkModifiedFromCpu();
+		}
 
 		//Find the highest peak in the first quarter of the histogram
 		size_t binval = 0;
