@@ -82,7 +82,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	FFTFilter.cpp
 	FIRFilter.cpp
 	FrequencyMeasurement.cpp
-	FSKDecoder.cpp
 	FullWidthHalfMax.cpp
 	GateFilter.cpp
 	GlitchRemovalFilter.cpp
