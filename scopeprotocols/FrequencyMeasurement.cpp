@@ -133,24 +133,26 @@ void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	}
 
 	//Create the output
+	size_t outlen = (elen-2) / 2;
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->m_timescale = 1;
+	cap->Resize(outlen);
 
 	//TODO: GPU inner loop
 	cap->PrepareForCpuAccess();
 	edges.PrepareForCpuAccess();
-	for(size_t i=0; i < (elen - 2); i+= 2)
+	for(size_t i=0; i < outlen; i++)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
+		int64_t start = edges[i*2];
+		int64_t end = edges[i*2 + 2];
 
 		int64_t delta = end - start;
 		double freq = FS_PER_SECOND / delta;
 
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(round(delta));
-		cap->m_samples.push_back(freq);
+		cap->m_offsets[i] = start;
+		cap->m_durations[i] = delta;
+		cap->m_samples[i] = round(freq);
 	}
 	cap->MarkModifiedFromCpu();
 
