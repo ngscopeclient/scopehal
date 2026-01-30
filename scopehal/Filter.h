@@ -577,6 +577,69 @@ public:
 	}
 
 	/**
+		@brief Gets the base and top voltage of a waveform which may be sparse or uniform
+	 */
+	static void GetBaseAndTopVoltage(
+		SparseAnalogWaveform* swfm,
+		UniformAnalogWaveform* uwfm,
+		float& base,
+		float& top)
+	{
+		if(swfm)
+			GetBaseAndTopVoltage(swfm, base, top);
+		else
+			GetBaseAndTopVoltage(uwfm, base, top);
+	}
+
+	/**
+		@brief Gets the most probable "0" and "1" level for a digital waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void GetBaseAndTopVoltage(T* cap, float& base, float& top)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		float vmin;
+		float vmax;
+		GetMinMaxVoltage(cap, vmin, vmax);
+
+		float delta = vmax - vmin;
+		const int nbins = 100;
+		auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+		//Find the highest peak in the first quarter of the histogram
+		size_t binval = 0;
+		int idx = 0;
+		for(int i=0; i<(nbins/4); i++)
+		{
+			if(hist[i] > binval)
+			{
+				binval = hist[i];
+				idx = i;
+			}
+		}
+
+		float fbin = (idx + 0.5f)/nbins;
+		base = fbin*delta + vmin;
+
+		//Find the highest peak in the third quarter of the histogram
+		binval = 0;
+		idx = 0;
+		for(int i=(nbins*3)/4; i<nbins; i++)
+		{
+			if(hist[i] > binval)
+			{
+				binval = hist[i];
+				idx = i;
+			}
+		}
+
+		fbin = (idx + 0.5f)/nbins;
+		top = fbin*delta + vmin;
+	}
+
+	/**
 		@brief Gets the most probable "0" level for a digital waveform
 	 */
 	template<class T>
@@ -585,8 +648,10 @@ public:
 	{
 		AssertTypeIsAnalogWaveform(cap);
 
-		float vmin = GetMinVoltage(cap);
-		float vmax = GetMaxVoltage(cap);
+		float vmin;
+		float vmax;
+		GetMinMaxVoltage(cap, vmin, vmax);
+
 		float delta = vmax - vmin;
 		const int nbins = 100;
 		auto hist = MakeHistogram(cap, vmin, vmax, nbins);
@@ -627,8 +692,10 @@ public:
 	{
 		AssertTypeIsAnalogWaveform(cap);
 
-		float vmin = GetMinVoltage(cap);
-		float vmax = GetMaxVoltage(cap);
+		float vmin;
+		float vmax;
+		GetMinMaxVoltage(cap, vmin, vmax);
+
 		float delta = vmax - vmin;
 		const int nbins = 100;
 		auto hist = MakeHistogram(cap, vmin, vmax, nbins);
