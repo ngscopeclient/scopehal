@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,7 +62,7 @@ HyperRAMDecoder::HyperRAMDecoder(const string& color)
 
 bool HyperRAMDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 11) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -76,12 +76,32 @@ string HyperRAMDecoder::GetProtocolName()
 	return "HyperRAM";
 }
 
-void HyperRAMDecoder::Refresh()
+Filter::DataLocation HyperRAMDecoder::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void HyperRAMDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("HyperRAMDecoder::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(size_t i=0; i<m_inputs.size(); i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -116,10 +136,8 @@ void HyperRAMDecoder::Refresh()
 		udata.push_back(dynamic_cast<UniformDigitalWaveform*>(data[i]));
 
 	//Create the capture
-	auto cap = new HyperRAMWaveform;
+	auto cap = SetupEmptyWaveform<HyperRAMWaveform>(clk, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
@@ -379,7 +397,6 @@ void HyperRAMDecoder::Refresh()
 			AdvanceToTimestampScaled(sdata[i], udata[i], idata[i], data[i]->size(), data_timestamp);
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
