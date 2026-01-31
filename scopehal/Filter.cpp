@@ -1063,7 +1063,7 @@ UniformAnalogWaveform* Filter::SetupEmptyUniformAnalogOutputWaveform(WaveformBas
 {
 	//Create the waveform, but only if necessary
 	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(stream));
-	if(cap == NULL)
+	if(cap == nullptr)
 	{
 		cap = new UniformAnalogWaveform;
 		SetData(cap, stream);
