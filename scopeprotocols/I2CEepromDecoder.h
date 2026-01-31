@@ -100,9 +100,8 @@ public:
 
 protected:
 	FilterParameter& m_memtype;
-
-	std::string m_baseaddrname;
-	std::string m_addrpinname;
+	FilterParameter& m_baseaddr;
+	FilterParameter& m_addrpin;
 };
 
 #endif

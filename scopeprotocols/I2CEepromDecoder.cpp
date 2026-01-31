@@ -39,6 +39,8 @@ using namespace std;
 I2CEepromDecoder::I2CEepromDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
 	, m_memtype(m_parameters["Address Bits"])
+	, m_baseaddr(m_parameters["Base Address"])
+	, m_addrpin(m_parameters["Address Pins"])
 {
 	CreateInput("i2c");
 
@@ -62,22 +64,20 @@ I2CEepromDecoder::I2CEepromDecoder(const string& color)
 	m_memtype.AddEnumValue("16+2 (24CM02)", 18);
 	m_memtype.SetIntVal(8);
 
-	m_baseaddrname = "Base Address";
-	m_parameters[m_baseaddrname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_baseaddrname].AddEnumValue("0xA0 (standard 24C)", 0xa0);
-	m_parameters[m_baseaddrname].AddEnumValue("0xB0 (AT24MAC address)", 0xb0);
-	m_parameters[m_baseaddrname].SetIntVal(0xa0);
+	m_baseaddr = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_baseaddr.AddEnumValue("0xA0 (standard 24C)", 0xa0);
+	m_baseaddr.AddEnumValue("0xB0 (AT24MAC address)", 0xb0);
+	m_baseaddr.SetIntVal(0xa0);
 
-	m_addrpinname = "Address Pins";
-	m_parameters[m_addrpinname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 000", 0x0);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 001", 0x2);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 010", 0x4);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 011", 0x6);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 100", 0x8);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 101", 0xa);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 110", 0xc);
-	m_parameters[m_addrpinname].AddEnumValue("A[2:0] = 111", 0xe);
+	m_addrpin = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_addrpin.AddEnumValue("A[2:0] = 000", 0x0);
+	m_addrpin.AddEnumValue("A[2:0] = 001", 0x2);
+	m_addrpin.AddEnumValue("A[2:0] = 010", 0x4);
+	m_addrpin.AddEnumValue("A[2:0] = 011", 0x6);
+	m_addrpin.AddEnumValue("A[2:0] = 100", 0x8);
+	m_addrpin.AddEnumValue("A[2:0] = 101", 0xa);
+	m_addrpin.AddEnumValue("A[2:0] = 110", 0xc);
+	m_addrpin.AddEnumValue("A[2:0] = 111", 0xe);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,7 +148,7 @@ void I2CEepromDecoder::Refresh(
 	din->PrepareForCpuAccess();
 
 	//Pull out our settings
-	uint8_t base_addr = m_parameters[m_baseaddrname].GetIntVal() | m_parameters[m_addrpinname].GetIntVal();
+	uint8_t base_addr = m_baseaddr.GetIntVal() | m_addrpin.GetIntVal();
 	int raw_bits = m_memtype.GetIntVal();
 	int device_bits = 0;
 	if(raw_bits > 16)
