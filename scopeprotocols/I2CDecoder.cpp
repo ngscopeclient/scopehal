@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,7 +55,7 @@ I2CDecoder::I2CDecoder(const string& color)
 
 bool I2CDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -76,6 +76,12 @@ vector<string> I2CDecoder::GetHeaders()
 	ret.push_back("Address");
 	ret.push_back("Len");
 	return ret;
+}
+
+Filter::DataLocation I2CDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,13 +287,29 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 		delete pack;
 }
 
-void I2CDecoder::Refresh()
+void I2CDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("I2CDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -304,10 +326,8 @@ void I2CDecoder::Refresh()
 	auto sscl = dynamic_cast<SparseDigitalWaveform*>(scl);
 
 	//Create the capture
-	auto cap = new I2CWaveform;
+	auto cap = SetupEmptyWaveform<I2CWaveform>(sda, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = sda->m_startTimestamp;
-	cap->m_startFemtoseconds = sda->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
@@ -320,7 +340,6 @@ void I2CDecoder::Refresh()
 	else /*if(ssda && uscl)*/
 		InnerLoop(ssda, uscl, cap);
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 

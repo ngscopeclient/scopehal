@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,29 +38,29 @@ using namespace std;
 
 I2CEepromDecoder::I2CEepromDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
+	, m_memtype(m_parameters["Address Bits"])
 {
 	CreateInput("i2c");
 
-	m_memtypename = "Address Bits";
-	m_parameters[m_memtypename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_memtypename].AddEnumValue("4 (24C00)", 4);
-	m_parameters[m_memtypename].AddEnumValue("7 (24C01)", 7);
-	m_parameters[m_memtypename].AddEnumValue("8 (24C02)", 8);
-	m_parameters[m_memtypename].AddEnumValue("9 (24C04)", 9);
-	m_parameters[m_memtypename].AddEnumValue("10 (24C08)", 10);
-	m_parameters[m_memtypename].AddEnumValue("11 (24C16)", 11);
-	m_parameters[m_memtypename].AddEnumValue("12 (24C32)", 12);
-	m_parameters[m_memtypename].AddEnumValue("13 (24C64 / 24C65)", 13);
+	m_memtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_memtype.AddEnumValue("4 (24C00)", 4);
+	m_memtype.AddEnumValue("7 (24C01)", 7);
+	m_memtype.AddEnumValue("8 (24C02)", 8);
+	m_memtype.AddEnumValue("9 (24C04)", 9);
+	m_memtype.AddEnumValue("10 (24C08)", 10);
+	m_memtype.AddEnumValue("11 (24C16)", 11);
+	m_memtype.AddEnumValue("12 (24C32)", 12);
+	m_memtype.AddEnumValue("13 (24C64 / 24C65)", 13);
 	//TODO: support block write protect and high endurance block in 24x65
-	m_parameters[m_memtypename].AddEnumValue("14 (24C128)", 14);
-	m_parameters[m_memtypename].AddEnumValue("15 (24C256)", 15);
-	m_parameters[m_memtypename].AddEnumValue("16 (24C512)", 16);
+	m_memtype.AddEnumValue("14 (24C128)", 14);
+	m_memtype.AddEnumValue("15 (24C256)", 15);
+	m_memtype.AddEnumValue("16 (24C512)", 16);
 
 	//These devices steal extra I2C address LSBs as memory addresses.
-	//Maybe they're multiple stacked 24C512s?
-	m_parameters[m_memtypename].AddEnumValue("16+1 (24CM01)", 17);
-	m_parameters[m_memtypename].AddEnumValue("16+2 (24CM02)", 18);
-	m_parameters[m_memtypename].SetIntVal(8);
+	//Maybe they're multiple stacked 24C512 dies?
+	m_memtype.AddEnumValue("16+1 (24CM01)", 17);
+	m_memtype.AddEnumValue("16+2 (24CM02)", 18);
+	m_memtype.SetIntVal(8);
 
 	m_baseaddrname = "Base Address";
 	m_parameters[m_baseaddrname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
@@ -85,13 +85,19 @@ I2CEepromDecoder::I2CEepromDecoder(const string& color)
 
 bool I2CEepromDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.GetData()) != NULL) )
+	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.GetData()) != nullptr) )
 		return true;
 
 	return false;
+}
+
+Filter::DataLocation I2CEepromDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,34 +120,43 @@ string I2CEepromDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void I2CEepromDecoder::Refresh()
+void I2CEepromDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DDR3Decoder::Refresh");
+	#endif
+
 	ClearPackets();
 
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
+	//Make sure we've got valid inputs
+	ClearErrors();
 	auto din = dynamic_cast<I2CWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid input", "Expected an I2C waveform");
+
+		SetData(nullptr, 0);
 		return;
 	}
 	din->PrepareForCpuAccess();
 
 	//Pull out our settings
 	uint8_t base_addr = m_parameters[m_baseaddrname].GetIntVal() | m_parameters[m_addrpinname].GetIntVal();
-	int raw_bits = m_parameters[m_memtypename].GetIntVal();
+	int raw_bits = m_memtype.GetIntVal();
 	int device_bits = 0;
 	if(raw_bits > 16)
 		device_bits = raw_bits - 16;
 	int pointer_bits = min(16, raw_bits);
 
 	//Set up output
-	auto cap = new I2CEepromWaveform(m_parameters[m_memtypename]);
+	auto cap = new I2CEepromWaveform(m_memtype);
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
