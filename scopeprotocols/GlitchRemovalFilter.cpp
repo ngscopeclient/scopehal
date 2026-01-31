@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,15 +37,15 @@ using namespace std;
 
 GlitchRemovalFilter::GlitchRemovalFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_minwidth(m_parameters["Minimum Width"])
 {
 	AddDigitalStream("data");
 	// AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 
 	CreateInput("Input");
 
-	m_minwidthname = "Minimum Width";
-	m_parameters[m_minwidthname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_minwidthname].SetIntVal(1000000000.0);
+	m_minwidth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_minwidth.SetIntVal(1000000000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +53,7 @@ GlitchRemovalFilter::GlitchRemovalFilter(const string& color)
 
 bool GlitchRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -68,6 +68,12 @@ bool GlitchRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string GlitchRemovalFilter::GetProtocolName()
 {
 	return "Glitch Removal";
+}
+
+Filter::DataLocation GlitchRemovalFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,21 +161,32 @@ void DoGlitchRemoval(T* din, SparseDigitalWaveform* cap, size_t minwidth)
 	cap->m_samples.shrink_to_fit();
 }
 
-void GlitchRemovalFilter::Refresh()
+void GlitchRemovalFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("GlitchRemovalFilter::Refresh");
+	#endif
+
 	//Get the input data
 	auto udin = dynamic_cast<UniformDigitalWaveform*>(GetInputWaveform(0));
 	auto sdin = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
 	if (!udin && !sdin)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Set up output waveform and get configuration
 	auto cap = SetupEmptySparseDigitalOutputWaveform(GetInputWaveform(0), 0);
 
-	size_t minwidth = floor(m_parameters[m_minwidthname].GetFloatVal() / cap->m_timescale);
+	size_t minwidth = floor(m_minwidth.GetIntVal() / cap->m_timescale);
 
 	if (sdin)
 		DoGlitchRemoval(sdin, cap, minwidth);
