@@ -27,58 +27,132 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FallMeasurement
- */
-#ifndef FallMeasurement_h
-#define FallMeasurement_h
+#version 460
+#pragma shader_stage(compute)
 
-class FallPushConstants
+#extension GL_ARB_gpu_shader_int64 : require
+
+layout(std430, binding=0) restrict readonly buffer buf_offsetsIn
 {
-public:
-	int64_t		timescale;
-	uint32_t	len;
-	uint32_t	bufferPerThread;
-	float		vstart;
-	float		vend;
+	int64_t offsetsIn[];
 };
 
-class FallMeasurement : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_samplesIn
 {
-public:
-	FallMeasurement(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(FallMeasurement)
-
-protected:
-	FilterParameter& m_start;
-	FilterParameter& m_end;
-
-	//Minmax calculation
-	ComputePipeline m_minmaxPipeline;
-	AcceleratorBuffer<float> m_minbuf;
-	AcceleratorBuffer<float> m_maxbuf;
-
-	//Histogram calculation
-	std::shared_ptr<ComputePipeline> m_histogramPipeline;
-	AcceleratorBuffer<uint64_t> m_histogramBuf;
-
-	//Fall time calculation
-	std::shared_ptr<ComputePipeline> m_firstPassUniformComputePipeline;
-	AcceleratorBuffer<int64_t> m_firstPassOffsets;
-	AcceleratorBuffer<float> m_firstPassSamples;
-	AcceleratorBuffer<int64_t> m_finalSampleCount;
-	std::shared_ptr<ComputePipeline> m_finalPassComputePipeline;
-	AcceleratorBuffer<float> m_partialSums;
+	float samplesIn[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_offsets
+{
+	int64_t offsets[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_samplesOut
+{
+	float samplesOut[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_durations
+{
+	int64_t durations[];
+};
+
+layout(std430, binding=5) restrict writeonly buffer buf_finalCount
+{
+	int64_t finalCount[];
+};
+
+layout(std430, binding=6) restrict writeonly buffer buf_finalSum
+{
+	float finalSum[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	int64_t timescale;
+	uint	len;
+	uint	bufferPerThread;
+	float	vstart;
+	float	vend;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//Initial starting sample indexes for this thread
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint nLastThread = numThreads - 1;
+
+	//Get starting input and output indexes
+	uint writebase = 0;
+	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
+		writebase += uint(offsetsIn[i * bufferPerThread]);
+	uint readbase = gl_GlobalInvocationID.x * bufferPerThread + 1;
+
+	//See how many samples this block is copying
+	uint count = uint(offsetsIn[readbase - 1]);
+
+	//Temporaries for Kahan summation
+	float partialSum = 0;
+	float c = 0;
+
+	//Copy samples
+	for(uint i=0; i<count; i ++)
+	{
+		//Read input
+		uint iin = readbase + i;
+		uint iout = writebase + i;
+		int64_t offset = offsetsIn[iin];
+		float fin = samplesIn[iin];
+
+		//Kahan sum the output values
+		float y = fin - c;
+		float t = partialSum + y;
+		c = (t - partialSum) - y;
+		partialSum = t;
+
+		//Copy to output
+		offsets[iout] = offset;
+		samplesOut[iout] = fin;
+
+		//Is there a sample after this one? Use it for duration
+		if(i+1 < count)
+			durations[iout] = offsetsIn[iin + 1] - offset;
+
+		//No sample, but another block?
+		else if(gl_GlobalInvocationID.x != nLastThread)
+		{
+			bool found = false;
+			for(uint nblock=gl_GlobalInvocationID.x; nblock < numThreads; nblock ++)
+			{
+				//Make sure the subsequent thread has samples
+				uint nextbase = (gl_GlobalInvocationID.x + 1) * bufferPerThread;
+				uint nextCount = uint(offsetsIn[nextbase]);
+				if(nextCount == 0)
+					continue;
+
+				//We're good, use this duration
+				int64_t nextOffset = offsetsIn[nextbase + 1];
+				durations[iout] = nextOffset - offset;
+				found = true;
+				break;
+			}
+
+			//No more samples? Tie it off
+			if(!found)
+				durations[iout] = 1;
+		}
+
+		//Last block?
+		else
+			durations[iout] = 1;
+	}
+
+	//Save final block index
+	if(gl_GlobalInvocationID.x == nLastThread)
+		finalCount[0] = int64_t(writebase + count);
+
+	//Save partial sum for this block
+	finalSum[gl_GlobalInvocationID.x] = partialSum;
+}

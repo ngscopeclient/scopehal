@@ -53,6 +53,21 @@ FallMeasurement::FallMeasurement(const string& color)
 	m_end = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
 	m_end.SetFloatVal(0.2);
 
+	if(g_hasShaderInt64)
+	{
+		m_firstPassUniformComputePipeline =
+			make_shared<ComputePipeline>("shaders/FallMeasurement_Uniform.spv", 3, sizeof(FallPushConstants));
+
+		m_finalPassComputePipeline =
+			make_shared<ComputePipeline>("shaders/FallMeasurement_FinalPass.spv", 7, sizeof(FallPushConstants));
+
+		m_firstPassOffsets.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_firstPassSamples.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+		m_finalSampleCount.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_partialSums.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	}
+
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
 		m_histogramPipeline =
@@ -145,10 +160,74 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	float vend = base + m_end.GetFloatVal()*delta;
 
 	//GPU path
-	//if(g_hasShaderInt64)
-	if(false)
+	//TODO: GPU sparse path
+	if(g_hasShaderInt64 && udin)
 	{
-		//TODO
+		const uint32_t nthreads = 8192;
+
+		cmdBuf.begin({});
+
+		//Worst case, we have falling and rising edges alternating
+		//so we can have at most half the input length at the output
+		uint32_t maxFallingEdges = len/2;
+		uint32_t bufferPerThread = GetComputeBlockCount(maxFallingEdges, nthreads) + 1;
+
+		FallPushConstants cfg;
+		cfg.timescale = din->m_timescale;
+		cfg.len = len;
+		cfg.bufferPerThread = bufferPerThread;
+		cfg.vstart = vstart;
+		cfg.vend = vend;
+
+		//Resize scratch buffers assuming we have (at most) one sample per two input edges
+		//(Offset buffer also needs one entry per thread for size output)
+		//We can get away with slightly less sample buffer but this keeps indexing math simple
+		m_firstPassOffsets.resize(bufferPerThread * nthreads);
+		m_firstPassSamples.resize(bufferPerThread * nthreads);
+
+		//First pass: look for edges in each block
+		m_firstPassUniformComputePipeline->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+		m_firstPassUniformComputePipeline->BindBufferNonblocking(1, m_firstPassOffsets, cmdBuf, true);
+		m_firstPassUniformComputePipeline->BindBufferNonblocking(2, m_firstPassSamples, cmdBuf, true);
+		m_firstPassUniformComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(nthreads, 64));
+		m_firstPassUniformComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		m_firstPassOffsets.MarkModifiedFromGpu();
+		m_firstPassSamples.MarkModifiedFromGpu();
+
+		//Second pass: coalesce outputs into one
+		cap->Resize(maxFallingEdges);
+		m_finalSampleCount.resize(1);
+		m_partialSums.resize(nthreads);
+
+		m_finalPassComputePipeline->BindBufferNonblocking(0, m_firstPassOffsets, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(1, m_firstPassSamples, cmdBuf);
+		m_finalPassComputePipeline->BindBufferNonblocking(2, cap->m_offsets, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_durations, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(5, m_finalSampleCount, cmdBuf, true);
+		m_finalPassComputePipeline->BindBufferNonblocking(6, m_partialSums, cmdBuf, true);
+		m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(nthreads, 64));
+		m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
+		cap->MarkModifiedFromGpu();
+		m_finalSampleCount.MarkModifiedFromGpu();
+		m_partialSums.MarkModifiedFromGpu();
+
+		m_finalSampleCount.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_partialSums.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		//Done
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Update size
+		cap->Resize(m_finalSampleCount[0]);
+
+		double sum = 0;
+		for(size_t i=0; i<nthreads; i++)
+			sum += m_partialSums[i];
+		m_streams[1].m_value = sum / cap->m_samples.size();
 	}
 
 	//CPU fallback
@@ -194,7 +273,11 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 						int64_t xdelta = InterpolateTime(sdin, i-1, vend) * din->m_timescale;
 						int64_t dt = xdelta + tnow - din->m_timescale - tedge;
 
-						cap->m_offsets.push_back(tlast);
+						auto outlen = cap->m_offsets.size();
+						if(outlen)
+							cap->m_durations[outlen-1] = tnow - tlast;
+
+						cap->m_offsets.push_back(tnow);
 						cap->m_durations.push_back(tnow - tlast);
 						cap->m_samples.push_back(dt);
 						tlast = tnow;
@@ -237,8 +320,12 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 						int64_t xdelta = InterpolateTime(udin, i-1, vend) * din->m_timescale;
 						int64_t dt = xdelta + tnow - din->m_timescale - tedge;
 
-						cap->m_offsets.push_back(tlast);
-						cap->m_durations.push_back(tnow - tlast);
+						auto outlen = cap->m_offsets.size();
+						if(outlen)
+							cap->m_durations[outlen-1] = tnow - tlast;
+
+						cap->m_offsets.push_back(tnow);
+						cap->m_durations.push_back(1);
 						cap->m_samples.push_back(dt);
 						tlast = tnow;
 

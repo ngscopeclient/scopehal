@@ -27,58 +27,114 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FallMeasurement
- */
-#ifndef FallMeasurement_h
-#define FallMeasurement_h
+#version 460
+#pragma shader_stage(compute)
 
-class FallPushConstants
+#extension GL_ARB_gpu_shader_int64 : require
+
+layout(std430, binding=0) restrict readonly buffer buf_inSamples
 {
-public:
-	int64_t		timescale;
-	uint32_t	len;
-	uint32_t	bufferPerThread;
-	float		vstart;
-	float		vend;
+	float samplesIn[];
 };
 
-class FallMeasurement : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_outOffsets
 {
-public:
-	FallMeasurement(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(FallMeasurement)
-
-protected:
-	FilterParameter& m_start;
-	FilterParameter& m_end;
-
-	//Minmax calculation
-	ComputePipeline m_minmaxPipeline;
-	AcceleratorBuffer<float> m_minbuf;
-	AcceleratorBuffer<float> m_maxbuf;
-
-	//Histogram calculation
-	std::shared_ptr<ComputePipeline> m_histogramPipeline;
-	AcceleratorBuffer<uint64_t> m_histogramBuf;
-
-	//Fall time calculation
-	std::shared_ptr<ComputePipeline> m_firstPassUniformComputePipeline;
-	AcceleratorBuffer<int64_t> m_firstPassOffsets;
-	AcceleratorBuffer<float> m_firstPassSamples;
-	AcceleratorBuffer<int64_t> m_finalSampleCount;
-	std::shared_ptr<ComputePipeline> m_finalPassComputePipeline;
-	AcceleratorBuffer<float> m_partialSums;
+	int64_t offsetsOut[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_outSamples
+{
+	float samplesOut[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	int64_t timescale;
+	uint	len;
+	uint	bufferPerThread;
+	float	vstart;
+	float	vend;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+#include "../../scopehal/shaders/InterpolateTime.h.glsl"
+
+void main()
+{
+	//Initial starting sample indexes for this thread
+	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+	uint numSamplesPerThread = len / numThreads;
+	uint startpos = gl_GlobalInvocationID.x * numSamplesPerThread;
+	uint outbase = bufferPerThread * gl_GlobalInvocationID.x;
+
+	//Adjust starting position to the left until we find a rising edge,
+	//the start of the waveform, or the start of a previous block
+	if(gl_GlobalInvocationID.x != 0)
+	{
+		uint minpos = startpos - numSamplesPerThread;
+
+		for(; startpos > minpos; startpos --)
+		{
+			if(samplesIn[startpos] > vstart)
+				break;
+		}
+
+		//If we hit the edge of the previous block, we had no edges at all for this thread.
+		//Stop and do nothing.
+		if(startpos == minpos)
+		{
+			offsetsOut[outbase] = 0;
+			return;
+		}
+	}
+
+	//Ending position
+	uint endpos;
+	if( (gl_GlobalInvocationID.x + 1) == numThreads)
+		endpos = len;
+	else
+		endpos = (gl_GlobalInvocationID.x+1) * numSamplesPerThread;
+
+	//Main loop
+	int state = 0;
+	float last = -1e20;
+	uint numOutputSamples = 0;
+	int64_t tedge = 0;
+	for(uint i=startpos; i < endpos; i++)
+	{
+		float cur = samplesIn[i];
+		int64_t tnow = int64_t(i) * timescale;
+
+		//Find start of edge
+		if(state == 0)
+		{
+			if( (cur < vstart) && (last >= vstart) )
+			{
+				float xdelta = InterpolateTime(last, cur, vstart) * float(timescale);
+				tedge = tnow - timescale + int64_t(xdelta);
+				state = 1;
+			}
+		}
+
+		//Find end of edge
+		else if(state == 1)
+		{
+			if( (cur < vend) && (last >= vend) )
+			{
+				float xdelta = InterpolateTime(last, cur, vend) * float(timescale);
+				int64_t dt = int64_t(xdelta) + tnow - timescale - tedge;
+
+				uint iout = outbase + numOutputSamples + 1;
+				samplesOut[iout] = float(dt);
+				offsetsOut[iout] = tedge;
+				numOutputSamples ++;
+			}
+		}
+
+		last = cur;
+	}
+
+	//Save number of samples at the start of the output buffer
+	offsetsOut[outbase] = int64_t(numOutputSamples);
+}

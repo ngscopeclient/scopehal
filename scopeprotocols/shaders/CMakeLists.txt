@@ -63,6 +63,8 @@ add_compute_shaders(
 		ExponentialMovingAverage.glsl
 		EyePattern.glsl
 		EyePattern_IndexSearch.glsl
+		FallMeasurement_Uniform.glsl
+		FallMeasurement_FinalPass.glsl
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
 		FrequencyMeasurement.glsl
