@@ -69,11 +69,15 @@ public:
 	{
 		m_hostDeviceCopiesBlocking.store(0);
 		m_hostDeviceCopiesNonBlocking.store(0);
+		m_hostDeviceCopiesSkipped.store(0);
+
 		m_deviceHostCopiesBlocking.store(0);
 		m_deviceHostCopiesNonBlocking.store(0);
-
-		m_hostDeviceCopiesSkipped.store(0);
 		m_deviceHostCopiesSkipped.store(0);
+
+		m_deviceDeviceCopiesBlocking.store(0);
+		m_deviceDeviceCopiesNonBlocking.store(0);
+		m_deviceDeviceCopiesSkipped.store(0);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +92,8 @@ public:
 	static void LogHostDeviceCopySkipped()
 	{ m_hostDeviceCopiesSkipped ++; }
 
+	//---
+
 	static void LogDeviceHostCopyBlocking()
 	{ m_deviceHostCopiesBlocking ++; }
 
@@ -96,6 +102,18 @@ public:
 
 	static void LogDeviceHostCopySkipped()
 	{ m_deviceHostCopiesSkipped ++; }
+
+	//---
+
+	static void LogDeviceDeviceCopyBlocking()
+	{ m_deviceDeviceCopiesBlocking ++; }
+
+	static void LogDeviceDeviceCopyNonBlocking()
+	{ m_deviceDeviceCopiesNonBlocking ++; }
+
+	static void LogDeviceDeviceCopySkipped()
+	{ m_deviceDeviceCopiesSkipped ++; }
+
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Actual counters
@@ -109,6 +127,8 @@ public:
 	///@brief Number of copies from the CPU to GPU avoided because the data was already resident
 	static std::atomic<int64_t> m_hostDeviceCopiesSkipped;
 
+	//---
+
 	///@brief Number of blocking copies from the GPU to CPU made with the global transfer queue
 	static std::atomic<int64_t> m_deviceHostCopiesBlocking;
 
@@ -117,6 +137,27 @@ public:
 
 	///@brief Number of copies from the CPU to GPU avoided because the data was already resident
 	static std::atomic<int64_t> m_deviceHostCopiesSkipped;
+
+	//---
+
+	///@brief Number of blocking copies from the GPU to GPU made with the global transfer queue
+	static std::atomic<int64_t> m_deviceDeviceCopiesBlocking;
+
+	///@brief Number of nonblocking copies from the GPU to GPU made as part of a larger command buffer
+	static std::atomic<int64_t> m_deviceDeviceCopiesNonBlocking;
+
+	///@brief Number of copies from the GPU to GPU avoided because the data was already resident
+	static std::atomic<int64_t> m_deviceDeviceCopiesSkipped;
+
+	//---
+
+	/*
+	///@brief Number of buffer resize operations requested
+	static std::atomic<int64_t> m_resizeRequests;
+
+	///@brief Number of GPU allocate operations requested
+	static std::atomic<int64_t> m_gpuAllocations;
+	*/
 };
 
 template<class T>
@@ -602,6 +643,8 @@ public:
 		{
 			std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
+			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopyBlocking();
+
 			//Make the transfer request
 			g_vkTransferCommandBuffer->begin({});
 			vk::BufferCopy region(0, 0, m_size * sizeof(T));
@@ -611,6 +654,8 @@ public:
 			//Submit the request and block until it completes
 			g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 		}
+		else if(rhs.HasGpuBuffer())
+			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopySkipped();
 		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
 	}
 
@@ -649,10 +694,14 @@ public:
 		//Valid data GPU side? Copy it to here
 		if(rhs.HasGpuBuffer() && !rhs.m_gpuPhysMemIsStale)
 		{
+			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopyNonBlocking();
+
 			//Make the transfer request
 			vk::BufferCopy region(0, 0, m_size * sizeof(T));
 			cmdBuf.copyBuffer(**rhs.m_gpuBuffer, **m_gpuBuffer, {region});
 		}
+		else if(rhs.HasGpuBuffer())
+			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopySkipped();
 		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
 	}
 
@@ -772,6 +821,8 @@ protected:
 					if(AllocateGpuBuffer(size))
 					{
 						std::lock_guard<std::mutex> lock(g_vkTransferMutex);
+
+						AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopyBlocking();
 
 						//Make the transfer request
 						//TODO perf counters
@@ -1422,7 +1473,7 @@ protected:
 				m_cpuMemoryType = MEM_TYPE_CPU_PAGED;
 
 				//Make the temp file
-				char fname[] = "/tmp/glscopeclient-tmpXXXXXX";
+				char fname[] = "/tmp/ngscopeclient-tmpXXXXXX";
 				m_tempFileHandle = mkstemp(fname);
 				if(m_tempFileHandle < 0)
 				{

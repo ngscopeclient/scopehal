@@ -148,9 +148,14 @@ bool g_hasFMA = false;
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesBlocking;
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesNonBlocking;
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesSkipped;
+
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceHostCopiesBlocking;
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceHostCopiesNonBlocking;
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceHostCopiesSkipped;
+
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceDeviceCopiesBlocking;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceDeviceCopiesNonBlocking;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceDeviceCopiesSkipped;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
