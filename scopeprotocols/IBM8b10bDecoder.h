@@ -112,7 +112,7 @@ protected:
 	FilterParameter& m_displayFormat;
 	FilterParameter& m_commaSearchWindow;
 
-	void Align(SparseDigitalWaveform& data, size_t& i);
+	void Align(SparseDigitalWaveform* din, size_t& i);
 };
 
 #endif

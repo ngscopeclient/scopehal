@@ -48,7 +48,6 @@ IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 {
 	AddProtocolStream("data");
 	CreateInput("data");
-	CreateInput("clk");
 
 	m_displayFormat = MakeIBM8b10bDisplayFormatParameter();
 
@@ -73,7 +72,7 @@ bool IBM8b10bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -106,46 +105,38 @@ void IBM8b10bDecoder::Refresh(
 
 	//Make sure we've got valid inputs
 	ClearErrors();
-	if(!VerifyAllInputsOK())
+	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		for(int i=0; i<2; i++)
-		{
-			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
-			else if(!GetInputWaveform(i))
-				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
-		}
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid inputs", "Expected a sparse digital waveform");
 
 		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetInputWaveform(0);
-	auto clkin = GetInputWaveform(1);
 	din->PrepareForCpuAccess();
-	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 	cap->SetDisplayFormat(m_displayFormat.GetIntVal());
 
-	//Record the value of the data stream at each clock edge
-	//TODO: allow single rate clocks too?
-	SparseDigitalWaveform data;
-	SampleOnAnyEdgesBase(din, clkin, data);
-	data.PrepareForCpuAccess();
-
 	//Preallocate output buffer
-	cap->Reserve(data.m_samples.size() / 10);
+	cap->Reserve(din->m_samples.size() / 10);
 
 	//Decode the actual data
 	int last_disp = -1;
 	bool first = true;
-	size_t nsamples = data.m_samples.size();
+	size_t nsamples = din->m_samples.size();
 	if(nsamples < 11)
 	{
+		AddErrorMessage("Invalid inputs", "Too short (must be at least 11 samples)");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -162,23 +153,23 @@ void IBM8b10bDecoder::Refresh(
 		//If we have a gap
 		if(i == 0)
 			first = true;
-		if( (data.m_offsets[i] - lastSymbolEnd) > 3*lastSymbolLength)
+		if( (din->m_offsets[i] - lastSymbolEnd) > 3*lastSymbolLength)
 			first = true;
 		if(first)
 		{
-			LogTrace("Realigning at t=%s\n", Unit(Unit::UNIT_FS).PrettyPrint(data.m_offsets[i]).c_str());
-			Align(data, i);
+			LogTrace("Realigning at t=%s\n", Unit(Unit::UNIT_FS).PrettyPrint(din->m_offsets[i]).c_str());
+			Align(din, i);
 		}
 
 		//5b/6b decode
 
 		uint8_t code6 =
-			(data.m_samples[i+0] ? 32 : 0) |
-			(data.m_samples[i+1] ? 16 : 0) |
-			(data.m_samples[i+2] ? 8 : 0) |
-			(data.m_samples[i+3] ? 4 : 0) |
-			(data.m_samples[i+4] ? 2 : 0) |
-			(data.m_samples[i+5] ? 1 : 0);
+			(din->m_samples[i+0] ? 32 : 0) |
+			(din->m_samples[i+1] ? 16 : 0) |
+			(din->m_samples[i+2] ? 8 : 0) |
+			(din->m_samples[i+3] ? 4 : 0) |
+			(din->m_samples[i+4] ? 2 : 0) |
+			(din->m_samples[i+5] ? 1 : 0);
 
 		static const int code5_table[64] =
 		{
@@ -235,10 +226,10 @@ void IBM8b10bDecoder::Refresh(
 
 		//3b/4b decode
 		uint8_t code4 =
-			(data.m_samples[i+6] ? 8 : 0) |
-			(data.m_samples[i+7] ? 4 : 0) |
-			(data.m_samples[i+8] ? 2 : 0) |
-			(data.m_samples[i+9] ? 1 : 0);
+			(din->m_samples[i+6] ? 8 : 0) |
+			(din->m_samples[i+7] ? 4 : 0) |
+			(din->m_samples[i+8] ? 2 : 0) |
+			(din->m_samples[i+9] ? 1 : 0);
 
 		static const bool err3_ctl_table[16] =
 		{
@@ -337,8 +328,8 @@ void IBM8b10bDecoder::Refresh(
 		//Horizontally shift the decoded symbol back by half a UI
 		//since the recovered clock edge is in the middle of the UI.
 		//We want the decoded signal boundaries to line up with the data edge, not the middle of the UI.
-		auto symbolStart = data.m_offsets[i] - data.m_durations[i]/2;
-		auto symbolLength = data.m_offsets[i+10] - data.m_offsets[i];
+		auto symbolStart = din->m_offsets[i] - din->m_durations[i]/2;
+		auto symbolLength = din->m_offsets[i+10] - din->m_offsets[i];
 		if( (symbolStart - lastSymbolStart) > 5*symbolLength)
 		{
 			LogTrace("Sync lost (big gap)\n");
@@ -389,7 +380,7 @@ void IBM8b10bDecoder::Refresh(
 	cap->MarkModifiedFromCpu();
 }
 
-void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
+void IBM8b10bDecoder::Align(SparseDigitalWaveform* din, size_t& i)
 {
 	size_t range = m_commaSearchWindow.GetIntVal();
 
@@ -397,7 +388,7 @@ void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
 	//TODO: make this more efficient?
 	size_t max_commas = 0;
 	size_t max_offset = 0;
-	size_t dend = data.m_samples.size() - 20;
+	size_t dend = din->m_samples.size() - 20;
 	for(size_t offset=0; offset < 10; offset ++)
 	{
 		size_t num_commas = 0;
@@ -416,7 +407,7 @@ void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
 			bool comma = true;
 			for(int j=3; j<=6; j++)
 			{
-				if(data.m_samples[base+j] != data.m_samples[base+2])
+				if(din->m_samples[base+j] != din->m_samples[base+2])
 				{
 					comma = false;
 					break;
@@ -424,16 +415,16 @@ void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
 			}
 
 			//Comma is always exactly five identical bits (so 1 and 7 must be different)
-			if(data.m_samples[base+1] == data.m_samples[base+2])
+			if(din->m_samples[base+1] == din->m_samples[base+2])
 				comma = false;
-			if(data.m_samples[base+7] == data.m_samples[base+2])
+			if(din->m_samples[base+7] == din->m_samples[base+2])
 				comma = false;
 
 			//Count number of 0s and 1s in the symbol
 			//Should always be equal (5/5) or two greater (4/6 or 6/4)
 			int nones = 0;
 			for(int j=0; j<10; j++)
-				nones += data.m_samples[base+j];
+				nones += din->m_samples[base+j];
 			if( (nones != 4) && (nones != 5) && (nones != 6) )
 				num_errors ++;
 
