@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,8 +56,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(ThresholdFilter)
 
 protected:
-	std::string m_threshname;
-	std::string m_hysname;
+	FilterParameter& m_threshold;
+	FilterParameter& m_hysteresis;
 
 	std::unique_ptr<ComputePipeline> m_computePipeline;
 };
