@@ -37,6 +37,7 @@ using namespace std;
 
 InvertFilter::InvertFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_computePipeline("shaders/InvertFilter.spv", 2, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
@@ -47,7 +48,7 @@ InvertFilter::InvertFilter(const string& color)
 
 bool InvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -72,47 +73,73 @@ void InvertFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
+Filter::DataLocation InvertFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void InvertFilter::Refresh()
+void InvertFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("InvertFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	auto din = GetInputWaveform(0);
+	if(!din)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
-	auto din = GetInputWaveform(0);
 	size_t len = din->size();
-
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 
+	//Early out if no data (this is a legal no-op)
+	if(len == 0)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+
+	cmdBuf.begin({});
+
+	//Sparse path
+	//TODO: copy offsets GPU side
 	if(sdin)
 	{
-		//Negate each sample
 		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
-		cap->PrepareForCpuAccess();
-		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-		float* a = (float*)__builtin_assume_aligned(&sdin->m_samples[0], 16);
-		for(size_t i=0; i<len; i++)
-			out[i] = -a[i];
-
-		cap->MarkModifiedFromCpu();
+		cap->Resize(len);
+		m_computePipeline.BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->m_samples.MarkModifiedFromGpu();
 	}
+
+	//Uniform path
 	else if(udin)
 	{
-		//Negate each sample
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
-		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-		float* a = (float*)__builtin_assume_aligned(&udin->m_samples[0], 16);
-		for(size_t i=0; i<len; i++)
-			out[i] = -a[i];
-
-		cap->MarkModifiedFromCpu();
+		m_computePipeline.BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->m_samples.MarkModifiedFromGpu();
 	}
+
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, (uint32_t)len,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }

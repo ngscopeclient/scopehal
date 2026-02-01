@@ -68,6 +68,7 @@ add_compute_shaders(
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
 		FrequencyMeasurement.glsl
+		InvertFilter.glsl
 		IQDemuxFilter.glsl
 		IQDemuxFilterAlignment.glsl
 		PAMEdgeDetector_InitialMerge.glsl
