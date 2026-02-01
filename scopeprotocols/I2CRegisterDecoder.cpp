@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,18 +38,18 @@ using namespace std;
 
 I2CRegisterDecoder::I2CRegisterDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
-	, m_addrbytesname("Address Bytes")
-	, m_baseaddrname("Bus Address")
+	, m_addrbytes(m_parameters["Address Bytes"])
+	, m_baseaddr(m_parameters["Bus Address"])
 {
 	CreateInput("i2c");
 
-	m_parameters[m_addrbytesname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_addrbytes = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	for(int i=1; i<=4; i++)
-		m_parameters[m_addrbytesname].AddEnumValue(to_string(i), i);
-	m_parameters[m_addrbytesname].SetIntVal(1);
+		m_addrbytes.AddEnumValue(to_string(i), i);
+	m_addrbytes.SetIntVal(1);
 
-	m_parameters[m_baseaddrname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_baseaddrname].SetIntVal(0x90);
+	m_baseaddr = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_baseaddr.SetIntVal(0x90);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,10 +57,10 @@ I2CRegisterDecoder::I2CRegisterDecoder(const string& color)
 
 bool I2CRegisterDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -83,36 +83,50 @@ string I2CRegisterDecoder::GetProtocolName()
 	return "I2C Register";
 }
 
+Filter::DataLocation I2CRegisterDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void I2CRegisterDecoder::Refresh()
+void I2CRegisterDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("I2CRegisterDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
+	//Make sure we've got valid inputs
+	ClearErrors();
 	auto din = dynamic_cast<I2CWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid input", "Expected an I2C waveform");
+
+		SetData(nullptr, 0);
 		return;
 	}
+
 	din->PrepareForCpuAccess();
 
 	//Pull out our settings
-	uint8_t base_addr = m_parameters[m_baseaddrname].GetIntVal();
-	int pointer_bytes = m_parameters[m_addrbytesname].GetIntVal();
+	uint8_t base_addr = m_baseaddr.GetIntVal();
+	int pointer_bytes = m_addrbytes.GetIntVal();
 
 	//Set up output
-	auto cap = new I2CRegisterWaveform(m_parameters[m_addrbytesname]);
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<I2CRegisterWaveform>(din, 0);
+	cap->SetAddrBytes(pointer_bytes);
 	cap->PrepareForCpuAccess();
 
 	//Main decode loop
@@ -414,11 +428,10 @@ void I2CRegisterDecoder::Refresh()
 	if(pack)
 		delete pack;
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
-std::string I2CRegisterWaveform::GetColor(size_t i)
+string I2CRegisterWaveform::GetColor(size_t i)
 {
 	const I2CRegisterSymbol& s = m_samples[i];
 
@@ -454,8 +467,7 @@ string I2CRegisterWaveform::GetText(size_t i)
 
 		case I2CRegisterSymbol::TYPE_ADDRESS:
 			{
-				auto nbytes = m_rawBytes.GetIntVal();
-				switch(nbytes)
+				switch(m_addrBytes)
 				{
 					case 1:
 						snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
