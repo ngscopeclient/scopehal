@@ -62,6 +62,8 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 		m_source[i] = new TestWaveformSource(*m_rng[i]);
 	}
 
+	m_digitalSource = new TestDigitalWaveformSource();
+
 	m_model = "Oscilloscope Simulator";
 	m_vendor = "Antikernel Labs";
 	m_serial = "12345";
@@ -93,6 +95,22 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 		m_channelModes[i] = CHANNEL_MODE_NOISE_LPF;
 	}
 
+	char chn[32];
+	for(size_t i=0; i<16; i++)
+	{
+		snprintf(chn, sizeof(chn), "D%zu", i);
+		auto chan = new OscilloscopeChannel(
+			this,
+			chn,
+			GetDefaultChannelColor(m_channels.size()),
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			m_channels.size());
+		m_channels.push_back(chan);
+		m_digitalChannels.push_back(chan);
+	}
+
 	m_sweepFreq = 1e9;
 
 	//Default sampling configuration
@@ -103,6 +121,22 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_channels[1]->SetDisplayName("Ramp");
 	m_channels[2]->SetDisplayName("PRBS31");
 	m_channels[3]->SetDisplayName("8B10B");
+
+	m_channels[4]->SetDisplayName("SPI-CS");
+	m_channels[5]->SetDisplayName("SPI-SCLK");
+	m_channels[6]->SetDisplayName("SPI-MOSI");
+	m_channels[7]->SetDisplayName("UART-0");
+	m_channels[8]->SetDisplayName("UART-0-Clk");
+	m_channels[9]->SetDisplayName("UART-1");
+	m_channels[10]->SetDisplayName("UART-1-Clk");
+	m_channels[11]->SetDisplayName("UART-2");
+	m_channels[12]->SetDisplayName("UART-2-Clk");
+	m_channels[13]->SetDisplayName("UART-3");
+	m_channels[14]->SetDisplayName("UART-3-Clk");
+	m_channels[15]->SetDisplayName("UART-4");
+	m_channels[16]->SetDisplayName("UART-4-Clk");
+	m_channels[17]->SetDisplayName("UART-5");
+	m_channels[18]->SetDisplayName("UART-5-Clk");
 
 	//Create Vulkan objects for the waveform conversion
 	for(int i=0; i<4; i++)
@@ -137,6 +171,24 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	}
 }
 
+vector<Oscilloscope::DigitalBank> DemoOscilloscope::GetDigitalBanks()
+{
+	vector<DigitalBank> banks;
+
+	for(size_t n = 0; n < 2; n++)
+	{
+		DigitalBank bank;
+
+		for(size_t i = 0; i < 8; i++)
+			bank.push_back(m_digitalChannels[i + n * 8]);
+
+		banks.push_back(bank);
+	}
+
+	return banks;
+}
+
+
 DemoOscilloscope::~DemoOscilloscope()
 {
 	LogTrace("Shutting down demo scope\n");
@@ -146,6 +198,7 @@ DemoOscilloscope::~DemoOscilloscope()
 		delete m_source[i];
 		delete m_rng[i];
 	}
+	delete m_digitalSource;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -538,7 +591,7 @@ bool DemoOscilloscope::AcquireData()
 
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	WaveformBase* waveforms[4] = {nullptr};
+	WaveformBase* waveforms[4+16] = {nullptr};
 	for(int i=0; i<4; i++)
 	{
 		if(!m_channelsEnabled[i])
@@ -591,8 +644,52 @@ bool DemoOscilloscope::AcquireData()
 		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 	}
 
+	// Prepare SPI data
+	auto cs =  new SparseDigitalWaveform("CS");
+	auto sclk = new SparseDigitalWaveform("SCLK");
+	auto mosi = new SparseDigitalWaveform("MOSI");
+	
+	m_digitalSource->GenerateSPI(cs,sclk,mosi,sampleperiod, depth);
+
+	for(int i=4; i<(4+16); i++)
+	{
+		if(!m_channelsEnabled[i])
+			continue;
+
+		// Lambda passed to generate waveform methods to update "download" percentage
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
+		switch(i)
+		{
+			case 4:
+				waveforms[i] = cs;
+				break;
+			case 5:
+				waveforms[i] = sclk;
+				break;
+			case 6:
+				waveforms[i] = mosi;
+				break;
+			default:
+				if(i%2 == 1)
+				{
+					auto wfm = new SparseDigitalWaveform("UART");
+					waveforms[i] = wfm;
+					m_digitalSource->GenerateUART(wfm, sampleperiod, depth);
+				}
+				else
+				{
+					auto wfm = new SparseDigitalWaveform("UART-Clk");
+					waveforms[i] = wfm;
+					m_digitalSource->GenerateUARTClock(wfm, sampleperiod, depth);
+				}
+				break;
+		}
+
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+	}
+
 	SequenceSet s;
-	for(int i=0; i<4; i++)
+	for(int i=0; i<(4+16); i++)
 	{
 		s[GetOscilloscopeChannel(i)] = waveforms[i];
 	}
