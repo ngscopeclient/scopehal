@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -73,7 +73,7 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 
 bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -143,12 +143,40 @@ void IBISDriverFilter::OnModelChanged()
 	}
 }
 
-void IBISDriverFilter::Refresh()
+Filter::DataLocation IBISDriverFilter::GetInputLocation()
 {
-	//If we don't have a model, nothing to do
-	if(!VerifyAllInputsOK() || !m_model)
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void IBISDriverFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("IBISDriverFilter::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
+		return;
+	}
+	if(!m_model)
+	{
+		AddErrorMessage("No model", "No valid IBIS model specified");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -163,7 +191,8 @@ void IBISDriverFilter::Refresh()
 	size_t rate = m_parameters[m_sampleRate].GetIntVal();
 	if(rate == 0)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid sample rate", "Sample rate cannot be zero");
+		SetData(nullptr, 0);
 		return;
 	}
 	size_t samplePeriod = FS_PER_SECOND / rate;
@@ -223,7 +252,8 @@ void IBISDriverFilter::Refresh()
 	//Sanity check that we actually have some data
 	if(edgeTimestamps.empty())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("No edges", "No edges in the input clock signal");
+		SetData(nullptr, 0);
 		return;
 	}
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,17 +43,17 @@ using namespace std;
 
 IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
-	, m_displayformat("Display Format")
-	, m_commaSearchWindow("Comma Search Window")
+	, m_displayFormat(m_parameters["Display Format"])
+	, m_commaSearchWindow(m_parameters["Comma Search Window"])
 {
 	AddProtocolStream("data");
 	CreateInput("data");
 	CreateInput("clk");
 
-	m_parameters[m_displayformat] = MakeIBM8b10bDisplayFormatParameter();
+	m_displayFormat = MakeIBM8b10bDisplayFormatParameter();
 
-	m_parameters[m_commaSearchWindow] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_UI));
-	m_parameters[m_commaSearchWindow].SetIntVal(20000);
+	m_commaSearchWindow = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_UI));
+	m_commaSearchWindow.SetIntVal(20000);
 }
 
 FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
@@ -62,7 +62,6 @@ FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
 	f.AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
 	f.AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
 	f.SetIntVal(FORMAT_DOTTED);
-
 	return f;
 }
 
@@ -71,7 +70,7 @@ FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
 
 bool IBM8b10bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -85,16 +84,38 @@ string IBM8b10bDecoder::GetProtocolName()
 	return "8b/10b (IBM)";
 }
 
+Filter::DataLocation IBM8b10bDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void IBM8b10bDecoder::Refresh()
+void IBM8b10bDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("IBM8b10bDecoder::Refresh");
+	#endif
+
 	LogTrace("IBM8b10bDecoder::Refresh\n");
 	LogIndenter li;
 
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -106,11 +127,9 @@ void IBM8b10bDecoder::Refresh()
 	clkin->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new IBM8b10bWaveform(m_parameters[m_displayformat]);
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
+	cap->SetDisplayFormat(m_displayFormat.GetIntVal());
 
 	//Record the value of the data stream at each clock edge
 	//TODO: allow single rate clocks too?
@@ -367,13 +386,12 @@ void IBM8b10bDecoder::Refresh()
 		lastSymbolStart = symbolStart;
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
 void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
 {
-	size_t range = m_parameters[m_commaSearchWindow].GetIntVal();
+	size_t range = m_commaSearchWindow.GetIntVal();
 
 	//Look for commas in the data stream
 	//TODO: make this more efficient?
@@ -457,7 +475,7 @@ string IBM8b10bWaveform::GetText(size_t i)
 {
 	const IBM8b10bSymbol& s = m_samples[i];
 
-	IBM8b10bDecoder::DisplayFormat cachedDisplayFormat = (IBM8b10bDecoder::DisplayFormat) m_displayformat.GetIntVal();
+	auto cachedDisplayFormat = static_cast<IBM8b10bDecoder::DisplayFormat>(m_displayFormat);
 
 	unsigned int right = s.m_data >> 5;
 	unsigned int left = s.m_data & 0x1F;

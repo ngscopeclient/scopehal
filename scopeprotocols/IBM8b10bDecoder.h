@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -72,11 +72,18 @@ public:
 class IBM8b10bWaveform : public SparseWaveform<IBM8b10bSymbol>
 {
 public:
-	IBM8b10bWaveform (FilterParameter& displayformat) : SparseWaveform<IBM8b10bSymbol>(), m_displayformat(displayformat) {};
+	IBM8b10bWaveform()
+		: SparseWaveform<IBM8b10bSymbol>(),
+		m_displayFormat(0)
+	{};
 	virtual std::string GetText(size_t) override;
 	virtual std::string GetColor(size_t) override;
 
-	FilterParameter& m_displayformat;
+	void SetDisplayFormat(int format)
+	{ m_displayFormat = format; }
+
+protected:
+	int m_displayFormat;
 };
 
 class IBM8b10bDecoder : public Filter
@@ -86,7 +93,8 @@ public:
 
 	static FilterParameter MakeIBM8b10bDisplayFormatParameter();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -101,9 +109,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(IBM8b10bDecoder)
 
 protected:
-	std::string m_displayformat;
-
-	std::string m_commaSearchWindow;
+	FilterParameter& m_displayFormat;
+	FilterParameter& m_commaSearchWindow;
 
 	void Align(SparseDigitalWaveform& data, size_t& i);
 };

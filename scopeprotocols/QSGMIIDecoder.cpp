@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -68,10 +68,10 @@ QSGMIIDecoder::~QSGMIIDecoder()
 
 bool QSGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -103,17 +103,10 @@ void QSGMIIDecoder::Refresh()
 	vector<IBM8b10bWaveform*> caps;
 	for(size_t i=0; i<4; i++)
 	{
-		auto cap = new IBM8b10bWaveform(m_parameters[m_displayformat]);
-
-		cap->m_timescale = 1;
-		cap->m_startTimestamp = din->m_startTimestamp;
-		cap->m_startFemtoseconds = din->m_startFemtoseconds;
-		cap->m_triggerPhase = 0;
+		auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, i);
+		cap->SetDisplayFormat(m_parameters[m_displayformat].GetIntVal());
 		cap->PrepareForCpuAccess();
-
 		caps.push_back(cap);
-
-		SetData(cap, i);
 
 		//We know roughly how big each output buffer should be (1/4 the input)
 		//so preallocate that space to avoid excessive allocations
