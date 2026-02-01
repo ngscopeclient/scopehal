@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,6 +37,8 @@ using namespace std;
 
 IQSquelchFilter::IQSquelchFilter(const string& color)
 	: Filter(color, CAT_RF)
+	, m_threshold(m_parameters["Threshold"])
+	, m_holdtime(m_parameters["Hold time"])
 {
 	//Set up channels
 	CreateInput("I");
@@ -45,13 +47,11 @@ IQSquelchFilter::IQSquelchFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
-	m_thresholdname = "Threshold";
-	m_parameters[m_thresholdname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_thresholdname].SetFloatVal(0.01);
+	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_threshold.SetFloatVal(0.01);
 
-	m_holdtimename = "Hold time";
-	m_parameters[m_holdtimename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_holdtimename].SetIntVal(1e6);
+	m_holdtime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_holdtime.SetIntVal(1e6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +59,7 @@ IQSquelchFilter::IQSquelchFilter(const string& color)
 
 bool IQSquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -76,27 +76,53 @@ string IQSquelchFilter::GetProtocolName()
 	return "IQ Squelch";
 }
 
+Filter::DataLocation IQSquelchFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void IQSquelchFilter::Refresh()
+void IQSquelchFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("IQSquelchFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	if(!din_i || !din_q)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No I signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at I input");
+		else if(!din_i)
+			AddErrorMessage("Invalid input", "Expected uniform analog waveform at I input");
+
+		if(!GetInput(1))
+			AddErrorMessage("Missing inputs", "No Q signal input connected");
+		else if(!GetInputWaveform(1))
+			AddErrorMessage("Missing inputs", "No waveform available at Q input");
+		else if(!din_q)
+			AddErrorMessage("Invalid input", "Expected uniform analog waveform at Q input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
-	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
 	din_i->PrepareForCpuAccess();
 	din_q->PrepareForCpuAccess();
 
 	size_t len = min(din_i->size(), din_q->size());
 
-	auto threshold = m_parameters[m_thresholdname].GetFloatVal();
-	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
+	auto threshold = m_threshold.GetFloatVal();
+	auto holdtime_fs = m_holdtime.GetIntVal();
 	size_t holdtime_samples = holdtime_fs / din_i->m_timescale;
 
 	auto dout_i = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
