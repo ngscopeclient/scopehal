@@ -71,12 +71,19 @@ public:
 class I2CEepromWaveform : public SparseWaveform<I2CEepromSymbol>
 {
 public:
-	I2CEepromWaveform (FilterParameter& raw_bits) : SparseWaveform<I2CEepromSymbol>(), m_raw_bits(raw_bits) {};
+	I2CEepromWaveform()
+		: SparseWaveform<I2CEepromSymbol>()
+		, m_memType(1)
+	{
+	};
 	virtual std::string GetText(size_t) override;
 	virtual std::string GetColor(size_t) override;
 
-private:
-	FilterParameter& m_raw_bits;
+	void SetMemType(int type)
+	{ m_memType = type; }
+
+protected:
+	int m_memType;
 };
 
 class I2CEepromDecoder : public PacketDecoder

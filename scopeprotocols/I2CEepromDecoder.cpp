@@ -156,10 +156,8 @@ void I2CEepromDecoder::Refresh(
 	int pointer_bits = min(16, raw_bits);
 
 	//Set up output
-	auto cap = new I2CEepromWaveform(m_memtype);
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<I2CEepromWaveform>(din, 0);
+	cap->SetMemType(raw_bits);
 	cap->PrepareForCpuAccess();
 
 	//Mask for device address
@@ -525,7 +523,6 @@ void I2CEepromDecoder::Refresh(
 	if(pack)
 		delete pack;
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
@@ -576,13 +573,13 @@ string I2CEepromWaveform::GetText(size_t i)
 			return "Ready";
 
 		case I2CEepromSymbol::TYPE_ADDRESS:
-			if(m_raw_bits.GetIntVal() > 16)
+			if(m_memType > 16)
 				snprintf(tmp, sizeof(tmp), "Addr: %05x", s.m_data);
-			else if(m_raw_bits.GetIntVal() > 12)
+			else if(m_memType > 12)
 				snprintf(tmp, sizeof(tmp), "Addr: %04x", s.m_data);
-			else if(m_raw_bits.GetIntVal() > 8)
+			else if(m_memType > 8)
 				snprintf(tmp, sizeof(tmp), "Addr: %03x", s.m_data);
-			else if(m_raw_bits.GetIntVal() > 4)
+			else if(m_memType > 4)
 				snprintf(tmp, sizeof(tmp), "Addr: %02x", s.m_data);
 			else
 				snprintf(tmp, sizeof(tmp), "Addr: %01x", s.m_data);
