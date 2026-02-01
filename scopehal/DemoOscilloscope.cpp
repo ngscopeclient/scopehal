@@ -386,6 +386,7 @@ vector<uint64_t> DemoOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(100 * k);
 	ret.push_back(1 * m);
 	ret.push_back(10 * m);
+	ret.push_back(50 * m);
 	return ret;
 }
 
