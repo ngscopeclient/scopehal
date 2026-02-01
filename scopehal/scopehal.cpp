@@ -142,6 +142,18 @@ bool g_hasFMA = false;
 #include <mach-o/dyld.h>
 #endif
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AcceleratorBuffer performance counters, should probably be moved to its own file eventually
+
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesBlocking;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesNonBlocking;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesSkipped;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceHostCopiesBlocking;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceHostCopiesNonBlocking;
+atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceHostCopiesSkipped;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
 	@brief True if filters can use GPU acceleration
 

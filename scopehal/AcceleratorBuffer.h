@@ -59,6 +59,66 @@ extern std::mutex g_vkTransferMutex;
 extern bool g_hasDebugUtils;
 extern bool g_vulkanDeviceHasUnifiedMemory;
 
+/**
+	@brief Performance counters shared by all AcceleratorBuffer instances
+ */
+class AcceleratorBufferPerformanceCounters
+{
+public:
+	static void Reset()
+	{
+		m_hostDeviceCopiesBlocking.store(0);
+		m_hostDeviceCopiesNonBlocking.store(0);
+		m_deviceHostCopiesBlocking.store(0);
+		m_deviceHostCopiesNonBlocking.store(0);
+
+		m_hostDeviceCopiesSkipped.store(0);
+		m_deviceHostCopiesSkipped.store(0);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Helpers for logging specific interactions
+
+	static void LogHostDeviceCopyBlocking()
+	{ m_hostDeviceCopiesBlocking ++; }
+
+	static void LogHostDeviceCopyNonBlocking()
+	{ m_hostDeviceCopiesNonBlocking ++; }
+
+	static void LogHostDeviceCopySkipped()
+	{ m_hostDeviceCopiesSkipped ++; }
+
+	static void LogDeviceHostCopyBlocking()
+	{ m_deviceHostCopiesBlocking ++; }
+
+	static void LogDeviceHostCopyNonBlocking()
+	{ m_deviceHostCopiesNonBlocking ++; }
+
+	static void LogDeviceHostCopySkipped()
+	{ m_deviceHostCopiesSkipped ++; }
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Actual counters
+
+	///@brief Number of blocking copies from the CPU to GPU made with the global transfer queue
+	static std::atomic<int64_t> m_hostDeviceCopiesBlocking;
+
+	///@brief Number of nonblocking copies from the CPU to GPU made as part of a larger command buffer
+	static std::atomic<int64_t> m_hostDeviceCopiesNonBlocking;
+
+	///@brief Number of copies from the CPU to GPU avoided because the data was already resident
+	static std::atomic<int64_t> m_hostDeviceCopiesSkipped;
+
+	///@brief Number of blocking copies from the GPU to CPU made with the global transfer queue
+	static std::atomic<int64_t> m_deviceHostCopiesBlocking;
+
+	///@brief Number of nonblocking copies from the GPU to CPU made as part of a larger command buffer
+	static std::atomic<int64_t> m_deviceHostCopiesNonBlocking;
+
+	///@brief Number of copies from the CPU to GPU avoided because the data was already resident
+	static std::atomic<int64_t> m_deviceHostCopiesSkipped;
+};
+
 template<class T>
 class AcceleratorBuffer;
 
@@ -510,6 +570,8 @@ public:
 
 	/**
 		@brief Copies our content from another AcceleratorBuffer
+
+		TODO perf counters
 	 */
 	 __attribute__((noinline))
 	void CopyFrom(const AcceleratorBuffer<T>& rhs, bool reallocateToMatch = true)
@@ -554,6 +616,8 @@ public:
 
 	/**
 		@brief Copies our content from another AcceleratorBuffer
+
+		TODO perf counters
 	 */
 	 __attribute__((noinline))
 	void CopyFromNonblocking(
@@ -710,6 +774,7 @@ protected:
 						std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
 						//Make the transfer request
+						//TODO perf counters
 						g_vkTransferCommandBuffer->begin({});
 						vk::BufferCopy region(0, 0, m_size * sizeof(T));
 						g_vkTransferCommandBuffer->copyBuffer(**bOld, **m_gpuBuffer, {region});
@@ -980,6 +1045,8 @@ public:
 
 		if(m_cpuPhysMemIsStale)
 			CopyToCpu();
+		else
+			AcceleratorBufferPerformanceCounters::LogDeviceHostCopySkipped();
 	}
 
 	/**
@@ -1021,6 +1088,8 @@ public:
 
 		if(m_cpuPhysMemIsStale)
 			CopyToCpuNonblocking(cmdBuf, skipBarrier);
+		else
+			AcceleratorBufferPerformanceCounters::LogDeviceHostCopySkipped();
 	}
 
 	/**
@@ -1051,6 +1120,8 @@ public:
 		//Make sure the GPU-side buffer is up to date
 		if(m_gpuPhysMemIsStale && !outputOnly)
 			CopyToGpu();
+		else
+			AcceleratorBufferPerformanceCounters::LogHostDeviceCopySkipped();
 	}
 
 	/**
@@ -1081,6 +1152,8 @@ public:
 		//Make sure the GPU-side buffer is up to date
 		if(m_gpuPhysMemIsStale && !outputOnly)
 			CopyToGpuNonblocking(cmdBuf);
+		else
+			AcceleratorBufferPerformanceCounters::LogHostDeviceCopySkipped();
 	}
 
 protected:
@@ -1094,6 +1167,8 @@ protected:
 	void CopyToCpu()
 	{
 		assert(std::is_trivially_copyable<T>::value);
+
+		AcceleratorBufferPerformanceCounters::LogHostDeviceCopyBlocking();
 
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
@@ -1115,6 +1190,8 @@ protected:
 	void CopyToCpuNonblocking(vk::raii::CommandBuffer& cmdBuf, bool skipBarrier = false)
 	{
 		assert(std::is_trivially_copyable<T>::value);
+
+		AcceleratorBufferPerformanceCounters::LogHostDeviceCopyNonBlocking();
 
 		//Add a barrier just in case a shader is still writing to it
 		if(!skipBarrier)
@@ -1145,6 +1222,8 @@ protected:
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
+		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyBlocking();
+
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
 		//Make the transfer request
@@ -1168,6 +1247,8 @@ protected:
 	void CopyToGpuNonblocking(vk::raii::CommandBuffer& cmdBuf)
 	{
 		assert(std::is_trivially_copyable<T>::value);
+
+		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyNonBlocking();
 
 		//Make the transfer request
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
@@ -1627,7 +1708,6 @@ public:
 				UpdateCpuNames();
 		}
 	}
-
 };
 
 extern std::set<MemoryPressureHandler> g_memoryPressureHandlers;
