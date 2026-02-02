@@ -131,8 +131,8 @@ void ConstellationFilter::ClearSweeps()
 }
 
 void ConstellationFilter::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ConstellationFilter::Refresh");
@@ -163,8 +163,11 @@ void ConstellationFilter::Refresh(
 		return;
 	}
 
-	din_i->PrepareForCpuAccess();
-	din_q->PrepareForCpuAccess();
+	cmdBuf.begin({});
+		din_i->PrepareForCpuAccessNonblocking(cmdBuf);
+		din_q->PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
 	//Recompute the nominal constellation point locations
 	RecomputeNominalPoints();
