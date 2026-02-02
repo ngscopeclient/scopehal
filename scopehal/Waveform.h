@@ -214,12 +214,19 @@ public:
 	/**
 		@brief Indicates that this waveform is going to be used by the CPU in the near future.
 
+		This ensures the CPU-side copy of the data is coherent with the most recently modified (CPU or GPU side) copy.
+	 */
+	virtual void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) =0;
+
+	/**
+		@brief Indicates that this waveform is going to be used by the GPU in the near future.
+
 		This ensures the GPU-side copy of the data is coherent with the most recently modified (CPU or GPU side) copy.
 	 */
 	virtual void PrepareForGpuAccess() =0;
 
 	/**
-		@brief Indicates that this waveform is going to be used by the CPU in the near future.
+		@brief Indicates that this waveform is going to be used by the GPU in the near future.
 
 		This ensures the GPU-side copy of the data is coherent with the most recently modified (CPU or GPU side) copy.
 	 */
@@ -458,6 +465,9 @@ public:
 	virtual void PrepareForGpuAccess() override
 	{ m_samples.PrepareForGpuAccess(); }
 
+	virtual void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{ m_samples.PrepareForCpuAccessNonblocking(cmdBuf); }
+
 	virtual void PrepareForGpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
 	{ m_samples.PrepareForGpuAccessNonblocking(false, cmdBuf); }
 
@@ -604,6 +614,13 @@ public:
 		m_offsets.PrepareForCpuAccess();
 		m_durations.PrepareForCpuAccess();
 		m_samples.PrepareForCpuAccess();
+	}
+
+	virtual void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{
+		m_samples.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
 	}
 
 	virtual void PrepareForGpuAccess() override

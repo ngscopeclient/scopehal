@@ -179,6 +179,12 @@ public:
 	virtual bool HasGpuBuffer() override
 	{ return m_accumdata.HasGpuBuffer(); }
 
+	virtual void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{
+		m_outdata.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_accumdata.PrepareForCpuAccessNonblocking(cmdBuf);
+	}
+
 	virtual void PrepareForCpuAccess() override
 	{
 		m_outdata.PrepareForCpuAccess();

@@ -97,6 +97,9 @@ public:
 	virtual void PrepareForGpuAccess() override
 	{ m_outdata.PrepareForGpuAccess();}
 
+	virtual void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{ m_outdata.PrepareForCpuAccessNonblocking(cmdBuf);}
+
 	virtual void PrepareForGpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
 	{ m_outdata.PrepareForGpuAccessNonblocking(false, cmdBuf);}
 
