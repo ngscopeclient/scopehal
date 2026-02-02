@@ -95,9 +95,7 @@ Filter::DataLocation Ethernet100BaseT1Decoder::GetInputLocation()
 	return LOC_DONTCARE;
 }
 
-void Ethernet100BaseT1Decoder::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("Ethernet100BaseT1Decoder::Refresh");
@@ -127,8 +125,11 @@ void Ethernet100BaseT1Decoder::Refresh(
 		return;
 	}
 
-	din_i->PrepareForCpuAccess();
-	din_q->PrepareForCpuAccess();
+	cmdBuf.begin({});
+		din_i->PrepareForCpuAccessNonblocking(cmdBuf);
+		din_q->PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
 	size_t ilen = min(din_i->size(), din_q->size());
 
