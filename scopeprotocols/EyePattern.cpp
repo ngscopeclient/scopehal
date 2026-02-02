@@ -328,7 +328,16 @@ void EyePattern::Refresh(
 
 	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)
+	{
+		cmdBuf.begin({});
+
+		m_clockEdgesMuxed->PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
 		RecalculateUIWidth(cap);
+	}
 
 	//Shift the clock by half a UI if it's edge aligned
 	//All of the eye creation logic assumes a center aligned clock.
@@ -1257,7 +1266,6 @@ EyeWaveform* EyePattern::ReallocateWaveform()
 
 void EyePattern::RecalculateUIWidth(EyeWaveform* cap)
 {
-	m_clockEdgesMuxed->PrepareForCpuAccess();
 	auto& edges = *m_clockEdgesMuxed;
 
 	//If manual override, don't look at anything else
