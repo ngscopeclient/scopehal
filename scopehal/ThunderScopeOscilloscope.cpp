@@ -141,11 +141,16 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	ResetPerCaptureDiagnostics();
 
 	//Initialize waveform buffers. Allocate one extra so we can overlap download and conversion
+	//Original implementation had GPU HINT_LIKELY and ran a copy followed by the shader
+	//on baseT1 benchmark with 3de65f016: 7.7 - 9.0 WFM/s
+	//with HINT_UNLIKELY does direct unified memory reads from shader
+	//on same benchmark: 8.6 - 9.2, seems to consistently average higher w/ less stalls,
+	//also saves 3.668 -> 3.575 = 93 MB of VRAM
 	for(size_t i=0; i<m_analogChannelCount + 1; i++)
 	{
 		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
 		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
-		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
+		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_UNLIKELY);
 	}
 
 	//Create Vulkan objects for the waveform conversion
