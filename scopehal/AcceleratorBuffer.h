@@ -1219,7 +1219,7 @@ protected:
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
-		AcceleratorBufferPerformanceCounters::LogHostDeviceCopyBlocking();
+		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyBlocking();
 
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
@@ -1242,7 +1242,7 @@ protected:
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
-		AcceleratorBufferPerformanceCounters::LogHostDeviceCopyNonBlocking();
+		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyNonBlocking();
 
 		//Add a barrier just in case a shader is still writing to it
 		if(!skipBarrier)
@@ -1273,7 +1273,7 @@ protected:
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
-		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyBlocking();
+		AcceleratorBufferPerformanceCounters::LogHostDeviceCopyBlocking();
 
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
@@ -1299,7 +1299,7 @@ protected:
 	{
 		assert(std::is_trivially_copyable<T>::value);
 
-		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyNonBlocking();
+		AcceleratorBufferPerformanceCounters::LogHostDeviceCopyNonBlocking();
 
 		//Make the transfer request
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
