@@ -81,6 +81,7 @@ void TestDigitalWaveformSource::GenerateUART(
 
 	int64_t numBits = timeWindow / bitPeriodFs;
 
+	wfm->clear();
 	wfm->Resize(numBits);
 
 	int64_t currentTime = 0;
@@ -100,7 +101,7 @@ void TestDigitalWaveformSource::GenerateUART(
 	push(wfm, currentTime, true);
 	currentTime += bitPeriod;
 
-	string msg = "Hello World from ngscopeclient UART !";
+	string msg = "Hello World from ngscopeclient UART !\n";
 
 	while(bitCount < numBits)
 	{
@@ -146,21 +147,16 @@ void TestDigitalWaveformSource::GenerateUART(
 	wfm->m_triggerPhase = 0;
 	wfm->m_timescale = sampleperiod;
 
-	int64_t timeWindow = depth * sampleperiod;
-
 	const int64_t bitPeriodFs = FS_PER_SECOND / baudrate;
 
-	int64_t numBits = timeWindow / bitPeriodFs;
-
-	wfm->Resize(numBits);
-
-	string msg = "Hello World from ngscopeclient UART uniform waveform !";
+	string msg = "Hello World from ngscopeclient UART uniform waveform !\n";
 
 	const int64_t samplesPerBit = bitPeriodFs / sampleperiod;
 
 	// Reqired bits
 	const size_t totalSamples = depth;
 
+	wfm->clear();
 	wfm->Resize(totalSamples);
 
 	size_t sample = 0;
@@ -218,6 +214,7 @@ void TestDigitalWaveformSource::GenerateUARTClock(
 
 	int64_t numBits = timeWindow / bitPeriodFs;
 
+	wfm->clear();
 	wfm->Resize(numBits);
 
 	int64_t t = 0;
@@ -254,15 +251,18 @@ void TestDigitalWaveformSource::GenerateSPI(SparseDigitalWaveform* cs, SparseDig
 	mosi->m_triggerPhase = 0;
 	mosi->m_timescale = sampleperiod;
 
-	string msg = "Hello ngscopeclient from SPI !";
+	string msg = "Hello ngscopeclient from SPI !\n";
 
 	int64_t t = 0;
-	int64_t numBits = msg.size()*8 + 2;
+	int64_t numBits = msg.size()*8 + 3;
 	const int64_t bitPeriod = depth/numBits;
 	const int64_t half = bitPeriod / 2;
 
+	cs->clear();
 	cs->Resize(numBits);
-	sclk->Resize(numBits);
+	sclk->clear();
+	sclk->Resize(numBits*2);
+	mosi->clear();
 	mosi->Resize(numBits);
 
 	auto push = [](SparseDigitalWaveform* w, int64_t time, int64_t duration, bool v)
@@ -280,7 +280,7 @@ void TestDigitalWaveformSource::GenerateSPI(SparseDigitalWaveform* cs, SparseDig
 	t += bitPeriod;
 
 	// Assert CS
-	push(cs, t, bitPeriod, false);
+	push(cs, t, bitPeriod*msg.size(), false);
 
 	for(uint8_t c : msg)
 	{
@@ -302,7 +302,67 @@ void TestDigitalWaveformSource::GenerateSPI(SparseDigitalWaveform* cs, SparseDig
 	}
 
 	// Deassert CS
+	push(cs, t, bitPeriod, true);
+	push(sclk, t, bitPeriod, false);
+	push(mosi, t, bitPeriod, false);
 	t += bitPeriod;
 	push(cs, t, bitPeriod, true);
+	push(sclk, t, bitPeriod, true);
+	push(mosi, t, bitPeriod, true);
+}
 
+void TestDigitalWaveformSource::GenerateParallel(std::vector<SparseDigitalWaveform*> &waveforms, int64_t sampleperiod, size_t depth)
+{
+	if(waveforms.size() != 9)
+	{
+		LogError("Invalid waveforms size: exected 9, found %zu.\n",waveforms.size());
+		return;
+	}
+	string msg = "\x01\x02\x04\x08\x10\x20\x40\x80\xFFHello ngscopeclient from UART !";
+
+	int64_t t = 0;
+	int64_t numBits = msg.size();
+	const int64_t bitPeriod = depth/numBits;
+	const int64_t half = bitPeriod / 2;
+
+	// Clock WF
+	auto wfClk = waveforms[0];
+	wfClk->m_triggerPhase = 0;
+	wfClk->m_timescale = sampleperiod;
+	wfClk->clear();
+	wfClk->Resize(2*numBits);
+	// Parallel lines waveforms
+	for(int i = 0 ; i < 8 ; i++)
+	{
+		auto wf = waveforms[i+1];
+		wf->m_triggerPhase = 0;
+		wf->m_timescale = sampleperiod;
+		wf->clear();
+		wf->Resize(numBits);
+	}
+
+	auto push = [](SparseDigitalWaveform* w, int64_t time, int64_t duration, bool v)
+	{
+		w->m_offsets.push_back(time);
+		w->m_durations.push_back(duration);
+		w->m_samples.push_back(v);
+	};
+
+	for(uint8_t c : msg)
+	{
+		for(int i = 0; i < 8; i++)
+		{
+			bool bit = (c >> i) & 1;
+			// Push data lines
+			push(waveforms[i+1], t, bitPeriod, bit);
+		}
+		push(wfClk, t, half, false);
+
+		t += half;
+
+		// Clock high (sampling edge)
+		push(wfClk, t, half, true);
+
+		t += half;
+	}
 }

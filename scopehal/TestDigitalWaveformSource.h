@@ -78,6 +78,10 @@ public:
 		int64_t sampleperiod,
 		size_t depth);
 
+	void GenerateParallel(std::vector<SparseDigitalWaveform*> &waveforms,
+		int64_t sampleperiod,
+		size_t depth);
+
 protected:
 
 };

@@ -129,14 +129,16 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_channels[8]->SetDisplayName("UART-0-Clk");
 	m_channels[9]->SetDisplayName("UART-1");
 	m_channels[10]->SetDisplayName("UART-1-Clk");
-	m_channels[11]->SetDisplayName("UART-2");
-	m_channels[12]->SetDisplayName("UART-2-Clk");
-	m_channels[13]->SetDisplayName("UART-3");
-	m_channels[14]->SetDisplayName("UART-3-Clk");
-	m_channels[15]->SetDisplayName("UART-4");
-	m_channels[16]->SetDisplayName("UART-4-Clk");
-	m_channels[17]->SetDisplayName("UART-5");
-	m_channels[18]->SetDisplayName("UART-5-Clk");
+	m_channels[11]->SetDisplayName("Parallel-Clk");
+	
+	m_channels[12]->SetDisplayName("Parallel-0");
+	m_channels[13]->SetDisplayName("Parallel-1");
+	m_channels[14]->SetDisplayName("Parallel-2");
+	m_channels[15]->SetDisplayName("Parallel-3");
+	m_channels[16]->SetDisplayName("Parallel-4");
+	m_channels[17]->SetDisplayName("Parallel-5");
+	m_channels[18]->SetDisplayName("Parallel-6");
+	m_channels[19]->SetDisplayName("Parallel-7");
 
 	//Create Vulkan objects for the waveform conversion
 	for(int i=0; i<4; i++)
@@ -644,17 +646,75 @@ bool DemoOscilloscope::AcquireData()
 		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 	}
 
+	bool spiEnabled = m_channelsEnabled[4]||m_channelsEnabled[5]||m_channelsEnabled[6];
+	bool parallelEnabled = false;
+	for(int i=11; i<=19; i++)
+	{
+		if(m_channelsEnabled[i])
+		{
+			parallelEnabled = true;
+			break;
+		}
+	}
+
+
 	// Prepare SPI data
-	auto cs =  new SparseDigitalWaveform("CS");
-	auto sclk = new SparseDigitalWaveform("SCLK");
-	auto mosi = new SparseDigitalWaveform("MOSI");
+	SparseDigitalWaveform* cs = nullptr;
+	SparseDigitalWaveform* sclk = nullptr;
+	SparseDigitalWaveform* mosi = nullptr;
+	if(spiEnabled)
+	{
+		cs = new SparseDigitalWaveform("CS");
+		sclk = new SparseDigitalWaveform("SCLK");
+		mosi = new SparseDigitalWaveform("MOSI");
+		m_digitalSource->GenerateSPI(cs,sclk,mosi,sampleperiod, depth);
+	}
 	
-	m_digitalSource->GenerateSPI(cs,sclk,mosi,sampleperiod, depth);
+	std::vector<SparseDigitalWaveform*> parallelWfms;
+	if(parallelEnabled)
+	{	// Prepare Parallel bus data
+		auto wfClk = new SparseDigitalWaveform("Parallel-Clk");
+		parallelWfms.push_back(wfClk);
+		// Parallel lines waveforms
+		for(int i = 0 ; i < 8 ; i++)
+		{
+			auto wf = new SparseDigitalWaveform("Parallel-"+to_string(i));
+			parallelWfms.push_back(wf);
+		}
+		m_digitalSource->GenerateParallel(parallelWfms,sampleperiod,depth);
+	}
 
 	for(int i=4; i<(4+16); i++)
 	{
 		if(!m_channelsEnabled[i])
+		{
+			switch(i)
+			{
+				case 4:
+					if(spiEnabled) delete cs;
+					break;
+				case 5:
+					if(spiEnabled) delete sclk;
+					break;
+				case 6:
+					if(spiEnabled) delete mosi;
+					break;
+				case 11:
+				case 12:
+				case 13:
+				case 14:
+				case 15:
+				case 16:
+				case 17:
+				case 18:
+				case 19:
+					// Paralle bus
+					if(parallelEnabled) delete parallelWfms[i-11];
+					break;
+			}
+
 			continue;
+		}
 
 		// Lambda passed to generate waveform methods to update "download" percentage
 		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
@@ -668,6 +728,18 @@ bool DemoOscilloscope::AcquireData()
 				break;
 			case 6:
 				waveforms[i] = mosi;
+				break;
+			case 11:
+			case 12:
+			case 13:
+			case 14:
+			case 15:
+			case 16:
+			case 17:
+			case 18:
+			case 19:
+				// Paralle bus
+				waveforms[i] = parallelWfms[i-11];
 				break;
 			default:
 				if(i%2 == 1)
