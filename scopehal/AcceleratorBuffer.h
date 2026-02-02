@@ -444,7 +444,7 @@ public:
 
 	~AcceleratorBuffer()
 	{
-		FreeCpuBuffer();
+		FreeCpuBuffer(true);
 		FreeGpuBuffer(true);
 	}
 
@@ -1344,7 +1344,7 @@ protected:
 	/**
 		@brief Free the CPU-side buffer and underlying physical memory
 	 */
-	void FreeCpuBuffer()
+	void FreeCpuBuffer(bool dataLossOK = false)
 	{
 		//Early out if buffer is already null
 		if(m_cpuPtr == nullptr)
@@ -1352,7 +1352,7 @@ protected:
 
 		//We have a buffer on the GPU.
 		//If it's stale, need to push our updated content there before freeing the CPU-side copy
-		if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale && !empty())
+		if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale && !empty() && !dataLossOK)
 			CopyToGpu();
 
 		//Free the Vulkan buffer object
