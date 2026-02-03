@@ -420,6 +420,7 @@ public:
 	/**
 		@brief Creates a new AcceleratorBuffer with no content
 	 */
+	__attribute__((noinline))
 	AcceleratorBuffer(const std::string& name = "")
 		: m_cpuMemoryType(MEM_TYPE_NULL)
 		, m_gpuMemoryType(MEM_TYPE_NULL)
@@ -440,6 +441,14 @@ public:
 		//non-trivially-copyable types can't be copied to GPU except on unified memory platforms
 		if(!std::is_trivially_copyable<T>::value && !g_vulkanDeviceHasUnifiedMemory)
 			m_gpuAccessHint = HINT_NEVER;
+
+		//Create synchronization events
+		//TODO: timeline semaphores if available
+		vk::EventCreateInfo eventCreateInfo;
+		m_deviceHostTransferEvent = std::make_unique<vk::raii::Event>(*g_vkComputeDevice, eventCreateInfo);
+		m_hostDeviceTransferEvent = std::make_unique<vk::raii::Event>(*g_vkComputeDevice, eventCreateInfo);
+
+		ClearTransferFlags();
 	}
 
 	~AcceleratorBuffer()
@@ -554,14 +563,20 @@ public:
 
 	/**
 		@brief Change the usable size of the container
+
+		@param size			New size
+		@param exactSize	True if we want to allocate exactly the requested size rather than rounding up
 	 */
-	void resize(size_t size)
+	void resize(size_t size, bool exactSize = false)
 	{
 		//Need to grow?
 		if(size > m_capacity)
 		{
+			if(exactSize)
+				reserve(size);
+
 			//Default to doubling in size each time to avoid excessive copying.
-			if(m_capacity == 0)
+			else if(m_capacity == 0)
 				reserve(size);
 			else if(size > m_capacity*2)
 				reserve(size);
@@ -703,6 +718,9 @@ public:
 		else if(rhs.HasGpuBuffer())
 			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopySkipped();
 		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
+
+		//Illegal to modify the buffer if a transfer is in progress. So mark any previous one as done
+		ClearTransferFlags();
 	}
 
 protected:
@@ -715,6 +733,9 @@ protected:
 	{
 		if(size == 0)
 			return;
+
+		//We can't have a transfer in progress when we reallocate
+		ClearTransferFlags();
 
 		/*
 			If we are a bool[] or similar one-byte type, we are likely going to be accessed from the GPU via a uint32
@@ -1062,7 +1083,12 @@ public:
 	void MarkModifiedFromCpu()
 	{
 		if(!m_buffersAreSame)
+		{
 			m_gpuPhysMemIsStale = true;
+
+			//Illegal to modify the buffer if a transfer is in progress. So mark any previous one as done
+			ClearTransferFlags();
+		}
 	}
 
 	/**
@@ -1073,7 +1099,12 @@ public:
 	void MarkModifiedFromGpu()
 	{
 		if(!m_buffersAreSame)
+		{
 			m_cpuPhysMemIsStale = true;
+
+			//Illegal to modify the buffer if a transfer is in progress. So mark any previous one as done
+			ClearTransferFlags();
+		}
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1094,7 +1125,7 @@ public:
 		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
 			AllocateCpuBuffer(m_capacity);
 
-		if(m_cpuPhysMemIsStale)
+		if(BeginDeviceHostTransferIfNeeded())
 			CopyToCpu();
 		else
 			AcceleratorBufferPerformanceCounters::LogDeviceHostCopySkipped();
@@ -1137,7 +1168,7 @@ public:
 		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
 			AllocateCpuBuffer(m_capacity);
 
-		if(m_cpuPhysMemIsStale)
+		if(BeginDeviceHostTransferIfNeeded())
 			CopyToCpuNonblocking(cmdBuf, skipBarrier);
 		else
 			AcceleratorBufferPerformanceCounters::LogDeviceHostCopySkipped();
@@ -1227,6 +1258,11 @@ protected:
 		g_vkTransferCommandBuffer->begin({});
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		g_vkTransferCommandBuffer->copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
+
+		//TODO: timeline semaphores if available
+		//for now use events
+		g_vkTransferCommandBuffer->setEvent(**m_deviceHostTransferEvent, vk::PipelineStageFlagBits::eTransfer);
+
 		g_vkTransferCommandBuffer->end();
 
 		//Submit the request and block until it completes
@@ -1263,6 +1299,10 @@ protected:
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		cmdBuf.copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
 
+		//TODO: timeline semaphores if available
+		//for now use events
+		cmdBuf.setEvent(**m_deviceHostTransferEvent, vk::PipelineStageFlagBits::eTransfer);
+
 		m_cpuPhysMemIsStale = false;
 	}
 
@@ -1281,6 +1321,11 @@ protected:
 		g_vkTransferCommandBuffer->begin({});
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		g_vkTransferCommandBuffer->copyBuffer(**m_cpuBuffer, **m_gpuBuffer, {region});
+
+		//TODO: timeline semaphores if available
+		//for now use events
+		g_vkTransferCommandBuffer->setEvent(**m_hostDeviceTransferEvent, vk::PipelineStageFlagBits::eTransfer);
+
 		g_vkTransferCommandBuffer->end();
 
 		//Submit the request and block until it completes
@@ -1304,6 +1349,10 @@ protected:
 		//Make the transfer request
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		cmdBuf.copyBuffer(**m_cpuBuffer, **m_gpuBuffer, {region});
+
+		//TODO: timeline semaphores if available
+		//for now use events
+		cmdBuf.setEvent(**m_hostDeviceTransferEvent, vk::PipelineStageFlagBits::eTransfer);
 
 		//Add the barrier
 		cmdBuf.pipelineBarrier(
@@ -1758,6 +1807,120 @@ public:
 			if(m_cpuBuffer != nullptr)
 				UpdateCpuNames();
 		}
+	}
+
+public:
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Device-host transfer synchronization
+
+	/*
+		KEY CONCEPTS
+			Filters run in parallel, multiple PrepareFor*Access calls can be concurrent on the same object
+			Modifying an AcceleratorBuffer can only be done from the filter/driver that creates it
+			Nobody will use it until that block has finished executing
+			Which means... we do NOT need to worry about a buffer becoming stale unexpectedly from another thread
+			modifying it underneath us.
+	 */
+
+	/**
+		@brief Starts a device-to-host transfer if we need to do one
+
+		@return true if transfer has started, false if not required
+	 */
+	bool BeginDeviceHostTransferIfNeeded()
+	{
+		//CPU copy is up to date
+		if(!m_cpuPhysMemIsStale)
+			return false;
+
+		//Set transfer-active flag to 1
+		//If it already was 1, somebody else started a transfer already! Wait until it finishes
+		if(m_deviceHostTransferActive.exchange(true))
+		{
+			#ifdef HAVE_NVTX
+				nvtx3::scoped_range nrange("Dev/host busy wait");
+			#endif
+
+			//Block until the other transfer finishes
+			while(	(m_deviceHostTransferEvent->getStatus() != vk::Result::eEventSet) ||
+					(m_deviceHostTransferActive.load() == 0) )
+			{}
+
+			//Transfer is no longer in progress
+			m_deviceHostTransferActive = 0;
+
+			return false;
+		}
+
+		//If we get here, we need to actually do the transfer
+		return true;
+	}
+
+	///@brief True if a device-host transfer has been submitted
+	std::atomic<bool> m_deviceHostTransferActive;
+
+	///@brief Event signaled upon completion of a device-host transfer
+	std::unique_ptr<vk::raii::Event> m_deviceHostTransferEvent;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Host-device transfer synchronization
+
+	/*
+		KEY CONCEPTS
+			Filters run in parallel, multiple PrepareFor*Access calls can be concurrent on the same object
+			Modifying an AcceleratorBuffer can only be done from the filter/driver that creates it
+			Nobody will use it until that block has finished executing
+			Which means... we do NOT need to worry about a buffer becoming stale unexpectedly from another thread
+			modifying it underneath us.
+	 */
+
+	/**
+		@brief Starts a host-to-device transfer if we need to do one
+
+		@return true if transfer has started, false if not required
+	 */
+	bool BeginHostDeviceTransferIfNeeded()
+	{
+		//GPU copy is up to date
+		if(!m_gpuPhysMemIsStale)
+			return false;
+
+		//Set transfer-active flag to 1
+		//If it already was 1, somebody else started a transfer already! Wait until it finishes
+		if(m_hostDeviceTransferActive.exchange(true))
+		{
+			#ifdef HAVE_NVTX
+				nvtx3::scoped_range nrange("Host/dev busy wait");
+			#endif
+
+			//Block until the other transfer finishes
+			while(	(m_hostDeviceTransferEvent->getStatus() != vk::Result::eEventSet) ||
+					(m_hostDeviceTransferActive.load() == 0) )
+			{}
+
+			//Transfer is no longer in progress
+			m_hostDeviceTransferActive = 0;
+
+			return false;
+		}
+
+		//If we get here, we need to actually do the transfer
+		return true;
+	}
+
+	///@brief True if a host-device transfer has been submitted
+	std::atomic<bool> m_hostDeviceTransferActive;
+
+	///@brief Event signaled upon completion of a host-device transfer
+	std::unique_ptr<vk::raii::Event> m_hostDeviceTransferEvent;
+
+	void ClearTransferFlags()
+	{
+		m_deviceHostTransferActive = 0;
+		m_deviceHostTransferEvent->reset();
+		m_hostDeviceTransferActive = 0;
+		m_hostDeviceTransferEvent->reset();
 	}
 };
 
