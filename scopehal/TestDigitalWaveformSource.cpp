@@ -214,9 +214,9 @@ void TestDigitalWaveformSource::GenerateSPI(SparseDigitalWaveform* cs, SparseDig
 	};
 
 	// Idle state
-	push(cs,   t, bitPeriod, true);
-	push(sclk, t, bitPeriod, false);
-	push(mosi, t, bitPeriod, false);
+	push(cs,   t, 3*bitPeriod, true);
+	push(sclk, t, 3*bitPeriod, false);
+	push(mosi, t, 3*bitPeriod, false);
 
 	t += (3*bitPeriod);
 
