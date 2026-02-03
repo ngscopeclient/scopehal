@@ -970,7 +970,6 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize)
 	return ret;
 }
 
-
 #ifdef _WIN32
 
 string NarrowPath(wchar_t* wide)

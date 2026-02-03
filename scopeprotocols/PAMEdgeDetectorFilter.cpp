@@ -214,8 +214,8 @@ void PAMEdgeDetectorFilter::Refresh(
 		PAMEdgeDetectorConstants cfg;
 		cfg.len = len;
 		cfg.order = order;
-		cfg.inputPerThread = len / numThreads;
-		cfg.outputPerThread = len / numThreads;
+		cfg.inputPerThread = GetComputeBlockCount(len, numThreads);
+		cfg.outputPerThread = cfg.inputPerThread;
 
 		//Run the first pass
 		m_firstPassComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
