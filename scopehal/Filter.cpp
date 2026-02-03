@@ -1243,7 +1243,7 @@ SparseDigitalWaveform* Filter::SetupSparseDigitalOutputWaveform(SparseWaveformBa
 {
 	//Create the waveform, but only if necessary
 	auto cap = dynamic_cast<SparseDigitalWaveform*>(GetData(stream));
-	if(cap == NULL)
+	if(cap == nullptr)
 	{
 		cap = new SparseDigitalWaveform;
 		SetData(cap, stream);

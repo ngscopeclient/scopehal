@@ -37,17 +37,17 @@ using namespace std;
 
 ThresholdFilter::ThresholdFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_threshold(m_parameters["Threshold"])
+	, m_hysteresis(m_parameters["Hysteresis"])
 {
 	AddDigitalStream("data");
 	CreateInput("din");
 
-	m_threshname = "Threshold";
-	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_threshname].SetFloatVal(0);
+	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_threshold.SetFloatVal(0);
 
-	m_hysname = "Hysteresis";
-	m_parameters[m_hysname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_hysname].SetFloatVal(0);
+	m_hysteresis = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_hysteresis.SetFloatVal(0);
 
 	if(g_hasShaderInt8)
 	{
@@ -63,7 +63,7 @@ ThresholdFilter::ThresholdFilter(const string& color)
 
 bool ThresholdFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -95,8 +95,15 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 		nvtx3::scoped_range range("ThresholdFilter::Refresh");
 	#endif
 
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
@@ -106,8 +113,8 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 	auto len = din->size();
 
 	//Setup
-	float midpoint = m_parameters[m_threshname].GetFloatVal();
-	float hys = m_parameters[m_hysname].GetFloatVal();
+	float midpoint = m_threshold.GetFloatVal();
+	float hys = m_hysteresis.GetFloatVal();
 
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
@@ -139,7 +146,7 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 				cmdBuf.end();
 				queue->SubmitAndBlock(cmdBuf);
 
-				cap->MarkModifiedFromGpu();
+				cap->m_samples.MarkModifiedFromGpu();
 			}
 			else
 			{
@@ -203,7 +210,7 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 				cmdBuf.end();
 				queue->SubmitAndBlock(cmdBuf);
 
-				cap->MarkModifiedFromGpu();
+				cap->m_samples.MarkModifiedFromGpu();
 			}
 			else
 			{
