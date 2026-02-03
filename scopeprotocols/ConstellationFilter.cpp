@@ -171,7 +171,6 @@ void ConstellationFilter::Refresh(
 	auto cap = dynamic_cast<ConstellationWaveform*>(GetData(0));
 	if(!cap)
 		cap = ReallocateWaveform();
-	cap->PrepareForCpuAccess();
 
 	//Recompute scales
 	float xscale = m_width / GetVoltageRange(0);
@@ -185,6 +184,8 @@ void ConstellationFilter::Refresh(
 	}
 	else
 	{
+		cap->PrepareForCpuAccess();
+
 		cmdBuf.begin({});
 			din_i->PrepareForCpuAccessNonblocking(cmdBuf);
 			din_q->PrepareForCpuAccessNonblocking(cmdBuf);
@@ -226,6 +227,8 @@ void ConstellationFilter::Refresh(
 				m_evmSum += sqrt(minvec);
 			}
 		}
+
+		cap->MarkModifiedFromCpu();
 
 		//Count total number of symbols we've integrated
 		cap->IntegrateSymbols(inlen);
