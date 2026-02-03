@@ -664,21 +664,21 @@ bool DemoOscilloscope::AcquireData()
 	SparseDigitalWaveform* mosi = nullptr;
 	if(spiEnabled)
 	{
-		cs = new SparseDigitalWaveform("CS");
-		sclk = new SparseDigitalWaveform("SCLK");
-		mosi = new SparseDigitalWaveform("MOSI");
+		cs = AllocateDigitalWaveform("CS");
+		sclk = AllocateDigitalWaveform("SCLK");
+		mosi = AllocateDigitalWaveform("MOSI");
 		m_digitalSource->GenerateSPI(cs,sclk,mosi,sampleperiod, depth);
 	}
 	
 	std::vector<SparseDigitalWaveform*> parallelWfms;
 	if(parallelEnabled)
 	{	// Prepare Parallel bus data
-		auto wfClk = new SparseDigitalWaveform("Parallel-Clk");
+		auto wfClk = AllocateDigitalWaveform("Parallel-Clk");
 		parallelWfms.push_back(wfClk);
 		// Parallel lines waveforms
 		for(int i = 0 ; i < 8 ; i++)
 		{
-			auto wf = new SparseDigitalWaveform("Parallel-"+to_string(i));
+			auto wf = AllocateDigitalWaveform("Parallel-"+to_string(i));
 			parallelWfms.push_back(wf);
 		}
 		m_digitalSource->GenerateParallel(parallelWfms,sampleperiod,depth);
@@ -744,13 +744,13 @@ bool DemoOscilloscope::AcquireData()
 			default:
 				if(i%2 == 1)
 				{
-					auto wfm = new SparseDigitalWaveform("UART");
+					auto wfm = AllocateDigitalWaveform("UART");
 					waveforms[i] = wfm;
 					m_digitalSource->GenerateUART(wfm, sampleperiod, depth);
 				}
 				else
 				{
-					auto wfm = new SparseDigitalWaveform("UART-Clk");
+					auto wfm = AllocateDigitalWaveform("UART-Clk");
 					waveforms[i] = wfm;
 					m_digitalSource->GenerateUARTClock(wfm, sampleperiod, depth);
 				}

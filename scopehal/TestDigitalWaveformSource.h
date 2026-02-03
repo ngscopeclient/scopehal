@@ -59,12 +59,6 @@ public:
 		size_t depth,
 		int64_t baudrate = 115200);
 
-	void GenerateUART(
-		UniformDigitalWaveform* wfm,
-		int64_t sampleperiod,
-		size_t depth,
-		int64_t baudrate = 115200);
-
 	void GenerateUARTClock(
 		SparseDigitalWaveform* wfm,
 		int64_t sampleperiod,
