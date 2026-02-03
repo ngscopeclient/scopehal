@@ -119,6 +119,9 @@ public:
 	virtual size_t size() const override
 	{ return 0; }
 
+	virtual size_t capacity() const override
+	{ return 0; }
+
 protected:
 
 	///@brief Buffer width, in pixels

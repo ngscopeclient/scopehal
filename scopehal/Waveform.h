@@ -166,6 +166,9 @@ public:
 	///@brief Returns the number of samples in this waveform
 	virtual size_t size() const  =0;
 
+	///@brief Returns the number of samples allocated in this waveform
+	virtual size_t capacity() const  =0;
+
 	///@brief Returns true if this waveform contains no samples, false otherwise
 	virtual bool empty()
 	{ return size() == 0; }
@@ -456,6 +459,9 @@ public:
 	virtual size_t size() const override
 	{ return m_samples.size(); }
 
+	virtual size_t capacity() const override
+	{ return m_samples.capacity(); }
+
 	virtual void clear() override
 	{ m_samples.clear(); }
 
@@ -601,6 +607,9 @@ public:
 
 	virtual size_t size() const override
 	{ return m_samples.size(); }
+
+	virtual size_t capacity() const override
+	{ return m_samples.capacity(); }
 
 	virtual void clear() override
 	{
