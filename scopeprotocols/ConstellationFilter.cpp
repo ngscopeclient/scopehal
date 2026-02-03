@@ -163,15 +163,8 @@ void ConstellationFilter::Refresh(
 		return;
 	}
 
-	cmdBuf.begin({});
-		din_i->PrepareForCpuAccessNonblocking(cmdBuf);
-		din_q->PrepareForCpuAccessNonblocking(cmdBuf);
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
 	//Recompute the nominal constellation point locations
 	RecomputeNominalPoints();
-
 	size_t inlen = min(din_i->size(), din_q->size());
 
 	//Generate the output waveform
@@ -186,40 +179,57 @@ void ConstellationFilter::Refresh(
 	float yscale = m_height / GetVoltageRange(0);
 	float ymid = m_height / 2;
 
-	//Actual integration loop
-	//TODO: vectorize, GPU, or both?
-	auto data = cap->GetAccumData();
-	for(size_t i=0; i<inlen; i++)
+	//TODO: GPU side integration
+	if(false)
 	{
-		float ival = din_i->m_samples[i];
-		float qval = din_q->m_samples[i];
+	}
+	else
+	{
+		cmdBuf.begin({});
+			din_i->PrepareForCpuAccessNonblocking(cmdBuf);
+			din_q->PrepareForCpuAccessNonblocking(cmdBuf);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 
-		ssize_t x = static_cast<ssize_t>(round(xmid + xscale * ival));
-		ssize_t y = static_cast<ssize_t>(round(ymid + yscale * qval));
-
-		//bounds check
-		if( (x < 0) || (x >= (ssize_t)m_width) || (y < 0) || (y >= (ssize_t)m_height) )
-			continue;
-
-		//fill
-		data[y*m_width + x] ++;
-
-		//Compute error vector
-		if(m_points.size())
+		//Actual integration loop
+		//TODO: vectorize, GPU, or both?
+		auto data = cap->GetAccumData();
+		for(size_t i=0; i<inlen; i++)
 		{
-			//TODO: this can definitely be made more efficient!!!
-			float minvec = FLT_MAX;
-			for(auto p : m_points)
-			{
-				float dx = (p.m_xval * 1e-6) - ival;
-				float dy = p.m_yval - qval;
-				float dsq = dx*dx + dy*dy;
-				minvec = min(minvec, dsq);
-			}
+			float ival = din_i->m_samples[i];
+			float qval = din_q->m_samples[i];
 
-			m_evmCount ++;
-			m_evmSum += sqrt(minvec);
+			ssize_t x = static_cast<ssize_t>(round(xmid + xscale * ival));
+			ssize_t y = static_cast<ssize_t>(round(ymid + yscale * qval));
+
+			//bounds check
+			if( (x < 0) || (x >= (ssize_t)m_width) || (y < 0) || (y >= (ssize_t)m_height) )
+				continue;
+
+			//fill
+			data[y*m_width + x] ++;
+
+			//Compute error vector
+			if(m_points.size())
+			{
+				//TODO: this can definitely be made more efficient!!!
+				float minvec = FLT_MAX;
+				for(auto p : m_points)
+				{
+					float dx = (p.m_xval * 1e-6) - ival;
+					float dy = p.m_yval - qval;
+					float dsq = dx*dx + dy*dy;
+					minvec = min(minvec, dsq);
+				}
+
+				m_evmCount ++;
+				m_evmSum += sqrt(minvec);
+			}
 		}
+
+		//Count total number of symbols we've integrated
+		cap->IntegrateSymbols(inlen);
+		cap->Normalize();
 	}
 
 	double evmRaw = m_evmSum / m_evmCount;
@@ -227,10 +237,6 @@ void ConstellationFilter::Refresh(
 
 	m_streams[1].m_value = evmRaw;
 	m_streams[2].m_value = evmNorm;
-
-	//Count total number of symbols we've integrated
-	cap->IntegrateSymbols(inlen);
-	cap->Normalize();
 }
 
 void ConstellationFilter::RecomputeNominalPoints()
