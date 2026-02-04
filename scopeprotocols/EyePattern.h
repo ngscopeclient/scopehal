@@ -61,6 +61,7 @@ public:
 	uint32_t	xmax;
 	uint32_t	ymax;
 	uint32_t	mwidth;
+	uint32_t	numSamplesPerThread;
 	float		xtimescale;
 	float		yscale;
 	float		yoff;

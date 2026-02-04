@@ -1051,7 +1051,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 
 	const uint32_t threadsPerBlock = 64;
 	const uint32_t numThreads = 8192;
-	const uint32_t numSamplesPerThread = (wend + 1) / numThreads;
+	const uint32_t numSamplesPerThread = GetComputeBlockCount(wend, numThreads);
 
 	//Push constants are basically just the function arguments
 	EyeFilterConstants cfg;
@@ -1069,6 +1069,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 	cfg.yoff = yoff;
 	cfg.xscale = m_xscale;
 	cfg.mwidth = m_width;
+	cfg.numSamplesPerThread = numSamplesPerThread;
 
 	//Allocate and fill index buffer
 	EyeIndexConstants indexCfg;

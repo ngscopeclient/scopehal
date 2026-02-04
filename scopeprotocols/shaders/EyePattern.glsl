@@ -65,6 +65,7 @@ layout(std430, push_constant) uniform constants
 	uint 		xmax;
 	uint 		ymax;
 	uint		mwidth;
+	uint		numSamplesPerThread;
 	float		xtimescale;
 	float		yscale;
 	float		yoff;
@@ -78,7 +79,6 @@ void main()
 	//Figure out how many samples are allocated to each thread
 	//TODO: is this more efficient to calculate once CPU-side?
 	const uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	const uint numSamplesPerThread = (wend + 1) / numThreads;
 
 	//Find the range of samples allocated to each thread
 	uint iclock = index[gl_GlobalInvocationID.x];
