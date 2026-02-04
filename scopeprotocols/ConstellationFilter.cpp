@@ -81,8 +81,8 @@ ConstellationFilter::ConstellationFilter(const string& color)
 
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
-		//m_constellationComputePipeline =
-		//	make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
+		m_constellationComputePipeline =
+			make_shared<ComputePipeline>("shaders/ConstellationFilter.spv", 3, sizeof(ConstellationPushConstants));
 	}
 }
 
@@ -184,10 +184,74 @@ void ConstellationFilter::Refresh(
 	float yscale = m_height / GetVoltageRange(0);
 	float ymid = m_height / 2;
 
-	//TODO: GPU side integration
-	if(false)
+	//GPU side integration
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
+		cmdBuf.begin({});
+
+			//TODO: remove this bit
+			din_i->PrepareForCpuAccessNonblocking(cmdBuf);
+			din_q->PrepareForCpuAccessNonblocking(cmdBuf);
+
+			//Push constants
+			const uint32_t threadsPerBlock = 64;
+			const uint32_t numThreads = 16384;
+			ConstellationPushConstants cfg;
+			cfg.width = m_width;
+			cfg.height = m_height;
+			cfg.inlen = inlen;
+			cfg.samplesPerThread = GetComputeBlockCount(inlen, numThreads);
+			cfg.xmid = xmid;
+			cfg.xscale = xscale;
+			cfg.ymid = ymid;
+			cfg.yscale = yscale;
+
+			m_constellationComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
+			m_constellationComputePipeline->BindBufferNonblocking(1, din_q->m_samples, cmdBuf);
+			m_constellationComputePipeline->BindBufferNonblocking(2, cap->GetAccumBuffer(), cmdBuf);
+			m_constellationComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+
+			cap->GetAccumBuffer().MarkModifiedFromGpu();
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Actual integration loop
+		//TODO: vectorize, GPU, or both?
+		cap->GetAccumBuffer().PrepareForCpuAccess();
+		auto data = cap->GetAccumData();
+
+		//EVM calculation
+		if(m_points.size())
+		{
+			for(size_t i=0; i<inlen; i++)
+			{
+				float ival = din_i->m_samples[i];
+				float qval = din_q->m_samples[i];
+
+				//TODO: this can definitely be made more efficient!!!
+				float minvec = FLT_MAX;
+				for(auto p : m_points)
+				{
+					float dx = (p.m_xval * 1e-6) - ival;
+					float dy = p.m_yval - qval;
+					float dsq = dx*dx + dy*dy;
+					minvec = min(minvec, dsq);
+				}
+
+				m_evmSum += sqrt(minvec);
+			}
+		}
+
+		cap->MarkModifiedFromCpu();
+
+		//Count total number of symbols we've integrated
+		cap->IntegrateSymbols(inlen);
+		cap->Normalize();
+
 	}
+
+	//CPU fallback
 	else
 	{
 		cap->PrepareForCpuAccess();
@@ -229,7 +293,6 @@ void ConstellationFilter::Refresh(
 					minvec = min(minvec, dsq);
 				}
 
-				m_evmCount ++;
 				m_evmSum += sqrt(minvec);
 			}
 		}
@@ -240,6 +303,8 @@ void ConstellationFilter::Refresh(
 		cap->IntegrateSymbols(inlen);
 		cap->Normalize();
 	}
+
+	m_evmCount += inlen;
 
 	double evmRaw = m_evmSum / m_evmCount;
 	double evmNorm = evmRaw / m_nomr.GetFloatVal();

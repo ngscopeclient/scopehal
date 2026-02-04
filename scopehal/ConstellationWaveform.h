@@ -58,6 +58,10 @@ public:
 	int64_t* GetAccumData()
 	{ return m_accumdata.GetCpuPointer(); }
 
+	///@brief Returns the raw accumulator sample data's buffer object
+	AcceleratorBuffer<int64_t>& GetAccumBuffer()
+	{ return m_accumdata; }
+
 	void Normalize();
 
 	///@brief Returns the number of integrated symbols in the constellation

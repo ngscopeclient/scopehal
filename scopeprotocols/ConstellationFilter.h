@@ -39,6 +39,19 @@
 #include "../scopehal/ConstellationWaveform.h"
 #include "../scopehal/ActionProvider.h"
 
+class ConstellationPushConstants
+{
+public:
+	uint32_t	width;
+	uint32_t	height;
+	uint32_t	inlen;
+	uint32_t	samplesPerThread;
+	float		xmid;
+	float		ymid;
+	float		xscale;
+	float		yscale;
+};
+
 class ConstellationPoint
 {
 public:
