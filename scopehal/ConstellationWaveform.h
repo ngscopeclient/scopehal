@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,7 +56,7 @@ public:
 
 	///@brief Returns the raw accumulator sample data
 	int64_t* GetAccumData()
-	{ return m_accumdata; }
+	{ return m_accumdata.GetCpuPointer(); }
 
 	void Normalize();
 
@@ -86,10 +86,52 @@ public:
 	float m_saturationLevel;
 
 	virtual void FreeGpuMemory() override
-	{}
+	{ m_accumdata.FreeGpuBuffer(); }
 
 	virtual bool HasGpuBuffer() override
-	{ return false; }
+	{ return m_accumdata.HasGpuBuffer(); }
+
+	virtual void PrepareForCpuAccessNonblocking(vk::raii::CommandBuffer& cmdBuf) override
+	{
+		m_outdata.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_accumdata.PrepareForCpuAccessNonblocking(cmdBuf);
+	}
+
+	virtual void PrepareForCpuAccess() override
+	{
+		m_outdata.PrepareForCpuAccess();
+		m_accumdata.PrepareForCpuAccess();
+	}
+
+	virtual void PrepareForGpuAccess() override
+	{
+		m_outdata.PrepareForGpuAccess();
+		m_accumdata.PrepareForGpuAccess();
+	}
+
+	virtual void MarkSamplesModifiedFromCpu() override
+	{
+		m_outdata.MarkModifiedFromCpu();
+		m_accumdata.MarkModifiedFromCpu();
+	}
+
+	virtual void MarkSamplesModifiedFromGpu() override
+	{
+		m_outdata.MarkModifiedFromGpu();
+		m_accumdata.MarkModifiedFromGpu();
+	}
+
+	virtual void MarkModifiedFromCpu() override
+	{
+		m_outdata.MarkModifiedFromCpu();
+		m_accumdata.MarkModifiedFromCpu();
+	}
+
+	virtual void MarkModifiedFromGpu() override
+	{
+		m_outdata.MarkModifiedFromGpu();
+		m_accumdata.MarkModifiedFromGpu();
+	}
 
 protected:
 
@@ -98,7 +140,7 @@ protected:
 
 		2D array of width*height values, each counting the number of hits at that pixel location
 	 */
-	int64_t* m_accumdata;
+	AcceleratorBuffer<int64_t> m_accumdata;
 
 	///@brief The number of symbols which have been integrated so far
 	size_t m_totalSymbols;

@@ -48,16 +48,19 @@ ConstellationWaveform::ConstellationWaveform(size_t width, size_t height)
 	, m_saturationLevel(1)
 	, m_totalSymbols(0)
 {
+	m_accumdata.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+	m_accumdata.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+
 	size_t npix = width*height;
-	m_accumdata = new int64_t[npix];
+	m_accumdata.resize(npix);
+	m_accumdata.PrepareForCpuAccess();
 	for(size_t i=0; i<npix; i++)
 		m_accumdata[i] = 0;
+	m_accumdata.MarkModifiedFromCpu();
 }
 
 ConstellationWaveform::~ConstellationWaveform()
 {
-	delete[] m_accumdata;
-	m_accumdata = NULL;
 }
 
 /**
@@ -68,10 +71,13 @@ ConstellationWaveform::~ConstellationWaveform()
 void ConstellationWaveform::Normalize()
 {
 	//Preprocessing
+	m_accumdata.PrepareForCpuAccess();
+
 	int64_t nmax = 0;
+	auto p = m_accumdata.GetCpuPointer();
 	for(size_t y=0; y<m_height; y++)
 	{
-		int64_t* row = m_accumdata + y*m_width;
+		int64_t* row = p + y*m_width;
 
 		//Find peak amplitude
 		for(size_t x=0; x<m_width; x++)
@@ -81,7 +87,8 @@ void ConstellationWaveform::Normalize()
 		nmax = 1;
 	float norm = 2.0f / nmax;
 
-	//TODO: do this in a shader?
+	m_accumdata.MarkModifiedFromCpu();
+
 	norm *= m_saturationLevel;
 	size_t len = m_width * m_height;
 	m_outdata.PrepareForCpuAccess();
