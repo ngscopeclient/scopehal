@@ -558,7 +558,7 @@ public:
 		return vk::DescriptorBufferInfo(
 			GetBuffer(),
 			0,
-			m_size * sizeof(T));
+			m_capacity * sizeof(T));
 	}
 
 	/**
