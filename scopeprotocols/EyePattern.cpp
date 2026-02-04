@@ -1050,7 +1050,7 @@ void EyePattern::DensePackedInnerLoopGPU(
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 
 	const uint32_t threadsPerBlock = 64;
-	const uint32_t numThreads = 8192;
+	const uint32_t numThreads = 16384;
 	const uint32_t numSamplesPerThread = GetComputeBlockCount(wend, numThreads);
 
 	//Push constants are basically just the function arguments
