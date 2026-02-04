@@ -27,140 +27,134 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ConstellationFilter
- */
+#version 460
+#pragma shader_stage(compute)
 
-#ifndef ConstellationFilter_h
-#define ConstellationFilter_h
-
-#include "../scopehal/ConstellationWaveform.h"
-#include "../scopehal/ActionProvider.h"
-
-class ConstellationPoint
+#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_EXT_shader_atomic_int64 : require
+/*
+layout(std430, binding=0) restrict readonly buffer buf_clockEdges
 {
-public:
-	ConstellationPoint(int64_t x, float y, float xn, float yn)
-		: m_xval(x)
-		, m_yval(y)
-		, m_xnorm(xn)
-		, m_ynorm(yn)
-	{}
-
-	///@brief Nominal X coordinate
-	int64_t m_xval;
-
-	///@brief Nominal Y coordinate
-	float m_yval;
-
-	///@brief Normalized X coordinate
-	float m_xnorm;
-
-	///@brief Normalized Y coordinate
-	float m_ynorm;
+	int64_t clockEdges[];
 };
 
-class ConstellationFilter
-	: public Filter
-	, public ActionProvider
+layout(std430, binding=1) restrict readonly buffer buf_waveform
 {
-public:
-	ConstellationFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	virtual float GetVoltageRange(size_t stream) override;
-	virtual float GetOffset(size_t stream) override;
-
-	virtual void ClearSweeps() override;
-
-	virtual std::vector<std::string> EnumActions() override;
-	virtual bool PerformAction(const std::string& id) override;
-
-	ConstellationWaveform* ReallocateWaveform();
-
-	void SetWidth(size_t width)
-	{
-		if(m_width != width)
-		{
-			SetData(nullptr, 0);
-			m_width = width;
-		}
-	}
-
-	void SetHeight(size_t height)
-	{
-		if(m_height != height)
-		{
-			SetData(nullptr, 0);
-			m_height = height;
-		}
-	}
-
-	int64_t GetXOffset()
-	{ return 0; }
-
-	float GetXScale()
-	{ return m_xscale; }
-
-	size_t GetWidth() const
-	{ return m_width; }
-
-	size_t GetHeight() const
-	{ return m_height; }
-
-	PROTOCOL_DECODER_INITPROC(ConstellationFilter)
-
-	enum modulation_t
-	{
-		MOD_NONE,
-		MOD_QAM4,
-		MOD_QAM9,
-		MOD_QAM16,
-		MOD_QAM32,
-		MOD_QAM64,
-		MOD_PSK8
-	};
-
-	const std::vector<ConstellationPoint>& GetNominalPoints()
-	{ return m_points; }
-
-protected:
-	void RecomputeNominalPoints();
-	void GetMinMaxSymbols(
-		std::vector<size_t>& hist,
-		float vmin,
-		float& vmin_out,
-		float& vmax_out,
-		float binsize,
-		size_t order,
-		ssize_t nbins);
-
-	size_t m_height;
-	size_t m_width;
-
-	float m_xscale;
-
-	FilterParameter& m_modulation;
-	FilterParameter& m_nomci;
-	FilterParameter& m_nomcq;
-	FilterParameter& m_nomr;
-
-	double m_evmSum;
-	int64_t m_evmCount;
-
-	///@brief Nominal locations of each constellation point
-	std::vector<ConstellationPoint> m_points;
-
-	///@brief Compute pipeline for the main constellation integration
-	std::shared_ptr<ComputePipeline> m_constellationComputePipeline;
+	float waveform[];
 };
 
-#endif
+layout(std430, binding=2) buffer buf_accum
+{
+	int64_t accum[];
+};
+
+layout(std430, binding=3) restrict readonly buffer buf_index
+{
+	uint index[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint64_t	width;
+	uint64_t	halfwidth;
+	int64_t		timescale;
+	int64_t		triggerPhase;
+	int64_t		xoff;
+	uint		wend;
+	uint 		cend;
+	uint 		xmax;
+	uint 		ymax;
+	uint		mwidth;
+	uint		numSamplesPerThread;
+	float		xtimescale;
+	float		yscale;
+	float		yoff;
+	float		xscale;
+};
+*/
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//Figure out how many samples are allocated to each thread
+	//TODO: is this more efficient to calculate once CPU-side?
+	const uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+
+	/*
+	//Find the range of samples allocated to each thread
+	uint iclock = index[gl_GlobalInvocationID.x];
+	uint istart = gl_GlobalInvocationID.x * numSamplesPerThread;
+	uint iend = istart + numSamplesPerThread;
+	if(gl_GlobalInvocationID.x == (numThreads - 1))
+		iend = wend;
+
+	//Loop over samples for this thread
+	float lastSample = waveform[istart];
+	int64_t lastClock = clockEdges[iclock];
+	int64_t tnext = clockEdges[iclock + 1];
+	int64_t tnext_adv = tnext;
+	for(uint i=istart; i<iend && iclock < cend; i++)
+	{
+		//Find time of this sample
+		int64_t tstart = int64_t(i) * timescale + triggerPhase;
+		tnext = tnext_adv;
+		int64_t ttnext = tnext - tstart;
+
+		//Fetch the next sample
+		float sampleA = lastSample;
+		float sampleB = waveform[i+1];
+		lastSample = sampleB;
+
+		//If it's past the end of the current UI, move to the next clock edge
+		int64_t offset = tstart - lastClock;
+		if(offset < 0)
+			continue;
+		if(tstart >= tnext)
+		{
+			//Move to the next clock edge
+			iclock ++;
+			lastClock = tnext;
+			if(iclock >= cend)
+				break;
+
+			//Prefetch the next edge timestamp
+			tnext_adv = clockEdges[iclock + 1];
+
+			//Figure out the offset to the next edge
+			offset = tstart - tnext;
+		}
+
+		//Interpolate position
+		float pixel_x_f = float(offset - xoff) * xscale;
+		float pixel_x_fround = floor(pixel_x_f);
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
+
+		//Early out if off end of plot
+		uint pixel_x_round = uint(floor(pixel_x_f));
+		if(pixel_x_round > xmax)
+			continue;
+
+		//Interpolate voltage, early out if clipping
+		float dv = sampleB - sampleA;
+		float nominal_voltage = sampleA + dv*dx_frac;
+		float nominal_pixel_y = nominal_voltage*yscale + yoff;
+		uint y1 = uint(nominal_pixel_y);
+		if(y1 >= ymax)
+			continue;
+
+		//Calculate how much of the pixel's intensity to put in each row
+		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+		int64_t bin2 = int64_t(yfrac * 64.0);
+		uint pixidx = y1*mwidth + pixel_x_round;
+
+		//Plot each point (this only draws the right half of the eye, we copy to the left later)
+		atomicAdd(accum[pixidx], 64 - bin2);
+		atomicAdd(accum[pixidx + mwidth], bin2);
+	}
+	*/
+}

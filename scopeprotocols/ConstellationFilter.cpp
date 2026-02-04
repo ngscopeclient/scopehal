@@ -44,10 +44,10 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	, m_height(1)
 	, m_width(1)
 	, m_xscale(0)
-	, m_modulation("Modulation")
-	, m_nomci("Center I")
-	, m_nomcq("Center Q")
-	, m_nomr("Range")
+	, m_modulation(m_parameters["Modulation"])
+	, m_nomci(m_parameters["Center I"])
+	, m_nomcq(m_parameters["Center Q"])
+	, m_nomr(m_parameters["Range"])
 	, m_evmSum(0)
 	, m_evmCount(0)
 {
@@ -60,24 +60,30 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	CreateInput("i");
 	CreateInput("q");
 
-	m_parameters[m_modulation] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modulation].AddEnumValue("None", MOD_NONE);
-	m_parameters[m_modulation].AddEnumValue("QAM-4 / QPSK", MOD_QAM4);
-	m_parameters[m_modulation].AddEnumValue("QAM-9 / 2D-PAM3", MOD_QAM9);
-	m_parameters[m_modulation].AddEnumValue("QAM-16", MOD_QAM16);
-	m_parameters[m_modulation].AddEnumValue("QAM-32", MOD_QAM32);
-	m_parameters[m_modulation].AddEnumValue("QAM-64", MOD_QAM64);
-	m_parameters[m_modulation].AddEnumValue("PSK-8", MOD_PSK8);
-	m_parameters[m_modulation].SetIntVal(MOD_NONE);
+	m_modulation = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_modulation.AddEnumValue("None", MOD_NONE);
+	m_modulation.AddEnumValue("QAM-4 / QPSK", MOD_QAM4);
+	m_modulation.AddEnumValue("QAM-9 / 2D-PAM3", MOD_QAM9);
+	m_modulation.AddEnumValue("QAM-16", MOD_QAM16);
+	m_modulation.AddEnumValue("QAM-32", MOD_QAM32);
+	m_modulation.AddEnumValue("QAM-64", MOD_QAM64);
+	m_modulation.AddEnumValue("PSK-8", MOD_PSK8);
+	m_modulation.SetIntVal(MOD_NONE);
 
-	m_parameters[m_nomci] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_nomci].SetFloatVal(0);
+	m_nomci = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_nomci.SetFloatVal(0);
 
-	m_parameters[m_nomcq] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_nomcq].SetFloatVal(0);
+	m_nomcq = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_nomcq.SetFloatVal(0);
 
-	m_parameters[m_nomr] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_nomr].SetFloatVal(0.5);
+	m_nomr = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_nomr.SetFloatVal(0.5);
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		//m_constellationComputePipeline =
+		//	make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,7 +242,7 @@ void ConstellationFilter::Refresh(
 	}
 
 	double evmRaw = m_evmSum / m_evmCount;
-	double evmNorm = evmRaw / m_parameters[m_nomr].GetFloatVal();
+	double evmNorm = evmRaw / m_nomr.GetFloatVal();
 
 	m_streams[1].m_value = evmRaw;
 	m_streams[2].m_value = evmNorm;
@@ -246,12 +252,12 @@ void ConstellationFilter::RecomputeNominalPoints()
 {
 	m_points.clear();
 
-	float nomci = m_parameters[m_nomci].GetFloatVal();
-	float nomcq = m_parameters[m_nomcq].GetFloatVal();
+	float nomci = m_nomci.GetFloatVal();
+	float nomcq = m_nomcq.GetFloatVal();
 
-	float nomr = m_parameters[m_nomr].GetFloatVal();
+	float nomr = m_nomr.GetFloatVal();
 
-	auto mod = m_parameters[m_modulation].GetIntVal();
+	auto mod = m_modulation.GetIntVal();
 	switch(mod)
 	{
 		//2x2 square
@@ -388,7 +394,7 @@ bool ConstellationFilter::PerformAction(const string& id)
 	if(id == "Normalize")
 	{
 		size_t order = 1;
-		auto mod = m_parameters[m_modulation].GetIntVal();
+		auto mod = m_modulation.GetIntVal();
 		switch(mod)
 		{
 			case MOD_QAM4:
@@ -422,7 +428,6 @@ bool ConstellationFilter::PerformAction(const string& id)
 				return true;
 		}
 
-		//TODO: handle uniform inputs too
 		auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
 		auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
 		if(din_i && din_q)
@@ -451,13 +456,13 @@ bool ConstellationFilter::PerformAction(const string& id)
 			LogTrace("I symbol range: (%s, %s)\n", yunit.PrettyPrint(ismin).c_str(), yunit.PrettyPrint(ismax).c_str());
 			LogTrace("Q symbol range: (%s, %s)\n", yunit.PrettyPrint(qsmin).c_str(), yunit.PrettyPrint(qsmax).c_str());
 
-			m_parameters[m_nomci].SetFloatVal( (ismin + ismax) / 2 );
-			m_parameters[m_nomcq].SetFloatVal( (qsmin + qsmax) / 2 );
+			m_nomci.SetFloatVal( (ismin + ismax) / 2 );
+			m_nomcq.SetFloatVal( (qsmin + qsmax) / 2 );
 
 			float fmax = (ismax + qsmax) / 2;
 			float fmin = (ismin + qsmin) / 2;
 
-			m_parameters[m_nomr].SetFloatVal( (fmax - fmin) / 2 );
+			m_nomr.SetFloatVal( (fmax - fmin) / 2 );
 		}
 	}
 	return true;
