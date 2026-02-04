@@ -1132,6 +1132,39 @@ public:
 	}
 
 	/**
+		@brief Prepare *only* the first and last samples in the buffer to be accessed from the CPU.
+
+		This function does not modify dirty flags and is intended only for use by the sparse-waveform path in
+		WaveformArea::RasterizeAnalogOrDigitalWaveform()
+	 */
+	void PrepareForCpuAccessFirstAndLastOnly()
+	{
+		//Early out if no content
+		if(m_size == 0)
+			return;
+
+		//If there's no buffer at all on the CPU, allocate one
+		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
+			AllocateCpuBuffer(m_capacity);
+
+		if(m_cpuPhysMemIsStale)
+		{
+			//If an existing transfer is active, wait
+			//This should not race the filter graph because we have the waveform data mutex held
+			if(m_deviceHostTransferActive)
+			{
+				while(	(m_deviceHostTransferEvent->getStatus() != vk::Result::eEventSet) ||
+					(m_deviceHostTransferActive.load() == 0) )
+				{}
+			}
+
+			//otherwise copy the samples
+			else
+				CopyToCpuFirstAndLastOnly();
+		}
+	}
+
+	/**
 		@brief Prepares the buffer to be accessed from the CPU, but does not copy GPU-side data to the CPU.
 
 		This function can be used instead of PrepareForCpuAccess() for improved performance if you intend to
@@ -1269,6 +1302,34 @@ protected:
 		g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 
 		m_cpuPhysMemIsStale = false;
+	}
+
+	/**
+		@brief Copy the first and last elements of the buffer contents from GPU to CPU and blocks until the transfer completes.
+	 */
+	void CopyToCpuFirstAndLastOnly()
+	{
+		assert(std::is_trivially_copyable<T>::value);
+
+		AcceleratorBufferPerformanceCounters::LogDeviceHostCopyBlocking();
+
+		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
+
+		//Make the transfer request
+		g_vkTransferCommandBuffer->begin({});
+
+		vk::BufferCopy startregion(0, 0, sizeof(T));
+		size_t endOffset = (m_size - 1) * sizeof(T);
+		vk::BufferCopy endregion(endOffset, endOffset, sizeof(T));
+		g_vkTransferCommandBuffer->copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {startregion});
+		g_vkTransferCommandBuffer->copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {endregion});
+
+		g_vkTransferCommandBuffer->end();
+
+		//Submit the request and block until it completes
+		g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
+
+		//do NOT modify m_cpuPhysMemIsStale, since the rest of the buffer is still stale
 	}
 
 	/**
