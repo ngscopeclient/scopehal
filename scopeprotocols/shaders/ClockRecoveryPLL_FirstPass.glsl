@@ -55,6 +55,7 @@ layout(std430, push_constant) uniform constants
 	int64_t	timescale;
 	int64_t	triggerPhase;
 	uint	nedges;
+	uint	numEdgesPerThread;
 	uint	maxOffsetsPerThread;
 	uint	maxInputSamples;
 };
@@ -65,8 +66,17 @@ void main()
 {
 	//Initial starting sample indexes for this thread
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	uint numEdgesPerThread = nedges / numThreads;
 	uint nStartingEdge = gl_GlobalInvocationID.x * numEdgesPerThread;
+
+	//Sometimes thread count doesn't divide evenly and the last thread has no work to do. If so, bail
+	if(nStartingEdge >= nedges)
+	{
+		stateOut[gl_GlobalInvocationID.x*3] 	= 0;
+		stateOut[gl_GlobalInvocationID.x*3 + 1] = initialPeriod;
+		stateOut[gl_GlobalInvocationID.x*3 + 2] = 0;
+		return;
+	}
+
 	uint nedge = nStartingEdge;
 	int64_t edgepos = edges[nStartingEdge];
 	nedge ++;
@@ -78,18 +88,10 @@ void main()
 	float fHalfPeriod = float(halfPeriod);
 
 	//End timestamp and edge index for this thread
-	int64_t tThreadEnd;
-	uint edgemax;
-	if(gl_GlobalInvocationID.x == (numThreads - 1))
-	{
-		tThreadEnd = tend;
+	uint edgemax = nStartingEdge + numEdgesPerThread - 1;
+	if(edgemax >= nedges)
 		edgemax = nedges - 1;
-	}
-	else
-	{
-		edgemax = nStartingEdge + numEdgesPerThread - 1;
-		tThreadEnd = edges[edgemax];
-	}
+	int64_t tThreadEnd = edges[edgemax];
 
 	//Output buffer pointers
 	uint outputBase = gl_GlobalInvocationID.x * maxOffsetsPerThread;

@@ -46,6 +46,7 @@ public:
 	int64_t		timescale;
 	int64_t		triggerPhase;
 	uint32_t	nedges;
+	uint32_t	numEdgesPerThread;
 	uint32_t	maxOffsetsPerThread;
 	uint32_t	maxInputSamples;
 };

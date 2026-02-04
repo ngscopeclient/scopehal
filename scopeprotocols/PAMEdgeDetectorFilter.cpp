@@ -60,7 +60,8 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 		m_edgeStatesScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 		m_edgeRisingScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 
-		m_edgeCount.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		//Use pinned memory for output buffers to avoid separate copy operations
+		m_edgeCount.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_UNLIKELY);
 		m_edgeCount.resize(1);
 
 		m_thresholds.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);

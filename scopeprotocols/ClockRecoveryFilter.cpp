@@ -293,17 +293,10 @@ void ClockRecoveryFilter::Refresh(
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
 			//TODO: do we need to tune numThreads to lock well to short waveforms?
-			uint64_t numThreads = 4096;
+			uint64_t numThreads = 4096;//4096;
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
 			const uint64_t maxEdges = din->size() / 2;
-
-			//We have no idea how many edges we might generate since the PLL can slew arbitrarily depending on input.
-			//The hard upper bound is Nyquist (one edge every 2 input samples) so allocate that much to start
-			m_firstPassTimestamps.resize(maxEdges);
-			m_secondPassTimestamps.resize(maxEdges);
-			cap->Resize(maxEdges);
-			scap->Resize(maxEdges);
 
 			//Allocate thread output buffers
 			const uint64_t numStateValuesPerThread = 3;
@@ -315,13 +308,22 @@ void ClockRecoveryFilter::Refresh(
 			//Constants shared by all passes
 			ClockRecoveryConstants cfg;
 			cfg.nedges = nedges;
+			cfg.numEdgesPerThread = GetComputeBlockCount(nedges, numThreads);
 			cfg.fnyquist = fnyquist;
-			cfg.maxOffsetsPerThread = maxEdges / numThreads;
+			cfg.maxOffsetsPerThread = GetComputeBlockCount(maxEdges, numThreads);
 			cfg.initialPeriod = initialPeriod;
 			cfg.tend = tend;
 			cfg.timescale = din->m_timescale;
 			cfg.triggerPhase = din->m_triggerPhase;
 			cfg.maxInputSamples = din->size();
+
+			//We have no idea how many edges we might generate since the PLL can slew arbitrarily depending on input.
+			//The hard upper bound is Nyquist (one edge every 2 input samples) so allocate that much to start
+			size_t maxBuffer = cfg.maxOffsetsPerThread * numThreads;
+			m_firstPassTimestamps.resize(maxBuffer);
+			m_secondPassTimestamps.resize(maxBuffer);
+			cap->Resize(maxBuffer);
+			scap->Resize(maxBuffer);
 
 			//Run the first pass
 			m_firstPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);

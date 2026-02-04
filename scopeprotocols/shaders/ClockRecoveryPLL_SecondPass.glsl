@@ -65,6 +65,7 @@ layout(std430, push_constant) uniform constants
 	int64_t	timescale;
 	int64_t	triggerPhase;
 	uint	nedges;
+	uint	numEdgesPerThread;
 	uint	maxOffsetsPerThread;
 	uint	maxInputSamples;
 };
@@ -75,7 +76,6 @@ void main()
 {
 	//The very last thread does nothing (there's no additional buffer to roll into)
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	uint numEdgesPerThread = nedges / numThreads;
 	bool lastThread = (gl_GlobalInvocationID.x == (numThreads - 1));
 	if(lastThread)
 	{
@@ -107,16 +107,14 @@ void main()
 
 	//End timestamp and edge index for this thread
 	int64_t tThreadEnd;
-	uint edgemax;
-	if(lastThread)
+	uint edgemax = nStartingEdge + numEdgesPerThread;
+	if(edgemax >= nedges)
 	{
-		tThreadEnd = tend;
 		edgemax = nedges - 1;
+		tThreadEnd = tend;
 	}
 	else
 	{
-		edgemax = nStartingEdge + numEdgesPerThread;
-
 		//For the second pass: our ending timestamp should actually be the timestamp of the first pass's last edge
 		//since that's where the next block started phase 2 from
 		uint numPrev = uint(stateFirstPass[(gl_GlobalInvocationID.x + 1)*3]);

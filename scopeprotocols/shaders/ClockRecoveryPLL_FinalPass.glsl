@@ -86,6 +86,7 @@ layout(std430, push_constant) uniform constants
 	int64_t	timescale;
 	int64_t	triggerPhase;
 	uint	nedges;
+	uint	numEdgesPerThread;
 	uint	maxOffsetsPerThread;
 	uint	maxInputSamples;
 };
@@ -202,16 +203,21 @@ void main()
 			return;
 
 		//Last sample (if needed)
-		uint iout = writebase + count - 1;
-		int64_t lastOffset = offsetsSecondPass[readbase + count-1];
-		int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.y - 1)*3 + 1];
-		int64_t tout = lastOffset;
-		offsets[iout] = tout;
-		squarewave[iout] = uint8_t(iout & 1);
-		durations[iout] = lastPeriod;
+		//Make sure not to corrupt things if we have a block with no samples near the end
+		//(may happen in the case of imperfect workload distribution)
+		if(count != 0)
+		{
+			uint iout = writebase + count - 1;
+			int64_t lastOffset = offsetsSecondPass[readbase + count-1];
+			int64_t lastPeriod = stateSecondPass[(gl_GlobalInvocationID.y - 1)*3 + 1];
+			int64_t tout = lastOffset;
+			offsets[iout] = tout;
+			squarewave[iout] = uint8_t(iout & 1);
+			durations[iout] = lastPeriod;
 
-		//Generate sampled data output
-		uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
-		ssamples[iout] = isamples[nsample];
+			//Generate sampled data output
+			uint nsample = min(uint((tout - triggerPhase) / timescale), maxInputSamples-1);
+			ssamples[iout] = isamples[nsample];
+		}
 	}
 }
