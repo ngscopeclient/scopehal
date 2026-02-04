@@ -82,7 +82,10 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
 		m_constellationComputePipeline =
-			make_shared<ComputePipeline>("shaders/ConstellationFilter.spv", 3, sizeof(ConstellationPushConstants));
+			make_shared<ComputePipeline>("shaders/ConstellationFilter.spv", 5, sizeof(ConstellationPushConstants));
+
+		m_xvpoints.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+		m_yvpoints.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	}
 }
 
@@ -184,6 +187,8 @@ void ConstellationFilter::Refresh(
 	float yscale = m_height / GetVoltageRange(0);
 	float ymid = m_height / 2;
 
+	auto npoints = m_points.size();
+
 	//GPU side integration
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
@@ -201,54 +206,50 @@ void ConstellationFilter::Refresh(
 			cfg.height = m_height;
 			cfg.inlen = inlen;
 			cfg.samplesPerThread = GetComputeBlockCount(inlen, numThreads);
+			cfg.nConstellationPoints = npoints;
 			cfg.xmid = xmid;
 			cfg.xscale = xscale;
 			cfg.ymid = ymid;
 			cfg.yscale = yscale;
 
+			//Run the main integration shader
 			m_constellationComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
 			m_constellationComputePipeline->BindBufferNonblocking(1, din_q->m_samples, cmdBuf);
 			m_constellationComputePipeline->BindBufferNonblocking(2, cap->GetAccumBuffer(), cmdBuf);
+			m_constellationComputePipeline->BindBufferNonblocking(3, m_xvpoints, cmdBuf);
+			m_constellationComputePipeline->BindBufferNonblocking(4, m_yvpoints, cmdBuf);
 			m_constellationComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
 
 			cap->GetAccumBuffer().MarkModifiedFromGpu();
 
+			//Update integrated symbol count
+			cap->IntegrateSymbols(inlen);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
-		//Actual integration loop
-		//TODO: vectorize, GPU, or both?
-		cap->GetAccumBuffer().PrepareForCpuAccess();
-		auto data = cap->GetAccumData();
-
 		//EVM calculation
-		if(m_points.size())
+		if(npoints)
 		{
 			for(size_t i=0; i<inlen; i++)
 			{
 				float ival = din_i->m_samples[i];
 				float qval = din_q->m_samples[i];
 
-				//TODO: this can definitely be made more efficient!!!
 				float minvec = FLT_MAX;
-				for(auto p : m_points)
+				for(size_t j=0; j<npoints; j++)
 				{
-					float dx = (p.m_xval * 1e-6) - ival;
-					float dy = p.m_yval - qval;
-					float dsq = dx*dx + dy*dy;
-					minvec = min(minvec, dsq);
+					float dx = m_xvpoints[j] - ival;
+					float dy = m_yvpoints[j] - qval;
+					minvec = min(minvec, dx*dx + dy*dy);
 				}
-
 				m_evmSum += sqrt(minvec);
 			}
 		}
 
-		cap->MarkModifiedFromCpu();
-
-		//Count total number of symbols we've integrated
-		cap->IntegrateSymbols(inlen);
+		//CPU side normalization for now
+		cap->GetAccumBuffer().PrepareForCpuAccess();
 		cap->Normalize();
-
 	}
 
 	//CPU fallback
@@ -281,18 +282,15 @@ void ConstellationFilter::Refresh(
 			data[y*m_width + x] ++;
 
 			//Compute error vector
-			if(m_points.size())
+			if(npoints)
 			{
-				//TODO: this can definitely be made more efficient!!!
 				float minvec = FLT_MAX;
-				for(auto p : m_points)
+				for(size_t j=0; j<npoints; j++)
 				{
-					float dx = (p.m_xval * 1e-6) - ival;
-					float dy = p.m_yval - qval;
-					float dsq = dx*dx + dy*dy;
-					minvec = min(minvec, dsq);
+					float dx = m_xvpoints[j] - ival;
+					float dy = m_yvpoints[j] - qval;
+					minvec = min(minvec, dx*dx + dy*dy);
 				}
-
 				m_evmSum += sqrt(minvec);
 			}
 		}
@@ -437,6 +435,20 @@ void ConstellationFilter::RecomputeNominalPoints()
 		case MOD_NONE:
 			break;
 	}
+
+	//Initialize voltage views of each point
+	auto n = m_points.size();
+	m_xvpoints.resize(n);
+	m_yvpoints.resize(n);
+	m_xvpoints.PrepareForCpuAccess();
+	m_yvpoints.PrepareForCpuAccess();
+	for(size_t j=0; j<n; j++)
+	{
+		m_xvpoints[j] = m_points[j].m_xval * 1e-6;
+		m_yvpoints[j] = m_points[j].m_yval;
+	}
+	m_xvpoints.MarkModifiedFromCpu();
+	m_yvpoints.MarkModifiedFromCpu();
 }
 
 ConstellationWaveform* ConstellationFilter::ReallocateWaveform()

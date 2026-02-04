@@ -48,7 +48,17 @@ layout(std430, binding=2) restrict buffer buf_accum
 	int64_t accum[];
 };
 
-//TODO: constellation points and EVM measurements
+layout(std430, binding=3) restrict readonly buffer buf_pointsI
+{
+	float pointsI[];
+};
+
+layout(std430, binding=4) restrict readonly buffer buf_pointsQ
+{
+	float pointsQ[];
+};
+
+//TODO: EVM output
 
 layout(std430, push_constant) uniform constants
 {
@@ -56,6 +66,7 @@ layout(std430, push_constant) uniform constants
 	uint		height;
 	uint		inlen;
 	uint		samplesPerThread;
+	uint		nConstellationPoints;
 	float		xmid;
 	float		ymid;
 	float		xscale;

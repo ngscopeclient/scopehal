@@ -46,6 +46,7 @@ public:
 	uint32_t	height;
 	uint32_t	inlen;
 	uint32_t	samplesPerThread;
+	uint32_t	nConstellationPoints;
 	float		xmid;
 	float		ymid;
 	float		xscale;
@@ -169,8 +170,14 @@ protected:
 	double m_evmSum;
 	int64_t m_evmCount;
 
-	///@brief Nominal locations of each constellation point
+	///@brief Nominal locations of each constellation point (host-side metadata)
 	std::vector<ConstellationPoint> m_points;
+
+	///@brief X position, in volts, of each constellation point
+	AcceleratorBuffer<float> m_xvpoints;
+
+	///@brief Y position, in volts, of each constellation point
+	AcceleratorBuffer<float> m_yvpoints;
 
 	///@brief Compute pipeline for the main constellation integration
 	std::shared_ptr<ComputePipeline> m_constellationComputePipeline;
