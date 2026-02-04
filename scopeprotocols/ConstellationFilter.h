@@ -179,6 +179,9 @@ protected:
 	///@brief Y position, in volts, of each constellation point
 	AcceleratorBuffer<float> m_yvpoints;
 
+	///@brief EVM calculation scratchpad buffer
+	AcceleratorBuffer<float> m_evmScratchpad;
+
 	///@brief Compute pipeline for the main constellation integration
 	std::shared_ptr<ComputePipeline> m_constellationComputePipeline;
 };

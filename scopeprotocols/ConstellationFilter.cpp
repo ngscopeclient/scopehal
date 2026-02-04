@@ -28,6 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
+#include "../scopehal/KahanSummation.h"
 #include "ConstellationFilter.h"
 #include <algorithm>
 #ifdef __x86_64__
@@ -82,10 +83,14 @@ ConstellationFilter::ConstellationFilter(const string& color)
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
 		m_constellationComputePipeline =
-			make_shared<ComputePipeline>("shaders/ConstellationFilter.spv", 5, sizeof(ConstellationPushConstants));
+			make_shared<ComputePipeline>("shaders/ConstellationFilter.spv", 6, sizeof(ConstellationPushConstants));
 
+		//Keep constellation points in GPU memory because they don't change much and are used a lot
 		m_xvpoints.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 		m_yvpoints.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+		//Scratchpad outputs go in host memory since they're write-once
+		m_evmScratchpad.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_UNLIKELY);
 	}
 }
 
@@ -194,10 +199,6 @@ void ConstellationFilter::Refresh(
 	{
 		cmdBuf.begin({});
 
-			//TODO: remove this bit
-			din_i->PrepareForCpuAccessNonblocking(cmdBuf);
-			din_q->PrepareForCpuAccessNonblocking(cmdBuf);
-
 			//Push constants
 			const uint32_t threadsPerBlock = 64;
 			const uint32_t numThreads = 16384;
@@ -212,12 +213,15 @@ void ConstellationFilter::Refresh(
 			cfg.ymid = ymid;
 			cfg.yscale = yscale;
 
+			m_evmScratchpad.resize(numThreads);
+
 			//Run the main integration shader
 			m_constellationComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
 			m_constellationComputePipeline->BindBufferNonblocking(1, din_q->m_samples, cmdBuf);
 			m_constellationComputePipeline->BindBufferNonblocking(2, cap->GetAccumBuffer(), cmdBuf);
 			m_constellationComputePipeline->BindBufferNonblocking(3, m_xvpoints, cmdBuf);
 			m_constellationComputePipeline->BindBufferNonblocking(4, m_yvpoints, cmdBuf);
+			m_constellationComputePipeline->BindBufferNonblocking(5, m_evmScratchpad, cmdBuf, true);
 			m_constellationComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
 
 			cap->GetAccumBuffer().MarkModifiedFromGpu();
@@ -228,23 +232,13 @@ void ConstellationFilter::Refresh(
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
-		//EVM calculation
+		//Final reduction of EVM values happens CPU side
 		if(npoints)
 		{
-			for(size_t i=0; i<inlen; i++)
-			{
-				float ival = din_i->m_samples[i];
-				float qval = din_q->m_samples[i];
-
-				float minvec = FLT_MAX;
-				for(size_t j=0; j<npoints; j++)
-				{
-					float dx = m_xvpoints[j] - ival;
-					float dy = m_yvpoints[j] - qval;
-					minvec = min(minvec, dx*dx + dy*dy);
-				}
-				m_evmSum += sqrt(minvec);
-			}
+			KahanSummation tmp;
+			for(size_t i=0; i<numThreads; i++)
+				tmp += m_evmScratchpad[i];
+			m_evmSum += tmp.GetSum();
 		}
 
 		//CPU side normalization for now
@@ -281,7 +275,8 @@ void ConstellationFilter::Refresh(
 			//fill
 			data[y*m_width + x] ++;
 
-			//Compute error vector
+			//Find the closest constellation point by brute force
+			//TODO: can we be more efficient?
 			if(npoints)
 			{
 				float minvec = FLT_MAX;

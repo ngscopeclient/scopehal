@@ -58,7 +58,10 @@ layout(std430, binding=4) restrict readonly buffer buf_pointsQ
 	float pointsQ[];
 };
 
-//TODO: EVM output
+layout(std430, binding=5) restrict writeonly buffer buf_evm
+{
+	float evm[];
+};
 
 layout(std430, push_constant) uniform constants
 {
@@ -81,24 +84,51 @@ void main()
 	uint istart = gl_GlobalInvocationID.x * samplesPerThread;
 	uint iend = (gl_GlobalInvocationID.x + 1) * samplesPerThread;
 	if(istart >= inlen)
+	{
+		evm[gl_GlobalInvocationID.x] = 0;
 		return;
+	}
 	if(iend >= inlen)
 		iend = inlen - 1;
 
 	//Crunch the samples
+	float partialSum = 0;
+	float c = 0;
 	for(uint i=istart; i<iend; i++)
 	{
 		float ival = din_i[i];
 		float qval = din_q[i];
 
+		//EVM calculation
+		if(nConstellationPoints > 0)
+		{
+			//Find the closest simulation point by brute force
+			//TODO: can we be more efficient?
+			float minvec = 1e10;
+			for(uint j=0; j<nConstellationPoints; j++)
+			{
+				float dx = pointsI[j] - ival;
+				float dy = pointsQ[j] - qval;
+				minvec = min(minvec, dx*dx + dy*dy);
+			}
+
+			//Kahan summation to calculate overall EVM
+			float y = sqrt(minvec) - c;
+			float t = partialSum + y;
+			c = (t - partialSum) - y;
+			partialSum = t;
+		}
+
+		//Convert to screen coordinates, bounds check, and discard if off the plot
 		uint x = uint(round(xmid + xscale*ival));
 		uint y = uint(round(ymid + yscale*qval));
-
-		//Bounds check
 		if( (x >= width) || (y >= height) )
 			continue;
 
 		//Plot the point
 		atomicAdd(accum[y*width + x], 1);
 	}
+
+	//Save final EVM
+	evm[gl_GlobalInvocationID.x] = partialSum;
 }
