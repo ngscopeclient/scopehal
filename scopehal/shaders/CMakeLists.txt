@@ -29,6 +29,8 @@ endfunction()
 add_compute_shaders(
 	halshaders
 	SOURCES
+		ConstellationNormalizeReduce.glsl
+		ConstellationNormalizeScale.glsl
 		Convert8BitSamples.glsl
 		Convert8BitSamplesWithClipDetection.glsl
 		Convert16BitSamples.glsl

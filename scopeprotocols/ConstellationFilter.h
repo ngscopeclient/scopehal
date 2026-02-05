@@ -182,8 +182,17 @@ protected:
 	///@brief EVM calculation scratchpad buffer
 	AcceleratorBuffer<float> m_evmScratchpad;
 
+	///@brief Max amplitude of the constellation
+	AcceleratorBuffer<int64_t> m_normalizeMaxBuf;
+
 	///@brief Compute pipeline for the main constellation integration
 	std::shared_ptr<ComputePipeline> m_constellationComputePipeline;
+
+	///@brief Compute pipeline for finding the maximum amplitude of the constellation
+	std::shared_ptr<ComputePipeline> m_normalizeReduceComputePipeline;
+
+	///@brief Compute pipeline for normalizing the constellation
+	std::shared_ptr<ComputePipeline> m_normalizeScaleComputePipeline;
 };
 
 #endif

@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -31,7 +31,6 @@
 #pragma shader_stage(compute)
 
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_shader_atomic_int64 : require
 
 layout(std430, binding=0) restrict buffer buf_accumData
 {
@@ -41,6 +40,11 @@ layout(std430, binding=0) restrict buffer buf_accumData
 layout(std430, binding=1) buffer buf_reduceData
 {
 	int64_t nmax;
+};
+
+layout(std430, binding=2) buffer buf_outData
+{
+	float outData[];
 };
 
 layout(std430, push_constant) uniform constants
@@ -55,32 +59,18 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//thread X coordinate is actually our Y position, weird but that's how it worked out lol
-
-	//If out of bounds, stop without doing anything else
 	if(gl_GlobalInvocationID.x >= height)
 		return;
 
-	//Clear the output to zero
-	if(gl_GlobalInvocationID.x == 0)
-		nmax = 0;
-	memoryBarrier();
+	//Calculate scaling factor for normalization
+	int64_t imax = nmax;
+	if(imax == 0)
+		imax = 1;
+	float norm = 2.0 * satLevel / float(imax);
 
-	int64_t nmaxTemp = 0;
-	uint halfwidth = width / 2;
-
-	//Loop over pixels
-	uint offsetRead = gl_GlobalInvocationID.x * width;
-	for(uint x=halfwidth; x < width; x ++)
-	{
-		//Find peak amplitude
-		int64_t readPixel = accumData[offsetRead + x];
-		nmaxTemp = max(readPixel, nmaxTemp);
-
-		//Copy it to the left half
-		accumData[offsetRead + x - halfwidth] = readPixel;
-	}
-
-	//Write it back
-	atomicMax(nmax, nmaxTemp);
+	//Normalize the output
+	uint base = gl_GlobalInvocationID.x * width;
+	for(uint x=0; x<width; x++)
+		outData[base + x] = min(1.0, float(accumData[base + x])*norm);
 }
 

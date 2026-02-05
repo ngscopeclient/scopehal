@@ -91,6 +91,14 @@ ConstellationFilter::ConstellationFilter(const string& color)
 
 		//Scratchpad outputs go in host memory since they're write-once
 		m_evmScratchpad.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_UNLIKELY);
+
+		m_normalizeReduceComputePipeline =
+			make_shared<ComputePipeline>("shaders/ConstellationNormalizeReduce.spv", 2, sizeof(EyeNormalizeConstants));
+		m_normalizeScaleComputePipeline =
+			make_shared<ComputePipeline>("shaders/ConstellationNormalizeScale.spv", 3, sizeof(EyeNormalizeConstants));
+
+		m_normalizeMaxBuf.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_normalizeMaxBuf.resize(1);
 	}
 }
 
@@ -229,6 +237,13 @@ void ConstellationFilter::Refresh(
 			//Update integrated symbol count
 			cap->IntegrateSymbols(inlen);
 
+			//Normalize it
+			cap->Normalize(
+				cmdBuf,
+				m_normalizeReduceComputePipeline,
+				m_normalizeScaleComputePipeline,
+				m_normalizeMaxBuf);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
@@ -240,10 +255,6 @@ void ConstellationFilter::Refresh(
 				tmp += m_evmScratchpad[i];
 			m_evmSum += tmp.GetSum();
 		}
-
-		//CPU side normalization for now
-		cap->GetAccumBuffer().PrepareForCpuAccess();
-		cap->Normalize();
 	}
 
 	//CPU fallback
