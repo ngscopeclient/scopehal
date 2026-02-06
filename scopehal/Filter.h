@@ -39,6 +39,7 @@
 
 #include "OscilloscopeChannel.h"
 #include "FlowGraphNode.h"
+#include "KahanSummation.h"
 
 class QueueHandle;
 
@@ -795,11 +796,10 @@ public:
 		AssertTypeIsAnalogWaveform(cap);
 
 		//Loop over samples and find the average
-		//TODO: more numerically stable summation algorithm for deep captures
-		double sum = 0;
+		KahanSummation ksum;
 		for(float f : cap->m_samples)
-			sum += f;
-		return sum / cap->m_samples.size();
+			ksum += f;
+		return ksum.GetSum() / cap->m_samples.size();
 	}
 
 	/**
