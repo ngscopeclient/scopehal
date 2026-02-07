@@ -39,6 +39,15 @@
 
 #include <chrono>
 
+
+
+struct TransportEndpoint
+{
+    std::string path;
+    std::string description;
+};
+
+
 /**
 	@brief Abstraction of a transport layer for moving SCPI data between endpoints
 	@ingroup transports
@@ -127,12 +136,20 @@ public:
 	static void EnumTransports(std::vector<std::string>& names);
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);
 
+	typedef std::vector<TransportEndpoint> (*EnumEndpointsProcType)();
+	static void DoAddTransportClass(std::string name, EnumEndpointsProcType proc);
+	static std::vector<TransportEndpoint> EnumEndpoints(std::string transport);
+	static std::vector<TransportEndpoint> EnumTransportEndpoints();
+
 protected:
 	void RateLimitingWait();
 
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
 	static CreateMapType m_createprocs;
+
+	typedef std::map< std::string, EnumEndpointsProcType > EnumEndpointseMapType;
+	static EnumEndpointseMapType m_enumEndpointsProcs;
 
 	//Queued commands waiting to be sent
 	std::mutex m_queueMutex;
@@ -171,6 +188,6 @@ std::string to_string(SCPITransportType transportType);
 	virtual std::string GetName() override \
 	{ return GetTransportName(); }
 
-#define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance)
+#define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance); SCPITransport::DoAddTransportClass(T::GetTransportName(), T::EnumTransportEndpoints)
 
 #endif

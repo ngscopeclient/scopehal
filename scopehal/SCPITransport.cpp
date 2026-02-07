@@ -40,6 +40,8 @@ using namespace std;
 
 SCPITransport::CreateMapType SCPITransport::m_createprocs;
 
+SCPITransport::EnumEndpointseMapType SCPITransport::m_enumEndpointsProcs;
+
 SCPITransport::SCPITransport()
 	: m_rateLimitingEnabled(false)
 	, m_rateLimitingInterval(0)
@@ -293,3 +295,25 @@ std::string to_string(SCPITransportType transportType)
 	return "unknown";
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Static functions
+
+void SCPITransport::DoAddTransportClass(string name, EnumEndpointsProcType proc)
+{
+	m_enumEndpointsProcs[name] = proc;
+}
+
+std::vector<TransportEndpoint> SCPITransport::EnumEndpoints(std::string transport)
+{
+	if(m_enumEndpointsProcs.find(transport) != m_enumEndpointsProcs.end())
+		return m_enumEndpointsProcs[transport]();
+
+	LogError("Invalid transport name \"%s\"\n", transport.c_str());
+	return std::vector<TransportEndpoint>();
+}
+
+// Default implementation returns no endpoints
+std::vector<TransportEndpoint> SCPITransport::EnumTransportEndpoints()
+{
+	return std::vector<TransportEndpoint>();
+}
