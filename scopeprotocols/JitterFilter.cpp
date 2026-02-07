@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,22 +38,22 @@ using namespace std;
 
 JitterFilter::JitterFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_stdevname("Rj Stdev")
-	, m_pjfreqname("Pj Frequency")
-	, m_pjamplitudename("Pj Amplitude")
+	, m_stdev(m_parameters["Rj Stdev"])
+	, m_pjfreq(m_parameters["Pj Frequency"])
+	, m_pjamplitude(m_parameters["Pj Amplitude"])
 
 {
 	AddDigitalStream("data");
 	CreateInput("din");
 
-	m_parameters[m_stdevname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_stdevname].SetFloatVal(5000);
+	m_stdev = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_stdev.SetFloatVal(5000);
 
-	m_parameters[m_pjfreqname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_pjfreqname].SetFloatVal(10 * 1000 * 1000);
+	m_pjfreq = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_pjfreq.SetFloatVal(10 * 1000 * 1000);
 
-	m_parameters[m_pjamplitudename] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_pjamplitudename].SetFloatVal(3000);
+	m_pjamplitude = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_pjamplitude.SetFloatVal(3000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,7 @@ JitterFilter::JitterFilter(const string& color)
 
 bool JitterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -78,15 +78,33 @@ string JitterFilter::GetProtocolName()
 	return "Jitter";
 }
 
+Filter::DataLocation JitterFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void JitterFilter::Refresh()
+void JitterFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("DDR3Decoder::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -97,9 +115,9 @@ void JitterFilter::Refresh()
 
 	size_t len = din->size();
 
-	float pjfreq = m_parameters[m_pjfreqname].GetIntVal();
-	float stdev = m_parameters[m_stdevname].GetFloatVal();
-	float pjamp = m_parameters[m_pjamplitudename].GetFloatVal();
+	float pjfreq = m_pjfreq.GetIntVal();
+	float stdev = m_stdev.GetFloatVal();
+	float pjamp = m_pjamplitude.GetFloatVal();
 
 	minstd_rand rng(rand());
 	normal_distribution<> noise(0, stdev);
