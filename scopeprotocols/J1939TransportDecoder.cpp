@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -81,35 +81,46 @@ string J1939TransportDecoder::GetProtocolName()
 	return "J1939 Transport";
 }
 
+Filter::DataLocation J1939TransportDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void J1939TransportDecoder::Refresh()
+void J1939TransportDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("J1939TransportDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
-	if(!VerifyAllInputsOK())
-	{
-		SetData(nullptr, 0);
-		return;
-	}
-
+	//Make sure we've got valid inputs
+	ClearErrors();
 	auto din = dynamic_cast<J1939PDUWaveform*>(GetInputWaveform(0));
-	auto len = din->size();
 	if(!din)
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid input", "Expected a J1939 PDU waveform");
+
 		SetData(nullptr, 0);
 		return;
 	}
+	auto len = din->size();
 
 	//Create the capture
-	auto cap = new J1939PDUWaveform;
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = 0;
+	auto cap = SetupEmptyWaveform<J1939PDUWaveform>(din, 0);
+	din->PrepareForCpuAccess();
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	enum
 	{
