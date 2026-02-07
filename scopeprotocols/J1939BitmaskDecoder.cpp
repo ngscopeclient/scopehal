@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -65,10 +65,10 @@ J1939BitmaskDecoder::J1939BitmaskDecoder(const string& color)
 
 bool J1939BitmaskDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<J1939PDUWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<J1939PDUWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -82,24 +82,41 @@ string J1939BitmaskDecoder::GetProtocolName()
 	return "J1939 Bitmask";
 }
 
+Filter::DataLocation J1939BitmaskDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void J1939BitmaskDecoder::Refresh()
+void J1939BitmaskDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("J1939BitmaskDecoder::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	auto din = dynamic_cast<J1939PDUWaveform*>(GetInputWaveform(0));
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid input", "Expected a J1939 PDU waveform");
+
 		SetData(nullptr, 0);
 		return;
 	}
 
-	auto din = dynamic_cast<J1939PDUWaveform*>(GetInputWaveform(0));
-	if(!din)
-	{
-		SetData(nullptr, 0);
-		return;
-	}
 	auto len = din->size();
+	din->PrepareForCpuAccess();
 
 	//Make output waveform
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
