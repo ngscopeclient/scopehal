@@ -71,6 +71,8 @@ public:
 	std::string GetSerialNumber()
 	{ return m_serialNumber; }
 
+	static std::vector<TransportEndpoint> EnumTransportEndpoints();
+
 	TRANSPORT_INITPROC(SCPIHIDTransport)
 
 protected:
