@@ -1469,102 +1469,6 @@ float Filter::Bessel(float x)
  */
 void Filter::SetDefaultName()
 {
-	/*
-	//Start with our immediate inputs
-	set<StreamDescriptor> inputs;
-	for(auto i : m_inputs)
-		inputs.emplace(i);
-
-	//If we're a measurement, stop
-	//We want to see the full list of inputs as-is
-	if(m_category == CAT_MEASUREMENT)
-	{
-	}
-
-	//Walk filter graph back to find source nodes
-	else
-	{
-		//Replace each input with its ancestor
-		while(true)
-		{
-			bool changed = false;
-			set<StreamDescriptor> next;
-
-			for(auto i : inputs)
-			{
-				//If the channel is not a filter, it's a scope channel.
-				//Pass through unchanged.
-				auto f = dynamic_cast<Filter*>(i.m_channel);
-				if(!f)
-					next.emplace(i);
-
-				//It's a filter. Does it have any inputs?
-				//If not, it's an import or waveform generation filter. Pass through unchanged.
-				else if(f->GetInputCount() == 0)
-					next.emplace(i);
-
-				//Filter that has inputs. Use them.
-				else
-				{
-					for(size_t j=0; j<f->GetInputCount(); j++)
-						next.emplace(f->GetInput(j));
-					changed = true;
-				}
-			}
-
-			if(!changed)
-				break;
-			inputs = next;
-		}
-	}
-
-	//If we have any non-import inputs, hide all import inputs
-	//This prevents e.g. s-parameter filenames propagating into all dependent filter names
-	bool hasNonImportInputs = false;
-	set<StreamDescriptor> imports;
-	for(auto i : inputs)
-	{
-		auto f = dynamic_cast<Filter*>(i.m_channel);
-		if((f != nullptr) && (f->GetInputCount() == 0) )
-			imports.emplace(i);
-		else
-			hasNonImportInputs = true;
-	}
-	if(hasNonImportInputs)
-	{
-		for(auto i : imports)
-			inputs.erase(i);
-	}
-
-	//Sort the inputs alphabetically (up to now, they're sorted by the std::set)
-	vector<string> sorted;
-	for(auto i : inputs)
-		sorted.push_back(i.GetName());
-	sort(sorted.begin(), sorted.end());
-
-	string inames = "";
-	for(auto s : sorted)
-	{
-		if(s == "NULL")
-			continue;
-		if(inames.empty())
-		{
-			inames = s;
-			continue;
-		}
-
-		if(inames.length() + s.length() > 25)
-		{
-			inames += ", ...";
-			break;
-		}
-
-		if(inames != "")
-			inames += ",";
-		inames += s;
-	}
-	*/
-
 	//Format final output: remove spaces from display name, add instance number
 	auto pname = GetProtocolDisplayName();
 	string pname2;
@@ -1573,9 +1477,7 @@ void Filter::SetDefaultName()
 		if(isalnum(c))
 			pname2 += c;
 	}
-	string name = pname2 + +"_" + to_string(m_instanceNum + 1);
-	/*if(!inames.empty())
-		name += "(" + inames + ")";*/
+	string name = pname2 + "_" + to_string(m_instanceNum + 1);
 
 	m_hwname = name;
 	m_displayname = name;
