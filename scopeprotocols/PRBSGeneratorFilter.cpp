@@ -37,27 +37,27 @@ using namespace std;
 
 PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_baudname("Data Rate")
-	, m_polyname("Polynomial")
-	, m_depthname("Depth")
+	, m_baud(m_parameters["Data Rate"])
+	, m_poly(m_parameters["Polynomial"])
+	, m_depth(m_parameters["Depth"])
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "Data", Stream::STREAM_TYPE_DIGITAL);
 	AddStream(Unit(Unit::UNIT_COUNTS), "Clock", Stream::STREAM_TYPE_DIGITAL);
 
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_baudname].SetIntVal(103125LL * 100LL * 1000LL);
+	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_baud.SetIntVal(103125LL * 100LL * 1000LL);
 
-	m_parameters[m_polyname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_polyname].AddEnumValue("PRBS-7", POLY_PRBS7);
-	m_parameters[m_polyname].AddEnumValue("PRBS-9", POLY_PRBS9);
-	m_parameters[m_polyname].AddEnumValue("PRBS-11", POLY_PRBS11);
-	m_parameters[m_polyname].AddEnumValue("PRBS-15", POLY_PRBS15);
-	m_parameters[m_polyname].AddEnumValue("PRBS-23", POLY_PRBS23);
-	m_parameters[m_polyname].AddEnumValue("PRBS-31", POLY_PRBS31);
-	m_parameters[m_polyname].SetIntVal(POLY_PRBS7);
+	m_poly = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_poly.AddEnumValue("PRBS-7", POLY_PRBS7);
+	m_poly.AddEnumValue("PRBS-9", POLY_PRBS9);
+	m_poly.AddEnumValue("PRBS-11", POLY_PRBS11);
+	m_poly.AddEnumValue("PRBS-15", POLY_PRBS15);
+	m_poly.AddEnumValue("PRBS-23", POLY_PRBS23);
+	m_poly.AddEnumValue("PRBS-31", POLY_PRBS31);
+	m_poly.SetIntVal(POLY_PRBS7);
 
-	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_depthname].SetIntVal(100 * 1000);
+	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_depth.SetIntVal(100 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ void PRBSGeneratorFilter::SetDefaultName()
 	Unit rate(Unit::UNIT_BITRATE);
 
 	string prefix = "";
-	switch(m_parameters[m_polyname].GetIntVal())
+	switch(m_poly.GetIntVal())
 	{
 		case POLY_PRBS7:
 			prefix = "PRBS7";
@@ -110,7 +110,7 @@ void PRBSGeneratorFilter::SetDefaultName()
 			break;
 	}
 
-	m_hwname = prefix + "(" + rate.PrettyPrint(m_parameters[m_baudname].GetIntVal()).c_str() + ")";
+	m_hwname = prefix + "(" + rate.PrettyPrint(m_baud.GetIntVal()).c_str() + ")";
 	m_displayname = m_hwname;
 }
 
@@ -165,9 +165,9 @@ void PRBSGeneratorFilter::Refresh(
 		nvtx3::scoped_range nrange("PRBSGeneratorFilter::Refresh");
 	#endif
 
-	size_t depth = m_parameters[m_depthname].GetIntVal();
-	int64_t baudrate = m_parameters[m_baudname].GetIntVal();
-	auto poly = static_cast<Polynomials>(m_parameters[m_polyname].GetIntVal());
+	size_t depth = m_depth.GetIntVal();
+	int64_t baudrate = m_baud.GetIntVal();
+	auto poly = static_cast<Polynomials>(m_poly.GetIntVal());
 	size_t samplePeriod = FS_PER_SECOND / baudrate;
 
 	double t = GetTime();

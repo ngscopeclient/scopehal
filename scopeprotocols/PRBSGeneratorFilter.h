@@ -63,9 +63,9 @@ public:
 	static bool RunPRBS(uint32_t& state, Polynomials poly);
 
 protected:
-	std::string m_baudname;
-	std::string m_polyname;
-	std::string m_depthname;
+	FilterParameter& m_baud;
+	FilterParameter& m_poly;
+	FilterParameter& m_depth;
 };
 
 #endif
