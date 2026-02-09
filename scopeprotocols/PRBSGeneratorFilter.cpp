@@ -58,6 +58,14 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 
 	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_depth.SetIntVal(100 * 1000);
+
+	if(g_hasShaderInt8)
+	{
+		m_prbs7Pipeline = make_unique<ComputePipeline>(
+			"shaders/PRBS7.spv",
+			1,
+			sizeof(PRBSGeneratorConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -215,12 +223,59 @@ void PRBSGeneratorFilter::Refresh(
 		clk->MarkModifiedFromCpu();
 	}
 
-	//Always generate the PRBS
-	dat->PrepareForCpuAccess();
+	//GPU path
+	if(g_hasShaderInt8)
+	{
+		PRBSGeneratorConstants cfg;
+		cfg.count = depth;
+		cfg.seed = rand();
 
-	uint32_t prbs = rand();
-	for(size_t i=0; i<depth; i++)
-		dat->m_samples[i] = RunPRBS(prbs, poly);
+		switch(poly)
+		{
+			case POLY_PRBS7:
+				{
+					//PRBS7 path: each thread generates a full PRBS cycle (127 bits) from the chosen offset
+					uint32_t numThreads = GetComputeBlockCount(depth, 127);
+					const uint32_t compute_block_count = GetComputeBlockCount(depth, 64);
 
-	dat->MarkModifiedFromCpu();
+					cmdBuf.begin({});
+
+					m_prbs7Pipeline->BindBufferNonblocking(0, dat->m_samples, cmdBuf, true);
+					m_prbs7Pipeline->Dispatch(cmdBuf, cfg,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
+
+					cmdBuf.end();
+					queue->SubmitAndBlock(cmdBuf);
+
+					dat->m_samples.MarkModifiedFromGpu();
+				}
+				break;
+
+			default:
+				{
+					//Always generate the PRBS
+					dat->PrepareForCpuAccess();
+
+					uint32_t prbs = cfg.seed;
+					for(size_t i=0; i<depth; i++)
+						dat->m_samples[i] = RunPRBS(prbs, poly);
+
+					dat->MarkModifiedFromCpu();
+				}
+				break;
+		}
+	}
+
+	else
+	{
+		//Always generate the PRBS
+		dat->PrepareForCpuAccess();
+
+		uint32_t prbs = rand();
+		for(size_t i=0; i<depth; i++)
+			dat->m_samples[i] = RunPRBS(prbs, poly);
+
+		dat->MarkModifiedFromCpu();
+	}
 }

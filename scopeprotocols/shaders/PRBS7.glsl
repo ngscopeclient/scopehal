@@ -27,54 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PRBSGeneratorFilter
- */
-#ifndef PRBSGeneratorFilter_h
-#define PRBSGeneratorFilter_h
+#version 460
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_8bit_storage : require
 
-class PRBSGeneratorConstants
+layout(std430, binding=0) restrict writeonly buffer buf_dout
 {
-public:
-	uint32_t	count;
-	uint32_t	seed;
+	uint8_t dout[];
 };
 
-class PRBSGeneratorFilter : public Filter
+layout(std430, push_constant) uniform constants
 {
-public:
-	PRBSGeneratorFilter(const std::string& color);
+	uint count;
+	uint seed;
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
+void main()
+{
+	//Range calculation
+	const int PRBS_LEN = 127;
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint startpos = nthread * PRBS_LEN;
+	uint endpos = startpos + PRBS_LEN;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	//Clamp loop bounds to requested dataset size
+	if(startpos > count)
+		return;
+	if(endpos > count)
+		endpos = count;
 
-	PROTOCOL_DECODER_INITPROC(PRBSGeneratorFilter)
-
-	enum Polynomials
+	//PRBS generation
+	uint state = seed;
+	for(uint i=startpos; i<endpos; i++)
 	{
-		POLY_PRBS7 = 7,
-		POLY_PRBS9 = 9,
-		POLY_PRBS11 = 11,
-		POLY_PRBS15 = 15,
-		POLY_PRBS23 = 23,
-		POLY_PRBS31 = 31
-	};
-
-	static bool RunPRBS(uint32_t& state, Polynomials poly);
-
-protected:
-	FilterParameter& m_baud;
-	FilterParameter& m_poly;
-	FilterParameter& m_depth;
-
-	std::unique_ptr<ComputePipeline> m_prbs7Pipeline;
-};
-
-#endif
+		uint next = ( (state >> 6) ^ (state >> 5) ) & 1;
+		state = (state << 1) | next;
+		dout[i] = uint8_t(next);
+	}
+}
