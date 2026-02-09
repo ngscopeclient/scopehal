@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,8 +42,7 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 {
 	AddDigitalStream("data");
 
-	CreateInput("Data");
-	CreateInput("Clock");
+	CreateInput("sampledData");
 
 	m_parameters[m_polyname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_polyname].AddEnumValue("PRBS-7", PRBSGeneratorFilter::POLY_PRBS7);
@@ -60,13 +59,19 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 
 bool PRBSCheckerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
+}
+
+Filter::DataLocation PRBSCheckerFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,64 +122,109 @@ void PRBSCheckerFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PRBSCheckerFilter::Refresh()
+void PRBSCheckerFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	if(!VerifyAllInputsOK())
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PRBSCheckerFilter::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
+	auto din = GetInputWaveform(0);
+	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
+	if(!sdin && !udin)
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid input", "Expected a digital waveform");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
-	//Sample the input data stream
-	//TODO: allow single rate clocks too?
-	auto din = GetInputWaveform(0);
-	auto clkin = GetInputWaveform(1);
-	din->PrepareForCpuAccess();
-	clkin->PrepareForCpuAccess();
-
-	SparseDigitalWaveform data;
-	data.PrepareForCpuAccess();
-	SampleOnAnyEdgesBase(din, clkin, data);
-
-	auto poly = static_cast<PRBSGeneratorFilter::Polynomials>(m_parameters[m_polyname].GetIntVal());
-
 	//Figure out how many bits of state we need
+	auto poly = static_cast<PRBSGeneratorFilter::Polynomials>(m_parameters[m_polyname].GetIntVal());
 	size_t statesize = poly;
 
 	//Need at least the state size worth of data bits to do a meaningful check
-	auto len = data.m_samples.size();
+	auto len = din->size();
 	if(len < statesize)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "Cannot verify a PRBS with input shorter than the polynomial length");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Create the output "error found" waveform
 	auto dout = SetupEmptySparseDigitalOutputWaveform(din, 0);
-	dout->PrepareForCpuAccess();
-	dout->m_timescale = 1;
 	dout->Resize(len);
 
-	//Read the first N bits of state into the seed
-	uint32_t prbs = 0;
-	for(size_t i=0; i<statesize; i++)
+	//GPU path
+	if(false)
 	{
-		prbs = (prbs << 1) | data.m_samples[i];
-
-		dout->m_offsets[i] = data.m_offsets[i];
-		dout->m_durations[i] = data.m_durations[i];
-		dout->m_samples[i] = 0;
 	}
 
-	//Start checking actual data bits
-	for(size_t i=statesize; i<len; i++)
+	//CPU fallback
+	else
 	{
-		dout->m_offsets[i] = data.m_offsets[i];
-		dout->m_durations[i] = data.m_durations[i];
+		din->PrepareForCpuAccess();
+		dout->PrepareForCpuAccess();
 
-		bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
-		dout->m_samples[i] = (value != data.m_samples[i]);
+		//Sparse path
+		if(sdin)
+		{
+			//Read the first N bits of state into the seed
+			uint32_t prbs = 0;
+			for(size_t i=0; i<statesize; i++)
+			{
+				prbs = (prbs << 1) | sdin->m_samples[i];
+
+				dout->m_offsets[i] = sdin->m_offsets[i];
+				dout->m_durations[i] = sdin->m_durations[i];
+				dout->m_samples[i] = 0;
+			}
+
+			//Start checking actual data bits
+			for(size_t i=statesize; i<len; i++)
+			{
+				dout->m_offsets[i] = sdin->m_offsets[i];
+				dout->m_durations[i] = sdin->m_durations[i];
+
+				bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
+				dout->m_samples[i] = (value != sdin->m_samples[i]);
+			}
+		}
+
+		//Uniform path
+		else
+		{
+			//Read the first N bits of state into the seed
+			uint32_t prbs = 0;
+			for(size_t i=0; i<statesize; i++)
+			{
+				prbs = (prbs << 1) | udin->m_samples[i];
+				dout->m_offsets[i] = i;
+				dout->m_durations[i] = 1;
+				dout->m_samples[i] = 0;
+			}
+
+			//Start checking actual data bits
+			for(size_t i=statesize; i<len; i++)
+			{
+				dout->m_offsets[i] = i;
+				dout->m_durations[i] = 1;
+
+				bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
+				dout->m_samples[i] = (value != udin->m_samples[i]);
+			}
+		}
+
+		dout->MarkModifiedFromCpu();
 	}
-
-	dout->MarkModifiedFromCpu();
 }
