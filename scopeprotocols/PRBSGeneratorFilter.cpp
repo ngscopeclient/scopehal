@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -151,8 +151,20 @@ bool PRBSGeneratorFilter::RunPRBS(uint32_t& state, Polynomials poly)
 	return (bool)next;
 }
 
-void PRBSGeneratorFilter::Refresh()
+Filter::DataLocation PRBSGeneratorFilter::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void PRBSGeneratorFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PRBSGeneratorFilter::Refresh");
+	#endif
+
 	size_t depth = m_parameters[m_depthname].GetIntVal();
 	int64_t baudrate = m_parameters[m_baudname].GetIntVal();
 	auto poly = static_cast<Polynomials>(m_parameters[m_polyname].GetIntVal());
@@ -168,36 +180,47 @@ void PRBSGeneratorFilter::Refresh()
 		dat = new UniformDigitalWaveform;
 		SetData(dat, 0);
 	}
-	dat->PrepareForCpuAccess();
 	dat->m_timescale = samplePeriod;
 	dat->m_triggerPhase = 0;
 	dat->m_startTimestamp = floor(t);
 	dat->m_startFemtoseconds = fs;
 	dat->Resize(depth);
 
+	//Set up the clock waveform
 	auto clk = dynamic_cast<UniformDigitalWaveform*>(GetData(1));
 	if(!clk)
 	{
 		clk = new UniformDigitalWaveform;
 		SetData(clk, 1);
 	}
-	clk->PrepareForCpuAccess();
 	clk->m_timescale = samplePeriod;
 	clk->m_triggerPhase = samplePeriod / 2;
 	clk->m_startTimestamp = floor(t);
 	clk->m_startFemtoseconds = fs;
+	size_t oldClockSize = clk->size();
 	clk->Resize(depth);
 
-	bool lastclk = false;
-	uint32_t prbs = rand();
-	for(size_t i=0; i<depth; i++)
+	//Only generate the clock waveform if we changed length
+	if(oldClockSize != depth)
 	{
-		clk->m_samples[i] = lastclk;
-		lastclk = !lastclk;
+		clk->PrepareForCpuAccess();
 
-		dat->m_samples[i] = RunPRBS(prbs, poly);
+		bool lastclk = false;
+		for(size_t i=0; i<depth; i++)
+		{
+			clk->m_samples[i] = lastclk;
+			lastclk = !lastclk;
+		}
+
+		clk->MarkModifiedFromCpu();
 	}
 
-	clk->MarkModifiedFromCpu();
+	//Always generate the PRBS
+	dat->PrepareForCpuAccess();
+
+	uint32_t prbs = rand();
+	for(size_t i=0; i<depth; i++)
+		dat->m_samples[i] = RunPRBS(prbs, poly);
+
 	dat->MarkModifiedFromCpu();
 }
