@@ -84,8 +84,12 @@ void main()
 	uint iclock = index[gl_GlobalInvocationID.x];
 	uint istart = gl_GlobalInvocationID.x * numSamplesPerThread;
 	uint iend = istart + numSamplesPerThread;
-	if(gl_GlobalInvocationID.x == (numThreads - 1))
-		iend = wend;
+
+	//Clamp bounds
+	if(istart >= wend)
+		return;
+	if(iend >= wend)
+		iend = wend - 1;
 
 	//Loop over samples for this thread
 	float lastSample = waveform[istart];
