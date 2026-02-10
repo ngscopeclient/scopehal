@@ -60,6 +60,11 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 			"shaders/PRBS7Checker.spv",
 			2,
 			sizeof(PRBSCheckerConstants));
+
+		m_prbs9Pipeline = make_unique<ComputePipeline>(
+			"shaders/PRBS9Checker.spv",
+			2,
+			sizeof(PRBSCheckerConstants));
 	}
 }
 
@@ -223,6 +228,31 @@ void PRBSCheckerFilter::Refresh(
 
 					m_prbs7Pipeline->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
 					m_prbs7Pipeline->Dispatch(cmdBuf, cfg,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
+
+					cmdBuf.end();
+					queue->SubmitAndBlock(cmdBuf);
+
+					dout->m_samples.MarkModifiedFromGpu();
+				}
+				return;
+
+			case PRBSGeneratorFilter::POLY_PRBS9:
+				{
+					//PRBS9 path: each thread generates a full PRBS cycle (511 bits) from the chosen offset
+					uint32_t numThreads = GetComputeBlockCount(len, 511);
+					const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+
+					cmdBuf.begin({});
+
+					if(sdin)
+						m_prbs9Pipeline->BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+					else
+						m_prbs9Pipeline->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+
+					m_prbs9Pipeline->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
+					m_prbs9Pipeline->Dispatch(cmdBuf, cfg,
 						min(compute_block_count, 32768u),
 						compute_block_count / 32768 + 1);
 
