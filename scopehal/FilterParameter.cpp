@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -222,17 +222,17 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 /**
 	@brief Returns a pretty-printed representation of the parameter's value.
  */
-string FilterParameter::ToString(bool useDisplayLocale) const
+string FilterParameter::ToString(bool useDisplayLocale, int sigfigs) const
 {
 	string ret;
 	switch(m_type)
 	{
 		case TYPE_FLOAT:
-			return m_unit.PrettyPrint(m_floatval, -1, useDisplayLocale);
+			return m_unit.PrettyPrint(m_floatval, sigfigs, useDisplayLocale);
 
 		case TYPE_BOOL:
 		case TYPE_INT:
-			return m_unit.PrettyPrintInt64(m_intval, -1, useDisplayLocale);
+			return m_unit.PrettyPrintInt64(m_intval, sigfigs, useDisplayLocale);
 
 		case TYPE_FILENAME:
 		case TYPE_STRING:

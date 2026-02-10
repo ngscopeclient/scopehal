@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -105,7 +105,7 @@ public:
 	static FilterParameter UnitSelector();
 
 	void ParseString(const std::string& str, bool useDisplayLocale = true);
-	std::string ToString(bool useDisplayLocale = true) const;
+	std::string ToString(bool useDisplayLocale = true, int sigfigs = -1) const;
 
 	/**
 		@brief Returns the value of the parameter interpreted as a boolean
