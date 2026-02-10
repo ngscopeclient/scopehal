@@ -70,6 +70,11 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 			"shaders/PRBS11Checker.spv",
 			2,
 			sizeof(PRBSCheckerConstants));
+
+		m_prbs15Pipeline = make_shared<ComputePipeline>(
+			"shaders/PRBS15Checker.spv",
+			2,
+			sizeof(PRBSCheckerConstants));
 	}
 }
 
@@ -236,6 +241,11 @@ void PRBSCheckerFilter::Refresh(
 				pipe = m_prbs11Pipeline;
 				break;
 
+			case PRBSGeneratorFilter::POLY_PRBS15:
+				numThreads = GetComputeBlockCount(len, 32767);
+				pipe = m_prbs15Pipeline;
+				break;
+
 			default:
 				break;
 		}
@@ -247,6 +257,7 @@ void PRBSCheckerFilter::Refresh(
 			case PRBSGeneratorFilter::POLY_PRBS7:
 			case PRBSGeneratorFilter::POLY_PRBS9:
 			case PRBSGeneratorFilter::POLY_PRBS11:
+			case PRBSGeneratorFilter::POLY_PRBS15:
 				{
 					cmdBuf.begin({});
 
@@ -266,6 +277,8 @@ void PRBSCheckerFilter::Refresh(
 					dout->m_samples.MarkModifiedFromGpu();
 				}
 				return;
+
+			//TODO
 
 			default:
 				break;

@@ -75,6 +75,11 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 			"shaders/PRBS11.spv",
 			1,
 			sizeof(PRBSGeneratorConstants));
+
+		m_prbs15Pipeline = make_shared<ComputePipeline>(
+			"shaders/PRBS15.spv",
+			1,
+			sizeof(PRBSGeneratorConstants));
 	}
 }
 
@@ -260,6 +265,11 @@ void PRBSGeneratorFilter::Refresh(
 				pipe = m_prbs11Pipeline;
 				break;
 
+			case POLY_PRBS15:
+				numThreads = GetComputeBlockCount(depth, 32767);
+				pipe = m_prbs15Pipeline;
+				break;
+
 			default:
 				break;
 		}
@@ -271,6 +281,7 @@ void PRBSGeneratorFilter::Refresh(
 			case POLY_PRBS7:
 			case POLY_PRBS9:
 			case POLY_PRBS11:
+			case POLY_PRBS15:
 				{
 					cmdBuf.begin({});
 

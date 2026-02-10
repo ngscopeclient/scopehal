@@ -82,6 +82,8 @@ add_compute_shaders(
 		PRBS9Checker.glsl
 		PRBS11.glsl
 		PRBS11Checker.glsl
+		PRBS15.glsl
+		PRBS15Checker.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl

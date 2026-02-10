@@ -77,6 +77,7 @@ protected:
 	std::shared_ptr<ComputePipeline> m_prbs7Pipeline;
 	std::shared_ptr<ComputePipeline> m_prbs9Pipeline;
 	std::shared_ptr<ComputePipeline> m_prbs11Pipeline;
+	std::shared_ptr<ComputePipeline> m_prbs15Pipeline;
 };
 
 #endif
