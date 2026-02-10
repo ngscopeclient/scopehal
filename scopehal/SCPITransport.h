@@ -39,14 +39,11 @@
 
 #include <chrono>
 
-
-
 struct TransportEndpoint
 {
     std::string path;
     std::string description;
 };
-
 
 /**
 	@brief Abstraction of a transport layer for moving SCPI data between endpoints
@@ -64,7 +61,7 @@ public:
 	/*
 		Queued command API
 
-		Note that glscopeclient flushes the command queue in ScopeThread.
+		Note that ngscopeclient flushes the command queue in ScopeThread.
 		Headless applications will need to do this manually after performing a write-only application, otherwise
 		the command will remain queued indefinitely.
 
@@ -131,13 +128,12 @@ public:
 
 public:
 	typedef SCPITransport* (*CreateProcType)(const std::string& args);
-	static void DoAddTransportClass(std::string name, CreateProcType proc);
+	typedef std::vector<TransportEndpoint> (*EnumEndpointsProcType)();
+	static void DoAddTransportClass(std::string name, CreateProcType proc, EnumEndpointsProcType eproc);
 
 	static void EnumTransports(std::vector<std::string>& names);
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);
 
-	typedef std::vector<TransportEndpoint> (*EnumEndpointsProcType)();
-	static void DoAddTransportClass(std::string name, EnumEndpointsProcType proc);
 	static std::vector<TransportEndpoint> EnumEndpoints(std::string transport);
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
@@ -148,8 +144,8 @@ protected:
 	typedef std::map< std::string, CreateProcType > CreateMapType;
 	static CreateMapType m_createprocs;
 
-	typedef std::map< std::string, EnumEndpointsProcType > EnumEndpointseMapType;
-	static EnumEndpointseMapType m_enumEndpointsProcs;
+	typedef std::map< std::string, EnumEndpointsProcType > EnumEndpointsMapType;
+	static EnumEndpointsMapType m_enumEndpointsProcs;
 
 	//Queued commands waiting to be sent
 	std::mutex m_queueMutex;
@@ -188,6 +184,6 @@ std::string to_string(SCPITransportType transportType);
 	virtual std::string GetName() override \
 	{ return GetTransportName(); }
 
-#define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance); SCPITransport::DoAddTransportClass(T::GetTransportName(), T::EnumTransportEndpoints)
+#define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance, T::EnumTransportEndpoints)
 
 #endif

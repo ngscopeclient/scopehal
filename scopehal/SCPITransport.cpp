@@ -40,7 +40,7 @@ using namespace std;
 
 SCPITransport::CreateMapType SCPITransport::m_createprocs;
 
-SCPITransport::EnumEndpointseMapType SCPITransport::m_enumEndpointsProcs;
+SCPITransport::EnumEndpointsMapType SCPITransport::m_enumEndpointsProcs;
 
 SCPITransport::SCPITransport()
 	: m_rateLimitingEnabled(false)
@@ -55,9 +55,10 @@ SCPITransport::~SCPITransport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPITransport::DoAddTransportClass(string name, CreateProcType proc)
+void SCPITransport::DoAddTransportClass(string name, CreateProcType proc, EnumEndpointsProcType eproc)
 {
 	m_createprocs[name] = proc;
+	m_enumEndpointsProcs[name] = eproc;
 }
 
 void SCPITransport::EnumTransports(vector<string>& names)
@@ -279,7 +280,7 @@ void SCPITransport::FlushRXBuffer(void)
 	LogError("SCPITransport::FlushRXBuffer is unimplemented\n");
 }
 
-std::string to_string(SCPITransportType transportType)
+string to_string(SCPITransportType transportType)
 {
 	switch(transportType)
 	{
@@ -298,12 +299,7 @@ std::string to_string(SCPITransportType transportType)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Static functions
 
-void SCPITransport::DoAddTransportClass(string name, EnumEndpointsProcType proc)
-{
-	m_enumEndpointsProcs[name] = proc;
-}
-
-std::vector<TransportEndpoint> SCPITransport::EnumEndpoints(std::string transport)
+vector<TransportEndpoint> SCPITransport::EnumEndpoints(string transport)
 {
 	if(m_enumEndpointsProcs.find(transport) != m_enumEndpointsProcs.end())
 		return m_enumEndpointsProcs[transport]();
@@ -313,7 +309,7 @@ std::vector<TransportEndpoint> SCPITransport::EnumEndpoints(std::string transpor
 }
 
 // Default implementation returns no endpoints
-std::vector<TransportEndpoint> SCPITransport::EnumTransportEndpoints()
+vector<TransportEndpoint> SCPITransport::EnumTransportEndpoints()
 {
-	return std::vector<TransportEndpoint>();
+	return vector<TransportEndpoint>();
 }
