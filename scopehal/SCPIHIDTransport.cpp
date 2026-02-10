@@ -164,3 +164,26 @@ bool SCPIHIDTransport::IsCommandBatchingSupported()
 {
 	return false;
 }
+
+std::vector<TransportEndpoint> SCPIHIDTransport::EnumTransportEndpoints()
+{
+	std::vector<TransportEndpoint> result;
+	auto devices = HID::EnumerateDevices();
+	char buffer[512];
+	std::set<string> paths;
+
+	for(auto device : devices)
+	{
+		snprintf(buffer, sizeof(buffer), "%x:%x:%s",device.vendorId,device.productId,device.serialNumber.c_str());
+		string path = string(buffer);
+		if(paths.find(path) == paths.end())
+		{	// Ignore duplicates
+			TransportEndpoint endpoint;
+			endpoint.path = path;
+			endpoint.description = device.description;
+			result.push_back(endpoint);
+			paths.emplace(path);
+		}
+	}
+	return result;
+}

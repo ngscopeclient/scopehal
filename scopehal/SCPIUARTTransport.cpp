@@ -171,3 +171,17 @@ bool SCPIUARTTransport::IsCommandBatchingSupported()
 {
 	return false;
 }
+
+std::vector<TransportEndpoint> SCPIUARTTransport::EnumTransportEndpoints()
+{
+	std::vector<TransportEndpoint> result;
+	auto uarts = UART::EnumerateUarts();
+	for(auto uart : uarts)
+	{
+		TransportEndpoint endpoint;
+		endpoint.path = uart.port;
+		endpoint.description = uart.description;
+		result.push_back(endpoint);
+	}
+	return result;
+}
