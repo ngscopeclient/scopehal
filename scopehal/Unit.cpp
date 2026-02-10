@@ -746,7 +746,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	@param useDisplayLocale		True if the string is formatted for display (user's locale)
 								False if the string is formatted for serialization ("C" locale regardless of user pref)
  */
-string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLocale) const
+string Unit::PrettyPrintInt64(int64_t value, int sigfigs, bool useDisplayLocale) const
 {
 	if(useDisplayLocale)
 		SetPrintingLocale();
@@ -761,7 +761,7 @@ string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLoc
 
 	//Apply the rescaling in the integer domain
 	int64_t mulFactor = scaleFactor;
-	int64_t divFactor = 1.0 / scaleFactor;
+	int64_t divFactor = round(1.0 / scaleFactor);
 
 	int64_t value_rescaled;
 	if(scaleFactor > 1)
@@ -799,35 +799,85 @@ string Unit::PrettyPrintInt64(int64_t value, int /*sigfigs*/, bool useDisplayLoc
 			break;
 
 		default:
-			//Default to 4 sig figs for now
 			{
+				//Default if not specified is 4 sig figs
+				if(sigfigs < 0)
+					sigfigs = 4;
+
+				//Cap max sig figs to 9 for now
+				if(sigfigs > 9)
+					sigfigs = 9;
+
+				const int64_t scales[10] =
+				{
+					1LL,
+					10LL,
+					100LL,
+					1000LL,
+					10000LL,
+					100000LL,
+					1000000LL,
+					10000000LL,
+					100000000LL,
+					1000000000LL
+				};
+				int64_t digscale = scales[sigfigs];
+
+				const char* formatsDisplay[10] =
+				{
+					"%" PRId64 "%c%01" PRId64,
+					"%" PRId64 "%c%01" PRId64,
+					"%" PRId64 "%c%02" PRId64,
+					"%" PRId64 "%c%03" PRId64,
+					"%" PRId64 "%c%04" PRId64,
+					"%" PRId64 "%c%05" PRId64,
+					"%" PRId64 "%c%06" PRId64,
+					"%" PRId64 "%c%07" PRId64,
+					"%" PRId64 "%c%08" PRId64,
+					"%" PRId64 "%c%09" PRId64,
+				};
+
+				const char* formatsSerial[10] =
+				{
+					"%" PRId64 ".%01" PRId64,
+					"%" PRId64 ".%01" PRId64,
+					"%" PRId64 ".%02" PRId64,
+					"%" PRId64 ".%03" PRId64,
+					"%" PRId64 ".%04" PRId64,
+					"%" PRId64 ".%05" PRId64,
+					"%" PRId64 ".%06" PRId64,
+					"%" PRId64 ".%07" PRId64,
+					"%" PRId64 ".%08" PRId64,
+					"%" PRId64 ".%09" PRId64,
+				};
+
 				//Normal pretty printing routine for small values
 				int64_t value1;
 				int64_t value2;
-				if(scaleFactor > 1e-6)
+				if(divFactor < digscale)
 				{
-					value1 = value * 10000;
+					value1 = value * digscale;
 					if(scaleFactor > 1)
 						value1 *= mulFactor;
 					else
 						value1 /= divFactor;
-					value2 = value1 % 10000;
-					value1 /= 10000;
+					value2 = value1 % digscale;
+					value1 /= digscale;
 				}
 
 				//For really big values, prescale first to avoid overflow
 				else
 				{
-					value1 = value / (divFactor / 10000);
-					value2 = value1 % 10000;
-					value1 /= 10000;
+					value1 = value / (divFactor / digscale);
+					value2 = value1 % digscale;
+					value1 /= digscale;
 				}
 
 				//Use correct decimal separator for user's locale if needed
 				if(useDisplayLocale)
-					snprintf(tmp, sizeof(tmp), "%" PRId64 "%c%04" PRId64, value1, m_decimalSeparator, value2);
+					snprintf(tmp, sizeof(tmp), formatsDisplay[sigfigs], value1, m_decimalSeparator, value2);
 				else
-					snprintf(tmp, sizeof(tmp), "%" PRId64 ".%04" PRId64, value1, value2);
+					snprintf(tmp, sizeof(tmp), formatsSerial[sigfigs], value1, value2);
 
 				//Trim zeroes at right
 				ssize_t n = strlen(tmp) - 1;
