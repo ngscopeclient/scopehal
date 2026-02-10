@@ -280,13 +280,13 @@ void PRBSGeneratorFilter::Refresh(
 			default:
 				{
 					//Always generate the PRBS
-					dat->PrepareForCpuAccess();
+					dat->m_samples.PrepareForCpuAccess();
 
 					uint32_t prbs = cfg.seed;
 					for(size_t i=0; i<depth; i++)
 						dat->m_samples[i] = RunPRBS(prbs, poly);
 
-					dat->MarkModifiedFromCpu();
+					dat->m_samples.MarkModifiedFromCpu();
 				}
 				break;
 		}
@@ -295,12 +295,12 @@ void PRBSGeneratorFilter::Refresh(
 	else
 	{
 		//Always generate the PRBS
-		dat->PrepareForCpuAccess();
+		dat->m_samples.PrepareForCpuAccess();
 
 		uint32_t prbs = rand();
 		for(size_t i=0; i<depth; i++)
 			dat->m_samples[i] = RunPRBS(prbs, poly);
 
-		dat->MarkModifiedFromCpu();
+		dat->m_samples.MarkModifiedFromCpu();
 	}
 }

@@ -27,41 +27,70 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PRBSCheckerFilter
- */
-#ifndef PRBSCheckerFilter_h
-#define PRBSCheckerFilter_h
+#version 460
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_8bit_storage : require
 
-class PRBSCheckerConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	count;
+	uint8_t din[];
 };
 
-class PRBSCheckerFilter : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	PRBSCheckerFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(PRBSCheckerFilter)
-
-protected:
-	FilterParameter& m_poly;
-
-	std::unique_ptr<ComputePipeline> m_prbs7Pipeline;
-
-	size_t m_lastSize;
+	uint8_t dout[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint count;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//Range calculation
+	const uint PRBS_LEN = 127;
+	const uint PRBS_BITS = 7;
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint startpos = (nthread * PRBS_LEN);
+	uint endpos = startpos + PRBS_LEN;
+
+	//Clamp loop bounds to requested dataset size
+	if(startpos > count)
+		return;
+	if(endpos > count)
+		endpos = count;
+
+	//Use the first few PRBS bits as the starting state
+	uint state = 0;
+	for(uint i=0; i<PRBS_BITS; i++)
+	{
+		state = (state << 1);
+		if(uint(din[i]) != 0)
+			state = state | 1;
+	}
+
+	//Verify the LFSR state bits (this will always return correct for the first block since it was the seed)
+	for(uint i=0; i<PRBS_BITS; i++)
+	{
+		if(uint(din[i]) == uint(din[startpos + i]))
+			dout[startpos+i] = uint8_t(0);
+		else
+			dout[startpos+i] = uint8_t(1);
+	}
+	startpos += PRBS_BITS;
+
+	//PRBS verification
+	for(uint i=startpos; i<endpos; i++)
+	{
+		uint next = ( (state >> 6) ^ (state >> 5) ) & 1;
+		state = (state << 1) | next;
+
+		if(next == uint(din[i]))
+			dout[i] = uint8_t(0);
+		else
+			dout[i] = uint8_t(1);
+	}
+}

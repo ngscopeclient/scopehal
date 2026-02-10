@@ -77,6 +77,7 @@ add_compute_shaders(
 		PAMEdgeDetector_MergeCrossings.glsl
 		PAMEdgeDetector_FinalMerge.glsl
 		PRBS7.glsl
+		PRBS7Checker.glsl
 		PRBS9.glsl
 		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
