@@ -267,11 +267,11 @@ void PRBSGeneratorFilter::Refresh(
 
 		switch(poly)
 		{
+			//Each thread generates a full PRBS cycle from the chosen offset
 			case POLY_PRBS7:
 			case POLY_PRBS9:
 			case POLY_PRBS11:
 				{
-					//Each thread generates a full PRBS cycle (127 bits) from the chosen offset
 					cmdBuf.begin({});
 
 					pipe->BindBufferNonblocking(0, dat->m_samples, cmdBuf, true);

@@ -243,6 +243,7 @@ void PRBSCheckerFilter::Refresh(
 
 		switch(poly)
 		{
+			//Each thread checks a full PRBS cycle from the chosen offset
 			case PRBSGeneratorFilter::POLY_PRBS7:
 			case PRBSGeneratorFilter::POLY_PRBS9:
 			case PRBSGeneratorFilter::POLY_PRBS11:
