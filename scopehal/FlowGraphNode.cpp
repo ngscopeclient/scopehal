@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -346,7 +346,7 @@ YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 	{
 		auto desc = m_inputs[i];
 		string value;
-		if(desc.m_channel == NULL)
+		if(desc.m_channel == nullptr)
 			value = "0";
 		else
 			value = to_string(table.emplace(desc.m_channel)) + "/" + to_string(desc.m_stream);
@@ -361,7 +361,7 @@ YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 		//Save both type and value for the parameter
 		YAML::Node pnode;
 		pnode["type"] = it.second.GetUnit().ToString();
-		pnode["value"] = it.second.ToString(false);
+		pnode["value"] = it.second.ToString(false, 7);
 		parameters[it.first] = pnode;
 	}
 	node["parameters"] = parameters;
