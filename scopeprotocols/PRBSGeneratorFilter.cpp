@@ -61,13 +61,18 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 
 	if(g_hasShaderInt8)
 	{
-		m_prbs7Pipeline = make_unique<ComputePipeline>(
+		m_prbs7Pipeline = make_shared<ComputePipeline>(
 			"shaders/PRBS7.spv",
 			1,
 			sizeof(PRBSGeneratorConstants));
 
-		m_prbs9Pipeline = make_unique<ComputePipeline>(
+		m_prbs9Pipeline = make_shared<ComputePipeline>(
 			"shaders/PRBS9.spv",
+			1,
+			sizeof(PRBSGeneratorConstants));
+
+		m_prbs11Pipeline = make_shared<ComputePipeline>(
+			"shaders/PRBS11.spv",
 			1,
 			sizeof(PRBSGeneratorConstants));
 	}
@@ -235,38 +240,42 @@ void PRBSGeneratorFilter::Refresh(
 		cfg.count = depth;
 		cfg.seed = rand();
 
+		//Figure out the shader and thread block count to use
+		uint32_t numThreads = 0;
+		shared_ptr<ComputePipeline> pipe;
 		switch(poly)
 		{
 			case POLY_PRBS7:
-				{
-					//PRBS7 path: each thread generates a full PRBS cycle (127 bits) from the chosen offset
-					uint32_t numThreads = GetComputeBlockCount(depth, 127);
-					const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
-
-					cmdBuf.begin({});
-
-					m_prbs7Pipeline->BindBufferNonblocking(0, dat->m_samples, cmdBuf, true);
-					m_prbs7Pipeline->Dispatch(cmdBuf, cfg,
-						min(compute_block_count, 32768u),
-						compute_block_count / 32768 + 1);
-
-					cmdBuf.end();
-					queue->SubmitAndBlock(cmdBuf);
-
-					dat->m_samples.MarkModifiedFromGpu();
-				}
+				numThreads = GetComputeBlockCount(depth, 127);
+				pipe = m_prbs7Pipeline;
 				break;
 
 			case POLY_PRBS9:
-				{
-					//PRBS9 path: each thread generates a full PRBS cycle (511 bits) from the chosen offset
-					uint32_t numThreads = GetComputeBlockCount(depth, 511);
-					const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+				numThreads = GetComputeBlockCount(depth, 511);
+				pipe = m_prbs9Pipeline;
+				break;
 
+			case POLY_PRBS11:
+				numThreads = GetComputeBlockCount(depth, 2047);
+				pipe = m_prbs11Pipeline;
+				break;
+
+			default:
+				break;
+		}
+		const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+
+		switch(poly)
+		{
+			case POLY_PRBS7:
+			case POLY_PRBS9:
+			case POLY_PRBS11:
+				{
+					//Each thread generates a full PRBS cycle (127 bits) from the chosen offset
 					cmdBuf.begin({});
 
-					m_prbs9Pipeline->BindBufferNonblocking(0, dat->m_samples, cmdBuf, true);
-					m_prbs9Pipeline->Dispatch(cmdBuf, cfg,
+					pipe->BindBufferNonblocking(0, dat->m_samples, cmdBuf, true);
+					pipe->Dispatch(cmdBuf, cfg,
 						min(compute_block_count, 32768u),
 						compute_block_count / 32768 + 1);
 
@@ -277,6 +286,7 @@ void PRBSGeneratorFilter::Refresh(
 				}
 				break;
 
+			//Software fallback
 			default:
 				{
 					//Always generate the PRBS

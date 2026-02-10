@@ -56,13 +56,18 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 
 	if(g_hasShaderInt8)
 	{
-		m_prbs7Pipeline = make_unique<ComputePipeline>(
+		m_prbs7Pipeline = make_shared<ComputePipeline>(
 			"shaders/PRBS7Checker.spv",
 			2,
 			sizeof(PRBSCheckerConstants));
 
-		m_prbs9Pipeline = make_unique<ComputePipeline>(
+		m_prbs9Pipeline = make_shared<ComputePipeline>(
 			"shaders/PRBS9Checker.spv",
+			2,
+			sizeof(PRBSCheckerConstants));
+
+		m_prbs11Pipeline = make_shared<ComputePipeline>(
+			"shaders/PRBS11Checker.spv",
 			2,
 			sizeof(PRBSCheckerConstants));
 	}
@@ -211,48 +216,46 @@ void PRBSCheckerFilter::Refresh(
 		PRBSCheckerConstants cfg;
 		cfg.count = len;
 
+		//Figure out the shader and thread block count to use
+		uint32_t numThreads = 0;
+		shared_ptr<ComputePipeline> pipe;
 		switch(poly)
 		{
 			case PRBSGeneratorFilter::POLY_PRBS7:
-				{
-					//PRBS7 path: each thread generates a full PRBS cycle (127 bits) from the chosen offset
-					uint32_t numThreads = GetComputeBlockCount(len, 127);
-					const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
-
-					cmdBuf.begin({});
-
-					if(sdin)
-						m_prbs7Pipeline->BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
-					else
-						m_prbs7Pipeline->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
-
-					m_prbs7Pipeline->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
-					m_prbs7Pipeline->Dispatch(cmdBuf, cfg,
-						min(compute_block_count, 32768u),
-						compute_block_count / 32768 + 1);
-
-					cmdBuf.end();
-					queue->SubmitAndBlock(cmdBuf);
-
-					dout->m_samples.MarkModifiedFromGpu();
-				}
-				return;
+				numThreads = GetComputeBlockCount(len, 127);
+				pipe = m_prbs7Pipeline;
+				break;
 
 			case PRBSGeneratorFilter::POLY_PRBS9:
-				{
-					//PRBS9 path: each thread generates a full PRBS cycle (511 bits) from the chosen offset
-					uint32_t numThreads = GetComputeBlockCount(len, 511);
-					const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+				numThreads = GetComputeBlockCount(len, 511);
+				pipe = m_prbs9Pipeline;
+				break;
 
+			case PRBSGeneratorFilter::POLY_PRBS11:
+				numThreads = GetComputeBlockCount(len, 2047);
+				pipe = m_prbs11Pipeline;
+				break;
+
+			default:
+				break;
+		}
+		const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+
+		switch(poly)
+		{
+			case PRBSGeneratorFilter::POLY_PRBS7:
+			case PRBSGeneratorFilter::POLY_PRBS9:
+			case PRBSGeneratorFilter::POLY_PRBS11:
+				{
 					cmdBuf.begin({});
 
 					if(sdin)
-						m_prbs9Pipeline->BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+						pipe->BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
 					else
-						m_prbs9Pipeline->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+						pipe->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
 
-					m_prbs9Pipeline->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
-					m_prbs9Pipeline->Dispatch(cmdBuf, cfg,
+					pipe->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
+					pipe->Dispatch(cmdBuf, cfg,
 						min(compute_block_count, 32768u),
 						compute_block_count / 32768 + 1);
 

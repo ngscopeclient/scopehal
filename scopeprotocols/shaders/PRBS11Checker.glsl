@@ -27,56 +27,70 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PRBSGeneratorFilter
- */
-#ifndef PRBSGeneratorFilter_h
-#define PRBSGeneratorFilter_h
+#version 460
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_8bit_storage : require
 
-class PRBSGeneratorConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	count;
-	uint32_t	seed;
+	uint8_t din[];
 };
 
-class PRBSGeneratorFilter : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	PRBSGeneratorFilter(const std::string& color);
+	uint8_t dout[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+layout(std430, push_constant) uniform constants
+{
+	uint count;
+};
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+void main()
+{
+	//Range calculation
+	const uint PRBS_LEN = 2047;
+	const uint PRBS_BITS = 11;
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint startpos = (nthread * PRBS_LEN);
+	uint endpos = startpos + PRBS_LEN;
 
-	PROTOCOL_DECODER_INITPROC(PRBSGeneratorFilter)
+	//Clamp loop bounds to requested dataset size
+	if(startpos > count)
+		return;
+	if(endpos > count)
+		endpos = count;
 
-	enum Polynomials
+	//Use the first few PRBS bits as the starting state
+	uint state = 0;
+	for(uint i=0; i<PRBS_BITS; i++)
 	{
-		POLY_PRBS7 = 7,
-		POLY_PRBS9 = 9,
-		POLY_PRBS11 = 11,
-		POLY_PRBS15 = 15,
-		POLY_PRBS23 = 23,
-		POLY_PRBS31 = 31
-	};
+		state = (state << 1);
+		if(uint(din[i]) != 0)
+			state = state | 1;
+	}
 
-	static bool RunPRBS(uint32_t& state, Polynomials poly);
+	//Verify the LFSR state bits (this will always return correct for the first block since it was the seed)
+	for(uint i=0; i<PRBS_BITS; i++)
+	{
+		if(uint(din[i]) == uint(din[startpos + i]))
+			dout[startpos+i] = uint8_t(0);
+		else
+			dout[startpos+i] = uint8_t(1);
+	}
+	startpos += PRBS_BITS;
 
-protected:
-	FilterParameter& m_baud;
-	FilterParameter& m_poly;
-	FilterParameter& m_depth;
+	//PRBS verification
+	for(uint i=startpos; i<endpos; i++)
+	{
+		uint next = ( (state >> 10) ^ (state >> 8) ) & 1;
+		state = (state << 1) | next;
 
-	std::shared_ptr<ComputePipeline> m_prbs7Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs9Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs11Pipeline;
-};
-
-#endif
+		if(next == uint(din[i]))
+			dout[i] = uint8_t(0);
+		else
+			dout[i] = uint8_t(1);
+	}
+}

@@ -59,8 +59,9 @@ public:
 protected:
 	FilterParameter& m_poly;
 
-	std::unique_ptr<ComputePipeline> m_prbs7Pipeline;
-	std::unique_ptr<ComputePipeline> m_prbs9Pipeline;
+	std::shared_ptr<ComputePipeline> m_prbs7Pipeline;
+	std::shared_ptr<ComputePipeline> m_prbs9Pipeline;
+	std::shared_ptr<ComputePipeline> m_prbs11Pipeline;
 
 	size_t m_lastSize;
 };
