@@ -27,73 +27,72 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PRBSGeneratorFilter
- */
-#ifndef PRBSGeneratorFilter_h
-#define PRBSGeneratorFilter_h
+#version 460
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_8bit_storage : require
 
-//Small PRBSes that run one iteration per thread block
-class PRBSGeneratorConstants
+layout(std430, binding=0) restrict writeonly buffer buf_dout
 {
-public:
-	uint32_t	count;
-	uint32_t	seed;
+	uint8_t dout[];
 };
 
-//Big PRBSes that do lookahead
-class PRBSGeneratorBlockConstants
+layout(std430, binding=1) restrict readonly buffer buf_lfsrTable
 {
-public:
-	uint32_t	count;
-	uint32_t	seed;
-	uint32_t	samplesPerThread;
+	uint lfsrTable[];
 };
 
-class PRBSGeneratorFilter : public Filter
+layout(std430, push_constant) uniform constants
 {
-public:
-	PRBSGeneratorFilter(const std::string& color);
+	uint count;
+	uint seed;
+	uint samplesPerThread;
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
+void main()
+{
+	//Range calculation
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint startpos = nthread * samplesPerThread;
+	uint endpos = startpos + samplesPerThread;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	//Clamp loop bounds to requested dataset size
+	if(startpos > count)
+		return;
+	if(endpos > count)
+		endpos = count;
 
-	PROTOCOL_DECODER_INITPROC(PRBSGeneratorFilter)
+	//Figure out starting LFSR state given seed and starting position
+	uint startposMod = startpos % 0x7fffff;
+	uint state = seed;
 
-	enum Polynomials
+	//Calculate LFSR state at the start of this block given the initial state
+	const uint LFSR_BITS = 23;
+	uint tmp = 0;
+	for(uint iterbit = 0; iterbit < LFSR_BITS; iterbit ++)
 	{
-		POLY_PRBS7 = 7,
-		POLY_PRBS9 = 9,
-		POLY_PRBS11 = 11,
-		POLY_PRBS15 = 15,
-		POLY_PRBS23 = 23,
-		POLY_PRBS31 = 31
-	};
+		//if input bit is set, use that table entry
+		if( (startposMod & (1 << iterbit)) != 0 )
+		{
+			tmp = 0;
 
-	static bool RunPRBS(uint32_t& state, Polynomials poly);
+			//xor each table entry into it
+			for(int i=0; i<LFSR_BITS; i++)
+			{
+				if( (state & (1 << i) ) != 0)
+					tmp ^= lfsrTable[iterbit*LFSR_BITS + i];
+			}
 
-protected:
-	FilterParameter& m_baud;
-	FilterParameter& m_poly;
-	FilterParameter& m_depth;
+			state = tmp;
+		}
+	}
 
-	std::shared_ptr<ComputePipeline> m_prbs7Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs9Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs11Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs15Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs23Pipeline;
-
-	///@brief LFSR lookahead table
-	AcceleratorBuffer<uint32_t> m_prbs23Table;
-};
-
-extern const uint32_t g_prbs23Table[23][23];
-
-#endif
+	//PRBS generation
+	for(uint i=startpos; i<endpos; i++)
+	{
+		uint next = ( (state >> 22) ^ (state >> 17) ) & 1;
+		state = (state << 1) | next;
+		dout[i] = uint8_t(next);
+	}
+}
