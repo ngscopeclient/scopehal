@@ -40,6 +40,7 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 	: Filter(color, CAT_ANALYSIS)
 	, m_poly(m_parameters["Polynomial"])
 	, m_lastSize(0)
+	, m_prbs23Table("PRBSCheckerFilter.m_prbs23Table")
 {
 	AddDigitalStream("data");
 
@@ -75,6 +76,25 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 			"shaders/PRBS15Checker.spv",
 			2,
 			sizeof(PRBSCheckerConstants));
+
+		//PRBS-23 and up need table for lookahead since they don't run an entire LFSR cycle per thread
+		m_prbs23Pipeline = make_shared<ComputePipeline>(
+			"shaders/PRBS23Checker.spv",
+			3,
+			sizeof(PRBSCheckerBlockConstants));
+
+		//Fill lookahead table for PRBS-23
+		uint32_t rows = 23;
+		uint32_t cols = rows;
+		m_prbs23Table.resize(rows * cols);
+		m_prbs23Table.PrepareForCpuAccess();
+		m_prbs23Table.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		for(uint32_t row=0; row<rows; row++)
+		{
+			for(uint32_t col=0; col<cols; col++)
+				m_prbs23Table[row*cols + col] = g_prbs23Table[row][col];
+		}
+		m_prbs23Table.MarkModifiedFromCpu();
 	}
 }
 
@@ -221,6 +241,11 @@ void PRBSCheckerFilter::Refresh(
 		PRBSCheckerConstants cfg;
 		cfg.count = len;
 
+		uint32_t numBlockThreads = 524288;
+		PRBSCheckerBlockConstants blockcfg;
+		blockcfg.count = len;
+		blockcfg.samplesPerThread = GetComputeBlockCount(len, numBlockThreads);
+
 		//Figure out the shader and thread block count to use
 		uint32_t numThreads = 0;
 		shared_ptr<ComputePipeline> pipe;
@@ -246,10 +271,16 @@ void PRBSCheckerFilter::Refresh(
 				pipe = m_prbs15Pipeline;
 				break;
 
+			case PRBSGeneratorFilter::POLY_PRBS23:
+				numThreads = numBlockThreads;
+				pipe = m_prbs23Pipeline;
+				break;
+
 			default:
 				break;
 		}
-		const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t compute_block_count = GetComputeBlockCount(numThreads, threadsPerBlock);
 
 		switch(poly)
 		{
@@ -278,7 +309,29 @@ void PRBSCheckerFilter::Refresh(
 				}
 				return;
 
-			//TODO
+			//Larger sequences have separate structure with lookahead
+			case PRBSGeneratorFilter::POLY_PRBS23:
+				{
+					cmdBuf.begin({});
+
+					if(sdin)
+						pipe->BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+					else
+						pipe->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+
+					pipe->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
+					pipe->BindBufferNonblocking(2, m_prbs23Table, cmdBuf);
+
+					pipe->Dispatch(cmdBuf, blockcfg,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
+
+					cmdBuf.end();
+					queue->SubmitAndBlock(cmdBuf);
+
+					dout->m_samples.MarkModifiedFromGpu();
+				}
+				return;
 
 			default:
 				break;

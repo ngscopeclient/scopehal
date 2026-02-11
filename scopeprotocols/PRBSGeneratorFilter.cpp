@@ -329,6 +329,7 @@ void PRBSGeneratorFilter::Refresh(
 			case POLY_PRBS23:
 				numThreads = numBlockThreads;
 				pipe = m_prbs23Pipeline;
+				break;
 
 			default:
 				break;
@@ -358,7 +359,7 @@ void PRBSGeneratorFilter::Refresh(
 				}
 				break;
 
-			//Larger sequences have separate structure
+			//Larger sequences have separate structure with lookahead
 			case POLY_PRBS23:
 				{
 					cmdBuf.begin({});

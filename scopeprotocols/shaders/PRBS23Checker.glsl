@@ -27,55 +27,97 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PRBSCheckerFilter
- */
-#ifndef PRBSCheckerFilter_h
-#define PRBSCheckerFilter_h
+#version 460
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_8bit_storage : require
 
-class PRBSCheckerConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	count;
+	uint8_t din[];
 };
 
-class PRBSCheckerBlockConstants
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	uint32_t	count;
-	uint32_t	samplesPerThread;
+	uint8_t dout[];
 };
 
-class PRBSCheckerFilter : public Filter
+layout(std430, binding=2) restrict readonly buffer buf_lfsrTable
 {
-public:
-	PRBSCheckerFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(PRBSCheckerFilter)
-
-protected:
-	FilterParameter& m_poly;
-
-	std::shared_ptr<ComputePipeline> m_prbs7Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs9Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs11Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs15Pipeline;
-	std::shared_ptr<ComputePipeline> m_prbs23Pipeline;
-
-	size_t m_lastSize;
-
-	///@brief LFSR lookahead table
-	AcceleratorBuffer<uint32_t> m_prbs23Table;
+	uint lfsrTable[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint count;
+	uint samplesPerThread;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	const uint PRBS_BITS = 23;
+
+	//Range calculation
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint startpos = nthread * samplesPerThread;
+
+	//Figure out starting LFSR state given seed and starting position
+	//Use the first few PRBS bits as the starting state
+	uint startposMod = startpos % 0x7fffff;
+	uint state = 0;
+	for(uint i=0; i<PRBS_BITS; i++)
+	{
+		state = (state << 1);
+		if(uint(din[i]) != 0)
+			state = state | 1;
+	}
+
+	//Calculate LFSR state at the start of this block given the initial state
+	uint tmp = 0;
+	for(uint iterbit = 0; iterbit < PRBS_BITS; iterbit ++)
+	{
+		//if input bit is set, use that table entry
+		if( (startposMod & (1 << iterbit)) != 0 )
+		{
+			tmp = 0;
+
+			//xor each table entry into it
+			for(int i=0; i<PRBS_BITS; i++)
+			{
+				if( (state & (1 << i) ) != 0)
+					tmp ^= lfsrTable[iterbit*PRBS_BITS + i];
+			}
+
+			state = tmp;
+		}
+	}
+
+	//Shift starting position by state size and bounds check
+	uint endpos = startpos + samplesPerThread;
+	startpos += PRBS_BITS;
+	if(startpos > count)
+		return;
+	if(endpos > count)
+		endpos = count;
+
+	//Zero out error flags for beginning of the output
+	if(nthread == 0)
+	{
+		for(uint i=0; i<PRBS_BITS; i++)
+			dout[i] = uint8_t(0);
+	}
+
+	//PRBS verification
+	for(uint i=startpos; i<endpos; i++)
+	{
+		uint next = ( (state >> 22) ^ (state >> 17) ) & 1;
+		state = (state << 1) | next;
+
+		if(next == uint(din[i]))
+			dout[i] = uint8_t(0);
+		else
+			dout[i] = uint8_t(1);
+	}
+
+}
