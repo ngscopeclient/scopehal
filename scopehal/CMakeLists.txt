@@ -224,6 +224,7 @@ set(SCOPEHAL_SOURCES
 	SParameterFilter.cpp
 
 	TestWaveformSource.cpp
+	TestDigitalWaveformSource.cpp
 
 	ComputePipeline.cpp
 	FilterGraphExecutor.cpp
