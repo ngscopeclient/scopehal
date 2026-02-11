@@ -31,17 +31,12 @@
 #pragma shader_stage(compute)
 #extension GL_EXT_shader_8bit_storage : require
 
-layout(std430, binding=0) restrict readonly buffer buf_din
-{
-	uint8_t din[];
-};
-
-layout(std430, binding=1) restrict writeonly buffer buf_dout
+layout(std430, binding=0) restrict writeonly buffer buf_dout
 {
 	uint8_t dout[];
 };
 
-layout(std430, binding=2) restrict readonly buffer buf_lfsrTable
+layout(std430, binding=1) restrict readonly buffer buf_lfsrTable
 {
 	uint lfsrTable[];
 };
@@ -49,6 +44,7 @@ layout(std430, binding=2) restrict readonly buffer buf_lfsrTable
 layout(std430, push_constant) uniform constants
 {
 	uint count;
+	uint seed;
 	uint samplesPerThread;
 };
 
@@ -56,77 +52,45 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	const uint PRBS_BITS = 23;
-
 	//Range calculation
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 	uint startpos = nthread * samplesPerThread;
-
-	//Figure out starting LFSR state given seed and starting position
-	//Use the first few PRBS bits as the starting state
-	uint state = 0;
-	for(uint i=0; i<PRBS_BITS; i++)
-	{
-		state = (state << 1);
-		if(uint(din[i]) != 0)
-			state = state | 1;
-	}
-
-	//Skip first N samples that we used as initial state
 	uint endpos = startpos + samplesPerThread;
-	if(nthread == 0)
-		startpos = PRBS_BITS;
 
-	//Seek into the LFSR data stream to find our starting position
-	else
-	{
-		//Back up by one LFSR size to account for the starting state bits
-		uint startposMod = (startpos - PRBS_BITS) % 0x7fffff;
-
-		//Calculate LFSR state at the start of this block given the initial state
-		uint tmp = 0;
-		for(uint iterbit = 0; iterbit < PRBS_BITS; iterbit ++)
-		{
-			//if input bit is set, use that table entry
-			if( (startposMod & (1 << iterbit)) != 0 )
-			{
-				tmp = 0;
-
-				//xor each table entry into it
-				for(int i=0; i<PRBS_BITS; i++)
-				{
-					if( (state & (1 << i) ) != 0)
-						tmp ^= lfsrTable[iterbit*PRBS_BITS + i];
-				}
-
-				state = tmp;
-			}
-		}
-	}
-
-	//Clamp to iteration bounds
+	//Clamp loop bounds to requested dataset size
 	if(startpos > count)
 		return;
 	if(endpos > count)
 		endpos = count;
 
-	//Zero out error flags for beginning of the output
-	if(nthread == 0)
+	//Calculate LFSR state at the start of this block given the initial state
+	//No startposMod because PRBS period is greater than our max record length
+	uint state = seed;
+	const uint LFSR_BITS = 31;
+	uint tmp = 0;
+	for(uint iterbit = 0; iterbit < 30; iterbit ++)	//only 30 rows because max record length is 2^30
 	{
-		for(uint i=0; i<PRBS_BITS; i++)
-			dout[i] = uint8_t(0);
+		//if input bit is set, use that table entry
+		if( (startpos & (1 << iterbit)) != 0 )
+		{
+			tmp = 0;
+
+			//xor each table entry into it
+			for(int i=0; i<LFSR_BITS; i++)
+			{
+				if( (state & (1 << i) ) != 0)
+					tmp ^= lfsrTable[iterbit*LFSR_BITS + i];
+			}
+
+			state = tmp;
+		}
 	}
 
-	//PRBS verification
+	//PRBS generation
 	for(uint i=startpos; i<endpos; i++)
 	{
-		uint next = ( (state >> 22) ^ (state >> 17) ) & 1;
+		uint next = ( (state >> 30) ^ (state >> 27) ) & 1;
 		state = (state << 1) | next;
-
-		if(next == uint(din[i]))
-			dout[i] = uint8_t(0);
-		else
-			dout[i] = uint8_t(1);
+		dout[i] = uint8_t(next);
 	}
-
 }

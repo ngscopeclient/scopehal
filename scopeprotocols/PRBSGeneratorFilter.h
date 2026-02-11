@@ -89,11 +89,16 @@ protected:
 	std::shared_ptr<ComputePipeline> m_prbs11Pipeline;
 	std::shared_ptr<ComputePipeline> m_prbs15Pipeline;
 	std::shared_ptr<ComputePipeline> m_prbs23Pipeline;
+	std::shared_ptr<ComputePipeline> m_prbs31Pipeline;
 
-	///@brief LFSR lookahead table
+	///@brief LFSR lookahead table for PRBS-23 polynomial
 	AcceleratorBuffer<uint32_t> m_prbs23Table;
+
+	///@brief LFSR lookahead table for PRBS-31 polynomial
+	AcceleratorBuffer<uint32_t> m_prbs31Table;
 };
 
 extern const uint32_t g_prbs23Table[23][23];
+extern const uint32_t g_prbs31Table[30][31];
 
 #endif
