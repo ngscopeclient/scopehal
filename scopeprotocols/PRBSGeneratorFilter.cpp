@@ -458,9 +458,10 @@ void PRBSGeneratorFilter::Refresh(
 		}
 	}
 
+	//CPU fallback
 	else
 	{
-		//Always generate the PRBS
+		//Always generate the PRBS CPU side
 		dat->m_samples.PrepareForCpuAccess();
 
 		uint32_t prbs = rand();

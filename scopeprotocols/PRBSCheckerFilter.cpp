@@ -82,6 +82,10 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 			"shaders/PRBS23Checker.spv",
 			3,
 			sizeof(PRBSCheckerBlockConstants));
+		m_prbs31Pipeline = make_shared<ComputePipeline>(
+			"shaders/PRBS31Checker.spv",
+			3,
+			sizeof(PRBSCheckerBlockConstants));
 
 		//Fill lookahead table for PRBS-23
 		uint32_t rows = 23;
@@ -95,6 +99,20 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 				m_prbs23Table[row*cols + col] = g_prbs23Table[row][col];
 		}
 		m_prbs23Table.MarkModifiedFromCpu();
+
+		//Fill lookahead table for PRBS-31
+		//(last row omitted because our max waveform size is only 2^30)
+		rows = 30;
+		cols = 31;
+		m_prbs31Table.resize(rows * cols);
+		m_prbs31Table.PrepareForCpuAccess();
+		m_prbs31Table.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		for(uint32_t row=0; row<rows; row++)
+		{
+			for(uint32_t col=0; col<cols; col++)
+				m_prbs31Table[row*cols + col] = g_prbs31Table[row][col];
+		}
+		m_prbs31Table.MarkModifiedFromCpu();
 	}
 }
 
@@ -276,6 +294,11 @@ void PRBSCheckerFilter::Refresh(
 				pipe = m_prbs23Pipeline;
 				break;
 
+			case PRBSGeneratorFilter::POLY_PRBS31:
+				numThreads = numBlockThreads;
+				pipe = m_prbs31Pipeline;
+				break;
+
 			default:
 				break;
 		}
@@ -307,10 +330,11 @@ void PRBSCheckerFilter::Refresh(
 
 					dout->m_samples.MarkModifiedFromGpu();
 				}
-				return;
+				break;
 
 			//Larger sequences have separate structure with lookahead
 			case PRBSGeneratorFilter::POLY_PRBS23:
+			case PRBSGeneratorFilter::POLY_PRBS31:
 				{
 					cmdBuf.begin({});
 
@@ -320,7 +344,11 @@ void PRBSCheckerFilter::Refresh(
 						pipe->BindBufferNonblocking(0, udin->m_samples, cmdBuf);
 
 					pipe->BindBufferNonblocking(1, dout->m_samples, cmdBuf, true);
-					pipe->BindBufferNonblocking(2, m_prbs23Table, cmdBuf);
+
+					if(poly == PRBSGeneratorFilter::POLY_PRBS23)
+						pipe->BindBufferNonblocking(2, m_prbs23Table, cmdBuf);
+					else
+						pipe->BindBufferNonblocking(2, m_prbs31Table, cmdBuf);
 
 					pipe->Dispatch(cmdBuf, blockcfg,
 						min(compute_block_count, 32768u),
@@ -331,7 +359,7 @@ void PRBSCheckerFilter::Refresh(
 
 					dout->m_samples.MarkModifiedFromGpu();
 				}
-				return;
+				break;
 
 			default:
 				break;
@@ -339,51 +367,53 @@ void PRBSCheckerFilter::Refresh(
 	}
 
 	//CPU fallback if we get to this point
-
-	//Sparse path
-	uint32_t prbs = 0;
-	if(sdin)
-	{
-		dout->m_samples.PrepareForCpuAccess();
-		sdin->m_samples.PrepareForCpuAccess();
-
-		//Read the first N bits of state into the seed
-		for(size_t i=0; i<statesize; i++)
-		{
-			prbs = (prbs << 1) | sdin->m_samples[i];
-			dout->m_samples[i] = 0;
-		}
-
-		//Start checking actual data bits
-		for(size_t i=statesize; i<len; i++)
-		{
-			bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
-			dout->m_samples[i] = (value != sdin->m_samples[i]);
-		}
-
-		dout->m_samples.MarkModifiedFromCpu();
-	}
-
-	//Uniform path
 	else
 	{
-		dout->m_samples.PrepareForCpuAccess();
-		udin->m_samples.PrepareForCpuAccess();
-
-		//Read the first N bits of state into the seed
-		for(size_t i=0; i<statesize; i++)
+		//Sparse path
+		uint32_t prbs = 0;
+		if(sdin)
 		{
-			prbs = (prbs << 1) | udin->m_samples[i];
-			dout->m_samples[i] = 0;
+			dout->m_samples.PrepareForCpuAccess();
+			sdin->m_samples.PrepareForCpuAccess();
+
+			//Read the first N bits of state into the seed
+			for(size_t i=0; i<statesize; i++)
+			{
+				prbs = (prbs << 1) | sdin->m_samples[i];
+				dout->m_samples[i] = 0;
+			}
+
+			//Start checking actual data bits
+			for(size_t i=statesize; i<len; i++)
+			{
+				bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
+				dout->m_samples[i] = (value != sdin->m_samples[i]);
+			}
+
+			dout->m_samples.MarkModifiedFromCpu();
 		}
 
-		//Start checking actual data bits
-		for(size_t i=statesize; i<len; i++)
+		//Uniform path
+		else
 		{
-			bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
-			dout->m_samples[i] = (value != udin->m_samples[i]);
-		}
+			dout->m_samples.PrepareForCpuAccess();
+			udin->m_samples.PrepareForCpuAccess();
 
-		dout->m_samples.MarkModifiedFromCpu();
+			//Read the first N bits of state into the seed
+			for(size_t i=0; i<statesize; i++)
+			{
+				prbs = (prbs << 1) | udin->m_samples[i];
+				dout->m_samples[i] = 0;
+			}
+
+			//Start checking actual data bits
+			for(size_t i=statesize; i<len; i++)
+			{
+				bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
+				dout->m_samples[i] = (value != udin->m_samples[i]);
+			}
+
+			dout->m_samples.MarkModifiedFromCpu();
+		}
 	}
 }
