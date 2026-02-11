@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,7 +48,7 @@ MagnitudeFilter::MagnitudeFilter(const string& color)
 
 bool MagnitudeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -65,32 +65,67 @@ string MagnitudeFilter::GetProtocolName()
 	return "Vector Magnitude";
 }
 
+Filter::DataLocation MagnitudeFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void MagnitudeFilter::Refresh()
+void MagnitudeFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("MagnitudeFilter::Refresh");
+	#endif
+
 	//Make sure we've got valid inputs
+	auto a = GetInputWaveform(0);
+	auto b = GetInputWaveform(1);
+	auto ua = dynamic_cast<UniformAnalogWaveform*>(a);
+	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
+	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
+	auto sb = dynamic_cast<SparseAnalogWaveform*>(b);
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		//Make sure we have valid inputs
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else
+			{
+				auto w = GetInputWaveform(i);
+				if(!w)
+					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+			}
+		}
+		return;
+	}
+
+	//Make sure inputs are the same type
+	if(ua && ub)
+	{}
+	else if(sa && sb)
+	{}
+	else
+	{
+		AddErrorMessage(
+			"Inconsistent input types",
+			"Both inputs must be sparse analog or uniform analog, mixing is not possible");
 		return;
 	}
 
 	//Get the input data
-	auto a = GetInputWaveform(0);
-	auto b = GetInputWaveform(1);
 	a->PrepareForCpuAccess();
 	b->PrepareForCpuAccess();
 	auto len = min(a->size(), b->size());
 
 	//Copy Y axis units from input
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-
-	auto ua = dynamic_cast<UniformAnalogWaveform*>(a);
-	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
-	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
-	auto sb = dynamic_cast<SparseAnalogWaveform*>(b);
 
 	if(ua && ub)
 	{
