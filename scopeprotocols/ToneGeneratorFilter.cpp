@@ -44,6 +44,7 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 	, m_depth(m_parameters["Depth"])
 	, m_phase(m_parameters["Starting Phase"])
 	, m_unit(m_parameters["Unit"])
+	, m_computePipeline("shaders/ToneGeneratorFilter.spv", 2, sizeof(ToneGeneratorConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
@@ -138,9 +139,25 @@ void ToneGeneratorFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	float scale = amplitude / 2;
 
-	//Main loop
-	cap->PrepareForCpuAccess();
-	for(size_t i=0; i<depth; i++)
-		cap->m_samples[i] = bias + (scale * sin(i*radians_per_sample + startphase));
-	cap->MarkModifiedFromCpu();
+	//Push onstants
+	ToneGeneratorConstants cfg;
+	cfg.radians_per_sample = radians_per_sample;
+	cfg.depth = depth;
+	cfg.bias = bias;
+	cfg.scale = scale;
+	cfg.startphase = startphase;
+
+	//Run the main shader
+	cmdBuf.begin({});
+	m_computePipeline.BindBufferNonblocking(0, cap->m_samples, cmdBuf, true);
+
+	const uint32_t compute_block_count = GetComputeBlockCount(depth, 64);
+	m_computePipeline.Dispatch(cmdBuf, cfg,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cap->MarkModifiedFromGpu();
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }

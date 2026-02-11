@@ -96,6 +96,7 @@ add_compute_shaders(
 		TIEMeasurement_FirstPass.glsl
 		TIEMeasurement_SecondPass.glsl
 		Threshold.glsl
+		ToneGeneratorFilter.glsl
 		UpsampleFilter.glsl
 		VectorFrequency.glsl
 		VectorPhase.glsl

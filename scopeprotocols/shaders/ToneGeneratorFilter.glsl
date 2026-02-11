@@ -27,50 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of ToneGeneratorFilter
- */
-#ifndef ToneGeneratorFilter_h
-#define ToneGeneratorFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-class ToneGeneratorConstants
+layout(std430, binding=0) restrict writeonly buffer buf_dout
 {
-public:
-	double		radians_per_sample;
-	uint32_t	depth;
-	float		bias;
-	float		scale;
-	float		startphase;
+	float dout[];
 };
 
-class ToneGeneratorFilter : public Filter
+layout(std430, push_constant) uniform constants
 {
-public:
-	ToneGeneratorFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(ToneGeneratorFilter)
-
-protected:
-	FilterParameter& m_rate;
-	FilterParameter& m_freq;
-	FilterParameter& m_bias;
-	FilterParameter& m_amplitude;
-	FilterParameter& m_depth;
-	FilterParameter& m_phase;
-	FilterParameter& m_unit;
-
-	void OnUnitChanged();
-
-	ComputePipeline m_computePipeline;
+	double radians_per_sample;
+	uint depth;
+	float bias;
+	float scale;
+	float startphase;
 };
 
-#endif
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= depth)
+		return;
+
+	double theta = i * radians_per_sample + startphase;
+	theta = mod(theta, 6.28318530717);
+	dout[i] = bias + (scale * sin(float(theta)));
+}
