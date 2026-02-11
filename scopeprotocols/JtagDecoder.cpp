@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -89,7 +89,7 @@ JtagDecoder::JtagDecoder(const string& color)
 
 bool JtagDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 4) &&
@@ -105,6 +105,12 @@ string JtagDecoder::GetProtocolName()
 	return "JTAG";
 }
 
+Filter::DataLocation JtagDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -117,13 +123,27 @@ vector<string> JtagDecoder::GetHeaders()
 	return ret;
 }
 
-void JtagDecoder::Refresh()
+void JtagDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("JtagDecoder::Refresh");
+	#endif
+
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<4; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -146,10 +166,9 @@ void JtagDecoder::Refresh()
 	SampleOnRisingEdgesBase(tms, tck, dtms);
 
 	//Create the capture
-	auto cap = new JtagWaveform;
+	auto cap = SetupEmptyWaveform<JtagWaveform>(tck, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = tck->m_startTimestamp;
-	cap->m_startFemtoseconds = tck->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
 	//Table for state transitions
@@ -329,11 +348,10 @@ void JtagDecoder::Refresh()
 
 	//LogDebug("%zu packets\n", m_packets.size());
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
-std::string JtagWaveform::GetColor(size_t i)
+string JtagWaveform::GetColor(size_t i)
 {
 	const JtagSymbol& s = m_samples[i];
 
