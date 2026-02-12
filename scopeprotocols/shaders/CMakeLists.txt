@@ -73,6 +73,7 @@ add_compute_shaders(
 		IQDemuxFilter.glsl
 		IQDemuxFilterAlignment.glsl
 		Magnitude.glsl
+		MovingAverageFilter_Uniform.glsl
 		PAMEdgeDetector_InitialMerge.glsl
 		PAMEdgeDetector_LevelCrossings.glsl
 		PAMEdgeDetector_MergeCrossings.glsl

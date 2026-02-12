@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,13 +37,14 @@ using namespace std;
 
 MovingAverageFilter::MovingAverageFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_depth(m_parameters["Depth"])
+	, m_uniformComputePipeline("shaders/MovingAverageFilter_Uniform.spv", 2, sizeof(MovingAveragePushConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_depthname = "Depth";
-	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_depthname].SetFloatVal(10);
+	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_depth.SetFloatVal(10);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +52,7 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 
 bool MovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -68,25 +69,45 @@ string MovingAverageFilter::GetProtocolName()
 	return "Moving average";
 }
 
+Filter::DataLocation MovingAverageFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void MovingAverageFilter::Refresh()
+void MovingAverageFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("MovingAverageFilter::Refresh");
+	#endif
+
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get the input data
 	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
 	size_t len = din->size();
-	size_t depth = m_parameters[m_depthname].GetIntVal();
+	size_t depth = m_depth.GetIntVal();
 	if(len < depth)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "Input signal must be larger than the averaging window");
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -99,13 +120,20 @@ void MovingAverageFilter::Refresh()
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
+	//Push constants
+	MovingAveragePushConstants cfg;
+	cfg.nsamples = nsamples;
+	cfg.depth = depth;
+	cfg.scale = 1.0 / depth;
+
+	//CPU side sparse path for now
 	if(sdin)
 	{
-		//Do the average
 		auto cap = SetupSparseOutputWaveform(sdin, 0, off, off);
+
+		din->PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
 
-		//#pragma omp parallel for
 		for(size_t i=0; i<nsamples; i++)
 		{
 			float v = 0;
@@ -121,24 +149,28 @@ void MovingAverageFilter::Refresh()
 
 		cap->MarkModifiedFromCpu();
 	}
+
+	//Uniform path
 	else
 	{
-		//Do the average
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
-		cap->PrepareForCpuAccess();
 		cap->Resize(nsamples);
-		//#pragma omp parallel for
-		for(size_t i=0; i<nsamples; i++)
-		{
-			float v = 0;
-			for(size_t j=0; j<depth; j++)
-				v += udin->m_samples[i+j];
-			v /= depth;
 
-			cap->m_samples[i] = v;
-		}
-		SetData(cap, 0);
+		//Phase shift by half the waveform length
+		cap->m_triggerPhase = off * udin->m_timescale;
 
-		cap->MarkModifiedFromCpu();
+		cmdBuf.begin({});
+
+		m_uniformComputePipeline.BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+		m_uniformComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		cap->MarkSamplesModifiedFromGpu();
+
+		const uint32_t compute_block_count = GetComputeBlockCount(nsamples, 64);
+		m_uniformComputePipeline.Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
 	}
 }
