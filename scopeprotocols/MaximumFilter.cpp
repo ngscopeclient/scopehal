@@ -112,7 +112,7 @@ void MaximumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHan
 
 Filter::DataLocation MaximumFilter::GetInputLocation()
 {
-	return LOC_CPU;
+	return LOC_DONTCARE;
 }
 
 string MaximumFilter::GetProtocolName()

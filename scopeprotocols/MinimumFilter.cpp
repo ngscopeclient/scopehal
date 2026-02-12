@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,6 +34,7 @@ using namespace std;
 
 MinimumFilter::MinimumFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_computePipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "latest", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_VOLTS), "cumulative", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -52,11 +53,19 @@ MinimumFilter::~MinimumFilter()
 {
 }
 
-void MinimumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void MinimumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("MaximumFilter::Refresh");
+	#endif
+
+	ClearErrors();
 	auto din = GetInput(0);
 	if(!din)
+	{
+		AddErrorMessage("Missing inputs", "No input connected");
 		return;
+	}
 
 	//Copy units to output streams
 	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
@@ -77,24 +86,25 @@ void MinimumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 	else
 	{
 		auto data = din.GetData();
-		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
-		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
-		float total = FLT_MAX;
 		size_t len = data->size();
 
+		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
+		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
+
+		float vmin;
+		float vmax;
 		if(udata)
-		{
-			for(auto sample : udata->m_samples)
-				total = min(total, sample);
-		}
+			Filter::GetMinMaxVoltage(cmdBuf, queue, m_computePipeline, m_scratchMin, m_scratchMax, udata, vmin, vmax);
 		else if(sdata)
+			Filter::GetMinMaxVoltage(cmdBuf, queue, m_computePipeline, m_scratchMin, m_scratchMax, sdata, vmin, vmax);
+		else
 		{
-			for(auto sample : sdata->m_samples)
-				total = min(total, sample);
+			AddErrorMessage("Invalid inputs", "Expected sparse or uniform analog waveform");
+			return;
 		}
 
-		m_streams[0].m_value = total;
-		m_streams[1].m_value = min((double)total, m_streams[1].m_value);
+		m_streams[0].m_value = vmin;
+		m_streams[1].m_value = min((double)vmin, m_streams[1].m_value);
 		m_streams[2].m_value += len;
 		m_streams[3].m_value ++;
 	}
@@ -102,7 +112,7 @@ void MinimumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 
 Filter::DataLocation MinimumFilter::GetInputLocation()
 {
-	return LOC_CPU;
+	return LOC_DONTCARE;
 }
 
 string MinimumFilter::GetProtocolName()
