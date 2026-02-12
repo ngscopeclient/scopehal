@@ -27,30 +27,39 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of MagnitudeFilter
- */
-#ifndef MagnitudeFilter_h
-#define MagnitudeFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class MagnitudeFilter : public Filter
+layout(std430, binding=0) restrict readonly buffer buf_inA
 {
-public:
-	MagnitudeFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(MagnitudeFilter)
-
-protected:
-	ComputePipeline m_computePipeline;
+	float inA[];
 };
 
-#endif
+layout(std430, binding=1) restrict readonly buffer buf_inB
+{
+	float inB[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint	len;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= len)
+		return;
+
+	float fa = inA[i];
+	float fb = inB[i];
+
+	dout[i] = sqrt(fa*fa + fb*fb);
+}

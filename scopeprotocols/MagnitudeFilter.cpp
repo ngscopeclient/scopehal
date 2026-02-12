@@ -37,6 +37,7 @@ using namespace std;
 
 MagnitudeFilter::MagnitudeFilter(const string& color)
 	: Filter(color, CAT_RF)
+	, m_computePipeline("shaders/Magnitude.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("I");
@@ -89,6 +90,7 @@ void MagnitudeFilter::Refresh(
 	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
 	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
 	auto sb = dynamic_cast<SparseAnalogWaveform*>(b);
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
 		//Make sure we have valid inputs
@@ -119,42 +121,46 @@ void MagnitudeFilter::Refresh(
 		return;
 	}
 
-	//Get the input data
-	a->PrepareForCpuAccess();
-	b->PrepareForCpuAccess();
-	auto len = min(a->size(), b->size());
+	//Get input size, can only work on overlapping region
+	uint32_t len = min(a->size(), b->size());
 
 	//Copy Y axis units from input
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
+	cmdBuf.begin({});
+
+	//Uniform path: set up output and bind buffers
 	if(ua && ub)
 	{
-		//Set up the output waveform
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(a, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
 
-		float* fa = (float*)__builtin_assume_aligned(ua->m_samples.GetCpuPointer(), 16);
-		float* fb = (float*)__builtin_assume_aligned(ub->m_samples.GetCpuPointer(), 16);
-		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
-		for(size_t i=0; i<len; i++)
-			fdst[i] = sqrtf(fa[i]*fa[i] + fb[i]*fb[i]);
+		m_computePipeline.BindBufferNonblocking(0, ua->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, ub->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
-		cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromGpu();
 	}
-	else if(sa && sb)
+
+	//Sparse path: set up output and bind buffers
+	else //if(sa && sb)
 	{
-		//Set up the output waveform
 		auto cap = SetupSparseOutputWaveform(sa, 0, 0, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
 
-		float* fa = (float*)__builtin_assume_aligned(sa->m_samples.GetCpuPointer(), 16);
-		float* fb = (float*)__builtin_assume_aligned(sb->m_samples.GetCpuPointer(), 16);
-		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
-		for(size_t i=0; i<len; i++)
-			fdst[i] = sqrtf(fa[i]*fa[i] + fb[i]*fb[i]);
+		m_computePipeline.BindBufferNonblocking(0, sa->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, sb->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
-		cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromGpu();
 	}
+
+	//Shader dispatch is the same either way
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, len,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
