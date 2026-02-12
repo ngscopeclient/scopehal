@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,18 +43,18 @@ using namespace std;
 
 MDIODecoder::MDIODecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
+	, m_type(m_parameters["PHY Type"])
 {
 	//Set up channels
 	CreateInput("mdio");
 	CreateInput("mdc");
 
-	m_typename = "PHY Type";
-	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_typename].AddEnumValue("Generic", PHY_TYPE_GENERIC);
-	m_parameters[m_typename].AddEnumValue("DP83867", PHY_TYPE_DP83867);
-	m_parameters[m_typename].AddEnumValue("KSZ9031", PHY_TYPE_KSZ9031);
-	m_parameters[m_typename].AddEnumValue("VSC8512", PHY_TYPE_VSC8512);
-	m_parameters[m_typename].SetIntVal(PHY_TYPE_GENERIC);
+	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_type.AddEnumValue("Generic", PHY_TYPE_GENERIC);
+	m_type.AddEnumValue("DP83867", PHY_TYPE_DP83867);
+	m_type.AddEnumValue("KSZ9031", PHY_TYPE_KSZ9031);
+	m_type.AddEnumValue("VSC8512", PHY_TYPE_VSC8512);
+	m_type.SetIntVal(PHY_TYPE_GENERIC);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,7 @@ MDIODecoder::MDIODecoder(const string& color)
 
 bool MDIODecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -81,19 +81,41 @@ bool MDIODecoder::GetShowDataColumn()
 	return false;
 }
 
+Filter::DataLocation MDIODecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void MDIODecoder::Refresh()
+void MDIODecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("MDIODecoder::Refresh");
+	#endif
+
 	char tmp[128];
 
 	//Remove old packets from previous decode passes
 	ClearPackets();
 
+	//Make sure we've got valid inputs
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		for(int i=0; i<2; i++)
+		{
+			if(!GetInput(i))
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+			else if(!GetInputWaveform(i))
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+		}
+
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -103,13 +125,11 @@ void MDIODecoder::Refresh()
 	mdio->PrepareForCpuAccess();
 	mdc->PrepareForCpuAccess();
 
-	int phytype = m_parameters[m_typename].GetIntVal();
+	int phytype = m_type.GetIntVal();
 
 	//Create the capture
-	auto cap = new MDIOWaveform;
+	auto cap = SetupEmptyWaveform<MDIOWaveform>(mdc, 0);
 	cap->m_timescale = 1;	//SampleOnRisingEdges() gives us fs level timestamps
-	cap->m_startTimestamp = mdc->m_startTimestamp;
-	cap->m_startFemtoseconds = mdc->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
 	//Maintain MMD state across transactions
@@ -857,7 +877,6 @@ void MDIODecoder::Refresh()
 		}
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
@@ -979,7 +998,7 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 	ret->m_headers["Info"] = pack->m_headers["Info"];
 	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
 
-	int phytype = m_parameters[m_typename].GetIntVal();
+	int phytype = m_type.GetIntVal();
 
 	//Search forward until we find the actual MMD data access, then update our color/type based on that
 	unsigned int mmd_reg_addr = 0;
