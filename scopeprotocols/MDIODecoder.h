@@ -109,6 +109,15 @@ public:
 
 protected:
 	FilterParameter& m_type;
+
+	std::string DecodeBasicControl(uint16_t value);
+	std::string DecodeBasicStatus(uint16_t value);
+	std::string DecodePhyID1(uint16_t value, uint16_t phytype);
+	std::string DecodePhyID2(uint16_t value, uint16_t phytype);
+	std::string DecodeANAdvertisement(uint16_t value);
+	std::string DecodeANPartnerAbility(uint16_t value);
+	std::string Decode1000BaseTControl(uint16_t value);
+	std::string Decode1000BaseTStatus(uint16_t value);
 };
 
 #endif

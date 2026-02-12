@@ -90,6 +90,281 @@ Filter::DataLocation MDIODecoder::GetInputLocation()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+/**
+	@brief Decode the Basic Control register
+ */
+string MDIODecoder::DecodeBasicControl(uint16_t value)
+{
+	string info = "Basic Control: ";
+
+	if(value & 0x8000)
+		info += "Reset ";
+	if(value & 0x4000)
+		info += "Loopback ";
+	if(value & 0x0400)
+		info += "Isolate ";
+	if(value & 0x0200)
+		info += "AnegRestart ";
+
+	uint8_t speed = 0;
+	if(value & 0x0040)
+		speed |= 2;
+	if(value & 0x2000)
+		speed |= 1;
+
+	switch(speed)
+	{
+		case 0:
+			info += "10M";
+			break;
+
+		case 1:
+			info += "100M";
+			break;
+
+		case 2:
+			info += "1G";
+			break;
+
+		default:
+			info += "BadSpeed";
+			break;
+	}
+
+	if(value & 0x0100)
+		info += "/full ";
+	else
+		info += "/half ";
+
+	if( (value & 0x1000) == 0)
+		info += "AnegDisable ";
+
+	if(value & 0x0800)
+		info += "PowerDown ";
+
+	return 0;
+}
+
+/**
+	@brief Decode the Basic Status register
+ */
+string MDIODecoder::DecodeBasicStatus(uint16_t value)
+{
+	string info = "Basic Status: ";
+
+	if(value & 0x4)
+		info += "Up ";
+	else
+		info += "Down ";
+	if(value & 0x20)
+		info += "AnegDone ";
+
+	if(value & 0x0100)
+		info += "ExtStatus ";
+	if(value & 0x01)
+		info += "ExtCaps ";
+
+	if(value & 0x0040)
+		info += "PreambleSupp ";
+	if(value & 0x10)
+		info += "RemoteFault ";
+	if(value & 0x08)
+		info += "AnegCapable ";
+	if(value & 0x02)
+		info += "JabberDetect ";
+
+	info += "PMAs: ";
+	if(value & 0x8000)
+		info += "100baseT4 ";
+	if(value & 0x4000)
+		info += "100baseTX/full ";
+	if(value & 0x2000)
+		info += "100baseTX/half ";
+	if(value & 0x1000)
+		info += "10baseT/full ";
+	if(value & 0x0800)
+		info += "10baseT/half ";
+
+	return info;
+}
+
+/**
+	@brief Decode the PHY ID 1 register
+ */
+string MDIODecoder::DecodePhyID1(uint16_t value, uint16_t phytype)
+{
+	string info = "PHY ID 1";
+	switch(phytype)
+	{
+		case PHY_TYPE_KSZ9031:
+			if(value != 0x0022)
+				info += ": ERROR, should be 0x0022 for KSZ9031";
+			else
+				info += ": Kendin/Micrel/Microchip";
+			break;
+
+		case PHY_TYPE_VSC8512:
+			if(value != 0x0007)
+				info += ": ERROR, should be 0x0007 for VSC8512";
+			else
+				info += ": Vitesse/Microchip";
+			break;
+
+		default:
+			break;
+	}
+	return info;
+}
+
+/**
+	@brief Decode the PHY ID 2 register
+ */
+string MDIODecoder::DecodePhyID2(uint16_t value, uint16_t phytype)
+{
+	string info = "PHY ID 2";
+	switch(phytype)
+	{
+		case PHY_TYPE_KSZ9031:
+			if( ((value >> 10) & 0x3f) != 0x5)
+				info += ": ERROR, vendor ID should be 0x5 for KSZ9031";
+			else
+			{
+				if( ((value >> 4) & 0x3f) != 0x22)
+					info += ": ERROR, model ID should be 0x22 for KSZ9031";
+				else
+					info += string(": KSZ9031 stepping ") + to_string(value & 0xf);
+			}
+			break;
+
+		case PHY_TYPE_VSC8512:
+			if( ((value >> 10) & 0x3f) != 0x1)
+				info += ": ERROR, vendor ID should be 0x1 for VSC8512";
+			else
+			{
+				if( ((value >> 4) & 0x3f) != 0x2e)
+					info += ": ERROR, model ID should be 0x2e for VSC8512";
+				else
+					info += string(": VSC8512 stepping ") + to_string(value & 0xf);
+			}
+			break;
+
+		default:
+			break;
+	}
+	return info;
+}
+
+/**
+	@brief Decode the Autonegotiation Advertisement register
+ */
+string MDIODecoder::DecodeANAdvertisement(uint16_t value)
+{
+	string info = "ANEG Advertisement: ";
+	if( (value & 0x1F) != 1)
+		info += "NotEthernet ";
+	if(value & 0x8000)
+		info += "NextPage ";
+	if(value & 0x2000)
+		info += "RemFltSupp ";
+	if(value & 0x0800)
+		info += "AsymPause ";
+	if(value & 0x0400)
+		info += "SymPause ";
+	if(value & 0x0200)
+		info += "100baseT4 ";
+	if(value & 0x0100)
+		info += "100baseTX/full ";
+	if(value & 0x0080)
+		info += "100baseTX/half ";
+	if(value & 0x0040)
+		info += "10baseTX/full ";
+	if(value & 0x0020)
+		info += "10baseTX/half ";
+	return info;
+}
+
+/**
+	@brief Decode the Autonegotiation Partner Ability register
+ */
+string MDIODecoder::DecodeANPartnerAbility(uint16_t value)
+{
+	string info = "ANEG Partner Ability";
+	if( (value & 0x1F) != 1)
+		info += "NotEthernet ";
+	if(value & 0x8000)
+		info += "NextPage ";
+	if(value & 0x4000)
+		info += "ACK ";
+	if(value & 0x2000)
+		info += "RemoteFault ";
+	if(value & 0x0800)
+		info += "AsymPause ";
+	if(value & 0x0400)
+		info += "SymPause ";
+	if(value & 0x0200)
+		info += "100baseT4 ";
+	if(value & 0x0100)
+		info += "100baseTX/full ";
+	if(value & 0x0080)
+		info += "100baseTX/half ";
+	if(value & 0x0040)
+		info += "10baseTX/full ";
+	if(value & 0x0020)
+		info += "10baseTX/half ";
+	return info;
+}
+
+/**
+	@brief Decode the 1000BaseT Control register
+ */
+string MDIODecoder::Decode1000BaseTControl(uint16_t value)
+{
+	string info = "1000base-T Control: ";
+	if( (value >> 13) != 0)
+	{
+		char tmp[128];
+		snprintf(tmp, sizeof(tmp), "Test mode %d, ", value >> 13);
+		info += tmp;
+	}
+
+	if(value & 0x1000)
+	{
+		if(value & 0x0800)
+			info += "Force master";
+		else
+			info += "Force slave";
+	}
+	else
+	{
+		if(value & 0x0400)
+			info += "Prefer master";
+		else
+			info += "Prefer slave";
+	}
+	return info;
+}
+
+/**
+	@brief Decode the 1000BaseT Status register
+ */
+string MDIODecoder::Decode1000BaseTStatus(uint16_t value)
+{
+	string info = "1000base-T Status: ";
+
+	if(value & 0x4000)
+		info += "Master, ";
+	else
+		info += "Slave, ";
+
+	//TODO: other fields
+
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "Err count: %d", value & 0xff);
+	info += tmp;
+
+	return info;
+}
+
 void MDIODecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
@@ -343,210 +618,33 @@ void MDIODecoder::Refresh(
 				//802.3 Basic Control
 				case 0x00:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
-					{
-						info = "Basic Control: ";
-
-						if(value & 0x8000)
-							info += "Reset ";
-						if(value & 0x4000)
-							info += "Loopback ";
-						if(value & 0x0400)
-							info += "Isolate ";
-						if(value & 0x0200)
-							info += "AnegRestart ";
-
-						uint8_t speed = 0;
-						if(value & 0x0040)
-							speed |= 2;
-						if(value & 0x2000)
-							speed |= 1;
-
-						switch(speed)
-						{
-							case 0:
-								info += "10M";
-								break;
-
-							case 1:
-								info += "100M";
-								break;
-
-							case 2:
-								info += "1G";
-								break;
-
-							default:
-								info += "BadSpeed";
-								break;
-						}
-
-						if(value & 0x0100)
-							info += "/full ";
-						else
-							info += "/half ";
-
-						if( (value & 0x1000) == 0)
-							info += "AnegDisable ";
-
-						if(value & 0x0800)
-							info += "PowerDown ";
-					}
+						info = DecodeBasicControl(value);
 					break;
 
 				//802.3 Basic Status
 				case 0x1:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
-					{
-						info = "Basic Status: ";
-
-						if(value & 0x4)
-							info += "Up ";
-						else
-							info += "Down ";
-						if(value & 0x20)
-							info += "AnegDone ";
-
-						if(value & 0x0100)
-							info += "ExtStatus ";
-						if(value & 0x01)
-							info += "ExtCaps ";
-
-						if(value & 0x0040)
-							info += "PreambleSupp ";
-						if(value & 0x10)
-							info += "RemoteFault ";
-						if(value & 0x08)
-							info += "AnegCapable ";
-						if(value & 0x02)
-							info += "JabberDetect ";
-
-						info += "PMAs: ";
-						if(value & 0x8000)
-							info += "100baseT4 ";
-						if(value & 0x4000)
-							info += "100baseTX/full ";
-						if(value & 0x2000)
-							info += "100baseTX/half ";
-						if(value & 0x1000)
-							info += "10baseT/full ";
-						if(value & 0x0800)
-							info += "10baseT/half ";
-					}
+						info = DecodeBasicStatus(value);
 					break;
 
 				//PHY ID
 				case 0x2:
-					info = "PHY ID 1";
-					switch(phytype)
-					{
-						case PHY_TYPE_KSZ9031:
-							if(value != 0x0022)
-								info += ": ERROR, should be 0x0022 for KSZ9031";
-							else
-								info += ": Kendin/Micrel/Microchip";
-							break;
-
-						case PHY_TYPE_VSC8512:
-							if(value != 0x0007)
-								info += ": ERROR, should be 0x0007 for VSC8512";
-							else
-								info += ": Vitesse/Microchip";
-							break;
-
-						default:
-							break;
-					}
-
+					info = DecodePhyID1(value, phytype);
 					break;
+
 				case 0x3:
-					info = "PHY ID 2";
-					switch(phytype)
-					{
-						case PHY_TYPE_KSZ9031:
-							if( ((value >> 10) & 0x3f) != 0x5)
-								info += ": ERROR, vendor ID should be 0x5 for KSZ9031";
-							else
-							{
-								if( ((value >> 4) & 0x3f) != 0x22)
-									info += ": ERROR, model ID should be 0x22 for KSZ9031";
-								else
-									info += string(": KSZ9031 stepping ") + to_string(value & 0xf);
-							}
-							break;
-
-						case PHY_TYPE_VSC8512:
-							if( ((value >> 10) & 0x3f) != 0x1)
-								info += ": ERROR, vendor ID should be 0x1 for VSC8512";
-							else
-							{
-								if( ((value >> 4) & 0x3f) != 0x2e)
-									info += ": ERROR, model ID should be 0x2e for VSC8512";
-								else
-									info += string(": VSC8512 stepping ") + to_string(value & 0xf);
-							}
-							break;
-
-						default:
-							break;
-					}
+					info = DecodePhyID2(value, phytype);
 					break;
 
 				//Autonegotiation
 				case 0x4:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
-					{
-						info = "ANEG Advertisement: ";
-						if( (value & 0x1F) != 1)
-							info += "NotEthernet ";
-						if(value & 0x8000)
-							info += "NextPage ";
-						if(value & 0x2000)
-							info += "RemFltSupp ";
-						if(value & 0x0800)
-							info += "AsymPause ";
-						if(value & 0x0400)
-							info += "SymPause ";
-						if(value & 0x0200)
-							info += "100baseT4 ";
-						if(value & 0x0100)
-							info += "100baseTX/full ";
-						if(value & 0x0080)
-							info += "100baseTX/half ";
-						if(value & 0x0040)
-							info += "10baseTX/full ";
-						if(value & 0x0020)
-							info += "10baseTX/half ";
-					}
+						info = DecodeANAdvertisement(value);
 					break;
 
 				case 0x5:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
-					{
-						info = "ANEG Partner Ability";
-
-						if( (value & 0x1F) != 1)
-							info += "NotEthernet ";
-						if(value & 0x8000)
-							info += "NextPage ";
-						if(value & 0x4000)
-							info += "ACK ";
-						if(value & 0x2000)
-							info += "RemoteFault ";
-						if(value & 0x0800)
-							info += "AsymPause ";
-						if(value & 0x0400)
-							info += "SymPause ";
-						if(value & 0x0200)
-							info += "100baseT4 ";
-						if(value & 0x0100)
-							info += "100baseTX/full ";
-						if(value & 0x0080)
-							info += "100baseTX/half ";
-						if(value & 0x0040)
-							info += "10baseTX/full ";
-						if(value & 0x0020)
-							info += "10baseTX/half ";
-					}
+						info = DecodeANPartnerAbility(value);
 					break;
 				case 0x6:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
@@ -564,48 +662,12 @@ void MDIODecoder::Refresh(
 				//1000base-T
 				case 0x9:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
-					{
-						info = "1000base-T Control: ";
-						if( (value >> 13) != 0)
-						{
-							snprintf(tmp, sizeof(tmp), "Test mode %d, ", value >> 13);
-							info += tmp;
-						}
-
-						if(value & 0x1000)
-						{
-							if(value & 0x0800)
-								info += "Force master";
-							else
-								info += "Force slave";
-						}
-						else
-						{
-							if(value & 0x0400)
-								info += "Prefer master";
-							else
-								info += "Prefer slave";
-						}
-					}
+						info = Decode1000BaseTControl(value);
 					break;
 
 				case 0xa:
 					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
-					{
-						info = "1000base-T Status: ";
-
-						if(value & 0x4000)
-							info += "Master, ";
-						else
-							info += "Slave, ";
-
-						//TODO: other fields
-
-						{
-							snprintf(tmp, sizeof(tmp), "Err count: %d", value & 0xff);
-							info += tmp;
-						}
-					}
+						info = Decode1000BaseTStatus(value);
 					break;
 
 				//MMD stuff
@@ -980,6 +1042,22 @@ bool MDIODecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 			return true;
 	}
 
+	//VSC8512 specific
+	if(m_type.GetIntVal() == PHY_TYPE_VSC8512)
+	{
+		//If this is a VSC8512, start merging when we write the command register and the busy bit is set
+		unsigned int value;
+		sscanf(first->m_headers["Value"].c_str(), "%x", &value);
+		//bool op_is_rd = first->m_headers["Op"] == "Read";
+		bool op_is_wr = first->m_headers["Op"] == "Write";
+		bool first_is_cmd = first->m_headers["Reg"] == "12";
+		bool same_reg = first->m_headers["Reg"] == next->m_headers["Reg"];
+		bool next_is_rd = next->m_headers["Op"] == "Read";
+		if( op_is_wr && first_is_cmd && same_reg && next_is_rd && (value & 0x8000))
+			return true;
+	}
+
+
 	return false;
 }
 
@@ -1000,109 +1078,119 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 
 	int phytype = m_type.GetIntVal();
 
-	//Search forward until we find the actual MMD data access, then update our color/type based on that
-	unsigned int mmd_reg_addr = 0;
-	unsigned int mmd_device = 0;
-	unsigned int mmd_value = 0;
-	bool mmd_is_addr = false;
-	for(size_t j=i; j<m_packets.size(); j++)
+	//VSC8512 specific
+	if(m_type.GetIntVal() == PHY_TYPE_VSC8512)
 	{
-		//Check type field
-		auto p = m_packets[j];
-		unsigned int pvalue = strtol(p->m_headers["Value"].c_str(), NULL, 16);
+		//TODO
+	}
 
-		//Extend us
-		ret->m_len = (p->m_offset + p->m_len) - ret->m_offset;
-
-		//Decode address info
-		if(p->m_headers["Reg"] == "0d")
+	//MMD access
+	if(pack->m_headers["Reg"] == "0d")
+	{
+		//Search forward until we find the actual MMD data access, then update our color/type based on that
+		unsigned int mmd_reg_addr = 0;
+		unsigned int mmd_device = 0;
+		unsigned int mmd_value = 0;
+		bool mmd_is_addr = false;
+		for(size_t j=i; j<m_packets.size(); j++)
 		{
-			if(p->m_headers["Info"].find("Register") != string::npos)
-				mmd_is_addr = true;
-			else
-				mmd_is_addr = false;
+			//Check type field
+			auto p = m_packets[j];
+			unsigned int pvalue = strtol(p->m_headers["Value"].c_str(), NULL, 16);
 
-			mmd_device = pvalue & 0x1f;
+			//Extend us
+			ret->m_len = (p->m_offset + p->m_len) - ret->m_offset;
+
+			//Decode address info
+			if(p->m_headers["Reg"] == "0d")
+			{
+				if(p->m_headers["Info"].find("Register") != string::npos)
+					mmd_is_addr = true;
+				else
+					mmd_is_addr = false;
+
+				mmd_device = pvalue & 0x1f;
+			}
+
+			if(p->m_headers["Reg"] == "0e")
+			{
+				if(mmd_is_addr)
+					mmd_reg_addr = pvalue;
+
+				//Figure out top level op type on the final data transaction
+				else
+				{
+					ret->m_headers["Op"] = p->m_headers["Op"];
+					ret->m_headers["Reg"] = p->m_headers["Reg"];
+					ret->m_headers["Value"] = p->m_headers["Value"];
+					ret->m_displayBackgroundColor = p->m_displayBackgroundColor;
+
+					mmd_value = pvalue;
+					break;
+				}
+			}
 		}
 
-		if(p->m_headers["Reg"] == "0e")
+		//Default for unknown PHY type or unknown register
+		char tmp[128];
+		snprintf(tmp, sizeof(tmp), "MMD %02x reg %04x = %04x", mmd_device, mmd_reg_addr, mmd_value);
+		string info = tmp;
+
+		switch(phytype)
 		{
-			if(mmd_is_addr)
-				mmd_reg_addr = pvalue;
+			case PHY_TYPE_KSZ9031:
+				switch(mmd_device)
+				{
+					case 0x00:
+						switch(mmd_reg_addr)
+						{
+							case 3:
+								info = "AN FLP Timer Lo: ";
+								if(mmd_value == 0x1a80)
+									info += "16 ms";
+								else if(mmd_value == 0x4000)
+									info += "8 ms";
+								else
+									info += "Reserved";
+								break;
 
-			//Figure out top level op type on the final data transaction
-			else
-			{
-				ret->m_headers["Op"] = p->m_headers["Op"];
-				ret->m_headers["Reg"] = p->m_headers["Reg"];
-				ret->m_headers["Value"] = p->m_headers["Value"];
-				ret->m_displayBackgroundColor = p->m_displayBackgroundColor;
+							case 4:
+								info = "AN FLP Timer Hi: ";
+								if(mmd_value == 0x3)
+									info += "8 ms";
+								else if(mmd_value == 0x6)
+									info += "16 ms";
+								else
+									info += "Reserved";
+								break;
+						}
+						break;
 
-				mmd_value = pvalue;
+					case 0x1:
+						break;
+
+					case 0x2:
+						break;
+
+					case 0x1c:
+						if(mmd_reg_addr == 0x23)
+						{
+							//EDPD Control
+							info = "EDPD Control: ";
+							if(mmd_value & 1)
+								info += "Enable";
+							else
+								info += "Disable";
+						}
+						break;
+				}
 				break;
-			}
+
+			default:
+				break;
 		}
+
+		ret->m_headers["Info"] = info;
 	}
-
-	//Default for unknown PHY type or unknown register
-	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "MMD %02x reg %04x = %04x", mmd_device, mmd_reg_addr, mmd_value);
-	string info = tmp;
-
-	switch(phytype)
-	{
-		case PHY_TYPE_KSZ9031:
-			switch(mmd_device)
-			{
-				case 0x00:
-					switch(mmd_reg_addr)
-					{
-						case 3:
-							info = "AN FLP Timer Lo: ";
-							if(mmd_value == 0x1a80)
-								info += "16 ms";
-							else if(mmd_value == 0x4000)
-								info += "8 ms";
-							else
-								info += "Reserved";
-							break;
-
-						case 4:
-							info = "AN FLP Timer Hi: ";
-							if(mmd_value == 0x3)
-								info += "8 ms";
-							else if(mmd_value == 0x6)
-								info += "16 ms";
-							else
-								info += "Reserved";
-							break;
-					}
-					break;
-
-				case 0x1:
-					break;
-
-				case 0x2:
-					break;
-
-				case 0x1c:
-					if(mmd_reg_addr == 0x23)
-					{
-						//EDPD Control
-						info = "EDPD Control: ";
-						if(mmd_value & 1)
-							info += "Enable";
-						else
-							info += "Disable";
-					}
-					break;
-			}
-			break;
-
-		default:
-			break;
-	}
-
-	ret->m_headers["Info"] = info;
 	return ret;
 }
