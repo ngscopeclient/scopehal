@@ -27,41 +27,73 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of MovingAverageFilter
- */
-#ifndef MovingAverageFilter_h
-#define MovingAverageFilter_h
+#version 430
+#pragma shader_stage(compute)
+#extension GL_ARB_gpu_shader_int64 : require
 
-class MovingAveragePushConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	nsamples;
-	uint32_t	depth;
-	float		scale;
+	float din[];
 };
 
-class MovingAverageFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_dinOffsets
 {
-public:
-	MovingAverageFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(MovingAverageFilter)
-
-protected:
-	FilterParameter& m_depth;
-
-	std::unique_ptr<ComputePipeline> m_sparseComputePipeline;
-	ComputePipeline m_uniformComputePipeline;
+	int64_t dinOffsets[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, binding=3) restrict writeonly buffer buf_doutOffsets
+{
+	int64_t doutOffsets[];
+};
+
+layout(std430, binding=4) restrict writeonly buffer buf_doutDurations
+{
+	int64_t doutDurations[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint nsamples;
+	uint depth;
+	float scale;		//1.0 / depth, precomputed
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= nsamples)
+		return;
+
+	//Calculate offset
+	uint off = depth / 2;
+
+	//Copy offset
+	int64_t offIn = dinOffsets[i + depth];
+	doutOffsets[i] = offIn;
+
+	//Calculate duration
+	if(i+1 >= nsamples)
+		doutDurations[i] = 1;
+	else
+		doutDurations[i] = dinOffsets[i + depth + 1] - offIn;
+
+	//Kahan summation to improve numerical stability
+	float partialSum = 0;
+	float c = 0;
+	for(uint j=0; j<depth; j++)
+	{
+		float y = din[i+j] - c;
+		float t = partialSum + y;
+		c = (t - partialSum) - y;
+		partialSum = t;
+	}
+
+	dout[i] = partialSum * scale;
+}

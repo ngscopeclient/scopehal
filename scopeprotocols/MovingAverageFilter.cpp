@@ -45,6 +45,12 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 
 	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_depth.SetFloatVal(10);
+
+	if(g_hasShaderInt64)
+	{
+		m_sparseComputePipeline = make_unique<ComputePipeline>(
+			"shaders/MovingAverageFilter_Sparse.spv", 5, sizeof(MovingAveragePushConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,28 +132,54 @@ void MovingAverageFilter::Refresh(
 	cfg.depth = depth;
 	cfg.scale = 1.0 / depth;
 
-	//CPU side sparse path for now
+	//Sparse path
 	if(sdin)
 	{
-		auto cap = SetupSparseOutputWaveform(sdin, 0, off, off);
+		auto cap = SetupEmptySparseAnalogOutputWaveform(sdin, 0);
+		cap->Resize(nsamples);
 
-		din->PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		for(size_t i=0; i<nsamples; i++)
+		//GPU version if we have native int64 support
+		if(g_hasShaderInt64)
 		{
-			float v = 0;
-			for(size_t j=0; j<depth; j++)
-				v += sdin->m_samples[i+j];
-			v /= depth;
+			cmdBuf.begin({});
 
-			cap->m_offsets[i] = sdin->m_offsets[i+off];
-			cap->m_durations[i] = sdin->m_durations[i+off];
-			cap->m_samples[i] = v;
+			m_sparseComputePipeline->BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+			m_sparseComputePipeline->BindBufferNonblocking(1, sdin->m_offsets, cmdBuf);
+			m_sparseComputePipeline->BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+			m_sparseComputePipeline->BindBufferNonblocking(3, cap->m_offsets, cmdBuf, true);
+			m_sparseComputePipeline->BindBufferNonblocking(4, cap->m_durations, cmdBuf, true);
+			cap->MarkModifiedFromGpu();
+
+			const uint32_t compute_block_count = GetComputeBlockCount(nsamples, 64);
+			m_sparseComputePipeline->Dispatch(cmdBuf, cfg,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			cmdBuf.end();
+			queue->SubmitAndBlock(cmdBuf);
 		}
-		SetData(cap, 0);
 
-		cap->MarkModifiedFromCpu();
+		//CPU fallback
+		else
+		{
+			din->PrepareForCpuAccess();
+			cap->PrepareForCpuAccess();
+
+			for(size_t i=0; i<nsamples; i++)
+			{
+				float v = 0;
+				for(size_t j=0; j<depth; j++)
+					v += sdin->m_samples[i+j];
+				v /= depth;
+
+				cap->m_offsets[i] = sdin->m_offsets[i+off];
+				cap->m_durations[i] = sdin->m_durations[i+off];
+				cap->m_samples[i] = v;
+			}
+			SetData(cap, 0);
+
+			cap->MarkModifiedFromCpu();
+		}
 	}
 
 	//Uniform path
