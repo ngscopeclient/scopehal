@@ -501,13 +501,13 @@ public:
 		scratchMin.MarkModifiedFromGpu();
 		scratchMax.MarkModifiedFromGpu();
 
+		scratchMin.PrepareForCpuAccessNonblocking(cmdBuf);
+		scratchMax.PrepareForCpuAccessNonblocking(cmdBuf);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
 		//Final reduction on CPU (TODO: faster to do second shader invocation and read one value??)
-		scratchMin.PrepareForCpuAccess();
-		scratchMax.PrepareForCpuAccess();
-
 		vmin = scratchMin[0];
 		vmax = scratchMax[0];
 		for(uint32_t i=1; i<nthreads; i++)
