@@ -1082,12 +1082,12 @@ public:
 	 */
 	void MarkModifiedFromCpu()
 	{
-		if(!m_buffersAreSame)
+		if(!m_buffersAreSame && !m_gpuPhysMemIsStale)
 		{
-			m_gpuPhysMemIsStale = true;
-
 			//Illegal to modify the buffer if a transfer is in progress. So mark any previous one as done
 			ClearTransferFlags();
+
+			m_gpuPhysMemIsStale = true;
 		}
 	}
 
@@ -1098,12 +1098,12 @@ public:
 	 */
 	void MarkModifiedFromGpu()
 	{
-		if(!m_buffersAreSame)
+		if(!m_buffersAreSame && !m_cpuPhysMemIsStale)
 		{
-			m_cpuPhysMemIsStale = true;
-
 			//Illegal to modify the buffer if a transfer is in progress. So mark any previous one as done
 			ClearTransferFlags();
+
+			m_cpuPhysMemIsStale = true;
 		}
 	}
 
