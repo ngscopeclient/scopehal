@@ -44,7 +44,7 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 	, m_depth(m_parameters["Depth"])
 	, m_phase(m_parameters["Starting Phase"])
 	, m_unit(m_parameters["Unit"])
-	, m_computePipeline("shaders/ToneGeneratorFilter.spv", 2, sizeof(ToneGeneratorConstants))
+	, m_computePipeline("shaders/ToneGeneratorFilter.spv", 1, sizeof(ToneGeneratorConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
