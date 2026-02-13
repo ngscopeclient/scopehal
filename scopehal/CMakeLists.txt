@@ -63,6 +63,7 @@ set(SCOPEHAL_SOURCES
 	VulkanInit.cpp
 
 	FileSystem.cpp
+	ScratchBufferManager.cpp
 	Unit.cpp
 	Waveform.cpp
 	DensityFunctionWaveform.cpp

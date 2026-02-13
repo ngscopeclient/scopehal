@@ -120,6 +120,7 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "IDTable.h"
 
 #include "AcceleratorBuffer.h"
+#include "ScratchBufferManager.h"
 #include "ComputePipeline.h"
 
 #include "SCPITransport.h"
