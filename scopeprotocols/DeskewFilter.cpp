@@ -78,8 +78,8 @@ Filter::DataLocation DeskewFilter::GetInputLocation()
 // Actual decoder logic
 
 void DeskewFilter::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+	vk::raii::CommandBuffer& cmdBuf,
+	shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("DeskewFilter::Refresh");
@@ -106,17 +106,21 @@ void DeskewFilter::Refresh(
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Copy the data
+	cmdBuf.begin({});
 	if(sdin)
 	{
 		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
-		cap->m_samples.CopyFrom(sdin->m_samples);
+		cap->m_samples.CopyFromNonblocking(cmdBuf, sdin->m_samples, false);
 		cap->m_triggerPhase += offset;
 	}
 	else
 	{
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
 		cap->Resize(len);
-		cap->m_samples.CopyFrom(udin->m_samples);
+		cap->m_samples.CopyFromNonblocking(cmdBuf, udin->m_samples, false);
 		cap->m_triggerPhase += offset;
 	}
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
