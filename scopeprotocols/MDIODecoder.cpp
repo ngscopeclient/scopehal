@@ -142,7 +142,7 @@ string MDIODecoder::DecodeBasicControl(uint16_t value)
 	if(value & 0x0800)
 		info += "PowerDown ";
 
-	return 0;
+	return info;
 }
 
 /**
