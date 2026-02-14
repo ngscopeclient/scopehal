@@ -30,29 +30,49 @@
 #version 430
 #pragma shader_stage(compute)
 
-layout(std430, binding=0) restrict buffer buf_data
+layout(std430, binding=0) restrict readonly buffer buf_inP
 {
-	float data[];
+	float inP[];
 };
 
-layout(std430, binding=1) restrict readonly buffer buf_sinesA
+layout(std430, binding=1) restrict readonly buffer buf_inN
+{
+	float inN[];
+};
+
+layout(std430, binding=2) restrict readonly buffer buf_sinesA
 {
 	float sinesA[];
 };
 
-layout(std430, binding=2) restrict readonly buffer buf_cosinesA
+layout(std430, binding=3) restrict readonly buffer buf_cosinesA
 {
 	float cosinesA[];
 };
 
-layout(std430, binding=3) restrict readonly buffer buf_sinesB
+layout(std430, binding=4) restrict readonly buffer buf_sinesB
 {
 	float sinesB[];
 };
 
-layout(std430, binding=4) restrict readonly buffer buf_cosinesB
+layout(std430, binding=5) restrict readonly buffer buf_cosinesB
 {
 	float cosinesB[];
+};
+
+layout(std430, binding=6) restrict readonly buffer buf_sinesC
+{
+	float sinesC[];
+};
+
+layout(std430, binding=7) restrict readonly buffer buf_cosinesC
+{
+	float cosinesC[];
+};
+
+layout(std430, binding=8) restrict writeonly buffer buf_dout
+{
+	float dout[];
 };
 
 layout(std430, push_constant) uniform constants
@@ -69,23 +89,33 @@ void main()
 	if(nthread >= len)
 		return;
 
-	//Sin/cos values from rotation matrix
-	float sinval = sinesA[nthread];
-	float cosval = cosinesA[nthread];
+	//Positive side starting complex value
+	float realP = inP[nthread*2 + 0];
+	float imagP = inP[nthread*2 + 1];
 
-	//Uncorrected complex value
-	float real_orig = data[nthread*2 + 0];
-	float imag_orig = data[nthread*2 + 1];
+	//Negative side starting complex value
+	float realN = inN[nthread*2 + 0];
+	float imagN = inN[nthread*2 + 1];
 
 	//First pass
-	float real_A = real_orig*cosval - imag_orig*sinval;
-	float imag_A = real_orig*sinval + imag_orig*cosval;
+	float sinval = sinesA[nthread];
+	float cosval = cosinesA[nthread];
+	float real_A = realN*cosval - imagN*sinval;
+	float imag_A = realN*sinval + imagN*cosval;
 
-	//Second complex value
+	//Second pass
 	sinval = sinesB[nthread];
 	cosval = cosinesB[nthread];
 
-	//Apply the matrix and write back over the original value
-	data[nthread*2 + 0] = real_A*cosval - imag_A*sinval;
-	data[nthread*2 + 1] = real_A*sinval + imag_A*cosval;
+	//Subtract P and N
+	float real_orig = realP - (real_A*cosval - imag_A*sinval);
+	float imag_orig = imagP - (real_A*sinval + imag_A*cosval);
+
+	//Sin/cos values from rotation matrix
+	sinval = sinesC[nthread];
+	cosval = cosinesC[nthread];
+
+	//Apply the final S-params and write back
+	dout[nthread*2 + 0] = real_orig*cosval - imag_orig*sinval;
+	dout[nthread*2 + 1] = real_orig*sinval + imag_orig*cosval;
 }

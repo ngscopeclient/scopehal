@@ -33,7 +33,6 @@ add_compute_shaders(
 		ACRMS_Trend.glsl
 		AddFilter.glsl
 		ApplySParametersCascaded.glsl
-		ApplySParametersInPlaceCascaded.glsl
 		BaseMeasurement_FirstPass.glsl
 		BaseMeasurement_FinalPass.glsl
 		BlackmanHarrisWindow.glsl
@@ -48,6 +47,7 @@ add_compute_shaders(
 		ComplexToLogMagnitude.glsl
 		ComplexToMagnitude.glsl
 		ConstellationFilter.glsl
+		CouplerDeEmbedFilter_ForwardPath.glsl
 		CosineSumWindow.glsl
 		DDJMeasurement.glsl
 		DeEmbedNormalization.glsl

@@ -134,6 +134,17 @@ public:
 
 protected:
 
+	void ForwardPath(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInP,
+		AcceleratorBuffer<float>& samplesInN,
+		AcceleratorBuffer<float>& samplesOut,
+		CouplerSParameters& paramsA,
+		CouplerSParameters& paramsB,
+		CouplerSParameters& paramsC,
+		size_t npoints,
+		size_t nouts);
+
 	void SubtractAndApplySParameters(
 		vk::raii::CommandBuffer& cmdBuf,
 		AcceleratorBuffer<float>& samplesInP,
@@ -147,14 +158,6 @@ protected:
 		vk::raii::CommandBuffer& cmdBuf,
 		AcceleratorBuffer<float>& samplesInout,
 		CouplerSParameters& params,
-		size_t npoints,
-		size_t nouts);
-
-	void ApplySParametersInPlaceCascaded(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesInout,
-		CouplerSParameters& paramsFirst,
-		CouplerSParameters& paramsSecond,
 		size_t npoints,
 		size_t nouts);
 
@@ -211,7 +214,8 @@ protected:
 	ComputePipeline m_normalizeComputePipeline;
 	ComputePipeline m_subtractAndDeEmbedComputePipeline;
 	ComputePipeline m_applySParamsCascadedComputePipeline;
-	ComputePipeline m_applySParamsInPlaceCascadedComputePipeline;
+
+	ComputePipeline m_forwardPathComputePipeline;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan2;
