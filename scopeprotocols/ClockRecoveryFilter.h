@@ -135,19 +135,6 @@ protected:
 	///@brief Compute pipeline for final reduction pass
 	std::shared_ptr<ComputePipeline> m_finalPassComputePipeline;
 
-	///@brief Output timestamp buffer for first PLL pass
-	AcceleratorBuffer<int64_t> m_firstPassTimestamps;
-
-	/**
-		@brief Output status buffer for first PLL pass
-
-		3 int64s per thread:
-			Number of samples written
-			Ending period
-			Final edge position
-	 */
-	AcceleratorBuffer<int64_t> m_firstPassState;
-
 	///@brief Output timestamp buffer for second PLL pass
 	AcceleratorBuffer<int64_t> m_secondPassTimestamps;
 

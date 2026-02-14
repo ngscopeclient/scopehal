@@ -86,16 +86,12 @@ protected:
 	FilterParameter& m_baud;
 
 	AcceleratorBuffer<uint32_t> m_edgeIndexes;
-	AcceleratorBuffer<uint8_t> m_edgeStates;
-	AcceleratorBuffer<uint8_t> m_edgeRising;
 
 	AcceleratorBuffer<uint32_t> m_edgeCount;
 
 	AcceleratorBuffer<uint32_t> m_edgeIndexesScratch;
 	AcceleratorBuffer<uint8_t> m_edgeStatesScratch;
 	AcceleratorBuffer<uint8_t> m_edgeRisingScratch;
-
-	AcceleratorBuffer<int64_t> m_edgeOffsetsScratch;
 
 	AcceleratorBuffer<float> m_thresholds;
 	AcceleratorBuffer<float> m_levels;

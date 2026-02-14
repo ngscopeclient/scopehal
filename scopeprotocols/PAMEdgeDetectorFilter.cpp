@@ -53,8 +53,6 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	if(g_hasShaderInt8)
 	{
 		m_edgeIndexes.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
-		m_edgeStates.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
-		m_edgeRising.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 
 		m_edgeIndexesScratch.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 		m_edgeStatesScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
@@ -80,8 +78,6 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 
 			m_finalMergeComputePipeline =
 				make_shared<ComputePipeline>("shaders/PAMEdgeDetector_FinalMerge.spv", 5, sizeof(PAMEdgeDetectorMergeConstants));
-
-			m_edgeOffsetsScratch.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		}
 	}
 }
@@ -184,6 +180,10 @@ void PAMEdgeDetectorFilter::Refresh(
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
 
+	//Grab temporary buffers we're going to use
+	ScratchBuffer_uint8_t edgeStates(ScratchBufferManager::U8_GPU_WAVEFORM);
+	ScratchBuffer_uint8_t edgeRising(ScratchBufferManager::U8_GPU_WAVEFORM);
+
 	//Find *all* level crossings
 	//This will double-count some edges (e.g. a +1 to -1 edge will show up as +1 to 0 and 0 to -1)
 	if(g_hasShaderInt8)
@@ -202,8 +202,8 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_edgeRisingScratch.resize(len);
 
 		m_edgeIndexes.resize(len);
-		m_edgeStates.resize(len);
-		m_edgeRising.resize(len);
+		edgeStates->resize(len);
+		edgeRising->resize(len);
 
 		cmdBuf.begin({});
 
@@ -236,15 +236,15 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_secondPassComputePipeline->BindBufferNonblocking(1, m_edgeStatesScratch, cmdBuf);
 		m_secondPassComputePipeline->BindBufferNonblocking(2, m_edgeRisingScratch, cmdBuf);
 		m_secondPassComputePipeline->BindBufferNonblocking(3, m_edgeIndexes, cmdBuf, true);
-		m_secondPassComputePipeline->BindBufferNonblocking(4, m_edgeStates, cmdBuf, true);
-		m_secondPassComputePipeline->BindBufferNonblocking(5, m_edgeRising, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(4, *edgeStates, cmdBuf, true);
+		m_secondPassComputePipeline->BindBufferNonblocking(5, *edgeRising, cmdBuf, true);
 		m_secondPassComputePipeline->BindBufferNonblocking(6, m_edgeCount, cmdBuf, true);
 		m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 		m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 		m_edgeIndexes.MarkModifiedFromGpu();
-		m_edgeStates.MarkModifiedFromGpu();
-		m_edgeRising.MarkModifiedFromGpu();
+		edgeStates->MarkModifiedFromGpu();
+		edgeRising->MarkModifiedFromGpu();
 		m_edgeCount.MarkModifiedFromGpu();
 
 		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
@@ -253,8 +253,8 @@ void PAMEdgeDetectorFilter::Refresh(
 		if(!g_hasShaderInt64)
 		{
 			m_edgeIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
-			m_edgeStates.PrepareForCpuAccessNonblocking(cmdBuf);
-			m_edgeRising.PrepareForCpuAccessNonblocking(cmdBuf);
+			edgeStates->PrepareForCpuAccessNonblocking(cmdBuf);
+			edgeRising->PrepareForCpuAccessNonblocking(cmdBuf);
 		}
 
 		cmdBuf.end();
@@ -262,23 +262,23 @@ void PAMEdgeDetectorFilter::Refresh(
 
 		uint32_t numSamples = m_edgeCount[0];
 		m_edgeIndexes.resize(numSamples);
-		m_edgeStates.resize(numSamples);
-		m_edgeRising.resize(numSamples);
+		edgeStates->resize(numSamples);
+		edgeRising->resize(numSamples);
 	}
 
 	else
 	{
 		m_edgeIndexes.clear();
-		m_edgeStates.clear();
-		m_edgeRising.clear();
+		edgeStates->clear();
+		edgeRising->clear();
 
 		m_edgeIndexes.reserve(len);
-		m_edgeStates.reserve(len);
-		m_edgeRising.reserve(len);
+		edgeStates->reserve(len);
+		edgeRising->reserve(len);
 
 		m_edgeIndexes.PrepareForCpuAccess();
-		m_edgeStates.PrepareForCpuAccess();
-		m_edgeRising.PrepareForCpuAccess();
+		edgeStates->PrepareForCpuAccess();
+		edgeRising->PrepareForCpuAccess();
 
 		din->PrepareForCpuAccess();
 
@@ -297,8 +297,8 @@ void PAMEdgeDetectorFilter::Refresh(
 				if( (prev <= t) && (cur > t) )
 				{
 					m_edgeIndexes.push_back(i);
-					m_edgeRising.push_back(1);
-					m_edgeStates.push_back(j+1);
+					edgeRising->push_back(1);
+					edgeStates->push_back(j+1);
 					break;
 				}
 
@@ -306,8 +306,8 @@ void PAMEdgeDetectorFilter::Refresh(
 				else if( (prev >= t) && (cur < t) )
 				{
 					m_edgeIndexes.push_back(i);
-					m_edgeRising.push_back(0);
-					m_edgeStates.push_back(j);
+					edgeRising->push_back(0);
+					edgeStates->push_back(j);
 					break;
 				}
 
@@ -316,8 +316,8 @@ void PAMEdgeDetectorFilter::Refresh(
 		}
 
 		m_edgeIndexes.MarkModifiedFromCpu();
-		m_edgeStates.MarkModifiedFromCpu();
-		m_edgeRising.MarkModifiedFromCpu();
+		edgeStates->MarkModifiedFromCpu();
+		edgeRising->MarkModifiedFromCpu();
 	}
 
 	LogTrace("First pass: Found %zu level crossings\n", m_edgeIndexes.size());
@@ -342,25 +342,26 @@ void PAMEdgeDetectorFilter::Refresh(
 		cfg.order = order;
 		cfg.triggerPhase = din->m_triggerPhase;
 
-		m_edgeOffsetsScratch.resize(cfg.outputPerThread * numThreads);
+		ScratchBuffer_int64_t edgeOffsetsScratch(ScratchBufferManager::I64_GPU_WAVEFORM);
+		edgeOffsetsScratch->resize(cfg.outputPerThread * numThreads);
 
 		//Run the first pass
 		m_initialMergeComputePipeline->BindBufferNonblocking(0, m_edgeIndexes, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(1, m_edgeStates, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(2, m_edgeRising, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(1, *edgeStates, cmdBuf);
+		m_initialMergeComputePipeline->BindBufferNonblocking(2, *edgeRising, cmdBuf);
 		m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
 		m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(5, m_edgeOffsetsScratch, cmdBuf, true);
+		m_initialMergeComputePipeline->BindBufferNonblocking(5, *edgeOffsetsScratch, cmdBuf, true);
 		m_initialMergeComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 		m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
-		m_edgeOffsetsScratch.MarkModifiedFromGpu();
+		edgeOffsetsScratch->MarkModifiedFromGpu();
 
 		//Reserve space in the output buffer (this is an overestimate but will be corrected)
 		cap->Resize(cfg.outputPerThread * numThreads);
 
 		//Run the final pass
-		m_finalMergeComputePipeline->BindBufferNonblocking(0, m_edgeOffsetsScratch, cmdBuf);
+		m_finalMergeComputePipeline->BindBufferNonblocking(0, *edgeOffsetsScratch, cmdBuf);
 		m_finalMergeComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
 		m_finalMergeComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
 		m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
@@ -399,13 +400,13 @@ void PAMEdgeDetectorFilter::Refresh(
 			size_t istart = m_edgeIndexes[i] - 1;
 			size_t iend = m_edgeIndexes[i] + 1;
 			size_t symstart;
-			size_t symend = m_edgeStates[i];
+			size_t symend = (*edgeStates)[i];
 
 			//If our first sample occurs too early in the waveform, we can't interpolate. Skip it.
 			if(istart == 0)
 				continue;
 
-			if(m_edgeRising[i])
+			if((*edgeRising)[i])
 				symstart = symend - 1;
 			else
 				symstart = symend + 1;
@@ -419,12 +420,12 @@ void PAMEdgeDetectorFilter::Refresh(
 					break;
 
 				int64_t delta = (m_edgeIndexes[i] - m_edgeIndexes[i-lookback]) * din->m_timescale;
-				if( (m_edgeRising[i-lookback] == m_edgeRising[i]) && (delta < halfui) )
+				if( ((*edgeRising)[i-lookback] == (*edgeRising)[i]) && (delta < halfui) )
 				{
 					merging = true;
 					istart = m_edgeIndexes[i-lookback]-1;
 
-					if(m_edgeRising[i])
+					if((*edgeRising)[i])
 						symstart = symend - (lookback+1);
 					else
 						symstart = symend + (lookback+1);
