@@ -134,14 +134,6 @@ public:
 
 protected:
 
-	void ApplySParameters(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesIn,
-		AcceleratorBuffer<float>& samplesOut,
-		CouplerSParameters& params,
-		size_t npoints,
-		size_t nouts);
-
 	void SubtractAndApplySParameters(
 		vk::raii::CommandBuffer& cmdBuf,
 		AcceleratorBuffer<float>& samplesInP,
@@ -216,8 +208,6 @@ protected:
 	AcceleratorBuffer<float> m_vectorTempBuf3;
 	AcceleratorBuffer<float> m_vectorTempBuf4;
 
-	ComputePipeline m_deEmbedComputePipeline;
-	ComputePipeline m_deEmbedInPlaceComputePipeline;
 	ComputePipeline m_normalizeComputePipeline;
 	ComputePipeline m_subtractAndDeEmbedComputePipeline;
 	ComputePipeline m_applySParamsCascadedComputePipeline;

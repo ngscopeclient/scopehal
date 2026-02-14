@@ -50,7 +50,6 @@ add_compute_shaders(
 		ConstellationFilter.glsl
 		CosineSumWindow.glsl
 		DDJMeasurement.glsl
-		DeEmbedOutOfPlace.glsl
 		DeEmbedNormalization.glsl
 		Downconvert.glsl
 		DownsampleNoAAFilter.glsl
