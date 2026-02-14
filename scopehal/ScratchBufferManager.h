@@ -53,6 +53,12 @@ public:
 		U8_GPU_WAVEFORM
 	};
 
+	enum PoolID_float32
+	{
+		//Roughly one float32 per sample in the waveform, GPU resident
+		F32_GPU_WAVEFORM
+	};
+
 	enum PoolID_int64
 	{
 		//Roughly one int64_t per sample in the waveform, GPU resident
@@ -67,6 +73,7 @@ public:
 
 	static size_t GetTotalSize();
 	static size_t GetPoolSize(PoolID_uint8 id);
+	static size_t GetPoolSize(PoolID_float32 id);
 	static size_t GetPoolSize(PoolID_int64 id);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,9 +86,11 @@ public:
 	// The pools
 
 	static std::shared_ptr< AcceleratorBuffer<uint8_t> > Allocate(PoolID_uint8 pool);
+	static std::shared_ptr< AcceleratorBuffer<float> > Allocate(PoolID_float32 pool);
 	static std::shared_ptr< AcceleratorBuffer<int64_t> > Allocate(PoolID_int64 pool);
 
 	static void Free(std::shared_ptr< AcceleratorBuffer<uint8_t> >& p, PoolID_uint8 pool);
+	static void Free(std::shared_ptr< AcceleratorBuffer<float> >& p, PoolID_float32 pool);
 	static void Free(std::shared_ptr< AcceleratorBuffer<int64_t> >& p, PoolID_int64 pool);
 
 protected:
@@ -91,6 +100,9 @@ protected:
 
 	///@brief Pool for U8_GPU_WAVEFORM
 	static std::list< std::shared_ptr<AcceleratorBuffer<uint8_t> > > m_pool_u8_gpu_waveform;
+
+	///@brief Pool for F32_GPU_WAVEFORM
+	static std::list< std::shared_ptr<AcceleratorBuffer<float> > > m_pool_f32_gpu_waveform;
 
 	///@brief Pool for I64_GPU_WAVEFORM
 	static std::list< std::shared_ptr<AcceleratorBuffer<int64_t> > > m_pool_i64_gpu_waveform;
@@ -133,6 +145,7 @@ protected:
 };
 
 typedef ScratchBuffer<ScratchBufferManager::PoolID_uint8, uint8_t> ScratchBuffer_uint8_t;
+typedef ScratchBuffer<ScratchBufferManager::PoolID_float32, float> ScratchBuffer_float32_t;
 typedef ScratchBuffer<ScratchBufferManager::PoolID_int64, int64_t> ScratchBuffer_int64_t;
 
 #endif

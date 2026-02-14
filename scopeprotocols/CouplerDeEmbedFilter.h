@@ -140,7 +140,8 @@ protected:
 		AcceleratorBuffer<float>& samplesIn,
 		AcceleratorBuffer<float>& samplesOut,
 		size_t npointsPadded,
-		size_t npointsUnpadded
+		size_t npointsUnpadded,
+		AcceleratorBuffer<float>& scalarTempBuf1
 		);
 
 	void ApplySParameters(
@@ -180,7 +181,8 @@ protected:
 		size_t stream,
 		size_t npoints,
 		int64_t phaseshift,
-		AcceleratorBuffer<float>& samplesIn);
+		AcceleratorBuffer<float>& samplesIn,
+		AcceleratorBuffer<float>& samplesOut);
 
 	void GroupDelayCorrection(
 		CouplerSParameters& params,
@@ -206,7 +208,6 @@ protected:
 	CouplerSParameters m_forwardLeakageParams;
 	CouplerSParameters m_reverseLeakageParams;
 
-	AcceleratorBuffer<float> m_scalarTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf2;
 	AcceleratorBuffer<float> m_vectorTempBuf3;
