@@ -138,10 +138,7 @@ protected:
 		vk::raii::CommandBuffer& cmdBuf,
 		std::unique_ptr<VulkanFFTPlan>& plan,
 		AcceleratorBuffer<float>& samplesIn,
-		AcceleratorBuffer<float>& samplesOut,
-		size_t npointsPadded,
-		size_t npointsUnpadded,
-		AcceleratorBuffer<float>& scalarTempBuf1
+		AcceleratorBuffer<float>& samplesOut
 		);
 
 	void ApplySParameters(

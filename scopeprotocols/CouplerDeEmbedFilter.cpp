@@ -215,9 +215,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		sizechange = true;
 	}
 
-	ScratchBuffer_float32_t scalarTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
-	scalarTempBuf1->resize(npoints);
-
 	//Set up new FFT plans
 	if(!m_vkForwardPlan)
 		m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
@@ -275,9 +272,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Pad and FFT both inputs
 	//vec1 = raw rev, vec3 = raw fwd
 	ProcessScalarInput(
-		cmdBuf, m_vkForwardPlan, dinFwd->m_samples, m_vectorTempBuf3, npoints, npoints, *scalarTempBuf1);
+		cmdBuf, m_vkForwardPlan, dinFwd->m_samples, m_vectorTempBuf3);
 	ProcessScalarInput(
-		cmdBuf, m_vkForwardPlan2, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints, *scalarTempBuf1);
+		cmdBuf, m_vkForwardPlan2, dinRev->m_samples, m_vectorTempBuf1);
 
 	//De-embed the forward path
 	//vec1 = raw rev, vec2 = de-embedded fwd, vec3 = raw fwd
@@ -296,6 +293,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//to get signal at coupler input
 	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf4, m_reverseCoupledParams, npoints, nouts);
+
+	ScratchBuffer_float32_t scalarTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
+	scalarTempBuf1->resize(npoints);
 
 	//Generate final clean reverse path output
 	size_t istart = 0;
@@ -503,30 +503,11 @@ void CouplerDeEmbedFilter::ProcessScalarInput(
 	vk::raii::CommandBuffer& cmdBuf,
 	unique_ptr<VulkanFFTPlan>& plan,
 	AcceleratorBuffer<float>& samplesIn,
-	AcceleratorBuffer<float>& samplesOut,
-	size_t npointsPadded,
-	size_t npointsUnpadded,
-	AcceleratorBuffer<float>& scalarTempBuf1
+	AcceleratorBuffer<float>& samplesOut
 	)
 {
-	//Copy and zero-pad the input as needed
-	WindowFunctionArgs args;
-	args.numActualSamples = npointsUnpadded;
-	args.npoints = npointsPadded;
-	args.scale = 0;
-	args.alpha0 = 0;
-	args.alpha1 = 0;
-	args.offsetIn = 0;
-	args.offsetOut = 0;
-	m_rectangularComputePipeline.Bind(cmdBuf);
-	m_rectangularComputePipeline.BindBufferNonblocking(0, samplesIn, cmdBuf);
-	m_rectangularComputePipeline.BindBufferNonblocking(1, scalarTempBuf1, cmdBuf, true);
-	m_rectangularComputePipeline.DispatchNoRebind(cmdBuf, args, GetComputeBlockCount(npointsPadded, 64));
-	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-	scalarTempBuf1.MarkModifiedFromGpu();
-
 	//Do the actual FFT operation
-	plan->AppendForward(scalarTempBuf1, samplesOut, cmdBuf);
+	plan->AppendForward(samplesIn, samplesOut, cmdBuf);
 	samplesOut.MarkModifiedFromGpu();
 	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 }
