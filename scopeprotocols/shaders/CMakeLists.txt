@@ -29,9 +29,10 @@ endfunction()
 add_compute_shaders(
 	protocolshaders
 	SOURCES
-		AddFilter.glsl
 		ACRMS.glsl
 		ACRMS_Trend.glsl
+		AddFilter.glsl
+		ApplySParametersInPlaceCascaded.glsl
 		BaseMeasurement_FirstPass.glsl
 		BaseMeasurement_FinalPass.glsl
 		BlackmanHarrisWindow.glsl

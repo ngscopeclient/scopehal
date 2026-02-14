@@ -42,6 +42,7 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 	, m_subtractAndDeEmbedComputePipeline("shaders/SubtractAndApplySParameters.spv", 5, sizeof(uint32_t))
+	, m_applySParamsCascadedComputePipeline("shaders/ApplySParametersInPlaceCascaded.spv", 5, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
@@ -304,14 +305,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	GenerateScalarOutput(
 		cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4, m_vectorTempBuf2);
 
-	//De-embed the reverse path
-	//vec1 = de-embedded reverse, vec2 = fwd leakage, vec3 = raw fwd
-	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, npoints, nouts);
-
-	//Calculate reverse path leakage
+	//De-embed reverse path then calculate reverse path leakage
 	//TODO: calculate and correct for group delay in the leakage path
 	//vec1 = reverse leakage, vec2 = fwd leakage, vec3 = raw fwd
-	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseLeakageParams, npoints, nouts);
+	ApplySParametersInPlaceCascaded(
+		cmdBuf, m_vectorTempBuf1, m_reverseCoupledParams, m_reverseLeakageParams, npoints, nouts);
 
 	//Calculate forward path signal minus leakage from the reverse path
 	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
@@ -476,6 +474,32 @@ void CouplerDeEmbedFilter::ApplySParametersInPlace(
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
 	m_deEmbedInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	samplesInout.MarkModifiedFromGpu();
+}
+
+/**
+	@brief Apply two sets of processed S-parameters (either forward or inverse channel response)
+ */
+void CouplerDeEmbedFilter::ApplySParametersInPlaceCascaded(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInout,
+		CouplerSParameters& paramsFirst,
+		CouplerSParameters& paramsSecond,
+		size_t npoints,
+		size_t nouts)
+{
+	m_applySParamsCascadedComputePipeline.Bind(cmdBuf);
+	m_applySParamsCascadedComputePipeline.BindBufferNonblocking(0, samplesInout, cmdBuf);
+	m_applySParamsCascadedComputePipeline.BindBufferNonblocking(1, paramsFirst.m_resampledSparamSines, cmdBuf);
+	m_applySParamsCascadedComputePipeline.BindBufferNonblocking(2, paramsFirst.m_resampledSparamCosines, cmdBuf);
+	m_applySParamsCascadedComputePipeline.BindBufferNonblocking(3, paramsSecond.m_resampledSparamSines, cmdBuf);
+	m_applySParamsCascadedComputePipeline.BindBufferNonblocking(4, paramsSecond.m_resampledSparamCosines, cmdBuf);
+
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_applySParamsCascadedComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)nouts,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+	m_applySParamsCascadedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesInout.MarkModifiedFromGpu();
 }
 
