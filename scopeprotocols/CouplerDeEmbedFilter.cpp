@@ -205,10 +205,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
-		m_vectorTempBuf1.resize(2 * nouts);
-		m_vectorTempBuf2.resize(2 * nouts);
-		m_vectorTempBuf3.resize(2 * nouts);
-		m_vectorTempBuf4.resize(2 * nouts);
+		m_vectorTempBuf1.resize(2 * nouts, true);
+		m_vectorTempBuf3.resize(2 * nouts, true);
+		m_vectorTempBuf4.resize(2 * nouts, true);
 
 		m_cachedNumPoints = npoints;
 		sizechange = true;
@@ -276,9 +275,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	m_vectorTempBuf3.MarkModifiedFromGpu();
 	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
-
 	//De-embed the forward path
 	//vec1 = raw rev, vec2 = de-embedded fwd, vec3 = raw fwd
+	m_vectorTempBuf2.resize(2 * nouts, true);
 	ApplySParameters(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf2, m_forwardCoupledParams, npoints, nouts);
 
 	//Calculate forward path leakage from this
@@ -295,8 +294,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf4, m_reverseCoupledParams, npoints, nouts);
 
-	ScratchBuffer_float32_t scalarTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
-	scalarTempBuf1->resize(npoints);
+	//ScratchBuffer_float32_t scalarTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
+	//scalarTempBuf1->resize(npoints);
+
+	//Reuse vectorTempBuf2 as scalar output buffer
+	m_vectorTempBuf2.resize(npoints, true);
 
 	//Generate final clean reverse path output
 	size_t istart = 0;
@@ -304,7 +306,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	int64_t phaseshift = 0;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(
-		cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4, *scalarTempBuf1);
+		cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, m_vectorTempBuf4, m_vectorTempBuf2);
 
 	//De-embed the reverse path
 	//vec1 = de-embedded reverse, vec2 = fwd leakage, vec3 = raw fwd
@@ -329,7 +331,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	iend = npoints;
 	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(
-		cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf4, *scalarTempBuf1);
+		cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf4, m_vectorTempBuf2);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
