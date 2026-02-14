@@ -94,7 +94,6 @@ add_compute_shaders(
 		SpectrogramPostprocess.glsl
 		SubtractAndApplySParameters.glsl
 		SubtractFilter.glsl
-		SubtractInPlace.glsl
 		SubtractOutOfPlace.glsl
 		SubtractVectorScalar.glsl
 		TIEMeasurement_FirstPass.glsl

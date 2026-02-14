@@ -41,7 +41,6 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_deEmbedComputePipeline("shaders/DeEmbedOutOfPlace.spv", 4, sizeof(uint32_t))
 	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
-	, m_subtractInPlaceComputePipeline("shaders/SubtractInPlace.spv", 2, sizeof(uint32_t))
 	, m_subtractAndDeEmbedComputePipeline("shaders/SubtractAndApplySParameters.spv", 5, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
@@ -315,13 +314,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf1, m_reverseLeakageParams, npoints, nouts);
 
 	//Calculate forward path signal minus leakage from the reverse path
-	//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward
-	SubtractInPlace(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf1, nouts*2);
-
 	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
 	//to get signal at coupler input
 	//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward, vec4 = final reverse output
-	ApplySParameters(cmdBuf, m_vectorTempBuf3, m_vectorTempBuf4, m_forwardCoupledParams, npoints, nouts);
+	SubtractAndApplySParameters(
+		cmdBuf, m_vectorTempBuf3, m_vectorTempBuf1, m_vectorTempBuf4, m_forwardCoupledParams, npoints, nouts);
 
 	//Generate final clean forward path output
 	istart = 0;
@@ -335,26 +332,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Done, block until the compute operations finish
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
-}
-
-/**
-	@brief Subtract one signal from another and overwrite the first
- */
-void CouplerDeEmbedFilter::SubtractInPlace(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesInout,
-		AcceleratorBuffer<float>& samplesSub,
-		size_t npoints)
-{
-	m_subtractInPlaceComputePipeline.Bind(cmdBuf);
-	m_subtractInPlaceComputePipeline.BindBufferNonblocking(0, samplesInout, cmdBuf);
-	m_subtractInPlaceComputePipeline.BindBufferNonblocking(1, samplesSub, cmdBuf);
-	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
-	m_subtractInPlaceComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)npoints,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
-	m_subtractInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-	samplesInout.MarkModifiedFromGpu();
 }
 
 /**
