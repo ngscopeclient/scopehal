@@ -38,7 +38,6 @@ using namespace std;
 CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	: Filter(color, CAT_RF)
 	, m_maxGainName("Max Gain")
-	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_deEmbedComputePipeline("shaders/DeEmbedOutOfPlace.spv", 4, sizeof(uint32_t))
 	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
@@ -269,12 +268,14 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
 
-	//Pad and FFT both inputs
+	//FFT both inputs
 	//vec1 = raw rev, vec3 = raw fwd
-	ProcessScalarInput(
-		cmdBuf, m_vkForwardPlan, dinFwd->m_samples, m_vectorTempBuf3);
-	ProcessScalarInput(
-		cmdBuf, m_vkForwardPlan2, dinRev->m_samples, m_vectorTempBuf1);
+	m_vkForwardPlan->AppendForward(dinFwd->m_samples, m_vectorTempBuf3, cmdBuf);
+	m_vkForwardPlan2->AppendForward(dinRev->m_samples, m_vectorTempBuf1, cmdBuf);
+	m_vectorTempBuf1.MarkModifiedFromGpu();
+	m_vectorTempBuf3.MarkModifiedFromGpu();
+	m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+
 
 	//De-embed the forward path
 	//vec1 = raw rev, vec2 = de-embedded fwd, vec3 = raw fwd
@@ -494,22 +495,6 @@ void CouplerDeEmbedFilter::ApplySParametersInPlace(
 		compute_block_count / 32768 + 1);
 	m_deEmbedInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesInout.MarkModifiedFromGpu();
-}
-
-/**
-	@brief Zero-pad a scalar input to the proper length and FFT it
- */
-void CouplerDeEmbedFilter::ProcessScalarInput(
-	vk::raii::CommandBuffer& cmdBuf,
-	unique_ptr<VulkanFFTPlan>& plan,
-	AcceleratorBuffer<float>& samplesIn,
-	AcceleratorBuffer<float>& samplesOut
-	)
-{
-	//Do the actual FFT operation
-	plan->AppendForward(samplesIn, samplesOut, cmdBuf);
-	samplesOut.MarkModifiedFromGpu();
-	m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 }
 
 /**

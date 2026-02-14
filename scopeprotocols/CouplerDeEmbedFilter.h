@@ -134,13 +134,6 @@ public:
 
 protected:
 
-	void ProcessScalarInput(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::unique_ptr<VulkanFFTPlan>& plan,
-		AcceleratorBuffer<float>& samplesIn,
-		AcceleratorBuffer<float>& samplesOut
-		);
-
 	void ApplySParameters(
 		vk::raii::CommandBuffer& cmdBuf,
 		AcceleratorBuffer<float>& samplesIn,
@@ -210,7 +203,6 @@ protected:
 	AcceleratorBuffer<float> m_vectorTempBuf3;
 	AcceleratorBuffer<float> m_vectorTempBuf4;
 
-	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_deEmbedComputePipeline;
 	ComputePipeline m_deEmbedInPlaceComputePipeline;
 	ComputePipeline m_normalizeComputePipeline;
