@@ -42,7 +42,7 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	, m_deEmbedInPlaceComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 	, m_subtractInPlaceComputePipeline("shaders/SubtractInPlace.spv", 2, sizeof(uint32_t))
-	, m_subtractComputePipeline("shaders/SubtractOutOfPlace.spv", 3, sizeof(uint32_t))
+	, m_subtractAndDeEmbedComputePipeline("shaders/SubtractAndApplySParameters.spv", 5, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
@@ -285,14 +285,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//vec1 = raw rev, vec2 = fwd leakage, vec3 = raw fwd
 	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf2, m_forwardLeakageParams, npoints, nouts);
 
-	//Calculate reverse path signal minus leakage from the forward path
-	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
-	Subtract(cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_vectorTempBuf4, nouts*2);
-
 	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
 	//to get signal at coupler input
 	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
-	ApplySParametersInPlace(cmdBuf, m_vectorTempBuf4, m_reverseCoupledParams, npoints, nouts);
+	SubtractAndApplySParameters(
+		cmdBuf, m_vectorTempBuf1, m_vectorTempBuf2, m_vectorTempBuf4, m_reverseCoupledParams, npoints, nouts);
 
 	//ScratchBuffer_float32_t scalarTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
 	//scalarTempBuf1->resize(npoints);
@@ -358,28 +355,6 @@ void CouplerDeEmbedFilter::SubtractInPlace(
 		compute_block_count / 32768 + 1);
 	m_subtractInPlaceComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	samplesInout.MarkModifiedFromGpu();
-}
-
-/**
-	@brief Subtract one signal from another and overwrite the first
- */
-void CouplerDeEmbedFilter::Subtract(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesP,
-		AcceleratorBuffer<float>& samplesN,
-		AcceleratorBuffer<float>& samplesOut,
-		size_t npoints)
-{
-	m_subtractComputePipeline.Bind(cmdBuf);
-	m_subtractComputePipeline.BindBufferNonblocking(0, samplesP, cmdBuf);
-	m_subtractComputePipeline.BindBufferNonblocking(1, samplesN, cmdBuf);
-	m_subtractComputePipeline.BindBufferNonblocking(2, samplesOut, cmdBuf, true);
-	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
-	m_subtractComputePipeline.DispatchNoRebind(cmdBuf, (uint32_t)npoints,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
-	m_subtractComputePipeline.AddComputeMemoryBarrier(cmdBuf);
-	samplesOut.MarkModifiedFromGpu();
 }
 
 /**
@@ -449,6 +424,34 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
 	cap->MarkModifiedFromGpu();
+}
+
+/**
+	@brief Apply a set of processed S-parameters (either forward or inverse channel response)
+	to the difference of two complex streams
+ */
+void CouplerDeEmbedFilter::SubtractAndApplySParameters(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInP,
+		AcceleratorBuffer<float>& samplesInN,
+		AcceleratorBuffer<float>& samplesOut,
+		CouplerSParameters& params,
+		size_t npoints,
+		size_t nouts)
+{
+	m_subtractAndDeEmbedComputePipeline.Bind(cmdBuf);
+	m_subtractAndDeEmbedComputePipeline.BindBufferNonblocking(0, samplesInP, cmdBuf);
+	m_subtractAndDeEmbedComputePipeline.BindBufferNonblocking(1, samplesInN, cmdBuf);
+	m_subtractAndDeEmbedComputePipeline.BindBufferNonblocking(2, params.m_resampledSparamSines, cmdBuf);
+	m_subtractAndDeEmbedComputePipeline.BindBufferNonblocking(3, params.m_resampledSparamCosines, cmdBuf);
+	m_subtractAndDeEmbedComputePipeline.BindBufferNonblocking(4, samplesOut, cmdBuf, true);
+	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+	m_subtractAndDeEmbedComputePipeline.DispatchNoRebind(
+		cmdBuf, (uint32_t)nouts,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+	m_subtractAndDeEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	samplesOut.MarkModifiedFromGpu();
 }
 
 /**

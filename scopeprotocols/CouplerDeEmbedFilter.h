@@ -142,19 +142,21 @@ protected:
 		size_t npoints,
 		size_t nouts);
 
+	void SubtractAndApplySParameters(
+		vk::raii::CommandBuffer& cmdBuf,
+		AcceleratorBuffer<float>& samplesInP,
+		AcceleratorBuffer<float>& samplesInN,
+		AcceleratorBuffer<float>& samplesOut,
+		CouplerSParameters& params,
+		size_t npoints,
+		size_t nouts);
+
 	void ApplySParametersInPlace(
 		vk::raii::CommandBuffer& cmdBuf,
 		AcceleratorBuffer<float>& samplesInout,
 		CouplerSParameters& params,
 		size_t npoints,
 		size_t nouts);
-
-	void Subtract(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesP,
-		AcceleratorBuffer<float>& samplesN,
-		AcceleratorBuffer<float>& samplesOut,
-		size_t npoints);
 
 	void SubtractInPlace(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -207,7 +209,7 @@ protected:
 	ComputePipeline m_deEmbedInPlaceComputePipeline;
 	ComputePipeline m_normalizeComputePipeline;
 	ComputePipeline m_subtractInPlaceComputePipeline;
-	ComputePipeline m_subtractComputePipeline;
+	ComputePipeline m_subtractAndDeEmbedComputePipeline;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan2;

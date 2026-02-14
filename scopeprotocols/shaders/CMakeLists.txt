@@ -92,6 +92,7 @@ add_compute_shaders(
 		PRBS31.glsl
 		PRBS31Checker.glsl
 		SpectrogramPostprocess.glsl
+		SubtractAndApplySParameters.glsl
 		SubtractFilter.glsl
 		SubtractInPlace.glsl
 		SubtractOutOfPlace.glsl
