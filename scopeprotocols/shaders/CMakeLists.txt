@@ -32,6 +32,7 @@ add_compute_shaders(
 		ACRMS.glsl
 		ACRMS_Trend.glsl
 		AddFilter.glsl
+		ApplySParametersCascaded.glsl
 		ApplySParametersInPlaceCascaded.glsl
 		BaseMeasurement_FirstPass.glsl
 		BaseMeasurement_FinalPass.glsl
