@@ -180,12 +180,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		SetData(nullptr, 0);
 		return;
 	}
-	const size_t npoints_raw = min(dinFwd->size(), dinRev->size());
-
-	//Zero pad to next power of two up
-	const size_t npoints = next_pow2(npoints_raw);
-	//LogTrace("CouplerDeEmbedFilter: processing %zu raw points\n", npoints_raw);
-	//LogTrace("Rounded to %zu\n", npoints);
+	const size_t npoints = min(dinFwd->size(), dinRev->size());
 
 	//Format the input data as raw samples for the FFT
 	size_t nouts = npoints/2 + 1;
@@ -280,9 +275,9 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Pad and FFT both inputs
 	//vec1 = raw rev, vec3 = raw fwd
 	ProcessScalarInput(
-		cmdBuf, m_vkForwardPlan, dinFwd->m_samples, m_vectorTempBuf3, npoints, npoints_raw, *scalarTempBuf1);
+		cmdBuf, m_vkForwardPlan, dinFwd->m_samples, m_vectorTempBuf3, npoints, npoints, *scalarTempBuf1);
 	ProcessScalarInput(
-		cmdBuf, m_vkForwardPlan2, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints_raw, *scalarTempBuf1);
+		cmdBuf, m_vkForwardPlan2, dinRev->m_samples, m_vectorTempBuf1, npoints, npoints, *scalarTempBuf1);
 
 	//De-embed the forward path
 	//vec1 = raw rev, vec2 = de-embedded fwd, vec3 = raw fwd
@@ -304,7 +299,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//Generate final clean reverse path output
 	size_t istart = 0;
-	size_t iend = npoints_raw;
+	size_t iend = npoints;
 	int64_t phaseshift = 0;
 	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(
@@ -330,7 +325,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//Generate final clean forward path output
 	istart = 0;
-	iend = npoints_raw;
+	iend = npoints;
 	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
 	GenerateScalarOutput(
 		cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, m_vectorTempBuf4, *scalarTempBuf1);
