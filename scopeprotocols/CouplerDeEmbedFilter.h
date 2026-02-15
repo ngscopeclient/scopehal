@@ -145,31 +145,6 @@ protected:
 		size_t npoints,
 		size_t nouts);
 
-	void SubtractAndApplySParameters(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesInP,
-		AcceleratorBuffer<float>& samplesInN,
-		AcceleratorBuffer<float>& samplesOut,
-		CouplerSParameters& params,
-		size_t npoints,
-		size_t nouts);
-
-	void ApplySParametersInPlace(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesInout,
-		CouplerSParameters& params,
-		size_t npoints,
-		size_t nouts);
-
-	void ApplySParametersCascaded(
-		vk::raii::CommandBuffer& cmdBuf,
-		AcceleratorBuffer<float>& samplesIn,
-		AcceleratorBuffer<float>& samplesOut,
-		CouplerSParameters& paramsFirst,
-		CouplerSParameters& paramsSecond,
-		size_t npoints,
-		size_t nouts);
-
 	void GenerateScalarOutput(
 		vk::raii::CommandBuffer& cmdBuf,
 		std::unique_ptr<VulkanFFTPlan>& plan,
@@ -206,15 +181,12 @@ protected:
 	CouplerSParameters m_forwardLeakageParams;
 	CouplerSParameters m_reverseLeakageParams;
 
+	AcceleratorBuffer<float> m_scalarTempBuf1;
 	AcceleratorBuffer<float> m_vectorTempBuf1;
-	AcceleratorBuffer<float> m_vectorTempBuf2;
 	AcceleratorBuffer<float> m_vectorTempBuf3;
 	AcceleratorBuffer<float> m_vectorTempBuf4;
 
 	ComputePipeline m_normalizeComputePipeline;
-	ComputePipeline m_subtractAndDeEmbedComputePipeline;
-	ComputePipeline m_applySParamsCascadedComputePipeline;
-
 	ComputePipeline m_forwardPathComputePipeline;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;

@@ -32,7 +32,6 @@ add_compute_shaders(
 		ACRMS.glsl
 		ACRMS_Trend.glsl
 		AddFilter.glsl
-		ApplySParametersCascaded.glsl
 		BaseMeasurement_FirstPass.glsl
 		BaseMeasurement_FinalPass.glsl
 		BlackmanHarrisWindow.glsl
@@ -93,7 +92,6 @@ add_compute_shaders(
 		PRBS31.glsl
 		PRBS31Checker.glsl
 		SpectrogramPostprocess.glsl
-		SubtractAndApplySParameters.glsl
 		SubtractFilter.glsl
 		SubtractOutOfPlace.glsl
 		SubtractVectorScalar.glsl
