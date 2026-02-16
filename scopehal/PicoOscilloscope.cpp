@@ -723,6 +723,18 @@ void PicoOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz
 	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":BWLIM " + to_string(limit_mhz));
 }
 
+void PicoOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
+{
+	float maxOff = abs(stof(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":OFLIM?")));
+	float minOff = -maxOff;
+
+	offset = min(maxOff, offset);
+	offset = max(minOff, offset);
+	//LogDebug("SetChannelWaveform: %f\t %f\t\n", maxOff, offset);
+	
+	RemoteBridgeOscilloscope::SetChannelOffset(i, 0, offset);
+}
+
 OscilloscopeChannel* PicoOscilloscope::GetExternalTrigger()
 {
 	//FIXME
