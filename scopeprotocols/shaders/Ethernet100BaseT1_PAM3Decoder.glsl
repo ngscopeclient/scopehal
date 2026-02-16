@@ -27,56 +27,41 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseT1Decoder
- */
-#ifndef Ethernet100BaseT1Decoder_h
-#define Ethernet100BaseT1Decoder_h
+#version 460
+#pragma shader_stage(compute)
 
-#include "EthernetProtocolDecoder.h"
+#extension GL_EXT_shader_8bit_storage : require
 
-class PAM3DecodeConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	nsamples;
-	float		cuthi;
-	float		cutlo;
+	float din[];
 };
 
-class Ethernet100BaseT1Decoder : public EthernetProtocolDecoder
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	Ethernet100BaseT1Decoder(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseT1Decoder)
-
-	enum scrambler_t
-	{
-		SCRAMBLER_M_B13,
-		SCRAMBLER_S_B19
-	};
-
-protected:
-	FilterParameter& m_scrambler;
-
-	FilterParameter& m_upperThresholdI;
-	FilterParameter& m_upperThresholdQ;
-	FilterParameter& m_lowerThresholdI;
-	FilterParameter& m_lowerThresholdQ;
-
-	AcceleratorBuffer<int8_t> m_pointsI;
-	AcceleratorBuffer<int8_t> m_pointsQ;
-
-	std::shared_ptr<ComputePipeline> m_pam3DecodeComputePipeline;
+	int8_t dout[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint nsamples;
+	float cuthi;
+	float cutlo;
+};
+
+layout(local_size_x=128, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(nthread >= nsamples)
+		return;
+
+	float s = din[nthread];
+	if(s > cuthi)
+		dout[nthread] = int8_t(1);
+	else if(s > cutlo)
+		dout[nthread] = int8_t(0);
+	else
+		dout[nthread] = int8_t(-1);
+}

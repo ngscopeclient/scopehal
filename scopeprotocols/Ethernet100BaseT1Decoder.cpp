@@ -64,6 +64,15 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 	m_upperThresholdQ.SetFloatVal(0.4);
 	m_lowerThresholdI.SetFloatVal(-0.4);
 	m_lowerThresholdQ.SetFloatVal(-0.4);
+
+	if(g_hasShaderInt8 && g_hasPushDescriptor)
+	{
+		m_pointsI.SetGpuAccessHint(AcceleratorBuffer<int8_t>::HINT_LIKELY);
+		m_pointsQ.SetGpuAccessHint(AcceleratorBuffer<int8_t>::HINT_LIKELY);
+
+		m_pam3DecodeComputePipeline =
+			make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_PAM3Decoder.spv", 2, sizeof(PAM3DecodeConstants));
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,12 +134,6 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		return;
 	}
 
-	cmdBuf.begin({});
-		din_i->PrepareForCpuAccessNonblocking(cmdBuf);
-		din_q->PrepareForCpuAccessNonblocking(cmdBuf);
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
 	size_t ilen = min(din_i->size(), din_q->size());
 
 	enum
@@ -176,25 +179,103 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	bool masterMode = (m_scrambler.GetIntVal() == SCRAMBLER_M_B13);
 
+	//Decode raw symbols to 3-level constellation coordinates
+	m_pointsI.resize(ilen);
+	m_pointsQ.resize(ilen);
+	if(g_hasShaderInt8 && g_hasPushDescriptor)
+	{
+		PAM3DecodeConstants cfgI;
+		cfgI.nsamples = ilen;
+		cfgI.cuthi = cutip;
+		cfgI.cutlo = cutin;
+
+		PAM3DecodeConstants cfgQ;
+		cfgQ.nsamples = ilen;
+		cfgQ.cuthi = cutqp;
+		cfgQ.cutlo = cutqn;
+
+		const uint32_t compute_block_count = GetComputeBlockCount(ilen, 64);
+
+		cmdBuf.begin({});
+
+			m_pam3DecodeComputePipeline->Bind(cmdBuf);
+
+			//Copy I channel timestamps to CPU since we still need those for software decoding for now
+			din_i->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+			din_i->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+
+			//Decode I channel
+			m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
+			m_pam3DecodeComputePipeline->BindBufferNonblocking(1, m_pointsI, cmdBuf, true);
+			m_pam3DecodeComputePipeline->DispatchNoRebind(
+				cmdBuf,
+				cfgI,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+			m_pointsI.MarkModifiedFromGpu();
+
+			//Decode Q channel
+			m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_q->m_samples, cmdBuf);
+			m_pam3DecodeComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf, true);
+			m_pam3DecodeComputePipeline->DispatchNoRebind(
+				cmdBuf,
+				cfgQ,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+			m_pointsQ.MarkModifiedFromGpu();
+
+			//Copy points to CPU
+			m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+	}
+	else
+	{
+		//Set up input and output buffers
+		cmdBuf.begin({});
+			din_i->PrepareForCpuAccessNonblocking(cmdBuf);
+			din_q->PrepareForCpuAccessNonblocking(cmdBuf);
+			m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Decode raw symbols to 3-level constellation coordinates
+		m_pointsI.PrepareForCpuAccess();
+		m_pointsQ.PrepareForCpuAccess();
+		for(size_t i=0; i<ilen; i++)
+		{
+			float fi = din_i->m_samples[i];
+			float fq = din_q->m_samples[i];
+			int ci = 0;
+			int cq = 0;
+			if(fi > cutip)
+				ci = 1;
+			else if(fi < cutin)
+				ci = -1;
+			if(fq > cutqp)
+				cq = 1;
+			else if(fq < cutqn)
+				cq = -1;
+
+			m_pointsI[i] = ci;
+			m_pointsQ[i] = cq;
+		}
+
+		m_pointsI.MarkModifiedFromCpu();
+		m_pointsQ.MarkModifiedFromCpu();
+	}
+
 	size_t totalErrorsReported = 0;
 	for(size_t i=0; i<ilen; i++)
 	{
 		int64_t tnow = din_i->m_offsets[i];
 		int64_t tlen = din_i->m_durations[i];
 
-		//Decode raw symbols to 3-level constellation coordinates
-		float fi = din_i->m_samples[i];
-		float fq = din_q->m_samples[i];
-		int ci = 0;
-		int cq = 0;
-		if(fi > cutip)
-			ci = 1;
-		else if(fi < cutin)
-			ci = -1;
-		if(fq > cutqp)
-			cq = 1;
-		else if(fq < cutqn)
-			cq = -1;
+		int ci = m_pointsI[i];
+		int cq = m_pointsQ[i];
 
 		//Advance the scrambler for each constellation point
 		auto b32 = (scrambler >> 32) & 1;
