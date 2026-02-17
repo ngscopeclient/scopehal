@@ -208,7 +208,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		cmdBuf.begin({});
 
 		uint64_t numThreads = 8192;
-		const uint64_t blockSize = 128;
+		const uint64_t blockSize = 64;
 		const uint64_t numBlocks = numThreads / blockSize;
 
 		//Constants shared by all passes
