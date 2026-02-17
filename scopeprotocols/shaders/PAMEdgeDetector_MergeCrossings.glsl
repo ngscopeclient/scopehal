@@ -90,19 +90,19 @@ void main()
 	//Find starting sample index
 	uint writebase = 0;
 	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
-		writebase += idxIn[i * outputPerThread];
+		writebase += idxIn[i];
 
 	//Find number of samples to copy
-	uint readbase = gl_GlobalInvocationID.x * outputPerThread;
-	uint numSamples = idxIn[readbase];
-	readbase ++;	//skip the size value at position 0
+	uint numSamples = idxIn[gl_GlobalInvocationID.x];
 
 	//Actually do the copy
 	for(uint i=0; i<numSamples; i++)
 	{
-		idxOut[writebase + i] = idxIn[readbase + i];
-		statesOut[writebase + i] = statesIn[readbase + i];
-		risingOut[writebase + i] = risingIn[readbase + i];
+		uint readbase = (i + 1) * outputPerThread + gl_GlobalInvocationID.x;
+
+		idxOut[writebase + i] = idxIn[readbase];
+		statesOut[writebase + i] = statesIn[readbase];
+		risingOut[writebase + i] = risingIn[readbase];
 	}
 
 	if(gl_GlobalInvocationID.x == (numThreads - 1) )

@@ -84,7 +84,6 @@ void main()
 
 	//Block of outputs
 	uint nouts = 0;
-	uint outbase = gl_GlobalInvocationID.x * outputPerThread;
 
 	if(instart == 0)
 		instart ++;
@@ -102,7 +101,7 @@ void main()
 		for(uint j=0; j<numThresholds; j++)
 		{
 			float t = thresholds[j];
-			uint iout = outbase + nouts + 1;
+			uint iout = (nouts + 1) * outputPerThread + gl_GlobalInvocationID.x;
 
 			//Check for rising edge
 			if( (prev <= t) && (cur > t) )
@@ -128,5 +127,5 @@ void main()
 	}
 
 	//Save number of outputs we found
-	idx[outbase] = nouts;
+	idx[gl_GlobalInvocationID.x] = nouts;
 }
