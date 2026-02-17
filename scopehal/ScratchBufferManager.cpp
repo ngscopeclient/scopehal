@@ -35,6 +35,7 @@ using namespace std;
 // Static variables
 
 list< shared_ptr<AcceleratorBuffer<uint8_t> > > ScratchBufferManager::m_pool_u8_gpu_waveform;
+list< shared_ptr<AcceleratorBuffer<uint32_t> > > ScratchBufferManager::m_pool_u32_gpu_waveform;
 list< shared_ptr<AcceleratorBuffer<float> > > ScratchBufferManager::m_pool_f32_gpu_waveform;
 list< shared_ptr<AcceleratorBuffer<int64_t> > > ScratchBufferManager::m_pool_i64_gpu_waveform;
 list< shared_ptr<AcceleratorBuffer<int64_t> > > ScratchBufferManager::m_pool_i64_gpu_small;
@@ -51,6 +52,7 @@ size_t ScratchBufferManager::GetTotalSize()
 {
 	size_t tmp = 0;
 	tmp += GetPoolSize(U8_GPU_WAVEFORM);
+	tmp += GetPoolSize(U32_GPU_WAVEFORM);
 	tmp += GetPoolSize(F32_GPU_WAVEFORM);
 	tmp += GetPoolSize(I64_GPU_WAVEFORM);
 	tmp += GetPoolSize(I64_GPU_SMALL);
@@ -77,6 +79,28 @@ size_t ScratchBufferManager::GetPoolSize(PoolID_uint8 id)
 	}
 
 	return tmp * sizeof(uint8_t);
+}
+
+/**
+	@brief Get the total number of bytes in a specific scratch buffer pool
+ */
+size_t ScratchBufferManager::GetPoolSize(PoolID_uint32 id)
+{
+	lock_guard<mutex> lock(m_poolMutex);
+
+	size_t tmp = 0;
+	switch(id)
+	{
+		case U32_GPU_WAVEFORM:
+			for(auto& p : m_pool_u32_gpu_waveform)
+				tmp += p->capacity();
+			break;
+
+		default:
+			break;
+	}
+
+	return tmp * sizeof(uint32_t);
 }
 
 /**
@@ -138,6 +162,7 @@ void ScratchBufferManager::clear()
 {
 	lock_guard<mutex> lock(m_poolMutex);
 	m_pool_u8_gpu_waveform.clear();
+	m_pool_u32_gpu_waveform.clear();
 	m_pool_f32_gpu_waveform.clear();
 	m_pool_i64_gpu_waveform.clear();
 	m_pool_i64_gpu_small.clear();
@@ -203,6 +228,57 @@ void ScratchBufferManager::Free(shared_ptr< AcceleratorBuffer<uint8_t> >& p, Poo
 	{
 		case U8_GPU_WAVEFORM:
 			m_pool_u8_gpu_waveform.push_back(p);
+			break;
+
+		default:
+			LogFatal("Tried to free to nonexistent or unimplemented scratch buffer pool\n");
+			break;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pool management: uint32
+
+shared_ptr< AcceleratorBuffer<uint32_t> > ScratchBufferManager::Allocate(PoolID_uint32 pool)
+{
+	lock_guard<mutex> lock(m_poolMutex);
+
+	switch(pool)
+	{
+		case U32_GPU_WAVEFORM:
+			{
+				//If we have a suitable buffer in the pool now, allocate it
+				if(!m_pool_u32_gpu_waveform.empty())
+				{
+					auto p = *m_pool_u32_gpu_waveform.begin();
+					m_pool_u32_gpu_waveform.pop_front();
+					return p;
+				}
+
+				//No buffer available, allocate and hand out a new one
+				//TODO: keep track of a "in use" list somewhere?
+				else
+				{
+					auto p = make_shared<AcceleratorBuffer<uint32_t>>("ScratchBufferManager.U32_GPU_WAVEFORM");
+					p->SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+					return p;
+				}
+			}
+			break;
+
+		default:
+			LogFatal("Tried to allocate from nonexistent or unimplemented scratch buffer pool\n");
+			return nullptr;
+	}
+}
+
+void ScratchBufferManager::Free(shared_ptr< AcceleratorBuffer<uint32_t> >& p, PoolID_uint32 pool)
+{
+	lock_guard<mutex> lock(m_poolMutex);
+	switch(pool)
+	{
+		case U32_GPU_WAVEFORM:
+			m_pool_u32_gpu_waveform.push_back(p);
 			break;
 
 		default:
