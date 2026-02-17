@@ -70,7 +70,8 @@ layout(std430, push_constant) uniform constants
 	uint order;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define X_SIZE 64
+layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
 
 /**
 	@brief Final output merging and level crossings
@@ -78,28 +79,30 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//Figure out how many samples we had before us
-	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	bool lastBlock = (gl_GlobalInvocationID.x + 1) >= numThreads;
+	uint numThreads = gl_NumWorkGroups.y * gl_WorkGroupSize.y;
+	bool lastBlock = (gl_GlobalInvocationID.y + 1) >= numThreads;
 	uint writebase = 0;
-	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
+	for(uint i=0; i<gl_GlobalInvocationID.y; i++)
 		writebase += uint(offsetsIn[i * outputPerThread]);
-	uint readbase = gl_GlobalInvocationID.x * outputPerThread;
+	uint readbase = gl_GlobalInvocationID.y * outputPerThread;
 	uint numSamples = uint(offsetsIn[readbase]);
 
-	//Skip the sample counter itself
-	readbase ++;
+	//If this is the last block, write the number of samples
+	if(lastBlock && (gl_LocalInvocationID.x == 0) )
+		edgecount = writebase + numSamples;
 
 	//Do the actual copy
-	for(uint i=0; i<numSamples; i++)
+	for(uint i=gl_LocalInvocationID.x; i<numSamples; i += X_SIZE)
 	{
-		uint iin = readbase + i;
+		//Do the bulk copy
+		uint iin = readbase + i + 1;
 		uint iout = writebase + i;
 
 		//Copy the offset
 		int64_t offin = offsetsIn[iin];
 		offsetsOut[iout] = offin;
 
-		//Generate the squarewave
+		//Write the squarewave
 		samplesOut[iout] = uint8_t(iout % 2);
 
 		//Next sample from this block? Easy peasy
@@ -109,15 +112,11 @@ void main()
 
 		//Is there another block? Use its first sample
 		else if(!lastBlock)
-			offNext = offsetsIn[readbase + outputPerThread];
+			offNext = offsetsIn[readbase + outputPerThread + 1];
 
 		//otherwise this is the very last sample in the capture, just use the default duration of 1
 
 		//Either way, write the duration
 		durationsOut[iout] = offNext - offin;
 	}
-
-	//If this is the last block, write the number of samples
-	if(lastBlock)
-		edgecount = writebase + numSamples;
 }

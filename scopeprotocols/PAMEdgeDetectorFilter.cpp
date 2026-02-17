@@ -305,7 +305,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
 		m_finalMergeComputePipeline->BindBufferNonblocking(4, m_edgeCount, cmdBuf, true);
 
-		m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, numBlocks);
+		m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, /*numBlocks*/numThreads);
 		m_finalMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 		cap->MarkModifiedFromGpu();
