@@ -673,8 +673,6 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 						if(scramblerLocked)
 						{
-							LogDebug("Found SSD at sample %zu (scrambler = %016lx)\n", i, scrambler);
-
 							LogTrace("Found SSD at %s\n", fs.PrettyPrint(din_i->m_offsets[i]).c_str());
 
 							//Add the fake preamble byte
