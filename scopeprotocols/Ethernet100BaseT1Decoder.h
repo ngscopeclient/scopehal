@@ -45,6 +45,15 @@ public:
 	float		cutlo;
 };
 
+class BaseT1DescrambleConstants
+{
+public:
+	uint32_t	len;
+	uint32_t	samplesPerThread;
+	uint32_t	maxOutputPerThread;
+	uint8_t		masterMode;
+};
+
 class Ethernet100BaseT1Decoder : public EthernetProtocolDecoder
 {
 public:
@@ -77,6 +86,7 @@ protected:
 	AcceleratorBuffer<int8_t> m_pointsQ;
 
 	std::shared_ptr<ComputePipeline> m_pam3DecodeComputePipeline;
+	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
 };
 
 #endif
