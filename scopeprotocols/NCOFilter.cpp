@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,33 +37,33 @@ using namespace std;
 
 NCOFilter::NCOFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_ratename("Sample Rate")
-	, m_biasname("DC Bias")
-	, m_amplitudename("Amplitude")
-	, m_depthname("Depth")
-	, m_phasename("Starting Phase")
-	, m_unitname("Unit")
+	, m_rate(m_parameters["Sample Rate"])
+	, m_bias(m_parameters["DC Bias"])
+	, m_amplitude(m_parameters["Amplitude"])
+	, m_depth(m_parameters["Depth"])
+	, m_phase(m_parameters["Starting Phase"])
+	, m_unit(m_parameters["Unit"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
-	m_parameters[m_ratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_ratename].SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));
+	m_rate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_rate.SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));
 
-	m_parameters[m_biasname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_biasname].SetFloatVal(0);
+	m_bias = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_bias.SetFloatVal(0);
 
-	m_parameters[m_amplitudename] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_amplitudename].SetFloatVal(1);
+	m_amplitude = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_amplitude.SetFloatVal(1);
 
-	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_depthname].SetIntVal(100 * 1000);
+	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_depth.SetIntVal(100 * 1000);
 
-	m_parameters[m_phasename] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DEGREES));
-	m_parameters[m_phasename].SetFloatVal(0);
+	m_phase = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DEGREES));
+	m_phase.SetFloatVal(0);
 
-	m_parameters[m_unitname] = FilterParameter::UnitSelector();
-	m_parameters[m_unitname].SetIntVal(Unit::UNIT_VOLTS);
-	m_parameters[m_unitname].signal_changed().connect(sigc::mem_fun(*this, &NCOFilter::OnUnitChanged));
+	m_unit = FilterParameter::UnitSelector();
+	m_unit.SetIntVal(Unit::UNIT_VOLTS);
+	m_unit.signal_changed().connect(sigc::mem_fun(*this, &NCOFilter::OnUnitChanged));
 
 	CreateInput("freq");
 }
@@ -98,31 +98,47 @@ string NCOFilter::GetProtocolName()
 
 void NCOFilter::OnUnitChanged()
 {
-	Unit unit(static_cast<Unit::UnitType>(m_parameters[m_unitname].GetIntVal()));
+	Unit unit(static_cast<Unit::UnitType>(m_unit.GetIntVal()));
 
 	SetYAxisUnits(unit, 0);
-	m_parameters[m_amplitudename].SetUnit(unit);
-	m_parameters[m_biasname].SetUnit(unit);
+	m_amplitude.SetUnit(unit);
+	m_bias.SetUnit(unit);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void NCOFilter::Refresh()
+Filter::DataLocation NCOFilter::GetInputLocation()
 {
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void NCOFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("NCOFilter::Refresh");
+	#endif
+
 	//Make sure we have a valid input
+	ClearErrors();
 	if(!VerifyAllInputsOK())
 	{
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+
 		SetData(nullptr, 0);
 		return;
 	}
 
-	int64_t samplerate = m_parameters[m_ratename].GetIntVal();
+	int64_t samplerate = m_rate.GetIntVal();
 	size_t samplePeriod = FS_PER_SECOND / samplerate;
-	float bias = m_parameters[m_biasname].GetFloatVal();
-	float amplitude = m_parameters[m_amplitudename].GetFloatVal();
-	size_t depth = m_parameters[m_depthname].GetIntVal();
-	float startphase_deg = m_parameters[m_phasename].GetFloatVal();
+	float bias = m_bias.GetFloatVal();
+	float amplitude = m_amplitude.GetFloatVal();
+	size_t depth = m_depth.GetIntVal();
+	float startphase_deg = m_phase.GetFloatVal();
 
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
@@ -138,7 +154,6 @@ void NCOFilter::Refresh()
 	cap->m_startTimestamp = floor(t);
 	cap->m_startFemtoseconds = fs;
 	cap->Resize(depth);
-	cap->PrepareForCpuAccess();
 
 	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	float scale = amplitude / 2;
@@ -151,8 +166,12 @@ void NCOFilter::Refresh()
 	size_t ifreq = 0;
 	size_t nfreq = freq->size();
 	double curfreq = 1;
+
 	if(ufreq)
 	{
+		cap->PrepareForCpuAccess();
+		ufreq->PrepareForCpuAccess();
+
 		for(size_t i=0; i<depth; i++)
 		{
 			//Output the sample based on our current phase
@@ -167,10 +186,15 @@ void NCOFilter::Refresh()
 			double samples_per_cycle = samplerate * 1.0 / curfreq;
 			phase += 2 * M_PI / samples_per_cycle;
 		}
+
+		cap->MarkModifiedFromCpu();
 	}
 
 	else
 	{
+		cap->PrepareForCpuAccess();
+		sfreq->PrepareForCpuAccess();
+
 		for(size_t i=0; i<depth; i++)
 		{
 			//Output the sample based on our current phase
@@ -185,7 +209,7 @@ void NCOFilter::Refresh()
 			double samples_per_cycle = samplerate * 1.0 / curfreq;
 			phase += 2 * M_PI / samples_per_cycle;
 		}
-	}
 
-	cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromCpu();
+	}
 }
