@@ -57,7 +57,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(MultiplyFilter)
 
 protected:
-	void RefreshVectorVector();
+	void RefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	void RefreshScalarScalar();
 	void RefreshScalarVector(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -66,6 +66,7 @@ protected:
 		size_t iVector);
 
 	ComputePipeline m_multiplyByConstantPipeline;
+	ComputePipeline m_multiplyVectorVectorPipeline;
 };
 
 #endif

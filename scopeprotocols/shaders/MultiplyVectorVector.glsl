@@ -30,12 +30,17 @@
 #version 430
 #pragma shader_stage(compute)
 
-layout(std430, binding=0) restrict readonly buffer buf_din
+layout(std430, binding=0) restrict readonly buffer buf_dinA
 {
-	float din[];
+	float dinA[];
 };
 
-layout(std430, binding=1) restrict writeonly buffer buf_dout
+layout(std430, binding=1) restrict readonly buffer buf_dinB
+{
+	float dinB[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_dout
 {
 	float dout[];
 };
@@ -43,7 +48,6 @@ layout(std430, binding=1) restrict writeonly buffer buf_dout
 layout(std430, push_constant) uniform constants
 {
 	uint size;
-	float scale;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -54,5 +58,5 @@ void main()
 	if(i >= size)
 		return;
 
-	dout[i] = din[i] * scale;
+	dout[i] = dinA[i] * dinB[i];
 }

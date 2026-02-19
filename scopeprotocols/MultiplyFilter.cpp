@@ -38,6 +38,7 @@ using namespace std;
 MultiplyFilter::MultiplyFilter(const string& color)
 	: Filter(color, CAT_MATH)
 	, m_multiplyByConstantPipeline("shaders/MultiplyByConstant.spv", 2, sizeof(MultiplyByConstantConstants))
+	, m_multiplyVectorVectorPipeline("shaders/MultiplyVectorVector.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("a");
@@ -80,6 +81,10 @@ Filter::DataLocation MultiplyFilter::GetInputLocation()
 
 void MultiplyFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("MultiplyFilter::Refresh");
+	#endif
+
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
@@ -90,7 +95,7 @@ void MultiplyFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
 
 	if(veca && vecb)
-		RefreshVectorVector();
+		RefreshVectorVector(cmdBuf, queue);
 	else if(!veca && !vecb)
 		RefreshScalarScalar();
 	else if(veca)
@@ -168,7 +173,7 @@ void MultiplyFilter::RefreshScalarVector(
 	queue->SubmitAndBlock(cmdBuf);
 }
 
-void MultiplyFilter::RefreshVectorVector()
+void MultiplyFilter::RefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
 
@@ -183,8 +188,6 @@ void MultiplyFilter::RefreshVectorVector()
 	auto a = GetInputWaveform(0);
 	auto b = GetInputWaveform(1);
 	auto len = min(a->size(), b->size());
-	a->PrepareForCpuAccess();
-	b->PrepareForCpuAccess();
 
 	//Type conversion
 	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
@@ -192,34 +195,46 @@ void MultiplyFilter::RefreshVectorVector()
 	auto ua = dynamic_cast<UniformAnalogWaveform*>(a);
 	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
 
+	cmdBuf.begin({});
+
 	if(sa && sb)
 	{
 		//Set up the output waveform
 		auto cap = SetupSparseOutputWaveform(sa, 0, 0, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
 
-		float* fa = (float*)__builtin_assume_aligned(sa->m_samples.GetCpuPointer(), 16);
-		float* fb = (float*)__builtin_assume_aligned(sb->m_samples.GetCpuPointer(), 16);
-		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
-		for(size_t i=0; i<len; i++)
-			fdst[i] = fa[i] * fb[i];
+		m_multiplyVectorVectorPipeline.BindBufferNonblocking(0, sa->m_samples, cmdBuf);
+		m_multiplyVectorVectorPipeline.BindBufferNonblocking(1, sb->m_samples, cmdBuf);
+		m_multiplyVectorVectorPipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
-		cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromGpu();
 	}
 	else if(ua && ub)
 	{
 		//Set up the output waveform
 		auto cap = SetupEmptyUniformAnalogOutputWaveform(ua, 0);
 		cap->Resize(len);
-		cap->PrepareForCpuAccess();
 
-		float* fa = (float*)__builtin_assume_aligned(ua->m_samples.GetCpuPointer(), 16);
-		float* fb = (float*)__builtin_assume_aligned(ub->m_samples.GetCpuPointer(), 16);
-		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
-		for(size_t i=0; i<len; i++)
-			fdst[i] = fa[i] * fb[i];
+		m_multiplyVectorVectorPipeline.BindBufferNonblocking(0, ua->m_samples, cmdBuf);
+		m_multiplyVectorVectorPipeline.BindBufferNonblocking(1, ub->m_samples, cmdBuf);
+		m_multiplyVectorVectorPipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
-		cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromGpu();
 	}
+	else
+	{
+		cmdBuf.end();
+
+		AddErrorMessage("Invalid input configuration", "Inputs must be both sparse or both uniform, mixing is not allowed");
+		SetData(nullptr, 0);
+		return;
+	}
+
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_multiplyVectorVectorPipeline.Dispatch(cmdBuf, (uint32_t)len,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 }
