@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,45 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of MultiplyFilter
- */
-#ifndef MultiplyFilter_h
-#define MultiplyFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class MultiplyByConstantConstants
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	uint32_t	size;
-	float		scale;
+	float din[];
 };
 
-class MultiplyFilter : public Filter
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-public:
-	MultiplyFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(MultiplyFilter)
-
-protected:
-	void RefreshVectorVector();
-	void RefreshScalarScalar();
-	void RefreshScalarVector(
-		vk::raii::CommandBuffer& cmdBuf,
-		std::shared_ptr<QueueHandle> queue,
-		size_t iScalar,
-		size_t iVector);
-
-	ComputePipeline m_multiplyByConstantPipeline;
+	float dout[];
 };
 
-#endif
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+	float scale;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
+		return;
+
+	dout[i] = din[i] * scale;
+}

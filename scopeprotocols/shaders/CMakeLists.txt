@@ -77,6 +77,7 @@ add_compute_shaders(
 		Magnitude.glsl
 		MovingAverageFilter_Sparse.glsl
 		MovingAverageFilter_Uniform.glsl
+		MultiplyByConstant.glsl
 		PAMEdgeDetector_InitialMerge.glsl
 		PAMEdgeDetector_LevelCrossings.glsl
 		PAMEdgeDetector_MergeCrossings.glsl
