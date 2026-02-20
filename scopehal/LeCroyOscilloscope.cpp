@@ -1716,6 +1716,20 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 	if(i >= m_analogChannelCount)
 		return "";
 
+	if(m_modelid == MODEL_WAVESURFER_3K)
+	{
+		// Wavesurfer 3K does not report the lack of mux like other LeCroy scopes:
+		// .ActiveInput and .ProbeName properties do not exist, but .ConnectedProbe does
+		// (Note that there seems to be a .View property that indicates if a channel is visible and thus active,
+		// but it doesn't seem to affect the .ConnectedProbe property so we can ignore it.
+		auto name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".ConnectedProbe'"));
+		if(name == "None")
+			return "";
+		else
+			return name;
+	}
+
 	//Step 1: Determine which input is active.
 	//There's always a mux selector in software, even if only one is present on the physical acquisition board
 	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
@@ -3350,6 +3364,13 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 					ret.push_back(20 * g);
 				break;
 
+			case MODEL_WAVESURFER_3K:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				break;
+
 			default:
 				break;
 		}
@@ -3701,6 +3722,36 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 
 void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 {
+	if(m_modelid == MODEL_WAVESURFER_3K)
+	{
+		//Wavesurfer 3K does not support setting sample rate directly.
+		//Approximate by adjusting time/div to yield the requested rate for the current depth.
+		if(rate == 0)
+		{
+			LogWarning("Wavesurfer 3K sample rate request was zero, cannot set\n");
+			m_sampleRateValid = false;
+			return;
+		}
+
+		auto depth = GetSampleDepth();
+		if(depth == 0)
+		{
+			LogWarning("Wavesurfer 3K returned zero depth, cannot set sample rate\n");
+			m_sampleRateValid = false;
+			return;
+		}
+
+		double sec_per_div = (static_cast<double>(depth) / static_cast<double>(rate)) / 10.0;
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.Horizontal.HorScale = ") + to_string_sci(sec_per_div) + "'");
+
+		//Flush the cache to force a read so we know the actual rate we got.
+		m_sampleRateValid = false;
+		m_memoryDepthValid = false;
+		m_triggerOffsetValid = false;
+		return;
+	}
+
 	m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Horizontal.SampleRate = ") + to_string(rate) + "'");
 
 	m_sampleRate = rate;
@@ -3710,19 +3761,11 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 
 bool LeCroyOscilloscope::CanAverage(size_t i)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return false;
-
 	return (i < m_analogChannelCount);
 }
 
 size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return 1;
-
 	//not meaningful for trigger or digital channels
 	if(i >= m_analogChannelCount)
 		return 1;
@@ -3733,8 +3776,15 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 			return m_channelNavg[i];
 	}
 
-	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
-		string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
+	// Averaging on WS3K series is not handled per channel
+	// (https://github.com/ngscopeclient/scopehal/issues/1026)
+	std::string reply;
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.Horizontal.AverageSweeps'")));
+	else
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
 	auto navg = stoi(reply);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -3744,17 +3794,19 @@ size_t LeCroyOscilloscope::GetNumAverages(size_t i)
 
 void LeCroyOscilloscope::SetNumAverages(size_t i, size_t navg)
 {
-	//Disable averaging on WS3K series (https://github.com/ngscopeclient/scopehal/issues/1026)
-	if(m_modelid == MODEL_WAVESURFER_3K)
-		return;
-
 	//not meaningful for trigger or digital channels
 	if(i >= m_analogChannelCount)
 		return;
 
-	m_transport->SendCommandQueued(
-		string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps = " +
-		to_string(navg) + "'");
+	// Averaging on WS3K series not handled per channel
+	// (https://github.com/ngscopeclient/scopehal/issues/1026)
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.Horizontal.AverageSweeps = ") + to_string(navg) + "'");
+	else
+		m_transport->SendCommandQueued(
+			string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() +
+			".AverageSweeps = " + to_string(navg) + "'");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelNavg[i] = navg;
