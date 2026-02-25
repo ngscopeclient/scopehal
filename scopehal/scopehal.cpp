@@ -234,7 +234,7 @@ void DetectCPUFeatures()
 	if(g_hasAvx512VL)
 		LogDebug("* AVX512VL\n");
 	LogDebug("\n");
-#if defined(_WIN32) && defined(__GNUC__) // AVX2 is temporarily disabled on MingW64/GCC until this in resolved: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=54412
+#if defined(_WIN32) && defined(__GNUC__) && !defined(__clang__) // AVX2 is temporarily disabled on MingW64/GCC until this in resolved: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=54412
 	if (g_hasAvx2 || g_hasAvx512F || g_hasAvx512DQ || g_hasAvx512VL)
 	{
 		g_hasAvx2 = g_hasAvx512F = g_hasAvx512DQ = g_hasAvx512VL = false;
