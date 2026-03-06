@@ -92,7 +92,12 @@ string LineTrigger::GetTriggerName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Input validation
 
-bool LineTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+bool LineTrigger::ValidateChannel(size_t i, [[maybe_unused]] StreamDescriptor stream)
 {
+	if(i != 0)
+		return false;
+
+	//TODO: remove this entirely and just do edge trigger on "AC Line" like lecroy scopes do?
+
 	return true;
 }
