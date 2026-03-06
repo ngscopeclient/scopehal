@@ -73,8 +73,13 @@ MockInstrument::~MockInstrument()
 
 }
 
-void MockInstrument::ClearWarnings(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& warnings)
-{	// No warnings necessary for Mock instruments
+void MockInstrument::ClearWarnings(
+	[[maybe_unused]] int version,
+	[[maybe_unused]] const YAML::Node& node,
+	[[maybe_unused]] IDTable& table,
+	ConfigWarningList& warnings)
+{
+	// No warnings necessary for Mock instruments
 	warnings.m_warnings.erase(this);
 }
 
