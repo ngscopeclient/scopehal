@@ -275,7 +275,10 @@ void VulkanCreateDevice(
 	@brief Do context-level Vulkan initialization
 	@ingroup vksupport
 
-	@param skipGLFW Do not initialize GLFW
+	@param skipGLFW Do not initialize GLFW.
+
+	This is needed for headless use of libscopehal in unit tests or ATE applications, which may be executed on a
+	machine that does not have a display server running
  */
 bool VulkanInitInstance(
 	bool skipGLFW,
@@ -333,7 +336,7 @@ bool VulkanInitInstance(
 		LogDebug("Vulkan 1.2 support not available\n");
 
 	if(skipGLFW)
-		LogDebug("Skipping GLFW init to work around gtk gl/vulkan interop bug\n");
+		LogDebug("Skipping GLFW init, windowing system support will not be available\n");
 	else
 	{
 		//Log glfw version
