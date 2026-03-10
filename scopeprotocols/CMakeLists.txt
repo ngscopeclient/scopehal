@@ -65,6 +65,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetAutonegotiationDecoder.cpp
 	EthernetAutonegotiationPageDecoder.cpp
 	EthernetBaseXAutonegotiationDecoder.cpp
+	EthernetClause73AutonegotiationDecoder.cpp
 	EthernetGMIIDecoder.cpp
 	EthernetRGMIIDecoder.cpp
 	EthernetRMIIDecoder.cpp
