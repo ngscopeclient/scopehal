@@ -71,6 +71,7 @@
 
 #include "OwonXDMMultimeter.h"
 #include "RohdeSchwarzHMC8012Multimeter.h"
+#include "AgilentMultimeter.h"
 
 #include "OwonXDGFunctionGenerator.h"
 #include "SiglentFunctionGenerator.h"
@@ -294,6 +295,7 @@ void DriverStaticInit()
 
 	AddMiscInstrumentDriverClass(CSVStreamInstrument);
 
+	AddMultimeterDriverClass(AgilentMultimeter);
 	AddMultimeterDriverClass(OwonXDMMultimeter);
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 
