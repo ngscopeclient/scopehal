@@ -60,6 +60,8 @@ public:
 	virtual bool IsCommandBatchingSupported() override;
 	virtual bool IsConnected() override;
 
+	virtual bool SetTimeouts(unsigned int txUs, unsigned int rxUs) override;
+
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
 	TRANSPORT_INITPROC(SCPIUARTTransport)
