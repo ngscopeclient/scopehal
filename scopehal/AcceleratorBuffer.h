@@ -47,6 +47,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef __GNUC__
+#include <cxxabi.h>
+#endif
+
 #include <type_traits>
 
 extern uint32_t g_vkPinnedMemoryType;
@@ -239,6 +243,86 @@ std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const Accelerato
 { return a.GetIndex() - b.GetIndex(); }
 
 /**
+	@brief Base class for AcceleratorBuffer storing common metadata used by all derived types
+ */
+class AcceleratorBufferBase
+{
+public:
+
+	AcceleratorBufferBase(const std::string& name = "")
+		: m_capacity(0)
+		, m_size(0)
+		, m_name(name)
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_objectListMutex);
+		m_objectList.emplace(this);
+	}
+
+	~AcceleratorBufferBase()
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_objectListMutex);
+		m_objectList.erase(this);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sizes of buffers
+
+	///@brief Size of the allocated memory space (may be larger than m_size)
+	size_t m_capacity;
+
+	///@brief Size of the memory actually being used
+	size_t m_size;
+
+protected:
+
+	///@brief Friendly name of the buffer (for debug tools)
+	std::string m_name;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// General accessors
+public:
+
+	///@brief Returns the actual size of the container (may be smaller than what was allocated)
+	size_t size() const
+	{ return m_size; }
+
+	///@brief Returns the allocated size of the container
+	size_t capacity() const
+	{ return m_capacity; }
+
+	///@brief Returns the debug name of the buffer, if any
+	const std::string& GetName() const
+	{ return m_name; }
+
+	///@brief Gets the underlying C++ object type
+	virtual std::string GetType() const =0;
+
+	///@brief Gets the size of each entry in the container
+	virtual size_t GetElementSize() const =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Object enumeration
+
+protected:
+
+	///@brief Mutex controlling access to m_objectList
+	static std::recursive_mutex m_objectListMutex;
+
+	///@brief Set of all existing AcceleratorBufferBase objects
+	static std::set<AcceleratorBufferBase*> m_objectList;
+
+public:
+
+	///@brief Get the mutex for m_objectList
+	static std::recursive_mutex& GetMutex()
+	{ return m_objectListMutex; }
+
+	///@brief Get the set of all objects. You must hold a lock on m_objectListMutex while working with it.
+	static const std::set<AcceleratorBufferBase*>& GetObjects()
+	{ return m_objectList; }
+};
+
+/**
 	@brief A buffer of memory which may be used by GPU acceleration
 
 	At any given point in time the buffer may exist as a single copy on the CPU, a single copy on the GPU, or
@@ -255,8 +339,29 @@ std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const Accelerato
 	non-trivially-copyable types as a convenience for working with waveforms on the CPU.
  */
 template<class T>
-class AcceleratorBuffer
+class AcceleratorBuffer : public AcceleratorBufferBase
 {
+public:
+
+	virtual std::string GetType() const
+	{
+		//separate path here needed since GCC returns mangled name
+		#ifdef __GNUC__
+			int status;
+			auto pname = typeid(T).name();
+			auto tmp = abi::__cxa_demangle(pname, nullptr, nullptr, &status);
+
+			std::string ret = std::string(tmp);
+			free(tmp);
+			return ret;
+		#else
+			return std::string(typeid(T).name());
+		#endif
+	}
+
+	virtual size_t GetElementSize() const
+	{ return sizeof(T); }
+
 protected:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -385,18 +490,6 @@ protected:
 #endif
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Iteration
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Sizes of buffers
-
-	///@brief Size of the allocated memory space (may be larger than m_size)
-	size_t m_capacity;
-
-	///@brief Size of the memory actually being used
-	size_t m_size;
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Hint configuration
 public:
 	enum UsageHint
@@ -422,7 +515,8 @@ public:
 	 */
 	__attribute__((noinline))
 	AcceleratorBuffer(const std::string& name = "")
-		: m_cpuMemoryType(MEM_TYPE_NULL)
+		: AcceleratorBufferBase(name)
+		, m_cpuMemoryType(MEM_TYPE_NULL)
 		, m_gpuMemoryType(MEM_TYPE_NULL)
 		, m_cpuPtr(nullptr)
 		, m_gpuPhysMem(nullptr)
@@ -432,11 +526,8 @@ public:
 		#ifndef _WIN32
 		, m_tempFileHandle(0)
 		#endif
-		, m_capacity(0)
-		, m_size(0)
 		, m_cpuAccessHint(HINT_LIKELY)	//default access hint: CPU-side pinned memory
 		, m_gpuAccessHint(HINT_UNLIKELY)
-		, m_name(name)
 	{
 		//non-trivially-copyable types can't be copied to GPU except on unified memory platforms
 		if(!std::is_trivially_copyable<T>::value && !g_vulkanDeviceHasUnifiedMemory)
@@ -460,18 +551,6 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// General accessors
 public:
-
-	/**
-		@brief Returns the actual size of the container (may be smaller than what was allocated)
-	 */
-	size_t size() const
-	{ return m_size; }
-
-	/**
-		@brief Returns the allocated size of the container
-	 */
-	size_t capacity() const
-	{ return m_capacity; }
 
 	/**
 		@brief Returns the total reserved CPU memory, in bytes
@@ -1790,9 +1869,6 @@ protected:
 	}
 
 protected:
-
-	///@brief Friendly name of the buffer (for debug tools)
-	std::string m_name;
 
 	/**
 		@brief Pushes our friendly name to the underlying Vulkan objects

@@ -143,6 +143,12 @@ bool g_hasFMA = false;
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AcceleratorBuffer object enumeration, should probably be moved to its own file eventually
+
+recursive_mutex AcceleratorBufferBase::m_objectListMutex;
+set<AcceleratorBufferBase*> AcceleratorBufferBase::m_objectList;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AcceleratorBuffer performance counters, should probably be moved to its own file eventually
 
 atomic<int64_t> AcceleratorBufferPerformanceCounters::m_hostDeviceCopiesBlocking;
