@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,7 +52,12 @@ using namespace std;
  */
 TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
+	, m_forwardInBuf("TestWaveformSource.m_forwardInBuf")
+	, m_forwardOutBuf("TestWaveformSource.m_forwardOutBuf")
+	, m_reverseOutBuf("TestWaveformSource.m_reverseOutBuf")
 	, m_cachedBinSize(0)
+	, m_resampledSparamSines("TestWaveformSource.m_resampledSparamSines")
+	, m_resampledSparamCosines("TestWaveformSource.m_resampledSparamCosines")
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_channelEmulationComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_noisySineComputePipeline("shaders/NoisySine.spv", 1, sizeof(NoisySinePushConstants))
