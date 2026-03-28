@@ -345,17 +345,38 @@ public:
 
 	virtual std::string GetType() const
 	{
+		//Get the data type
+		auto& etype = typeid(T);
+
+		//Check common stdint data types and return them rather than the underlying C type
+		if(etype == typeid(int64_t))
+			return "int64_t";
+		else if(etype == typeid(uint64_t))
+			return "uint64_t";
+		else if(etype == typeid(int32_t))
+			return "int32_t";
+		else if(etype == typeid(uint32_t))
+			return "uint32_t";
+		else if(etype == typeid(int16_t))
+			return "int16_t";
+		else if(etype == typeid(uint16_t))
+			return "uint16_t";
+		else if(etype == typeid(int8_t))
+			return "int8_t";
+		else if(etype == typeid(uint8_t))
+			return "uint8_t";
+
 		//separate path here needed since GCC returns mangled name
 		#ifdef __GNUC__
 			int status;
-			auto pname = typeid(T).name();
+			auto pname = etype.name();
 			auto tmp = abi::__cxa_demangle(pname, nullptr, nullptr, &status);
 
 			std::string ret = std::string(tmp);
 			free(tmp);
 			return ret;
 		#else
-			return std::string(typeid(T).name());
+			return std::string(etype.name());
 		#endif
 	}
 
