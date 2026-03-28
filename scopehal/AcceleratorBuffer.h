@@ -1936,6 +1936,10 @@ public:
 	 */
 	void SetName(std::string name)
 	{
+		//Early out if name hasn't actually changed
+		if(m_name == name)
+			return;
+
 		m_name = name;
 		if(g_hasDebugUtils)
 		{
