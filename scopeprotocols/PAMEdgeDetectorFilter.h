@@ -91,7 +91,6 @@ protected:
 
 	AcceleratorBuffer<uint32_t> m_edgeIndexesScratch;
 	AcceleratorBuffer<uint8_t> m_edgeStatesScratch;
-	AcceleratorBuffer<uint8_t> m_edgeRisingScratch;
 
 	AcceleratorBuffer<float> m_thresholds;
 	AcceleratorBuffer<float> m_levels;

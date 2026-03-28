@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,7 +44,10 @@ public:
 		: m_cachedBinSize(0)
 		, m_groupDelayFs(0)
 		, m_groupDelaySamples(0)
-	{}
+	{
+		m_resampledSparamSines.SetName("CouplerSParameters.m_resampledSparamSines");
+		m_resampledSparamCosines.SetName("CouplerSParameters.m_resampledSparamCosines");
+	}
 
 	/**
 		@brief Check to see if we need to refresh our cache
@@ -182,9 +185,6 @@ protected:
 	CouplerSParameters m_reverseLeakageParams;
 
 	AcceleratorBuffer<float> m_scalarTempBuf1;
-	AcceleratorBuffer<float> m_vectorTempBuf1;
-	AcceleratorBuffer<float> m_vectorTempBuf3;
-	AcceleratorBuffer<float> m_vectorTempBuf4;
 
 	ComputePipeline m_normalizeComputePipeline;
 	ComputePipeline m_forwardPathComputePipeline;

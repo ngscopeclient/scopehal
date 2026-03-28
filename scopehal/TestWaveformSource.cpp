@@ -106,6 +106,7 @@ WaveformBase* TestWaveformSource::GenerateStep(
 	auto ret = new UniformAnalogWaveform("Step");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
+	ret->Rename("TestWaveformSource.Step");
 
 	size_t mid = depth/2;
 	for(size_t i=0; i<depth; i++)
@@ -146,6 +147,7 @@ void TestWaveformSource::GenerateNoisySinewave(
 	wfm->m_triggerPhase = 0;
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.NoisySine");
 
 	//Calculate a bunch of constants
 	const int numThreads = 32768;
@@ -199,6 +201,7 @@ void TestWaveformSource::GenerateNoisySinewaveSum(
 	wfm->m_triggerPhase = 0;
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.NoisySineSum");
 
 	//Calculate a bunch of constants
 	const int numThreads = 32768;
@@ -252,6 +255,7 @@ void TestWaveformSource::GeneratePRBS31(
 {
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.PRBS31");
 
 	//Generate the PRBS as a square wave. Interpolate zero crossings as needed.
 	uint32_t prbs = rand();
@@ -320,6 +324,7 @@ void TestWaveformSource::Generate8b10b(
 {
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.8B10B");
 
 	const int patternlen = 20;
 	const bool pattern[patternlen] =
