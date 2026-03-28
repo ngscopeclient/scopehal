@@ -258,7 +258,7 @@ public:
 		m_objectList.emplace(this);
 	}
 
-	~AcceleratorBufferBase()
+	virtual ~AcceleratorBufferBase()
 	{
 		std::lock_guard<std::recursive_mutex> lock(m_objectListMutex);
 		m_objectList.erase(this);
@@ -542,7 +542,7 @@ public:
 		ClearTransferFlags();
 	}
 
-	~AcceleratorBuffer()
+	virtual ~AcceleratorBuffer()
 	{
 		FreeCpuBuffer(true);
 		FreeGpuBuffer(true);
