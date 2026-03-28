@@ -167,18 +167,20 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	{
 		scap = SetupSparseOutputWaveform(sdin_p, 0, 0, 0);
 		scap->m_triggerPhase = max(din_p->m_triggerPhase, din_n->m_triggerPhase);
+		scap->Rename("SubtractFilter.data");
 	}
 	else if(udin_p && udin_n)
 	{
 		ucap = SetupEmptyUniformAnalogOutputWaveform(udin_p, 0);
 		ucap->m_triggerPhase = max(din_p->m_triggerPhase, din_n->m_triggerPhase);
 		ucap->Resize(len);
+		ucap->Rename("SubtractFilter.data");
 	}
 
 	//Mixed sparse/uniform not allowed
 	else
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 

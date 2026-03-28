@@ -39,6 +39,11 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
 	, m_order(m_parameters["PAM Order"])
 	, m_baud(m_parameters["Symbol rate"])
+	, m_edgeIndexes("PAMEdgeDetectorFilter.m_edgeIndexes")
+	, m_edgeCount("PAMEdgeDetectorFilter.m_edgeCount")
+	, m_edgeIndexesScratch("PAMEdgeDetectorFilter.m_edgeIndexesScratch")
+	, m_edgeStatesScratch("PAMEdgeDetectorFilter.m_edgeStatesScratch")
+	, m_edgeRisingScratch("PAMEdgeDetectorFilter.m_edgeRisingScratch")
 {
 	AddDigitalStream("data");
 
@@ -176,6 +181,7 @@ void PAMEdgeDetectorFilter::Refresh(
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
+	cap->Rename("PAMEdgeDetectorFilter.data");
 
 	//Grab temporary buffers we're going to use
 	ScratchBuffer_uint8_t edgeStates(ScratchBufferManager::U8_GPU_WAVEFORM);

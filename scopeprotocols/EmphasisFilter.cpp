@@ -126,6 +126,7 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
 	int64_t outlen = len - (tap_count * samples_per_tap);
+	cap->Rename("EmphasisFilter.data");
 	cap->Resize(outlen);
 
 	//Calculate the tap values

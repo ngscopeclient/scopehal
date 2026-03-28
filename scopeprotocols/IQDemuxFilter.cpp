@@ -157,6 +157,8 @@ void IQDemuxFilter::Refresh(
 	size_t outlen = (len - istart) / 2;
 	iout->Resize(outlen);
 	qout->Resize(outlen);
+	iout->Rename("IQDemuxFilter.I");
+	iout->Rename("IQDemuxFilter.Q");
 
 	if(g_hasShaderInt64)
 	{

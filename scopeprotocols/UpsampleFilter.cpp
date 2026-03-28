@@ -65,6 +65,7 @@ float blackman(float x, float width)
 UpsampleFilter::UpsampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
 	, m_factor(m_parameters["Upsample factor"])
+	, m_filter("UpsampleFilter.m_filter")
 	, m_computePipeline("shaders/UpsampleFilter.spv", 3, sizeof(UpsampleFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
@@ -153,6 +154,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	//Create the output and configure it
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_timescale = din->m_timescale / upsample_factor;
+	cap->Rename("UpsampleFilter.data");
 	size_t len = din->size();
 	size_t imax = len - window;
 	size_t outlen = imax*upsample_factor;

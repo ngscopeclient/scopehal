@@ -164,6 +164,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	auto cap = SetupEmptyWaveform<EthernetWaveform>(din_i, 0);
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
+	cap->Rename("Ethernet100BaseT1Decoder.data");
 
 	vector<uint8_t> bytes;
 	vector<uint64_t> starts;

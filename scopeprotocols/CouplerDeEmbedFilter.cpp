@@ -38,6 +38,10 @@ using namespace std;
 CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	: Filter(color, CAT_RF)
 	, m_maxGainName("Max Gain")
+	, m_scalarTempBuf1("CouplerDeEmbedFilter.m_scalarTempBuf1")
+	, m_vectorTempBuf1("CouplerDeEmbedFilter.m_vectorTempBuf1")
+	, m_vectorTempBuf3("CouplerDeEmbedFilter.m_vectorTempBuf3")
+	, m_vectorTempBuf4("CouplerDeEmbedFilter.m_vectorTempBuf4")
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 	, m_forwardPathComputePipeline("shaders/CouplerDeEmbedFilter_ForwardPath.spv", 9, sizeof(uint32_t))
 {

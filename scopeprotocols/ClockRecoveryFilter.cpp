@@ -44,6 +44,8 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	, m_baudRate(m_parameters["Symbol rate"])
 	, m_threshold(m_parameters["Threshold"])
 	, m_mtMode(m_parameters["Multithreading"])
+	, m_secondPassTimestamps("ClockRecoveryFilter.m_secondPassTimestamps")
+	, m_secondPassState("ClockRecoveryFilter.m_secondPassState")
 {
 	AddDigitalStream("recClk");
 	AddStream(Unit(Unit::UNIT_VOLTS), "sampledData", Stream::STREAM_TYPE_ANALOG);
@@ -226,6 +228,7 @@ void ClockRecoveryFilter::Refresh(
 
 	//Create the output waveform and copy our timescales
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
+	cap->Rename("ClockRecoveryFilter.recClk");
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 	cap->m_offsets.reserve(edges.size());
@@ -245,6 +248,7 @@ void ClockRecoveryFilter::Refresh(
 		scap = SetupEmptySparseAnalogOutputWaveform(sadin, 1);
 	else
 		scap = SetupEmptySparseDigitalOutputWaveform(din, 1);
+	scap->Rename("ClockRecoveryFilter.sampledData");
 	scap->m_triggerPhase = 0;
 	scap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 
