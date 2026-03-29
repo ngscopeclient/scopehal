@@ -366,18 +366,21 @@ public:
 		else if(etype == typeid(uint8_t))
 			return "uint8_t";
 
-		//separate path here needed since GCC returns mangled name
-		#ifdef __GNUC__
-			int status;
-			auto pname = etype.name();
-			auto tmp = abi::__cxa_demangle(pname, nullptr, nullptr, &status);
+		else
+		{
+			//separate path here needed since GCC returns mangled name
+			#ifdef __GNUC__
+				int status;
+				auto pname = etype.name();
+				auto tmp = abi::__cxa_demangle(pname, nullptr, nullptr, &status);
 
-			std::string ret = std::string(tmp);
-			free(tmp);
-			return ret;
-		#else
-			return std::string(etype.name());
-		#endif
+				std::string ret = std::string(tmp);
+				free(tmp);
+				return ret;
+			#else
+				return std::string(etype.name());
+			#endif
+		}
 	}
 
 	virtual size_t GetElementSize() const
