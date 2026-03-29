@@ -347,6 +347,10 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		{
 			scrambler = pinfo.second;
 			size_t i = pinfo.first;
+
+			if(i < 2)		//make sure we have a full symbol worth of data
+				continue;
+
 			int64_t tnow = din_i->m_offsets[i];
 			int64_t tlen = din_i->m_durations[i];
 

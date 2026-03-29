@@ -57,6 +57,11 @@ layout(std430, binding=4) restrict writeonly buffer buf_stateSecondPass
 	int64_t stateSecondPass[];
 };
 
+layout(std430, binding=5) restrict buffer buf_tooSmall
+{
+	uint tooSmall[];
+};
+
 layout(std430, push_constant) uniform constants
 {
 	int64_t	initialPeriod;
@@ -194,9 +199,12 @@ void main()
 		offsetsSecondPass[outputBase + iout] = edgepos + center;
 		iout ++;
 
-		//Bail if we've run out of places to store output (should never happen, just to be safe)
+		//Bail if we've run out of places to store output
 		if(iout >= maxOffsetsPerThread)
+		{
+			atomicAdd(tooSmall[0], 1);
 			break;
+		}
 
 		//TODO: align to the first pass and stop? Or save that for third pass
 	}

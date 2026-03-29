@@ -47,6 +47,11 @@ layout(std430, binding=2) restrict writeonly buffer buf_stateout
 	int64_t stateOut[];
 };
 
+layout(std430, binding=3) restrict buffer buf_tooSmall
+{
+	uint tooSmall[];
+};
+
 layout(std430, push_constant) uniform constants
 {
 	int64_t	initialPeriod;
@@ -164,9 +169,12 @@ void main()
 		offsets[outputBase + iout] = edgepos + center;
 		iout ++;
 
-		//Bail if we've run out of places to store output (should never happen, just to be safe)
+		//Bail if we've run out of places to store output
 		if(iout >= maxOffsetsPerThread)
+		{
+			atomicAdd(tooSmall[0], 1);
 			break;
+		}
 	}
 
 	//Save final stats
