@@ -79,14 +79,24 @@ void main()
 	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
 	uint instart = gl_GlobalInvocationID.x * inputPerThread;
 	uint inend = instart + inputPerThread;
-	if(gl_GlobalInvocationID.x == (numThreads - 1))
-		inend = len;
 
 	//Block of outputs
 	uint nouts = 0;
 
+	//Need a previous sample so make the first block start at n=1 not n=0
 	if(instart == 0)
 		instart ++;
+
+	//Clamp end
+	if(inend >= len)
+		inend = len;
+
+	//If we start after the end of the array, stop
+	if(instart >= len)
+	{
+		idx[gl_GlobalInvocationID.x] = 0;
+		return;
+	}
 
 	uint numThresholds = order-1;
 	uint maxOuts = outputPerThread - 1;
@@ -101,7 +111,7 @@ void main()
 		for(uint j=0; j<numThresholds; j++)
 		{
 			float t = thresholds[j];
-			uint iout = (nouts + 1) * outputPerThread + gl_GlobalInvocationID.x;
+			uint iout = (nouts + 1) * numThreads + gl_GlobalInvocationID.x;
 
 			//Check for rising edge
 			if( (prev <= t) && (cur > t) )
