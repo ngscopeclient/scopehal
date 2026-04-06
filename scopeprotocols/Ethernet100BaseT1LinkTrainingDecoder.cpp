@@ -41,7 +41,6 @@ Ethernet100BaseT1LinkTrainingDecoder::Ethernet100BaseT1LinkTrainingDecoder(const
 {
 	CreateInput("i");
 	CreateInput("q");
-	CreateInput("clk");
 
 	AddProtocolStream("data");
 
@@ -64,8 +63,6 @@ bool Ethernet100BaseT1LinkTrainingDecoder::ValidateChannel(size_t i, StreamDescr
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
