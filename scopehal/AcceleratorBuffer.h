@@ -1368,7 +1368,7 @@ public:
 		}
 
 		//Make sure the GPU-side buffer is up to date
-		if(m_gpuPhysMemIsStale && !outputOnly)
+		if(HasGpuBuffer() && m_gpuPhysMemIsStale && !outputOnly)
 			CopyToGpuNonblocking(cmdBuf);
 		else
 			AcceleratorBufferPerformanceCounters::LogHostDeviceCopySkipped();
@@ -1548,7 +1548,6 @@ public:
 			{});
 	}
 
-
 protected:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1556,6 +1555,9 @@ protected:
 
 	/**
 		@brief Free the CPU-side buffer and underlying physical memory
+
+		@param dataLossOK		True if we do not intend to use the contents of this buffer again
+								(and thus it's OK to remove the only copy of the data)
 	 */
 	void FreeCpuBuffer(bool dataLossOK = false)
 	{
@@ -1589,6 +1591,7 @@ protected:
 	}
 
 public:
+
 	/**
 		@brief Free the GPU-side buffer and underlying physical memory
 
