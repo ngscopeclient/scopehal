@@ -1977,6 +1977,24 @@ public:
 		}
 	}
 
+	/**
+		@brief Dump the raw contents of the buffer to a file for debugging
+	 */
+	__attribute__((noinline))
+	void DebugDumpToFile(std::string fname)
+	{
+		FILE* fp = fopen(fname.c_str(), "wb");
+		if(!fp)
+			LogFatal("failed to open debug dump %s\n", fname.c_str());
+
+		PrepareForCpuAccess();
+
+		//Actually write the data (only the valid part of the buffer for now... TODO extra tail stuff?)
+		fwrite(GetCpuPointer(), size(), sizeof(T), fp);
+
+		fclose(fp);
+	}
+
 public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
