@@ -101,7 +101,7 @@ VulkanFFTPlan::VulkanFFTPlan(
 		else
 			m_config.inputBufferStride[0] = npoints;
 
-		cacheKey = string("VkFFT_FWD_V8_");
+		cacheKey = string("VkFFT_FWD_V10_");
 		if(timeDomainType == TYPE_REAL)
 			cacheKey += "R2C_";
 		else
@@ -125,13 +125,18 @@ VulkanFFTPlan::VulkanFFTPlan(
 		m_config.inputBufferSize = &m_bsize;	//note that input and output buffers are swapped for reverse transform
 		m_config.inverseReturnToInputBuffer = 1;
 
-		cacheKey = string("VkFFT_INV_V8_");
+		cacheKey = string("VkFFT_INV_V10_");
 		if(timeDomainType == TYPE_REAL)
 			cacheKey += "C2R_";
 		else
 			cacheKey += "C2C_";
 		cacheKey += to_string(npoints);
 	}
+
+	//Use push descriptors if available
+	//TODO: This seems broken
+	//if(g_hasPushDescriptor)
+	//	m_config.usePushDescriptors = true;
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
 	QueueLock queuelock(g_vkTransferQueue);
