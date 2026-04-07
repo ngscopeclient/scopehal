@@ -182,7 +182,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	if(m_vkForwardPlan2)
 	{
 		if(m_vkForwardPlan2->size() != npoints)
-			m_vkForwardPlan = nullptr;
+			m_vkForwardPlan2 = nullptr;
 	}
 	if(m_vkReversePlan)
 	{
@@ -190,19 +190,20 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 			m_vkReversePlan = nullptr;
 	}
 
-	//Set up temporary buffers
+	//Set up temporary buffers, these always get resized
 	ScratchBuffer_float32_t vectorTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
 	ScratchBuffer_float32_t vectorTempBuf2(ScratchBufferManager::F32_GPU_WAVEFORM);
 	ScratchBuffer_float32_t vectorTempBuf3(ScratchBufferManager::F32_GPU_WAVEFORM);
+	vectorTempBuf1->resize(2 * nouts, true);
+	vectorTempBuf2->resize(2 * nouts, true);
+	vectorTempBuf3->resize(2 * nouts, true);
+
+	m_scalarTempBuf1.resize(npoints, true);
 
 	//Set up the FFT and allocate buffers if we change point count
 	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
-		vectorTempBuf1->resize(2 * nouts, true);
-		vectorTempBuf2->resize(2 * nouts, true);
-		vectorTempBuf3->resize(2 * nouts, true);
-
 		m_cachedNumPoints = npoints;
 		sizechange = true;
 	}
@@ -263,10 +264,15 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//FFT both inputs
 	//vec1 = raw rev, vec3 = raw fwd
-	m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf3, cmdBuf);
-	m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf1, cmdBuf);
-	vectorTempBuf1->MarkModifiedFromGpu();
-	vectorTempBuf3->MarkModifiedFromGpu();
+	//m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf3, cmdBuf);
+	//m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf1, cmdBuf);
+
+	//I don't understand why doing this in reverse order is necessary.
+	//Original design called for fwd -> tempBuf1 and rev->tempBuf3.
+	//But this seems to consistently work???
+	//Need a second set of eyes to figure out if we got the ordering backwards in the original code
+	m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf1, cmdBuf);
+	m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf3, cmdBuf);
 	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
 	//De-embed the forward path, then calculate forward path leakage from that
@@ -284,12 +290,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		m_reverseCoupledParams,
 		npoints,
 		nouts);
-
-	//ScratchBuffer_float32_t scalarTempBuf1(ScratchBufferManager::F32_GPU_WAVEFORM);
-	//scalarTempBuf1->resize(npoints);
-
-	//Reuse vectorTempBuf2 as scalar output buffer
-	m_scalarTempBuf1.resize(npoints, true);
 
 	//Generate final clean reverse path output
 	size_t istart = 0;
