@@ -834,5 +834,8 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		}
 	}
 
+	//Calculate color for each protocol event and cache it so we don't have to do a ton of string manipulation later
+	cap->PreCacheColors();
+
 	cap->MarkModifiedFromCpu();
 }

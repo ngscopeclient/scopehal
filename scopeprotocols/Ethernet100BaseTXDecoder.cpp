@@ -446,6 +446,8 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		m_4b5bSamples.PrepareForCpuAccessNonblocking(cmdBuf);
 		m_4b5bTimestamps.PrepareForCpuAccessNonblocking(cmdBuf);
 
+		//TODO: after deserialization, search for J/K and find frame starts??
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
@@ -603,6 +605,9 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			first = !first;
 		}
 	}
+
+	//Calculate color for each protocol event and cache it so we don't have to do a ton of string manipulation later
+	cap->PreCacheColors();
 
 	cap->MarkModifiedFromCpu();
 }
