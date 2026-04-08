@@ -474,6 +474,8 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	if(suppressedPreambleAndFCS)
 		segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
 
+	static const char hex[] = "0123456789abcdef";
+
 	for(size_t i=0; i<len; i++)
 	{
 		switch(segment.m_type)
@@ -556,14 +558,27 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					cap->m_samples.push_back(segment);
 
 					//Format the content for display
-					char tmp[64];
-					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
-						segment.m_data[0],
-						segment.m_data[1],
-						segment.m_data[2],
-						segment.m_data[3],
-						segment.m_data[4],
-						segment.m_data[5]);
+					char tmp[] =
+					{
+						hex[ (segment.m_data[0] >> 4) & 0xf],
+						hex[ segment.m_data[0] & 0xf],
+						':',
+						hex[ (segment.m_data[1] >> 4) & 0xf],
+						hex[ segment.m_data[1] & 0xf],
+						':',
+						hex[ (segment.m_data[2] >> 4) & 0xf],
+						hex[ segment.m_data[2] & 0xf],
+						':',
+						hex[ (segment.m_data[3] >> 4) & 0xf],
+						hex[ segment.m_data[3] & 0xf],
+						':',
+						hex[ (segment.m_data[4] >> 4) & 0xf],
+						hex[ segment.m_data[4] & 0xf],
+						':',
+						hex[ (segment.m_data[5] >> 4) & 0xf],
+						hex[ segment.m_data[5] & 0xf],
+						'\0'
+					};
 					pack->m_headers["Dest MAC"] = tmp;
 
 					//Reset for next block of the frame
@@ -592,14 +607,27 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					cap->m_samples.push_back(segment);
 
 					//Format the content for display
-					char tmp[64];
-					snprintf(tmp, sizeof(tmp),"%02x:%02x:%02x:%02x:%02x:%02x",
-						segment.m_data[0],
-						segment.m_data[1],
-						segment.m_data[2],
-						segment.m_data[3],
-						segment.m_data[4],
-						segment.m_data[5]);
+					char tmp[] =
+					{
+						hex[ (segment.m_data[0] >> 4) & 0xf],
+						hex[ segment.m_data[0] & 0xf],
+						':',
+						hex[ (segment.m_data[1] >> 4) & 0xf],
+						hex[ segment.m_data[1] & 0xf],
+						':',
+						hex[ (segment.m_data[2] >> 4) & 0xf],
+						hex[ segment.m_data[2] & 0xf],
+						':',
+						hex[ (segment.m_data[3] >> 4) & 0xf],
+						hex[ segment.m_data[3] & 0xf],
+						':',
+						hex[ (segment.m_data[4] >> 4) & 0xf],
+						hex[ segment.m_data[4] & 0xf],
+						':',
+						hex[ (segment.m_data[5] >> 4) & 0xf],
+						hex[ segment.m_data[5] & 0xf],
+						'\0'
+					};
 					pack->m_headers["Src MAC"] = tmp;
 
 					//Reset for next block of the frame
@@ -738,9 +766,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					segment.m_data.clear();
 
 					//Format the content for display
-					char tmp[64];
-					snprintf(tmp, sizeof(tmp),"%d", tag & 0xfff);
-					pack->m_headers["VLAN"] = tmp;
+					pack->m_headers["VLAN"] = to_string(tag & 0xfff);
 				}
 
 				break;
