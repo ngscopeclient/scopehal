@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -86,6 +86,8 @@ public:
 	{};
 	virtual std::string GetText(size_t) override;
 	virtual std::string GetColor(size_t) override;
+
+	void PreCacheColors();
 };
 
 class EthernetProtocolDecoder : public PacketDecoder
@@ -100,6 +102,13 @@ public:
 
 protected:
 	void BytesToFrames(
+		std::vector<uint8_t>& bytes,
+		std::vector<uint64_t>& starts,
+		std::vector<uint64_t>& ends,
+		EthernetWaveform* cap,
+		bool suppressedPreambleAndFCS = false);
+
+	void BytesToFramesUnitTimescale(
 		std::vector<uint8_t>& bytes,
 		std::vector<uint64_t>& starts,
 		std::vector<uint64_t>& ends,
