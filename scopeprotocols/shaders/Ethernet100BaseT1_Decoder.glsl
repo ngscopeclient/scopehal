@@ -89,7 +89,6 @@ layout(std430, push_constant) uniform constants
 layout(local_size_x=32, local_size_y=1, local_size_z=1) in;
 
 //state values because no glsl enums :'(
-#define STATE_IDLE 0
 #define STATE_SSD_1 1
 #define STATE_SSD_2 2
 #define STATE_PACKET 3
@@ -139,7 +138,7 @@ void main()
 	i++;
 
 	//Decode just this one packet
-	for(; (i<inputLength) && (state != STATE_IDLE); i++)
+	for(; i<inputLength; i++)
 	{
 		tnow = offsetsIn[i];
 		tlen = durationsIn[i];
@@ -264,7 +263,10 @@ void main()
 				if( (ci == 0) && (cq == 0) )
 					state = STATE_ESD_2;
 				else
-					state = STATE_IDLE;
+				{
+					starts[ioutBase] = 0;
+					return;
+				}
 
 				break;
 
