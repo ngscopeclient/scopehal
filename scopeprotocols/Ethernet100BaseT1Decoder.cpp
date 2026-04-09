@@ -346,6 +346,8 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		packetStarts->MarkModifiedFromCpu();
 		packetScramblers->MarkModifiedFromCpu();
 
+		//Next shader: make the full list of bytes in each packet
+
 		//Decode each packet that the GPU found
 		size_t npackets = packetStarts->size();
 		for(size_t j=0; j<npackets; j++)
@@ -373,7 +375,6 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			prevNib = 0;
 			phaseLow = true;
 			state = STATE_PACKET;
-			scramblerLocked = true;
 
 			i++;
 
@@ -412,7 +413,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 							state = STATE_ESD_1;
 
 						//No, it's a data symbol
-						else if(scramblerLocked)
+						else
 						{
 							//Decode to a sequence of 3 scrambled data bits
 							uint8_t sd = 0;
@@ -514,10 +515,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 						//ESD with error
 						//TODO: how to handle this? for now decode it anyway
 						else if( (ci == -1) && (cq == -1) )
-						{
-							if(scramblerLocked)
-								BytesToFrames(bytes, starts, ends, cap);
-						}
+							BytesToFrames(bytes, starts, ends, cap);
 
 						//invalid, don't try to decode
 						else
