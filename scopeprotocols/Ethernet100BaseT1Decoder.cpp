@@ -77,6 +77,9 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 		{
 			m_descrambleComputePipeline =
 				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Descrambler.spv", 4, sizeof(BaseT1DescrambleConstants));
+
+			m_decodeComputePipeline =
+				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Decoder.spv", 9, sizeof(BaseT1DecodeConstants));
 		}
 	}
 }
@@ -347,191 +350,71 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		packetScramblers->MarkModifiedFromCpu();
 
 		//Next shader: make the full list of bytes in each packet
-
-		//Decode each packet that the GPU found
+		//Buffer format to start: each thread gets a 2048 entry buffer of (bytes, starts, ends)
+		//Make them consecutive, so we can decode in a batch
 		size_t npackets = packetStarts->size();
+		size_t maxPacketBytes = 2048;
+		size_t bufsize = maxPacketBytes * npackets;
+		ScratchBuffer_uint8_t gpuBytes(ScratchBufferManager::U8_GPU_WAVEFORM);	//should be GPU_SMALL
+		ScratchBuffer_int64_t gpuStarts(ScratchBufferManager::I64_GPU_SMALL);
+		ScratchBuffer_int64_t gpuEnds(ScratchBufferManager::I64_GPU_SMALL);
+		gpuStarts->resize(bufsize);
+		gpuEnds->resize(bufsize);
+		gpuBytes->resize(bufsize);
+
+		cmdBuf.begin({});
+		BaseT1DecodeConstants dcfg;
+		dcfg.npackets = npackets;
+		dcfg.maxPacketBytes = maxPacketBytes;
+		dcfg.inputLength = ilen;
+		dcfg.masterMode = masterMode;
+
+		m_decodeComputePipeline->BindBufferNonblocking(0, m_pointsI, cmdBuf);
+		m_decodeComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf);
+		m_decodeComputePipeline->BindBufferNonblocking(2, *packetStarts, cmdBuf);
+		m_decodeComputePipeline->BindBufferNonblocking(3, *packetScramblers, cmdBuf);
+		m_decodeComputePipeline->BindBufferNonblocking(4, *gpuBytes, cmdBuf, true);
+		m_decodeComputePipeline->BindBufferNonblocking(5, *gpuStarts, cmdBuf, true);
+		m_decodeComputePipeline->BindBufferNonblocking(6, *gpuEnds, cmdBuf, true);
+		m_decodeComputePipeline->BindBufferNonblocking(7, din_i->m_offsets, cmdBuf);
+		m_decodeComputePipeline->BindBufferNonblocking(8, din_i->m_durations, cmdBuf);
+
+		auto decodeBlockCount = GetComputeBlockCount(npackets, 32);
+		m_decodeComputePipeline->Dispatch(
+			cmdBuf,
+			dcfg,
+			min(decodeBlockCount, 32768u),
+			decodeBlockCount / 32768 + 1);
+
+		gpuStarts->MarkModifiedFromGpu();
+		gpuEnds->MarkModifiedFromGpu();
+		gpuBytes->MarkModifiedFromGpu();
+
+		gpuStarts->PrepareForCpuAccessNonblocking(cmdBuf);
+		gpuEnds->PrepareForCpuAccessNonblocking(cmdBuf);
+		gpuBytes->PrepareForCpuAccessNonblocking(cmdBuf);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Pull the data off the GPU and do final CPU-side decoding
+		//TODO: this can be made more efficient if we omit copying and make BytesToFrames work on the block as-is
 		for(size_t j=0; j<npackets; j++)
 		{
-			scrambler = (*packetScramblers)[j];
-			size_t i = (*packetStarts)[j];
-
-			if(i < 2)		//make sure we have a full symbol worth of data
+			uint32_t base = j*maxPacketBytes;
+			uint32_t length = (*gpuStarts)[base];
+			if(length == 0)
 				continue;
 
-			int64_t tnow = din_i->m_offsets[i];
-			int64_t tlen = din_i->m_durations[i];
+			bytes.resize(length);
+			starts.resize(length);
+			ends.resize(length);
 
-			//Add the fake preamble byte
-			bytestart = din_i->m_offsets[i-2];
-			bytes.push_back(0x55);
-			starts.push_back(bytestart);
-			bytestart = tnow + (tlen * 2 / 3);
-			ends.push_back(bytestart);
+			memcpy(&bytes[0], gpuBytes->GetCpuPointer() + base + 1, length * sizeof(uint8_t));
+			memcpy(&starts[0], gpuStarts->GetCpuPointer() + base + 1, length * sizeof(int64_t));
+			memcpy(&ends[0], gpuEnds->GetCpuPointer() + base + 1, length * sizeof(int64_t));
 
-			//We're now 1 bit into the first preamble byte, which is always a 1
-			nbits = 1;
-			curNib = 1;
-
-			prevNib = 0;
-			phaseLow = true;
-			state = STATE_PACKET;
-
-			i++;
-
-			//Decode just this one packet
-			for(; (i<ilen) && (state != STATE_IDLE); i++)
-			{
-				tnow = din_i->m_offsets[i];
-				tlen = din_i->m_durations[i];
-
-				int ci = m_pointsI[i];
-				int cq = m_pointsQ[i];
-
-				//Advance the scrambler for each constellation point
-				auto b32 = (scrambler >> 32) & 1;
-				auto b19 = (scrambler >> 19) & 1;
-				auto b12 = (scrambler >> 12) & 1;
-				if(masterMode)
-					scrambler = (scrambler << 1) | ( b32 ^ b12 );
-				else
-					scrambler = (scrambler << 1) | ( b32 ^ b19 );
-
-				//Extract scrambler bits we care about for the data bits
-				auto b16 = (scrambler >> 16) & 1;
-				bool b8 = (scrambler >> 8) & 1;
-				bool b6 = (scrambler >> 6) & 1;
-				bool b3 = (scrambler >> 3) & 1;
-				bool b0 = (scrambler & 1);
-
-				switch(state)
-				{
-					case STATE_PACKET:
-
-						//Look for ESD
-						//96.3.3.3.5
-						if( (ci == 0) && (cq == 0) )
-							state = STATE_ESD_1;
-
-						//No, it's a data symbol
-						else
-						{
-							//Decode to a sequence of 3 scrambled data bits
-							uint8_t sd = 0;
-							switch(ci)
-							{
-								//-1 -> 3'b000, 0 = 3'b001, 1 = 3'b010
-								case -1:
-									sd = cq + 1;
-									break;
-
-								//Q=0 is disallowed here
-								case 0:
-									if(cq == -1)
-										sd = 3;
-									else //if(cq == 1)
-										sd = 4;
-									break;
-
-								//-1 -> 3'b101, 0 -> 3'b110, 1 -> 3'b111
-								case 1:
-									sd = cq + 6;
-
-								default:
-									break;
-							}
-
-							/*
-								Descramble sd per 40.3.1.4.2
-
-								Sy0 = scr0
-								sy1 = scr3 ^ 8
-								sy2 = scr6 ^ 16
-								sy3 = scr9 ^ 14 ^ 19 ^ 24
-
-								sx0 = scr4 ^ scr6
-								sx1 = scr7 ^ 9 ^ 12 ^ 14
-								sx2 = scr10 ^ 12 ^ 20 ^ 22
-								sx3 = scr13 ^ 15 ^ 18 ^ 20 ^ 23 ^ 25 ^ 28 ^ 30
-
-								scrambler for 7:4 is sx
-								scrambler for 3:0 is sy
-							 */
-							bool sy0 = b0;
-							bool sy1 = b3 ^ b8;
-							bool sy2 = b6 ^ b16;
-							sd ^= (sy2 << 2) ^ (sy1 << 1) ^ sy0;
-
-							//Add the 3 descrambled bits into the current nibble
-							curNib |= (sd << nbits);
-							nbits += 3;
-
-							//At this point we should have 3, 4, 5, or 6 bits in the current nibble-in-progress.
-							//If we have at least a whole nibble, process it
-							if(nbits >= 4)
-							{
-								uint8_t nib = curNib & 0xf;
-
-								curNib >>= 4;
-								nbits -= 4;
-
-								//Combine nibbles into bytes
-								if(!phaseLow)
-								{
-									uint8_t bval = (nib << 4) | prevNib;
-
-									//Add the byte
-									bytes.push_back(bval);
-									starts.push_back(bytestart);
-
-									//Byte end time depends on how many bits from this symbol weren't consumed
-									bytestart = tnow + (tlen * (2 - nbits) / 3);
-
-									ends.push_back(bytestart);
-								}
-
-								prevNib = nib;
-								phaseLow = !phaseLow;
-							}
-						}
-
-						break;
-
-					case STATE_ESD_1:
-
-						//Look for ESD, bail if malformed
-						if( (ci == 0) && (cq == 0) )
-							state = STATE_ESD_2;
-						else
-							state = STATE_IDLE;
-
-						break;
-
-					case STATE_ESD_2:
-
-						//Good ESD, decode what we got
-						if( (ci == 1) && (cq == 1) )
-							BytesToFrames(bytes, starts, ends, cap);
-
-						//ESD with error
-						//TODO: how to handle this? for now decode it anyway
-						else if( (ci == -1) && (cq == -1) )
-							BytesToFrames(bytes, starts, ends, cap);
-
-						//invalid, don't try to decode
-						else
-						{}
-
-						//Either way, clear frame data and move on
-						bytes.clear();
-						starts.clear();
-						ends.clear();
-						state = STATE_IDLE;
-						break;
-
-					default:
-						break;
-				}
-			}
+			BytesToFrames(bytes, starts, ends, cap);
 		}
 	}
 

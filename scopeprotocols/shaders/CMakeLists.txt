@@ -58,6 +58,7 @@ add_compute_shaders(
 		EnvelopeFilter.glsl
 		Ethernet100BaseT1_PAM3Decoder.glsl
 		Ethernet100BaseT1_Descrambler.glsl
+		Ethernet100BaseT1_Decoder.glsl
 		Ethernet100BaseTX_4b5bDecode.glsl
 		Ethernet100BaseTX_Descrambler.glsl
 		Ethernet100BaseTX_FindSSD.glsl
