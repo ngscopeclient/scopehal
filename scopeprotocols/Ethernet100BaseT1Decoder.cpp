@@ -321,10 +321,13 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
-		//CPU side coalescing
+		//CPU side coalescing (TODO move this to GPU)
 		auto pstart = tmp_vstarts->GetCpuPointer();
 		auto pscramble = tmp_vscramblers->GetCpuPointer();
-		vector< pair<uint32_t, int64_t> > packets;
+		ScratchBuffer_uint32_t packetStarts(ScratchBufferManager::U32_GPU_WAVEFORM);	//TODO U32_GPU_SMALL
+		ScratchBuffer_int64_t packetScramblers(ScratchBufferManager::I64_GPU_SMALL);
+		packetStarts->clear();
+		packetScramblers->clear();
 		for(size_t i=0; i<nthreads; i++)
 		{
 			uint32_t outbase = i * cfg.maxOutputPerThread;
@@ -335,18 +338,20 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			{
 				for(size_t j=0; j<numEntries; j++)
 				{
-					packets.push_back(pair<uint32_t, int64_t>(
-						pstart[outbase + j + 1],
-						pscramble[outbase + j + 1]));
+					packetStarts->push_back(pstart[outbase + j + 1]);
+					packetScramblers->push_back(pscramble[outbase + j + 1]);
 				}
 			}
 		}
+		packetStarts->MarkModifiedFromCpu();
+		packetScramblers->MarkModifiedFromCpu();
 
 		//Decode each packet that the GPU found
-		for(auto pinfo : packets)
+		size_t npackets = packetStarts->size();
+		for(size_t j=0; j<npackets; j++)
 		{
-			scrambler = pinfo.second;
-			size_t i = pinfo.first;
+			scrambler = (*packetScramblers)[j];
+			size_t i = (*packetStarts)[j];
 
 			if(i < 2)		//make sure we have a full symbol worth of data
 				continue;
