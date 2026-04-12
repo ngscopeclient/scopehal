@@ -155,6 +155,10 @@ void DivideFilter::RefreshScalarVector(size_t iScalar, size_t iVector)
 
 	//TODO: support different output formats
 
+	//Copy units
+	SetXAxisUnits(GetInput(iVector).GetXAxisUnits());
+	SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);
+
 	if(sparse)
 	{
 		//Set up the output waveform
@@ -203,9 +207,12 @@ void DivideFilter::RefreshScalarVector(size_t iScalar, size_t iVector)
 
 void DivideFilter::DoRefreshVectorVector()
 {
-	//Output units track the input (even if we don't have a valid second output)
+	//Output units track the input (even if we don't have a valid second input)
 	if(GetInput(0))
+	{
 		SetXAxisUnits(GetInput(0).GetXAxisUnits());
+		SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);
+	}
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

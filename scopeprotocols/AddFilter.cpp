@@ -102,9 +102,18 @@ void AddFilter::DoRefreshScalarScalar()
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
 	SetData(nullptr, 0);
 
+	//Set up units and complain if they're inconsistent
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
+	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
+		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
+	{
+		AddErrorMessage("Inconsistent units", "The inputs have different X or Y axis units");
+		SetData(nullptr, 0);
+		return;
+	}
+
 	//Add value
-	//TODO: how to handle unequal units?
-	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
 	m_streams[0].m_value = GetInput(0).GetScalarValue() + GetInput(1).GetScalarValue();
 }
 
@@ -126,6 +135,17 @@ void AddFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 	}
 	din->PrepareForCpuAccess();
 	auto len = din->size();
+
+	//Set up units and complain if they're inconsistent
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
+	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
+		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
+	{
+		AddErrorMessage("Inconsistent units", "The inputs have different X or Y axis units");
+		SetData(nullptr, 0);
+		return;
+	}
 
 	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
@@ -184,8 +204,8 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Set up units and complain if they're inconsistent
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
 		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
