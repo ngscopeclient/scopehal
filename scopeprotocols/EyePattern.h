@@ -258,6 +258,8 @@ protected:
 	std::shared_ptr<ComputePipeline> m_eyeNormalizeReduceComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeNormalizeScaleComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeIndexSearchPipeline;
+
+	size_t FindCenterOfMass(std::vector<float>& hist, size_t start, size_t end);
 };
 
 #endif

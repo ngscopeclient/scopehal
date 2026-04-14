@@ -244,32 +244,6 @@ void EyePattern::Refresh(
 	cap->m_numLevels = m_parameters[m_numLevelsName].GetIntVal();
 	int64_t* data = cap->GetAccumData();
 
-	//Set eye midpoint levels
-	//If NRZ, it's the vertical midpoint
-	if(cap->m_midpoints.size() != cap->m_numLevels)
-	{
-		cap->m_midpoints.resize(cap->m_numLevels);
-		switch(cap->m_numLevels)
-		{
-			//NRZ: midpoint of eye is midpoint of the single opening
-			case 2:
-				cap->m_midpoints[0] = m_height / 2;
-				break;
-
-			//PAM3 / MLT3: assume we're centered and use the midpoint of the top and bottom halves (1/4 and 3/4 points)
-			case 3:
-				cap->m_midpoints[0] = m_height / 4;
-				cap->m_midpoints[1] = m_height * 3 / 4;
-				break;
-
-			default:
-				m_errorTitle = "Unimplemented modulation order";
-				AddErrorMessage(string("Don't know how to find midpoints for ") +
-					to_string(cap->m_numLevels) + " level eye");
-				break;
-		}
-	}
-
 	//Find all toggles in the clock
 	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clock);
 	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clock);
@@ -429,12 +403,100 @@ void EyePattern::Refresh(
 	else
 		cap->Normalize();
 
+	//Set eye midpoint levels
+	//If NRZ, it's the vertical midpoint
+	//TODO: this should be scaled somehow by a histogram through the eye or something
+	if(cap->m_midpoints.size() != cap->m_numLevels)
+	{
+		LogTrace("Calculating nominal eye opening positions\n");
+		LogIndenter li2;
+
+		//Histogram based flow
+		int drange = 10;
+		vector<float> hist;
+		hist.resize(m_height);
+		cap->GetOutData().PrepareForCpuAccess();
+		auto adata = cap->GetData();
+		auto xmid = m_width / 2;
+		for(size_t y=0; y<m_height; y++)
+		{
+			float accum = 0;
+			for(int dx = -drange; dx <= drange; dx++)
+			{
+				int x = xmid + dx;
+				if( (x < 0) || (x > (int)m_width) )
+					continue;
+				accum += adata[y*m_width + x];
+			}
+			hist[y] = accum;
+		}
+
+		//TODO save in capture??
+		vector<int> symbolLevels;
+		symbolLevels.resize(cap->m_numLevels);
+
+		//TODO: divide evenly
+		switch(cap->m_numLevels)
+		{
+			//NRZ: look for levels above / below centerline
+			case 2:
+				symbolLevels[0] = FindCenterOfMass(hist, 0, m_height / 2);
+				symbolLevels[1] = FindCenterOfMass(hist, m_height / 2, m_height-1);
+				break;
+
+			//PAM3 / MLT3: assume we're centered and use the midpoint of the top and bottom halves (1/4 and 3/4 points)
+			case 3:
+				symbolLevels[0] = FindCenterOfMass(hist, 0, m_height / 3);
+				symbolLevels[1] = FindCenterOfMass(hist, m_height/3, 2*m_height / 3);
+				symbolLevels[2] = FindCenterOfMass(hist, 2*m_height / 3, m_height-1);
+				break;
+
+			default:
+				m_errorTitle = "Unimplemented modulation order";
+				AddErrorMessage(string("Don't know how to find midpoints for ") +
+					to_string(cap->m_numLevels) + " level eye");
+				break;
+		}
+
+		{
+			LogTrace("Symbol levels\n");
+			LogIndenter li3;
+			for(auto p : symbolLevels)
+				LogTrace("%d\n", p);
+		}
+
+		//Find the midpoints
+		LogTrace("Midpoints\n");
+		cap->m_midpoints.resize(cap->m_numLevels - 1);
+		for(size_t i=0; i<cap->m_midpoints.size(); i++)
+		{
+			cap->m_midpoints[i] = (symbolLevels[i] + symbolLevels[i+1]) / 2;
+			LogTrace("%d\n", cap->m_midpoints[i]);
+		}
+	}
+
 	m_streams[2].m_value = cap->GetTotalUIs();
 	m_streams[3].m_value = cap->GetTotalSamples();
 
 	//If we have an eye mask, prepare it for processing
 	if(m_mask.GetFileName() != "")
 		DoMaskTest(cap);
+}
+
+/**
+	@brief Finds the mass weighted center of a histogram peak
+ */
+size_t EyePattern::FindCenterOfMass(vector<float>& hist, size_t start, size_t end)
+{
+	float sum = 0;
+	float norm = 0;
+	for(size_t i=start; i<=end; i++)
+	{
+		sum += i * hist[i];
+		norm += hist[i];
+	}
+
+	return round(sum / norm);
 }
 
 #ifdef __x86_64__

@@ -181,7 +181,7 @@ double EyeWaveform::GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, 
 	}
 	else
 	{
-		//Unit vector from cursor towards the center of the eye
+		//Unit vector from cursor towards the center of the eye opening
 		//BER at center of eye is zero by definition
 		float uvecx = pointx - xmid;
 		float uvecy = pointy - ymid;
@@ -203,6 +203,7 @@ double EyeWaveform::GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, 
 		}
 
 		//Continue along the path until we hit the edge of the eye
+		//*or the next eye opening*
 		int64_t totalhits = innerhits;
 		for(size_t i=len; ; i++)
 		{
