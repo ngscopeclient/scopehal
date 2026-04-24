@@ -76,13 +76,16 @@ public:
 	/**
 		@brief Sets timeouts for the connection
 
+		@return true if RX and TX timeouts successfully set
+
 		@param txUs		Send timeout, in microseconds
 		@param rxUs		Receive timeout, in microseconds
 	 */
-	void SetTimeouts(unsigned int txUs, unsigned int rxUs)
+	bool SetTimeouts(unsigned int txUs, unsigned int rxUs)
 	{
-		m_socket.SetTxTimeout(txUs);
-		m_socket.SetRxTimeout(rxUs);
+		bool success = m_socket.SetTxTimeout(txUs);
+		success = success & m_socket.SetRxTimeout(rxUs);
+		return success;
 	}
 
 protected:

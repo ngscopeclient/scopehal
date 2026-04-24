@@ -163,6 +163,7 @@ set(SCOPEHAL_SOURCES
 	SwitchMatrix.cpp
 	RemoteBridgeOscilloscope.cpp
 
+	AgilentMultimeter.cpp
 	AgilentOscilloscope.cpp
 	AlientekPowerSupply.cpp
 	AntikernelLabsOscilloscope.cpp
