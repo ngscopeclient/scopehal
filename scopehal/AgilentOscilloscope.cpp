@@ -857,7 +857,11 @@ void AgilentOscilloscope::Stop()
 
 void AgilentOscilloscope::ForceTrigger()
 {
-	LogError("AgilentOscilloscope::ForceTrigger not implemented\n");
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(":SING");
+	m_transport->SendCommand(":TRIG:FORC");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 bool AgilentOscilloscope::IsTriggerArmed()
