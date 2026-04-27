@@ -195,12 +195,6 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
  */
 void PipelineCacheManager::LoadFromDisk()
 {
-	if(g_vulkanDeviceIsMoltenVK)
-	{
-		LogTrace("Device is MoltenVK, skipping pipeline cache load\n");
-		return;
-	}
-
 	lock_guard<mutex> lock(m_mutex);
 
 	LogTrace("Loading pipeline cache\n");
@@ -298,12 +292,6 @@ void PipelineCacheManager::LoadFromDisk()
  */
 void PipelineCacheManager::SaveToDisk()
 {
-	if(g_vulkanDeviceIsMoltenVK)
-	{
-		LogTrace("Device is MoltenVK, skipping pipeline cache save\n");
-		return;
-	}
-
 	lock_guard<mutex> lock(m_mutex);
 
 	LogTrace("Saving cache\n");
