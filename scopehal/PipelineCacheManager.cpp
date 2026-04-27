@@ -158,9 +158,9 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
 	if(m_vkCache.find(key) != m_vkCache.end())
 	{
 		//Apple paravirtual device seems to have broken pipeline caches, always miss
-		if(g_vulkanDeviceIsApplePV)
+		/*if(g_vulkanDeviceIsApplePV)
 			LogTrace("WORKAROUND: ignoring pipeline cache hit because Apple PV has broken caching");
-		else if(m_vkCacheTimestamps[key] != target)
+		else */if(m_vkCacheTimestamps[key] != target)
 			LogTrace("Ignoring out of date cache entry for %s\n", key.c_str());
 		else
 		{
@@ -198,6 +198,12 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
  */
 void PipelineCacheManager::LoadFromDisk()
 {
+	if(g_vulkanDeviceIsMoltenVK)
+	{
+		LogTrace("Device is MoltenVK, skipping pipeline cache load\n");
+		return;
+	}
+
 	lock_guard<mutex> lock(m_mutex);
 
 	LogTrace("Loading pipeline cache\n");
@@ -295,6 +301,12 @@ void PipelineCacheManager::LoadFromDisk()
  */
 void PipelineCacheManager::SaveToDisk()
 {
+	if(g_vulkanDeviceIsMoltenVK)
+	{
+		LogTrace("Device is MoltenVK, skipping pipeline cache save\n");
+		return;
+	}
+
 	lock_guard<mutex> lock(m_mutex);
 
 	LogTrace("Saving cache\n");
