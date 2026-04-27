@@ -252,6 +252,12 @@ bool g_vulkanDeviceIsAnyMesa = false;
  */
 bool g_vulkanDeviceIsMoltenVK = false;
 
+/**
+	@brief Indicates that the Vulkan driver is an Apple paravirtualization device
+	@ingroup vksupport
+ */
+bool g_vulkanDeviceIsApplePV = false;
+
 void VulkanCleanup();
 
 bool VulkanInitInstance(
@@ -724,6 +730,12 @@ void VulkanCreateDevice(
 			case vk::DriverId::eMoltenvk:
 				g_vulkanDeviceIsMoltenVK = true;
 				LogDebug("Driver: vk::DriverId::eMoltenvk\n");
+
+				if(!strcmp(&properties.deviceName[0], "Apple Paravirtual device"))
+				{
+					LogDebug("Apple paravirtual device detected\n");
+					g_vulkanDeviceIsApplePV = true;
+				}
 				break;
 
 			case vk::DriverId::eNvidiaProprietary:

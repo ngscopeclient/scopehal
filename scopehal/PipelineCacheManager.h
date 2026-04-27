@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -51,7 +51,7 @@ struct PipelineCacheFileHeader
 /**
 	@brief Helper for managing Vulkan / vkFFT pipeline cache objects
 
-	The cache is stored on disk under the .cache/glscopeclient directory on Linux, or FIXME on Windows.
+	The cache is stored on disk under the .cache/ngscopeclient directory on Linux, or FIXME on Windows.
 
 	Raw data: $cachedir/shader_raw_[key].bin
 	Vulkan shader data: $cachedir/shader_pipeline_[key].bin

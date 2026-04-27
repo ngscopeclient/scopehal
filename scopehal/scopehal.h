@@ -277,6 +277,7 @@ extern std::unique_ptr<QueueManager> g_vkQueueManager;
 extern bool g_vulkanDeviceIsIntelMesa;
 extern bool g_vulkanDeviceIsAnyMesa;
 extern bool g_vulkanDeviceIsMoltenVK;
+extern bool g_vulkanDeviceIsApplePV;
 extern uint32_t g_vkPinnedMemoryHeap;
 extern uint32_t g_vkLocalMemoryHeap;
 extern bool g_vulkanDeviceHasUnifiedMemory;
