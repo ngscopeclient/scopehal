@@ -46,7 +46,7 @@ FrequencyMeasurement::FrequencyMeasurement(const string& color)
 
 	m_span.resize(2);
 
-	if(g_hasShaderInt64)
+	if(g_hasShaderInt64 && g_hasShaderFloat64)
 		m_computePipeline = make_shared<ComputePipeline>("shaders/FrequencyMeasurement.spv", 5, sizeof(uint32_t));
 }
 
@@ -146,7 +146,7 @@ void FrequencyMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//GPU inner loop
 	double interval = 0;
-	if(g_hasShaderInt64)
+	if(g_hasShaderInt64 && g_hasShaderFloat64)
 	{
 		cmdBuf.begin({});
 
