@@ -157,10 +157,7 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
 	//Already in the cache? Return that copy
 	if(m_vkCache.find(key) != m_vkCache.end())
 	{
-		//Apple paravirtual device seems to have broken pipeline caches, always miss
-		if(g_vulkanDeviceIsMoltenVK)
-			LogTrace("WORKAROUND: ignoring pipeline cache hit because MoltenVK issues");
-		else if(m_vkCacheTimestamps[key] != target)
+		if(m_vkCacheTimestamps[key] != target)
 			LogTrace("Ignoring out of date cache entry for %s\n", key.c_str());
 		else
 		{
