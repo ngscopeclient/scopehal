@@ -128,6 +128,8 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
  */
 bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
 {
+	const lock_guard<recursive_mutex> lock(m_mutex);
+
 	//Not busy? Return immediately
 	if(!m_fenceBusy)
 		return true;
