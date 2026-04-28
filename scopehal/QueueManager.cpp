@@ -78,6 +78,10 @@ void QueueHandle::AddName(string name)
 {
 	const lock_guard<recursive_mutex> lock(m_mutex);
 
+	//Check if the name is already in the list
+	if(m_name.find(name) != string::npos)
+		return;
+
 	if(m_name.size() != 0)
 		m_name += ";";
 	m_name += name;
