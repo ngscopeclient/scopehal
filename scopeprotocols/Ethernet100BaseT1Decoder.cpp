@@ -379,7 +379,10 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 		size_t maxPacketBytes = 2048;
 		size_t npackets = packetStarts->size();
+		LogTrace("GPU found %zu packets\n", npackets);
 
+		//skip this if no packets identified
+		if(npackets)
 		{
 			#ifdef HAVE_NVTX
 				nvtx3::scoped_range nrange2("Decode");
@@ -719,6 +722,15 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 					break;
 
 				case STATE_ESD_1:
+
+					//at end of packet reset scrambler state if we're not locked
+					if(!scramblerLocked)
+					{
+						lastScramblerError = 0;
+						scramblerErrors = 0;
+						idlesMatched = 0;
+						totalErrorsReported = 0;
+					}
 
 					//Look for ESD, bail if malformed
 					if( (ci == 0) && (cq == 0) )
