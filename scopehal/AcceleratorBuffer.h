@@ -814,6 +814,17 @@ public:
 		{
 			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopyNonBlocking();
 
+			//Add a barrier
+			cmdBuf.pipelineBarrier(
+				vk::PipelineStageFlagBits::eComputeShader,
+				vk::PipelineStageFlagBits::eTransfer,
+				{},
+				vk::MemoryBarrier(
+					vk::AccessFlagBits::eShaderWrite,
+					vk::AccessFlagBits::eTransferRead),
+				{},
+				{});
+
 			//Make the transfer request
 			vk::BufferCopy region(0, 0, m_size * sizeof(T));
 			cmdBuf.copyBuffer(**rhs.m_gpuBuffer, **m_gpuBuffer, {region});
@@ -1392,6 +1403,15 @@ protected:
 
 		//Make the transfer request
 		g_vkTransferCommandBuffer->begin({});
+		g_vkTransferCommandBuffer->pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eShaderWrite,
+				vk::AccessFlagBits::eTransferRead),
+			{},
+			{});
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		g_vkTransferCommandBuffer->copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
 
@@ -1420,6 +1440,16 @@ protected:
 
 		//Make the transfer request
 		g_vkTransferCommandBuffer->begin({});
+
+		g_vkTransferCommandBuffer->pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eShaderWrite,
+				vk::AccessFlagBits::eTransferRead),
+			{},
+			{});
 
 		vk::BufferCopy startregion(0, 0, sizeof(T));
 		size_t endOffset = (m_size - 1) * sizeof(T);
