@@ -178,7 +178,7 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	if(chosenIdx < 0)
 		LogFatal("Failed to locate a vulkan queue satisfying the flags 0x%x", (unsigned int)flags);
 
-	LogTrace("Reusing handle idx=%zu name=%s rc=%zu for name=%s\n",
+	LogTrace("Reusing handle idx=%zu name=%s rc=%ld for name=%s\n",
 		chosenIdx,
 		m_queues[chosenIdx].Handle->GetName().c_str(),
 		m_queues[chosenIdx].Handle.use_count(),
