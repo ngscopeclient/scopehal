@@ -72,7 +72,7 @@ QueueHandle::~QueueHandle()
 
 void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 {
-	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
+	const scoped_lock lock(m_queue->GetMutex(), m_fenceMutex);
 
 	_waitFence();
 
@@ -84,14 +84,19 @@ void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 
 void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 {
-	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
+	//Submit while holding both mutexes
+	{
+		const scoped_lock lock(m_queue->GetMutex(), m_fenceMutex);
+		_waitFence();
 
-	_waitFence();
+		m_fenceBusy = true;
 
-	m_fenceBusy = true;
+		vk::SubmitInfo info({}, {}, *cmdBuf);
+		m_queue->GetQueue()->submit(info, **m_fence);
+	}
 
-	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->GetQueue()->submit(info, **m_fence);
+	//Then wait while only holding the fence mutex
+	const lock_guard<recursive_mutex> lock(m_fenceMutex);
 	_waitFence();
 }
 
@@ -103,7 +108,7 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 
 bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
 {
-	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
+	const lock_guard<recursive_mutex> lock(m_fenceMutex);
 
 	//Not busy? Return immediately
 	if(!m_fenceBusy)

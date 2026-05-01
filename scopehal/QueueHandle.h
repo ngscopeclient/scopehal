@@ -46,8 +46,12 @@
 #include "QueueWrapper.h"
 
 /**
- * @brief Wrapper around a Vulkan Queue, protected by mutex for thread safety.
- *
+	@brief Wrapper around a Vulkan Queue object
+
+	Many QueueHandle's can point to a single QueueWrapper and are thread safe, but a single QueueHandle cannot be
+	used from more than one thread simultaneously.
+
+	TODO: how does this play with g_vkTransferQueue? for now keep a lock on the fence for that use case
  */
 class QueueHandle
 {
@@ -96,6 +100,9 @@ protected:
 	bool m_fenceBusy;
 
 	std::string m_fenceName;
+
+	///@brief The mutex controlling access to the fence
+	std::recursive_mutex m_fenceMutex;
 };
 
 
