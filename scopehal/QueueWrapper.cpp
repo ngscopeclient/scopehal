@@ -32,34 +32,19 @@
 	@author Andrew D. Zonenberg
 	@brief Vulkan queue management
  */
-
-#include <vulkan/vulkan_raii.hpp>
-
-#include "log.h"
+#include "scopehal.h"
 #include "QueueWrapper.h"
 
 using namespace std;
-extern bool g_hasDebugUtils;
 
-QueueWrapper::QueueWrapper(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, string name)
+QueueWrapper::QueueWrapper(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index)
 	: m_family(family)
 	, m_index(index)
 	, m_mutex()
-	, m_name()
 	, m_device(device)
 	, m_queue(make_unique<vk::raii::Queue>(*device, family, index))
 {
-	AddName(name);
 
-	//Try to name the queue
-	if(g_hasDebugUtils)
-	{
-		m_device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
-				reinterpret_cast<uint64_t>(static_cast<VkQueue>(**m_queue)),
-				m_name.c_str()));
-	}
 }
 
 QueueWrapper::~QueueWrapper()
@@ -71,17 +56,18 @@ QueueWrapper::~QueueWrapper()
 	m_device = nullptr;
 }
 
-void QueueWrapper::AddName(string name)
+/**
+	@brief Update the debug name after an entry has been added or removed
+ */
+void QueueWrapper::UpdateName()
 {
-	const lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Check if the name is already in the list
-	if(m_name.find(name) != string::npos)
-		return;
-
-	if(m_name.size() != 0)
-		m_name += ";";
-	m_name += name;
+	m_name = "";
+	for(auto& name : m_names)
+	{
+		if(m_name.size() != 0)
+			m_name += ";";
+		m_name += name;
+	}
 
 	if(g_hasDebugUtils)
 	{

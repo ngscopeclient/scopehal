@@ -39,19 +39,19 @@
 using namespace std;
 extern bool g_hasDebugUtils;
 
-QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, string name)
-	: m_fence(make_unique<vk::raii::Fence>(*device, vk::FenceCreateInfo()))
+QueueHandle::QueueHandle(std::shared_ptr<QueueWrapper>& queue, string name)
+	: m_queue(queue)
+	, m_fence(make_unique<vk::raii::Fence>(*queue->GetDevice(), vk::FenceCreateInfo()))
 	, m_fenceBusy(false)
 	, m_fenceName(name)
 {
-	m_queue = make_shared<QueueWrapper>(device, family, index, name);
-
-	AddName(name);
+	//Add us as a named user of the physical queue
+	m_queue->AddName(name);
 
 	//Name our fence (this is private to the QueueHandle)
 	if(g_hasDebugUtils)
 	{
-		device->setDebugUtilsObjectNameEXT(
+		m_queue->GetDevice()->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eFence,
 				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
@@ -61,6 +61,8 @@ QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family
 
 QueueHandle::~QueueHandle()
 {
+	m_queue->RemoveName(m_fenceName);
+
 	{
 		const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
 		m_fence = nullptr;

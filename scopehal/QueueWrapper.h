@@ -47,11 +47,24 @@ class QueueLock;
 class QueueWrapper
 {
 public:
-	QueueWrapper(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, std::string name);
+	QueueWrapper(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index);
 	~QueueWrapper();
 
 	///@brief Append a name to the queue, used for debugging
-	void AddName(std::string name);
+	void AddName(std::string name)
+	{
+		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		m_names.emplace(name);
+		UpdateName();
+	}
+
+	///@brief Remove a name to the queue, used for debugging
+	void RemoveName(std::string name)
+	{
+		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		m_names.erase(name);
+		UpdateName();
+	}
 
 	/**
 		@brief Get the name of this queue
@@ -93,6 +106,8 @@ public:
 
 protected:
 
+	void UpdateName();
+
 	friend QueueLock;
 
 	///@brief The mutex controlling access to the queue
@@ -100,6 +115,9 @@ protected:
 
 	///@brief Debug name of the queue
 	std::string m_name;
+
+	///@brief Set of names
+	std::set<std::string> m_names;
 
 	///@brief The Vulkan device this queue submits to
 	std::shared_ptr<vk::raii::Device> m_device;

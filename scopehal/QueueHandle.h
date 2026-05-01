@@ -53,16 +53,8 @@ class QueueHandle
 {
 public:
 
-	QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, std::string name);
+	QueueHandle(std::shared_ptr<QueueWrapper>& queue, std::string name);
 	~QueueHandle();
-
-	/**
-		@brief Append a name to the queue, used for debugging
-
-		(this will get removed once we make QueueHandle's single owner objects)
-	 */
-	void AddName(std::string name)
-	{ m_queue->AddName(name); }
 
 	/// Submit the given command buffer on the queue
 	void Submit(vk::raii::CommandBuffer const& cmdBuf);
@@ -99,12 +91,11 @@ protected:
 
 protected:
 	friend QueueLock;
+	std::shared_ptr<QueueWrapper> m_queue;
 	std::unique_ptr<vk::raii::Fence> m_fence;
 	bool m_fenceBusy;
 
 	std::string m_fenceName;
-
-	std::shared_ptr<QueueWrapper> m_queue;
 };
 
 

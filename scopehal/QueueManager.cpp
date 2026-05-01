@@ -47,8 +47,19 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 {
 	auto families = phys->getQueueFamilyProperties();
 	for(size_t family=0; family<families.size(); family++)
+	{
 		for(size_t idx=0; idx<families[family].queueCount; idx++)
-			m_queues.push_back(QueueInfo{family, idx, families[family].queueFlags, nullptr});
+		{
+			m_queues.push_back(
+				QueueInfo
+				{
+					family,
+					idx,
+					families[family].queueFlags,
+					make_shared<QueueWrapper>(device, family, idx)
+				});
+		}
+	}
 	//Sort the queues in ascending order of feature flag count
 	//FIXME-CXX20 Use std::popcount() for sorting when we move to C++20
 	static_assert(sizeof(vk::QueueFlags::MaskType) == sizeof(uint32_t));
@@ -110,16 +121,16 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 	}
 
 	//Print out the list of eligible queues for each pool
-	LogDebug("Eligible queues:\n");
+	LogTrace("Eligible queues:\n");
 	for(auto it : m_poolNames)
 	{
 		LogIndenter li2;
 		auto& queues = eligiblePools[it.first];
-		LogDebug("%s:\n", it.second.c_str());
+		LogTrace("%s:\n", it.second.c_str());
 		for(auto& q : queues)
 		{
 			LogIndenter li3;
-			LogDebug("Family=%zu Index=%zu Flags=%08x\n", q.Family, q.Index, (uint32_t)q.Flags);
+			LogTrace("Family=%zu Index=%zu Flags=%08x\n", q.Family, q.Index, (uint32_t)q.Flags);
 		}
 	}
 
@@ -134,6 +145,8 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 {
 	const lock_guard<mutex> lock(m_mutex);
 
+	//TODO: smart allocation from queue pools to create less contention
+
 	//This will choose the first queue with matching flags that is not yet used.
 	//If all queues with matching flags are used, the queue with the fewest
 	//existing handles is chosen.
@@ -147,12 +160,12 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 			continue;
 
 		//If handle is unallocated, use it right away
-		if(m_queues[i].Handle.use_count() == 0)
+		if(m_queues[i].Handle.use_count() <= 1)
 		{
-			LogDebug("QueueManager creating family=%zu index=%zu name=%s\n", m_queues[i].Family, m_queues[i].Index, name.c_str());
-			m_queues[i].Handle = make_shared<QueueHandle>(
-				m_device, m_queues[i].Family, m_queues[i].Index, name);
-			return m_queues[i].Handle;
+			LogTrace("Creating family=%zu index=%zu name=%s\n",
+				m_queues[i].Family, m_queues[i].Index, name.c_str());
+
+			return make_shared<QueueHandle>(m_queues[i].Handle, name);
 		}
 
 		//Otherwise find the queue with the fewest existing handles
@@ -165,9 +178,11 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	if(chosenIdx < 0)
 		LogFatal("Failed to locate a vulkan queue satisfying the flags 0x%x", (unsigned int)flags);
 
-	LogTrace("QueueManager reusing handle idx=%zu name=%s for name=%s\n",
-		chosenIdx, m_queues[chosenIdx].Handle->GetName().c_str(), name.c_str());
-	m_queues[chosenIdx].Handle->AddName(name);
+	LogTrace("Reusing handle idx=%zu name=%s rc=%zu for name=%s\n",
+		chosenIdx,
+		m_queues[chosenIdx].Handle->GetName().c_str(),
+		m_queues[chosenIdx].Handle.use_count(),
+		name.c_str());
 
-	return m_queues[chosenIdx].Handle;
+	return make_shared<QueueHandle>(m_queues[chosenIdx].Handle, name);
 }

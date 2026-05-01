@@ -147,7 +147,7 @@ protected:
 		size_t Family;
 		size_t Index;
 		vk::QueueFlags Flags;
-		std::shared_ptr<QueueHandle> Handle;
+		std::shared_ptr<QueueWrapper> Handle;
 	};
 
 	///@brief All queues available on the device
