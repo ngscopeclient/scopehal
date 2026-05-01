@@ -70,6 +70,64 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 	LogIndenter li;
 	for(QueueInfo const& qi : m_queues)
 		LogDebug("Family=%zu Index=%zu Flags=%08x\n", qi.Family, qi.Index, (uint32_t)qi.Flags);
+
+	//Names for pools
+	m_poolNames[QUEUE_POOL_RENDER] = "Render";
+	m_poolNames[QUEUE_POOL_RASTERIZE] = "Rasterize";
+	m_poolNames[QUEUE_POOL_DRIVER] = "Driver";
+	m_poolNames[QUEUE_POOL_FILTER] = "Filter";
+	m_poolNames[QUEUE_POOL_TRANSFER] = "Transfer";
+	m_poolNames[QUEUE_POOL_MISC] = "Misc";
+
+	/*
+		Figure out how many queues we have that are *eligible* to be in each pool
+		(have the minimum number of feature flags set to use it).
+
+		This does not guarantee that the queue will actually be placed in the pool.
+	 */
+	std::map<QueuePoolID, std::vector<QueueInfo> > eligiblePools;
+	auto renderFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer;
+	auto computeFlags = vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
+	auto transferFlags = vk::QueueFlagBits::eTransfer;
+	for(auto& q : m_queues)
+	{
+		//Render pool needs graphics, compute, transfer
+		if( (q.Flags & renderFlags) == renderFlags)
+			eligiblePools[QUEUE_POOL_RENDER].push_back(q);
+
+		//Transfer pool just needs transfer
+		if( (q.Flags & transferFlags) == transferFlags)
+			eligiblePools[QUEUE_POOL_TRANSFER].push_back(q);
+
+		//All other pools need compute + transfer
+		if( (q.Flags & computeFlags) == computeFlags)
+		{
+			eligiblePools[QUEUE_POOL_RASTERIZE].push_back(q);
+			eligiblePools[QUEUE_POOL_DRIVER].push_back(q);
+			eligiblePools[QUEUE_POOL_FILTER].push_back(q);
+			eligiblePools[QUEUE_POOL_MISC].push_back(q);
+		}
+	}
+
+	//Print out the list of eligible queues for each pool
+	LogDebug("Eligible queues:\n");
+	for(auto it : m_poolNames)
+	{
+		LogIndenter li2;
+		auto& queues = eligiblePools[it.first];
+		LogDebug("%s:\n", it.second.c_str());
+		for(auto& q : queues)
+		{
+			LogIndenter li3;
+			LogDebug("Family=%zu Index=%zu Flags=%08x\n", q.Family, q.Index, (uint32_t)q.Flags);
+		}
+	}
+
+	//Initialize the queue pools
+
+	//This follows a few basic strategies:
+	//If we have only one queue: it goes in every pool
+	//If we are on an NVIDIA platform and have a lot of queues
 }
 
 shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, std::string name)

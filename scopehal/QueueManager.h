@@ -77,16 +77,40 @@ protected:
 
 
 /**
- * @brief Allocates and hands out std::shared_ptr<QueueHandle> instances for thread-safe access to Vulkan Queues.
- *
- * Each QueueHandle represents a single Vulkan Queue. Many shared pointers to a single
- * QueueHandle may exist at a given time, e.g. if the GPU only provides a single queue
- * of the required type.
+ @brief Allocates and hands out std::shared_ptr<QueueHandle> instances for thread-safe access to Vulkan Queues.
+
+ Each QueueWrapper represents a single Vulkan Queue. Many pointers to a single
+ QueueWrapper, each with its own QueueHandle, may exist at a given time, e.g. if the GPU only provides a single queue
+ of the required type.
  */
 class QueueManager
 {
 public:
 	QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device);
+
+	/**
+		@brief List of different queue pools
+	 */
+	enum QueuePoolID
+	{
+		///@brief Queues used for graphics and display
+		QUEUE_POOL_RENDER,
+
+		///@brief Queues used for rasterizing waveforms
+		QUEUE_POOL_RASTERIZE,
+
+		///@brief Queues used for instrument drivers (compute/transfer only)
+		QUEUE_POOL_DRIVER,
+
+		///@brief Queues used for the filter graph (compute/transfer only)
+		QUEUE_POOL_FILTER,
+
+		///@brief Dedicated transfer-only queues
+		QUEUE_POOL_TRANSFER,
+
+		///@brief Queues used for other miscellaneous stuff like the scope deskew wizard
+		QUEUE_POOL_MISC
+	};
 
 	/// Get a handle to a compute queue
 	std::shared_ptr<QueueHandle> GetComputeQueue(std::string name)
@@ -126,8 +150,14 @@ protected:
 		std::shared_ptr<QueueHandle> Handle;
 	};
 
-	/// All queues available on the device
+	///@brief All queues available on the device
 	std::vector<QueueInfo> m_queues;
+
+	///@brief Queue pools used for allocation
+	std::map<QueuePoolID, std::vector<QueueInfo> > m_pools;
+
+	//Names of pools
+	std::map<QueuePoolID, std::string> m_poolNames;
 };
 
 #endif
