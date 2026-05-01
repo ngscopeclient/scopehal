@@ -111,7 +111,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 
 		vk::CommandPoolCreateInfo poolInfo(
 			vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			m_queue[i]->m_family );
+			m_queue[i]->GetQueue()->m_family );
 		m_pool[i] = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 		vk::CommandBufferAllocateInfo bufinfo(**m_pool[i], vk::CommandBufferLevel::ePrimary, 1);

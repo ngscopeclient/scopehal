@@ -43,6 +43,8 @@
 #include <vector>
 #include <vulkan/vulkan_raii.hpp>
 
+#include "QueueWrapper.h"
+
 class QueueLock;
 
 /**
@@ -52,30 +54,40 @@ class QueueLock;
 class QueueHandle
 {
 public:
+
 	QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, std::string name);
 	~QueueHandle();
 
-	/// Append a name to the queue, used for debugging
-	void AddName(std::string name);
+	/**
+		@brief Append a name to the queue, used for debugging
+
+		(this will get removed once we make QueueHandle's single owner objects)
+	 */
+	void AddName(std::string name)
+	{ m_queue->AddName(name); }
 
 	/// Submit the given command buffer on the queue
 	void Submit(vk::raii::CommandBuffer const& cmdBuf);
+
 	/// Submit the given command buffer on the queue and wait until completion
 	void SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf);
 
-	const std::string& GetName() const
-	{ return m_name; }
+	const std::string GetName() const
+	{ return m_queue->GetName(); }
 
 	/**
 		@brief Wait for all previous submits to complete
 	 */
 	void WaitIdle()
 	{
-		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		const std::lock_guard<std::recursive_mutex> lock(m_queue->GetMutex());
 		_waitFence();
 	}
 
 	bool WaitIdleWithTimeout(uint64_t nanoseconds);
+
+	std::shared_ptr<QueueWrapper> GetQueue()
+	{ return m_queue; }
 
 public:
 	//non-copyable
@@ -87,21 +99,15 @@ protected:
 	/// Must obtain the lock before calling!
 	void _waitFence();
 
-public:
-	const size_t m_family;
-	const size_t m_index;
-
 protected:
 	friend QueueLock;
-	std::recursive_mutex m_mutex;
-	std::string m_name;
-	std::shared_ptr<vk::raii::Device> m_device;
-	std::unique_ptr<vk::raii::Queue> m_queue;
 	std::unique_ptr<vk::raii::Fence> m_fence;
-
 	bool m_fenceBusy;
-};
 
+	std::string m_fenceName;
+
+	std::shared_ptr<QueueWrapper> m_queue;
+};
 
 /**
  * @brief Obtains exclusive access to a Vulkan Queue for the duration of its existence, similar to a std::lock_guard.
@@ -113,12 +119,12 @@ class QueueLock
 {
 public:
 	QueueLock(std::shared_ptr<QueueHandle> handle)
-	: m_lock(handle->m_mutex)
+	: m_lock(handle->GetQueue()->m_mutex)
 	, m_handle(handle)
 	{ handle->_waitFence(); }
 
 	vk::raii::Queue& operator*()
-	{ return *(m_handle->m_queue); }
+	{ return *(m_handle->GetQueue()->GetQueue()); }
 
 public:
 	//non-copyable

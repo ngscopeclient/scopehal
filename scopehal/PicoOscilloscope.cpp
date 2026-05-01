@@ -297,7 +297,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	m_queue = g_vkQueueManager->GetComputeQueue("PicoOscilloscope.queue");
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		m_queue->m_family );
+		m_queue->GetQueue()->m_family );
 
 	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 

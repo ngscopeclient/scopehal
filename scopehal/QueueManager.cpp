@@ -39,85 +39,59 @@
 #include "QueueManager.h"
 
 using namespace std;
-
-
 extern bool g_hasDebugUtils;
 
-
 QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, string name)
-	: m_family(family)
-	, m_index(index)
-	, m_mutex()
-	, m_name()
-	, m_device(device)
-	, m_queue(make_unique<vk::raii::Queue>(*device, family, index))
-	, m_fence(make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo()))
+	: m_fence(make_unique<vk::raii::Fence>(*device, vk::FenceCreateInfo()))
 	, m_fenceBusy(false)
+	, m_fenceName(name)
 {
+	m_queue = make_shared<QueueWrapper>(device, family, index, name);
+
 	AddName(name);
 
+	//Name our fence (this is private to the QueueHandle)
 	if(g_hasDebugUtils)
 	{
-		m_device->setDebugUtilsObjectNameEXT(
+		device->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eFence,
 				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
-				m_name.c_str()));
+				name.c_str()));
 	}
 }
 
 QueueHandle::~QueueHandle()
 {
-	const lock_guard<recursive_mutex> lock(m_mutex);
-	m_fence = nullptr;
-	m_queue = nullptr;
-	m_device = nullptr;
-}
-
-void QueueHandle::AddName(string name)
-{
-	const lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Check if the name is already in the list
-	if(m_name.find(name) != string::npos)
-		return;
-
-	if(m_name.size() != 0)
-		m_name += ";";
-	m_name += name;
-
-	if(g_hasDebugUtils)
 	{
-		m_device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
-				reinterpret_cast<uint64_t>(static_cast<VkQueue>(**m_queue)),
-				m_name.c_str()));
+		const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
+		m_fence = nullptr;
 	}
+	m_queue = nullptr;
 }
 
 void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 {
-	const lock_guard<recursive_mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
 
 	_waitFence();
 
 	m_fenceBusy = true;
 
 	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->submit(info, **m_fence);
+	m_queue->GetQueue()->submit(info, **m_fence);
 }
 
 void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 {
-	const lock_guard<recursive_mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
 
 	_waitFence();
 
 	m_fenceBusy = true;
 
 	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->submit(info, **m_fence);
+	m_queue->GetQueue()->submit(info, **m_fence);
 	_waitFence();
 }
 
@@ -126,21 +100,22 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 
 	@return true if now idle, false if timeout
  */
+
 bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
 {
-	const lock_guard<recursive_mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
 
 	//Not busy? Return immediately
 	if(!m_fenceBusy)
 		return true;
 
 	//Wait exactly once for the submit, time out if not finished
-	if(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, nanoseconds))
+	if(vk::Result::eTimeout == m_queue->GetDevice()->waitForFences({**m_fence}, VK_TRUE, nanoseconds))
 		return false;
 
 	//If we get here, the most recent wait was the one that finished
 	m_fenceBusy = false;
-	m_device->resetFences(**m_fence);
+	m_queue->GetDevice()->resetFences(**m_fence);
 	return true;
 }
 
@@ -151,13 +126,12 @@ void QueueHandle::_waitFence()
 		return;
 
 	//Wait for any previous submit to finish
-	while(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
+	while(vk::Result::eTimeout == m_queue->GetDevice()->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
 	{}
 
 	m_fenceBusy = false;
-	m_device->resetFences(**m_fence);
+	m_queue->GetDevice()->resetFences(**m_fence);
 }
-
 
 QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device)
 : m_phys(phys)

@@ -1038,7 +1038,7 @@ void VulkanCreateDevice(
 	//Make a CommandPool for transfers
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		g_vkTransferQueue->m_family );
+		g_vkTransferQueue->GetQueue()->m_family );
 	g_vkTransferCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 	//Make a CommandBuffer for memory transfers that we can use implicitly during buffer management

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -61,7 +61,7 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	//TODO: Should this really be using the global transfer queue?
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		g_vkTransferQueue->m_family );
+		g_vkTransferQueue->GetQueue()->m_family );
 	m_commandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 	vk::CommandBufferAllocateInfo bufinfo(**m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
 	m_commandBuffer = make_unique<vk::raii::CommandBuffer>(
