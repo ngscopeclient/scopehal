@@ -33,105 +33,11 @@
 	@brief Vulkan queue management
  */
 
-#include <vulkan/vulkan_raii.hpp>
-
 #include "log.h"
 #include "QueueManager.h"
 
 using namespace std;
 extern bool g_hasDebugUtils;
-
-QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, string name)
-	: m_fence(make_unique<vk::raii::Fence>(*device, vk::FenceCreateInfo()))
-	, m_fenceBusy(false)
-	, m_fenceName(name)
-{
-	m_queue = make_shared<QueueWrapper>(device, family, index, name);
-
-	AddName(name);
-
-	//Name our fence (this is private to the QueueHandle)
-	if(g_hasDebugUtils)
-	{
-		device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eFence,
-				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
-				name.c_str()));
-	}
-}
-
-QueueHandle::~QueueHandle()
-{
-	{
-		const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
-		m_fence = nullptr;
-	}
-	m_queue = nullptr;
-}
-
-void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
-{
-	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
-
-	_waitFence();
-
-	m_fenceBusy = true;
-
-	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->GetQueue()->submit(info, **m_fence);
-}
-
-void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
-{
-	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
-
-	_waitFence();
-
-	m_fenceBusy = true;
-
-	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->GetQueue()->submit(info, **m_fence);
-	_waitFence();
-}
-
-/**
-	@brief Wait for previous submits to complete, but only up to a timeout
-
-	@return true if now idle, false if timeout
- */
-
-bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
-{
-	const lock_guard<recursive_mutex> lock(m_queue->GetMutex());
-
-	//Not busy? Return immediately
-	if(!m_fenceBusy)
-		return true;
-
-	//Wait exactly once for the submit, time out if not finished
-	if(vk::Result::eTimeout == m_queue->GetDevice()->waitForFences({**m_fence}, VK_TRUE, nanoseconds))
-		return false;
-
-	//If we get here, the most recent wait was the one that finished
-	m_fenceBusy = false;
-	m_queue->GetDevice()->resetFences(**m_fence);
-	return true;
-}
-
-void QueueHandle::_waitFence()
-{
-	//Not busy? Return immediately
-	if(!m_fenceBusy)
-		return;
-
-	//Wait for any previous submit to finish
-	while(vk::Result::eTimeout == m_queue->GetDevice()->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
-	{}
-
-	m_fenceBusy = false;
-	m_queue->GetDevice()->resetFences(**m_fence);
-}
 
 QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device)
 : m_phys(phys)

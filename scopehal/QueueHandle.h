@@ -30,11 +30,11 @@
 /**
 	@file
 	@author Lain Agan
-	@brief Declaration of QueueManager and QueueHandle
+	@brief Vulkan queue management
  */
 
-#ifndef QueueManager_h
-#define QueueManager_h
+#ifndef QueueHandle_h
+#define QueueHandle_h
 
 #include <map>
 #include <memory>
@@ -44,90 +44,68 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include "QueueWrapper.h"
-#include "QueueHandle.h"
-
-class QueueLock;
 
 /**
- * @brief Obtains exclusive access to a Vulkan Queue for the duration of its existence, similar to a std::lock_guard.
+ * @brief Wrapper around a Vulkan Queue, protected by mutex for thread safety.
  *
- * Use this when you need access to the vk::raii::Queue& directly.
- * Lock is released upon destruction.
  */
-class QueueLock
+class QueueHandle
 {
 public:
-	QueueLock(std::shared_ptr<QueueHandle> handle)
-	: m_lock(handle->GetQueue()->m_mutex)
-	, m_handle(handle)
-	{ handle->_waitFence(); }
 
-	vk::raii::Queue& operator*()
-	{ return *(m_handle->GetQueue()->GetQueue()); }
+	QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, std::string name);
+	~QueueHandle();
 
-public:
-	//non-copyable
-	QueueLock(QueueLock const&) = delete;
-	QueueLock& operator=(QueueLock const&) = delete;
+	/**
+		@brief Append a name to the queue, used for debugging
 
-protected:
-	const std::lock_guard<std::recursive_mutex> m_lock;
-	std::shared_ptr<QueueHandle> m_handle;
-};
+		(this will get removed once we make QueueHandle's single owner objects)
+	 */
+	void AddName(std::string name)
+	{ m_queue->AddName(name); }
 
+	/// Submit the given command buffer on the queue
+	void Submit(vk::raii::CommandBuffer const& cmdBuf);
 
-/**
- * @brief Allocates and hands out std::shared_ptr<QueueHandle> instances for thread-safe access to Vulkan Queues.
- *
- * Each QueueHandle represents a single Vulkan Queue. Many shared pointers to a single
- * QueueHandle may exist at a given time, e.g. if the GPU only provides a single queue
- * of the required type.
- */
-class QueueManager
-{
-public:
-	QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device);
+	/// Submit the given command buffer on the queue and wait until completion
+	void SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf);
 
-	/// Get a handle to a compute queue
-	std::shared_ptr<QueueHandle> GetComputeQueue(std::string name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
+	const std::string GetName() const
+	{ return m_queue->GetName(); }
 
-	/// Get a handle to a render queue
-	/// @note Currently this requires Graphics and Transfer capabilities to simplify texture transfer code in WaveformArea.
-	std::shared_ptr<QueueHandle> GetRenderQueue(std::string name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer, name); }
-
-	/// Get a handle to a transfer queue
-	/// @note This currently requires Compute capabilities so we can barrier on compute operations
-	std::shared_ptr<QueueHandle> GetTransferQueue(std::string name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
-
-	/// Get a handle to a queue that has the given flag bits set, allocating the queue if necessary,
-	/// and set or append name to the queue name for debug
-	std::shared_ptr<QueueHandle> GetQueueWithFlags(vk::QueueFlags flags, std::string name);
-
-public:
-	//non-copyable
-	QueueManager(QueueManager const&) = delete;
-	QueueManager& operator=(QueueManager const&) = delete;
-
-protected:
-	vk::raii::PhysicalDevice* m_phys;
-	std::shared_ptr<vk::raii::Device> m_device;
-
-	/// Mutex to guard allocations
-	std::mutex m_mutex;
-
-	struct QueueInfo
+	/**
+		@brief Wait for all previous submits to complete
+	 */
+	void WaitIdle()
 	{
-		size_t Family;
-		size_t Index;
-		vk::QueueFlags Flags;
-		std::shared_ptr<QueueHandle> Handle;
-	};
+		const std::lock_guard<std::recursive_mutex> lock(m_queue->GetMutex());
+		_waitFence();
+	}
 
-	/// All queues available on the device
-	std::vector<QueueInfo> m_queues;
+	bool WaitIdleWithTimeout(uint64_t nanoseconds);
+
+	std::shared_ptr<QueueWrapper> GetQueue()
+	{ return m_queue; }
+
+public:
+	//non-copyable
+	QueueHandle(QueueHandle const&) = delete;
+	QueueHandle& operator=(QueueHandle const&) = delete;
+
+protected:
+	/// Waits for previous submit's fence, if any, then resets the fence for reuse.
+	/// Must obtain the lock before calling!
+	void _waitFence();
+
+protected:
+	friend QueueLock;
+	std::unique_ptr<vk::raii::Fence> m_fence;
+	bool m_fenceBusy;
+
+	std::string m_fenceName;
+
+	std::shared_ptr<QueueWrapper> m_queue;
 };
+
 
 #endif
