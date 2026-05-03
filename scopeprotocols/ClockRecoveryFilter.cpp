@@ -296,8 +296,13 @@ void ClockRecoveryFilter::Refresh(
 			uadin)
 		{
 			//First pass: run the PLL separately on each chunk of the waveform
-			//TODO: do we need to tune numThreads to lock well to short waveforms?
 			uint64_t numThreads = 4096;
+
+			//If we have a huge number of samples (100M points or more), use more threads
+			//TODO: try to tune this based on waveform depth more dynamically/continuously?
+			if(din->size() >= (100 * 1000 * 1000) )
+				numThreads *= 8;
+
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
 
