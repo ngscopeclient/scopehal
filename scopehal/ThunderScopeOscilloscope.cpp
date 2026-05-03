@@ -183,10 +183,13 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	}
 
 	m_conversion8BitPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		"shaders/Convert8BitSamplesQuad.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
-	m_conversion16BitPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+	if(g_hasShaderInt16)
+	{
+		m_conversion16BitPipeline = make_unique<ComputePipeline>(
+			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+	}
 
 	m_clippingBuffer.resize(1);
 
@@ -525,14 +528,15 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 			//Kick off the GPU-side processing of the waveform to run nonblocking while we download the next
 			//Wait for any previous waveform processing to finish first, since we're reusing the command buffer
+			//and not using push descriptors
 			if(!keep)
 			{}
-			else if(g_hasShaderInt8 && g_hasPushDescriptor && (dataType == DATATYPE_I8))
+			else if(dataType == DATATYPE_I8)
 			{
 				m_queue->WaitIdle();
+
 				m_cmdBuf->begin({});
 
-				m_conversion8BitPipeline->Bind(*m_cmdBuf);
 				m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
 				m_conversion8BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
@@ -541,8 +545,8 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				args.gain = scales[i];
 				args.offset = -offsets[i];
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-				m_conversion8BitPipeline->DispatchNoRebind(
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*4); //4 samples per thread
+				m_conversion8BitPipeline->Dispatch(
 					*m_cmdBuf, args,
 					min(compute_block_count, 32768u),
 					compute_block_count / 32768 + 1);
@@ -551,12 +555,11 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
-			else if(g_hasShaderInt16 && g_hasPushDescriptor && (dataType == DATATYPE_I16))
+			else if(g_hasShaderInt16 && (dataType == DATATYPE_I16))
 			{
 				m_queue->WaitIdle();
 				m_cmdBuf->begin({});
 
-				m_conversion16BitPipeline->Bind(*m_cmdBuf);
 				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
 				m_conversion16BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
@@ -566,7 +569,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				args.offset = -offsets[i];
 
 				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-				m_conversion16BitPipeline->DispatchNoRebind(
+				m_conversion16BitPipeline->Dispatch(
 					*m_cmdBuf, args,
 					min(compute_block_count, 32768u),
 					compute_block_count / 32768 + 1);
@@ -590,6 +593,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		return true;
 
 	//Fallback path if GPU doesn't have suitable integer support
+	//(this is only the int16 path now, since int8 uses Convert8BitSamplesQuad)
 	if(!processedWaveformsOnGPU)
 	{
 		//Process analog captures in parallel
@@ -598,24 +602,12 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		{
 			auto cap = awfms[i];
 			cap->PrepareForCpuAccess();
-			if(dataType == DATATYPE_I8)
-			{
-				Convert8BitSamples(
-					(float*)&cap->m_samples[0],
-					(int8_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-					scales[i],
-					offsets[i],
-					cap->m_samples.size());
-			}
-			else if(dataType == DATATYPE_I16)
-			{
-				Convert16BitSamples(
-					(float*)&cap->m_samples[0],
-					(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-					scales[i],
-					offsets[i],
-					cap->m_samples.size());
-			}
+			Convert16BitSamples(
+				(float*)&cap->m_samples[0],
+				(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+				scales[i],
+				offsets[i],
+				cap->m_samples.size());
 			cap->MarkModifiedFromCpu();
 		}
 
