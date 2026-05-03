@@ -184,12 +184,8 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 
 	m_conversion8BitPipeline = make_unique<ComputePipeline>(
 		"shaders/Convert8BitSamplesQuad.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
-
-	if(g_hasShaderInt16)
-	{
-		m_conversion16BitPipeline = make_unique<ComputePipeline>(
-			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
-	}
+	m_conversion16BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
 
@@ -451,8 +447,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	vector<float> scales;
 	vector<float> offsets;
 
-	bool processedWaveformsOnGPU = true;
-
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
@@ -555,7 +549,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
-			else if(g_hasShaderInt16 && (dataType == DATATYPE_I16))
+			else /* if(dataType == DATATYPE_I16) */
 			{
 				m_queue->WaitIdle();
 				m_cmdBuf->begin({});
@@ -568,7 +562,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				args.gain = scales[i];
 				args.offset = -offsets[i];
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
 				m_conversion16BitPipeline->Dispatch(
 					*m_cmdBuf, args,
 					min(compute_block_count, 32768u),
@@ -578,10 +572,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
-
-			//Not available, fall back to CPU side processing
-			else
-				processedWaveformsOnGPU = false;
 		}
 		else
 		{
@@ -591,29 +581,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	if(!keep)
 		return true;
-
-	//Fallback path if GPU doesn't have suitable integer support
-	//(this is only the int16 path now, since int8 uses Convert8BitSamplesQuad)
-	if(!processedWaveformsOnGPU)
-	{
-		//Process analog captures in parallel
-		#pragma omp parallel for
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-			cap->PrepareForCpuAccess();
-			Convert16BitSamples(
-				(float*)&cap->m_samples[0],
-				(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				offsets[i],
-				cap->m_samples.size());
-			cap->MarkModifiedFromCpu();
-		}
-
-		//If we did CPU side conversion, push the waveforms to our queue now
-		PushPendingWaveformsIfReady();
-	}
 
 	m_receiveClock.Tick();
 	m_diag_receivedWFMHz.SetFloatVal(m_receiveClock.GetAverageHz());
