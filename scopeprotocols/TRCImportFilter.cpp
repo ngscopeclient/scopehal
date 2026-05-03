@@ -51,11 +51,8 @@ TRCImportFilter::TRCImportFilter(const string& color)
 			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 	}
 
-	if(g_hasShaderInt8)
-	{
-		m_computePipeline8Bit = make_unique<ComputePipeline>(
-			"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
-	}
+	m_computePipeline8Bit = make_unique<ComputePipeline>(
+		"shaders/Convert8BitSamplesQuad.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	//Make a command buffer for our accelerated stuff
 	//TODO: Should this really be using the global transfer queue?
@@ -296,49 +293,30 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 		buf.MarkModifiedFromCpu();
 
-		//The accelerated filter needs int8 support
-		if(g_hasShaderInt8)
-		{
-			m_commandBuffer->begin({});
+		m_commandBuffer->begin({});
 
-			//Update our descriptor sets with current buffers
-			m_computePipeline8Bit->BindBufferNonblocking(0, wfm->m_samples, *m_commandBuffer, true);
-			m_computePipeline8Bit->BindBufferNonblocking(1, buf, *m_commandBuffer);
+		//Update our descriptor sets with current buffers
+		m_computePipeline8Bit->BindBufferNonblocking(0, wfm->m_samples, *m_commandBuffer, true);
+		m_computePipeline8Bit->BindBufferNonblocking(1, buf, *m_commandBuffer);
 
-			ConvertRawSamplesShaderArgs args;
-			args.size = num_per_segment;
-			args.gain = v_gain;
-			args.offset = v_off;
+		ConvertRawSamplesShaderArgs args;
+		args.size = num_per_segment;
+		args.gain = v_gain;
+		args.offset = v_off;
 
-			//Dispatch the compute operation and block until it completes
-			//We are in an event handler, so use the global transfer queue here
-			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-			m_computePipeline8Bit->Dispatch(
-				*m_commandBuffer,
-				args,
-				min(compute_block_count, 32768u),
-				compute_block_count / 32768 + 1);
-			m_commandBuffer->end();
+		//Dispatch the compute operation and block until it completes
+		//We are in an event handler, so use the global transfer queue here
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64*4);	//4 samples per thread
+		m_computePipeline8Bit->Dispatch(
+			*m_commandBuffer,
+			args,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+		m_commandBuffer->end();
 
-			g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
+		g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
 
-			wfm->MarkModifiedFromGpu();
-		}
-
-		//Software fallback
-		else
-		{
-			wfm->PrepareForCpuAccess();
-
-			Oscilloscope::Convert8BitSamples(
-				(float*)&wfm->m_samples[0],
-				&buf[0],
-				v_gain,
-				v_off,
-				num_per_segment);
-
-			wfm->MarkModifiedFromCpu();
-		}
+		wfm->MarkModifiedFromGpu();
 	}
 
 	LogTrace("Loaded %zu samples\n", wfm->size());
