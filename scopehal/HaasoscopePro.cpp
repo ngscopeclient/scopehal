@@ -155,7 +155,7 @@ HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 	}
 
 	m_conversionPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
 
@@ -419,9 +419,9 @@ bool HaasoscopePro::AcquireData()
 	}
 
 	//Prefer GPU path
-	if(g_hasShaderInt16 && g_hasPushDescriptor)
+	if(g_hasPushDescriptor)
 	{
-		LogTrace("HaasoscopePro doing GPU path \n");
+		LogTrace("HaasoscopePro doing push descriptor path \n");
 		m_cmdBuf->begin({});
 		m_conversionPipeline->Bind(*m_cmdBuf);
 		for(size_t i=0; i<awfms.size(); i++)
@@ -436,7 +436,7 @@ bool HaasoscopePro::AcquireData()
 			args.gain = scales[i];
 			args.offset = -offsets[i];
 
-			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2);
 			m_conversionPipeline->DispatchNoRebind(
 				*m_cmdBuf, args,
 				min(compute_block_count, 32768u),
@@ -448,22 +448,33 @@ bool HaasoscopePro::AcquireData()
 		m_queue->SubmitAndBlock(*m_cmdBuf);
 	}
 
-	//Fallback path if GPU doesn't have suitable integer support
+	//Fallback path if no push descriptor: multiple separate submits
 	else
 	{
-		LogTrace("HaasoscopePro doing GPU path \n");
-		#pragma omp parallel for  //Process analog captures in parallel
+		LogTrace("HaasoscopePro doing non-push descriptor path \n");
 		for(size_t i=0; i<awfms.size(); i++)
 		{
+			m_cmdBuf->begin({});
+
 			auto cap = awfms[i];
-			cap->PrepareForCpuAccess();
-			Convert16BitSamples(
-				(float*)&cap->m_samples[0],
-				(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				offsets[i],
-				cap->m_samples.size());
-			cap->MarkModifiedFromCpu();
+
+			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scales[i];
+			args.offset = -offsets[i];
+
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2);
+			m_conversionPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+			cap->MarkModifiedFromGpu();
+
+			m_cmdBuf->end();
+			m_queue->SubmitAndBlock(*m_cmdBuf);
 		}
 	}
 

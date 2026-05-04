@@ -324,7 +324,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	}
 
 	m_conversionPipeline = make_unique<ComputePipeline>(
-			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+			"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 }
 
 /**
@@ -864,7 +864,6 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 	vector<UniformAnalogWaveform*> awfms;
 	lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
 
-	bool processedWaveformsOnGPU = false;
 	for(size_t i=0; i<numChannels; i++)
 	{
 		size_t tmp[2];
@@ -919,44 +918,27 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 
 			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
 
-			if(g_hasShaderInt16)
-			{
-				m_queue->WaitIdle();
-				m_cmdBuf->begin({});
+			m_queue->WaitIdle();
+			m_cmdBuf->begin({});
 
-				m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversionPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
+			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversionPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
-				ConvertRawSamplesShaderArgs args;
-				args.size = cap->size();
-				args.gain = scale;
-				args.offset = -offset;
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scale;
+			args.offset = -offset;
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-				m_conversionPipeline->Dispatch(
-					*m_cmdBuf, args,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2);
+			m_conversionPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
 
-				cap->MarkModifiedFromGpu();
+			cap->MarkModifiedFromGpu();
 
-				m_cmdBuf->end();
-				m_queue->Submit(*m_cmdBuf);
-
-				processedWaveformsOnGPU = true;
-			}
-			else
-			{
-				cap->PrepareForCpuAccess();
-				Convert16BitSamples(
-					cap->m_samples.GetCpuPointer(),
-					abuf->GetCpuPointer(),
-					scale,
-					-offset,
-					cap->size());
-
-				cap->MarkSamplesModifiedFromCpu();
-			}
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
 		}
 
 		//Digital pod
@@ -1054,10 +1036,6 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 
 	if(!keep)
 		return true;
-
-	//If we did CPU side conversion, push the waveforms to our queue now
-	if(!processedWaveformsOnGPU)
-		PushPendingWaveformsIfReady();
 
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)
