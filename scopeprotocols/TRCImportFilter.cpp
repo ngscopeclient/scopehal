@@ -45,11 +45,8 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	m_parameters[m_fpname].m_fileFilterName = "Teledyne LeCroy waveform files (*.trc)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &TRCImportFilter::OnFileNameChanged));
 
-	if(g_hasShaderInt16)
-	{
-		m_computePipeline16Bit = make_unique<ComputePipeline>(
-			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
-	}
+	m_computePipeline16Bit = make_unique<ComputePipeline>(
+		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_computePipeline8Bit = make_unique<ComputePipeline>(
 		"shaders/Convert8BitSamplesQuad.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
@@ -207,12 +204,11 @@ void TRCImportFilter::OnFileNameChanged()
 	size_t num_per_segment = num_samples /* / num_sequences*/;
 
 	//Create output waveform
-	auto wfm = new UniformAnalogWaveform;
+	auto wfm = SetupEmptyUniformAnalogOutputWaveform(nullptr, 0, true);
 	wfm->m_timescale = round(interval);
 	wfm->m_startTimestamp = ttime;
 	wfm->m_startFemtoseconds = basetime * FS_PER_SECOND;
 	wfm->m_triggerPhase = h_off_frac;
-	SetData(wfm, 0);
 	LogTrace("Sample interval: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(wfm->m_timescale).c_str());
 	LogTrace("Trigger phase: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(wfm->m_triggerPhase).c_str());
 
@@ -222,6 +218,8 @@ void TRCImportFilter::OnFileNameChanged()
 	if(hdMode)
 	{
 		AcceleratorBuffer<int16_t> buf;
+		buf.SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
+		buf.SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_UNLIKELY);
 		buf.resize(num_per_segment);
 		buf.PrepareForCpuAccess();
 
@@ -233,55 +231,43 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 		buf.MarkModifiedFromCpu();
 
-		//The accelerated filter needs int16 support
-		if(g_hasShaderInt16)
-		{
-			m_commandBuffer->begin({});
+		m_commandBuffer->begin({});
 
-			//Update our descriptor sets with current buffers
-			m_computePipeline16Bit->BindBufferNonblocking(0, wfm->m_samples, *m_commandBuffer, true);
-			m_computePipeline16Bit->BindBufferNonblocking(1, buf, *m_commandBuffer);
+		//Update our descriptor sets with current buffers
+		m_computePipeline16Bit->BindBufferNonblocking(0, wfm->m_samples, *m_commandBuffer, true);
+		m_computePipeline16Bit->BindBufferNonblocking(1, buf, *m_commandBuffer);
 
-			ConvertRawSamplesShaderArgs args;
-			args.size = num_per_segment;
-			args.gain = v_gain;
-			args.offset = v_off;
+		ConvertRawSamplesShaderArgs args;
+		args.size = num_per_segment;
+		args.gain = v_gain;
+		args.offset = v_off;
 
-			//Dispatch the compute operation and block until it completes
-			//We are in an event handler, so use the global transfer queue here
-			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-			m_computePipeline16Bit->Dispatch(
-				*m_commandBuffer,
-				args,
-				min(compute_block_count, 32768u),
-				compute_block_count / 32768 + 1);
-			m_commandBuffer->end();
+		//Dispatch the compute operation and block until it completes
+		//We are in an event handler, so use the global transfer queue here
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64*2); //2 samples per thread
+		m_computePipeline16Bit->Dispatch(
+			*m_commandBuffer,
+			args,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
 
-			g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
+		wfm->MarkModifiedFromGpu();
 
-			wfm->MarkModifiedFromGpu();
-		}
+		//Not sure why this is needed, it's working around a bug elsewhere we haven't found
+		//(https://github.com/ngscopeclient/scopehal/issues/1084)
+		//This will hurt performance a bit, but fixes it
+		wfm->PrepareForCpuAccessNonblocking(*m_commandBuffer);
 
-		//Software fallback
-		else
-		{
-			wfm->PrepareForCpuAccess();
-
-			Oscilloscope::Convert16BitSamples(
-				(float*)&wfm->m_samples[0],
-				&buf[0],
-				v_gain,
-				v_off,
-				num_per_segment);
-
-			wfm->MarkModifiedFromCpu();
-		}
+		m_commandBuffer->end();
+		g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
 	}
 
 	//8 bit sample path
 	else
 	{
 		AcceleratorBuffer<int8_t> buf;
+		buf.SetCpuAccessHint(AcceleratorBuffer<int8_t>::HINT_LIKELY);
+		buf.SetGpuAccessHint(AcceleratorBuffer<int8_t>::HINT_UNLIKELY);
 		buf.resize(num_per_segment);
 		buf.PrepareForCpuAccess();
 
@@ -312,11 +298,15 @@ void TRCImportFilter::OnFileNameChanged()
 			args,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
-		m_commandBuffer->end();
-
-		g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
-
 		wfm->MarkModifiedFromGpu();
+
+		//Not sure why this is needed, it's working around a bug elsewhere we haven't found
+		//(https://github.com/ngscopeclient/scopehal/issues/1084)
+		//This will hurt performance a bit, but fixes it
+		wfm->PrepareForCpuAccessNonblocking(*m_commandBuffer);
+
+		m_commandBuffer->end();
+		g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
 	}
 
 	LogTrace("Loaded %zu samples\n", wfm->size());
