@@ -35,6 +35,7 @@ add_compute_shaders(
 		Convert8BitSamplesQuadOffset.glsl
 		Convert8BitSamplesWithClipDetection.glsl
 		Convert16BitSamplesDual.glsl
+		Convert16BitSamplesDualOffset.glsl
 		DeEmbedFilter.glsl
 		DegradeSerialData.glsl
 		EyeNormalizeReduce.glsl

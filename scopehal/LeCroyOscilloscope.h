@@ -321,7 +321,7 @@ protected:
 		bool& any_enabled);
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	std::vector<WaveformBase*> ProcessAnalogWaveform(
-		const char* data,
+		AcceleratorBuffer<uint8_t>& data,
 		size_t datalen,
 		std::string& wavedesc,
 		uint32_t num_sequences,
@@ -398,6 +398,12 @@ protected:
 
 	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion8BitPipeline;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
 
 public:
 	static std::string GetDriverNameInternal();

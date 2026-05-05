@@ -94,6 +94,14 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	DetectAnalogChannels();
 	SharedCtorInit();
 	DetectOptions();
+
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("LeCroyOscilloscope");
+
+	m_conversion8BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert8BitSamplesQuadOffset.spv", 2, sizeof(ConvertRawSamplesOffsetShaderArgs) );
+	m_conversion16BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert16BitSamplesDualOffset.spv", 2, sizeof(ConvertRawSamplesOffsetShaderArgs) );
 }
 
 void LeCroyOscilloscope::SharedCtorInit()
@@ -2573,7 +2581,7 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 }
 
 vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
-	const char* data,
+	AcceleratorBuffer<uint8_t>& data,
 	size_t datalen,
 	string& wavedesc,
 	uint32_t num_sequences,
@@ -2610,8 +2618,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	else
 		num_samples = datalen;
 	size_t num_per_segment = num_samples / num_sequences;
-	const int16_t* wdata = reinterpret_cast<const int16_t*>(data);
-	const int8_t* bdata = reinterpret_cast<const int8_t*>(data);
 
 	for(size_t j=0; j<num_sequences; j++)
 	{
@@ -2620,7 +2626,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		cap->m_timescale = round(interval);
 		cap->m_triggerPhase = h_off_frac;
 		cap->m_startTimestamp = ttime;
-		cap->PrepareForCpuAccess();
 
 		//Parse the time
 		if(wavetime)
@@ -2633,24 +2638,53 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		//Convert raw ADC samples to volts
 		if(m_highDefinition)
 		{
-			Convert16BitSamples(
-				cap->m_samples.GetCpuPointer(),
-				wdata + j*num_per_segment,
-				v_gain,
-				v_off,
-				num_per_segment);
+			m_cmdBuf->begin({});
+
+			m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversion16BitPipeline->BindBufferNonblocking(1, data, *m_cmdBuf);
+
+			ConvertRawSamplesOffsetShaderArgs args;
+			args.size = num_per_segment;
+			args.gain = v_gain;
+			args.offset = v_off;
+			args.inputBufferOffset = j*num_per_segment;
+
+			const uint32_t compute_block_count = GetComputeBlockCount(num_per_segment, 64*2); //2 samples per thread
+			m_conversion16BitPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
+
+			cap->MarkSamplesModifiedFromGpu();
 		}
 		else
 		{
-			Convert8BitSamples(
-				cap->m_samples.GetCpuPointer(),
-				bdata + j*num_per_segment,
-				v_gain,
-				v_off,
-				num_per_segment);
+			m_cmdBuf->begin({});
+
+			m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversion8BitPipeline->BindBufferNonblocking(1, data, *m_cmdBuf);
+
+			ConvertRawSamplesOffsetShaderArgs args;
+			args.size = num_per_segment;
+			args.gain = v_gain;
+			args.offset = v_off;
+			args.inputBufferOffset = j*num_per_segment;
+
+			const uint32_t compute_block_count = GetComputeBlockCount(num_per_segment, 64*4); //4 samples per thread
+			m_conversion8BitPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
+
+			cap->MarkSamplesModifiedFromGpu();
 		}
 
-		cap->MarkSamplesModifiedFromCpu();
 		ret.push_back(cap);
 	}
 
@@ -2825,7 +2859,7 @@ bool LeCroyOscilloscope::AcquireData()
 	time_t ttime = 0;
 	double basetime = 0;
 	bool denabled = false;
-	map<int, string> analogWaveformData;
+	map<int, ScratchBuffer_uint8_t > analogWaveformData;
 	string wavetime;
 	bool enabled[8] = {false};
 	vector<string> wavedescs;
@@ -2933,10 +2967,21 @@ bool LeCroyOscilloscope::AcquireData()
 			{
 				if(enabled[i])
 				{
-					analogWaveformData[i] = m_transport->ReadReply(
+					//Download the data
+					auto tmp = m_transport->ReadReply(
 						false,
 						[i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
 					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+
+					//Store into scratch buffer removing 16 byte header DATA,\n#9xxxxxxxx
+					//TODO: u16 / 2x pool or something if HD mode to be more efficient?
+					ScratchBuffer_uint8_t scratch(ScratchBufferManager::U8_GPU_WAVEFORM);
+					auto buflen = tmp.size() - 16;
+					scratch->resize(buflen);
+					scratch->PrepareForCpuAccess();
+					memcpy(scratch->GetCpuPointer(), &tmp[16], buflen);
+					scratch->MarkModifiedFromCpu();
+					analogWaveformData[i] = std::move(scratch);
 				}
 			}
 		}
@@ -2989,8 +3034,8 @@ bool LeCroyOscilloscope::AcquireData()
 			//else unknown unit, ignore for now
 
 			waveforms[i] = ProcessAnalogWaveform(
-				&analogWaveformData[i][16],			//skip 16-byte SCPI header DATA,\n#9xxxxxxxx
-				analogWaveformData[i].size() - 17,	//skip header plus \n at end
+				*analogWaveformData[i],
+				analogWaveformData[i]->size() - 1,	//skip trailing \n
 				wavedescs[i],
 				num_sequences,
 				ttime,

@@ -59,24 +59,24 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	//Rest of shader assumes inputBufferOffset is a multiple of 4
+	//Rest of shader assumes inputBufferOffset is a multiple of 2
 	//If it's not, patch it to avoid problems
-	//(is this a reasonable assumption? do segmented captures ever have non multiple of 4 size?)
-	uint realBufferOffset = inputBufferOffset - (inputBufferOffset % 4);
+	//(is this a reasonable assumption? do segmented captures ever have non multiple of 2 size?)
+	uint realBufferOffset = inputBufferOffset - (inputBufferOffset % 2);
 
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	uint outbase = nthread*4;
-	uint base = (nthread * 4) + realBufferOffset;
+	uint outbase = nthread * 2;
+	uint base = (nthread * 2) + realBufferOffset;
 
 	//Don't go off the end of the input
 	if(base >= size)
 		return;
 
 	//Fetch the input sample
-	uint block = pin[nthread + realBufferOffset/4];
+	uint block = pin[nthread + realBufferOffset/2];
 
 	//Four samples per thread
-	for(uint i=0; i<4; i++)
+	for(uint i=0; i<2; i++)
 	{
 		//Make sure we don't go off the end
 		uint j = i + base;
@@ -84,11 +84,11 @@ void main()
 			return;
 
 		//Fetch the sample and sign extend
-		uint sampleIn = (block >> (8*i)) & 0xff;
+		uint sampleIn = (block >> (16*i)) & 0xffff;
 		int signExtended = int(sampleIn);
-		if( (sampleIn & 0x80) == 0x80)
+		if( (sampleIn & 0x8000) == 0x8000)
 		{
-			sampleIn = (~sampleIn + 1) & 0xff;
+			sampleIn = (~sampleIn + 1) & 0xffff;
 			signExtended = -int(sampleIn);
 		}
 
