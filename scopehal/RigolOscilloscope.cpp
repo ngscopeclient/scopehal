@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -148,7 +148,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n"));
 			if (reply == "1")
 				m_maxMdepth = 500*1000*1000;
-			
+
 			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T4\n"));
 			if (reply == "1")
 				m_bandwidth = 400;
@@ -168,7 +168,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n"));
 			if (reply == "1")
 				m_maxMdepth = 100*1000*1000;
-			
+
 			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW7T10\n"));
 			if (reply == "1")
 				m_bandwidth = 100;
@@ -204,28 +204,28 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		case 934: m_bandwidth = 350; break;
 		default: LogError("unknown MHO9xx\n");
 		}
-		
+
 		m_opt200M = false;	  // does not exist in 800/900 series
 		m_lowSrate = false;
 		m_maxSrate  = 4*1000*1000*1000U;
-		
+
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU-05\n"));
 		m_maxMdepth = reply == "1" ? 500*1000*1000 : 100*1000*1000;
-		
+
 		// we must support these, even if we didn't want to set them
 		// in the UI, because they could already be selected on the
 		// scope
 		m_has_125M_sample_depth = true;
 		m_has_200M_sample_depth = true;
-		
+
 		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU03T05\n"));
 		if (reply == "1")
 			m_bandwidth = 500;
-		
+
 		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU03T08\n"));
 		if (reply == "1")
 			m_bandwidth = 800;
-		
+
 		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU05T08\n"));
 		if (reply == "1")
 			m_bandwidth = 800;
@@ -302,6 +302,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 
 	//make sure all setup commands finish before we proceed
 	m_transport->FlushCommandQueue();
+
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("RigolOscilloscope");
 }
 
 RigolOscilloscope::~RigolOscilloscope()
@@ -882,7 +885,7 @@ bool RigolOscilloscope::AcquireData()
 				&yorigin,
 				&yreference);
 			if(sec_per_sample == 0)
-			{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+			{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform
 				LogWarning("Got null sec_per_sample value from the scope, ignoring this waveform.\n");
 				continue;
 			}
@@ -1007,12 +1010,12 @@ bool RigolOscilloscope::AcquireData()
 				float v;
 				if(m_highDefinition)
 				{
- 					v = (((static_cast<float>(temp_buf_int16[j]))) - ydelta) * yincrement;	
+ 					v = (((static_cast<float>(temp_buf_int16[j]))) - ydelta) * yincrement;
 					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf_int16[j], ydelta, yincrement);
 				}
 				else
 				{
- 					v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;	
+ 					v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
 					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
 				}
 				if(m_protocol == DS_OLD)
@@ -1556,7 +1559,7 @@ int64_t RigolOscilloscope::GetTriggerOffset()
 
 	m_triggerOffsetValid = true;
 
-	return m_triggerOffset;	
+	return m_triggerOffset;
 }
 
 bool RigolOscilloscope::IsInterleaving()
