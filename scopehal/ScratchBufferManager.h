@@ -131,13 +131,31 @@ class ScratchBuffer
 {
 public:
 
+	ScratchBuffer()
+		: m_ptr(nullptr)
+		//don't initialize id
+	{}
+
 	ScratchBuffer(ID id)
 		: m_ptr(ScratchBufferManager::Allocate(id))
 		, m_pool(id)
 	{}
 
 	~ScratchBuffer()
-	{ ScratchBufferManager::Free(m_ptr, m_pool); }
+	{
+		if(m_ptr != nullptr)
+			ScratchBufferManager::Free(m_ptr, m_pool);
+	}
+
+	//move one scratchbuffer to another, disconnecting the original one
+	auto& operator=(ScratchBuffer<ID, T>&& rhs)
+	{
+		m_ptr = rhs.m_ptr;
+		m_pool = rhs.m_pool;
+
+		rhs.m_ptr = nullptr;
+		return *this;
+	}
 
 	///@brief Get the underlying temporary
 	AcceleratorBuffer<T>& operator*()
