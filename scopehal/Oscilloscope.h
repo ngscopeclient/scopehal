@@ -866,14 +866,6 @@ public:
 	static void ConvertUnsigned8BitSamplesAVX2(float* pout, const uint8_t* pin, float gain, float offset, size_t count);
 #endif
 
-	static void Convert16BitSamples(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesGeneric(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-#ifdef __x86_64__
-	static void Convert16BitSamplesAVX2(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesFMA(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-#endif
-
 protected:
 
 	///@brief Vulkan queue for GPU waveform processing
