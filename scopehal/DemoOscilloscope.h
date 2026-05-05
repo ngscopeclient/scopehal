@@ -181,19 +181,17 @@ protected:
 
 	/**
 		@brief Signal sources for each channel
-
-		Must be separate to enable parallel waveform synthesis
 	 */
 	TestWaveformSource* m_source[4];
 
-	///@brief Vulkan queue for ISI channel
-	std::shared_ptr<QueueHandle> m_queue[4];
+	///@brief Vulkan queue for GPU waveform generation
+	std::shared_ptr<QueueHandle> m_queue;
 
-	///@brief Vulkan command pool for ISI channel
-	std::unique_ptr<vk::raii::CommandPool> m_pool[4];
+	///@brief Vulkan command pool for GPU waveform generation
+	std::unique_ptr<vk::raii::CommandPool> m_pool;
 
-	///@brief Vulkan command buffer for ISI channel
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf[4];
+	///@brief Vulkan command buffer for GPU waveform generation
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 
 public:
 	static std::string GetDriverNameInternal();
