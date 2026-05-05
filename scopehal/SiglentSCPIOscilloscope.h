@@ -312,7 +312,8 @@ protected:
 
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 
-	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
+	std::vector<WaveformBase*> ProcessAnalogWaveform(
+		AcceleratorBuffer<uint8_t>& data,
 		size_t datalen,
 		char* wavedesc,
 		uint32_t num_sequences,
@@ -320,7 +321,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	std::vector<SparseDigitalWaveform*> ProcessDigitalWaveform(const char* data,
 		size_t datalen,
 		char* wavedesc,
@@ -329,7 +330,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
@@ -413,6 +414,15 @@ protected:
 	OscilloscopeChannel* m_extTrigChannel;
 	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
+	///@brief Buffers for raw waveform data before conversion to float32
+	std::map<int, AcceleratorBuffer<uint8_t> > m_rawWaveformBuffers;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion8BitPipeline;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
 
 public:
 	static std::string GetDriverNameInternal();
