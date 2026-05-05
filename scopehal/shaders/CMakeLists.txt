@@ -32,6 +32,7 @@ add_compute_shaders(
 		ConstellationNormalizeReduce.glsl
 		ConstellationNormalizeScale.glsl
 		Convert8BitSamplesQuad.glsl
+		Convert8BitSamplesQuadOffset.glsl
 		Convert8BitSamplesWithClipDetection.glsl
 		Convert16BitSamplesDual.glsl
 		DeEmbedFilter.glsl

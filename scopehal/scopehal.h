@@ -267,6 +267,14 @@ struct ConvertRawSamplesShaderArgs
 	float offset;
 };
 
+struct ConvertRawSamplesOffsetShaderArgs
+{
+	uint32_t size;
+	float gain;
+	float offset;
+	uint32_t inputBufferOffset;
+};
+
 //Vulkan global stuff
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
