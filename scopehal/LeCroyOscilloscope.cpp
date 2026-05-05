@@ -159,6 +159,13 @@ void LeCroyOscilloscope::SharedCtorInit()
 		m_channelsEnabled[3] = false;
 	}
 
+	//Create capture channels
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		m_rawWaveformBuffers[i].SetCpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_rawWaveformBuffers[i].SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_UNLIKELY);
+	}
+
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
 }
@@ -2859,7 +2866,7 @@ bool LeCroyOscilloscope::AcquireData()
 	time_t ttime = 0;
 	double basetime = 0;
 	bool denabled = false;
-	map<int, ScratchBuffer_uint8_t > analogWaveformData;
+	map<int, AcceleratorBuffer<uint8_t>* > analogWaveformData;
 	string wavetime;
 	bool enabled[8] = {false};
 	vector<string> wavedescs;
@@ -2974,14 +2981,13 @@ bool LeCroyOscilloscope::AcquireData()
 					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
 
 					//Store into scratch buffer removing 16 byte header DATA,\n#9xxxxxxxx
-					//TODO: u16 / 2x pool or something if HD mode to be more efficient?
-					ScratchBuffer_uint8_t scratch(ScratchBufferManager::U8_GPU_WAVEFORM);
+					auto scratch = &m_rawWaveformBuffers[i];
+					analogWaveformData[i] = scratch;
 					auto buflen = tmp.size() - 16;
 					scratch->resize(buflen);
 					scratch->PrepareForCpuAccess();
 					memcpy(scratch->GetCpuPointer(), &tmp[16], buflen);
 					scratch->MarkModifiedFromCpu();
-					analogWaveformData[i] = std::move(scratch);
 				}
 			}
 		}

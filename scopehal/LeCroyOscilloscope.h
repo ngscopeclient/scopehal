@@ -405,6 +405,9 @@ protected:
 	///@brief Compute pipeline for converting raw ADC codes to float32 samples
 	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
 
+	///@brief Buffers for raw waveform data before conversion to float32
+	std::map<int, AcceleratorBuffer<uint8_t> > m_rawWaveformBuffers;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(LeCroyOscilloscope)
