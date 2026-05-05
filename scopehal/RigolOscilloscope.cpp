@@ -50,8 +50,12 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_triggerWasLive(false)
 	, m_triggerOneShot(false)
 	, m_liveMode(false)
+	, m_has_125M_sample_depth(false)
+	, m_has_200M_sample_depth(false)
 	, m_highDefinition(false)
 {
+	int nchans = -1;
+
 	//Last digit of the model number is the number of channels
 	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
 	{
@@ -184,6 +188,48 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			m_lowSrate = true;
 		}
 	}
+	else if(1 == sscanf(m_model.c_str(), "MHO%d", &m_modelNumber) && (m_modelNumber < 1000))
+	{	// Model numbers are :
+		// MHO98 (1GHz); MHO984 (800MHz); MHO954 (500MHz); MHO934 (350MHz)
+		m_protocol = DHO;
+		// Those are 12 bits (HD) models => default to high definition mode
+		// This can be overriden by driver 8bits setting
+		m_highDefinition = true;
+
+		switch (m_modelNumber)
+		{
+		case 98:  m_bandwidth = 1000; nchans = 4; break;
+		case 984: m_bandwidth = 800; break;
+		case 954: m_bandwidth = 500; break;
+		case 934: m_bandwidth = 350; break;
+		default: LogError("unknown MHO9xx\n");
+		}
+		
+		m_opt200M = false;	  // does not exist in 800/900 series
+		m_lowSrate = false;
+		m_maxSrate  = 4*1000*1000*1000U;
+		
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU-05\n"));
+		m_maxMdepth = reply == "1" ? 500*1000*1000 : 100*1000*1000;
+		
+		// we must support these, even if we didn't want to set them
+		// in the UI, because they could already be selected on the
+		// scope
+		m_has_125M_sample_depth = true;
+		m_has_200M_sample_depth = true;
+		
+		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU03T05\n"));
+		if (reply == "1")
+			m_bandwidth = 500;
+		
+		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU03T08\n"));
+		if (reply == "1")
+			m_bandwidth = 800;
+		
+		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU05T08\n"));
+		if (reply == "1")
+			m_bandwidth = 800;
+	}
 	else
 	{
 		LogError("Bad model number\n");
@@ -191,7 +237,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	}
 
 	// Maybe fix this in a similar manner to bandwidth
-	int nchans = m_modelNumber % 10;
+	if (nchans == -1)
+		nchans = m_modelNumber % 10;
 
 	if((m_protocol != MSO5) && (m_protocol != DHO))
 		m_bandwidth = m_modelNumber % 1000 - nchans;
@@ -604,7 +651,9 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 				break;
 			case 350:
 			case 400:
+			case 500:
 			case 800:
+			case 1000:
 				if((limit_mhz <= 20) & (limit_mhz != 0))
 					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
 				else if((limit_mhz <= 100) & (limit_mhz != 0))
@@ -1263,6 +1312,8 @@ static std::vector<uint64_t> dhoSampleDepths {
 		25*1000*1000,
 		50*1000*1000,
 		100*1000*1000,
+		125*1000*1000,
+		200*1000*1000,
 		250*1000*1000,
 		500*1000*1000,
 	}
@@ -1288,6 +1339,12 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 		uint64_t maxMemDepth = m_maxMdepth / GetEnabledChannelCount();
 		for (auto curMemDepth : dhoSampleDepths)
 		{
+			// these exist on MHO9x only
+			if(curMemDepth == 125*1000*1000 && !m_has_125M_sample_depth)
+				continue;
+			if(curMemDepth == 200*1000*1000 && !m_has_200M_sample_depth)
+				continue;
+
 			if(curMemDepth<=maxMemDepth)
 			{
 				ret.push_back(curMemDepth);
