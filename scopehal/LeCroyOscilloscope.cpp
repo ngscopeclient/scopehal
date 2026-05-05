@@ -159,7 +159,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 		m_channelsEnabled[3] = false;
 	}
 
-	//Create capture channels
+	//Create RX buffers for raw ADC samples
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		m_rawWaveformBuffers[i].SetCpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
