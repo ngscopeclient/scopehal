@@ -874,6 +874,19 @@ public:
 	static void Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, float gain, float offset, size_t count);
 #endif
 
+protected:
+
+	///@brief Vulkan queue for GPU waveform processing
+	std::shared_ptr<QueueHandle> m_queue;
+
+	///@brief Vulkan command pool for GPU waveform processing
+	std::unique_ptr<vk::raii::CommandPool> m_pool;
+
+	///@brief Vulkan command buffer for GPU waveform processing
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
+
+	void InitVulkanQueue(const char* debugName);
+
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Waveform Access

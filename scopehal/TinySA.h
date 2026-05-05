@@ -102,11 +102,6 @@ protected:
 	// dbm offset to apply on values received from the device (model depedant)
 	int64_t m_modelDbmOffset;
 
-	//Vulkan peak detection
-	std::shared_ptr<QueueHandle> m_queue;
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
-
 public:
 	static std::string GetDriverNameInternal();
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()

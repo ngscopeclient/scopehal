@@ -184,15 +184,6 @@ protected:
 	 */
 	TestWaveformSource* m_source[4];
 
-	///@brief Vulkan queue for GPU waveform generation
-	std::shared_ptr<QueueHandle> m_queue;
-
-	///@brief Vulkan command pool for GPU waveform generation
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-
-	///@brief Vulkan command buffer for GPU waveform generation
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
-
 public:
 	static std::string GetDriverNameInternal();
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()

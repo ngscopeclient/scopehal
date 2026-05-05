@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -122,15 +122,6 @@ protected:
 
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
-
-	///@brief Vulkan queue used for sample conversion
-	std::shared_ptr<QueueHandle> m_queue;
-
-	///@brief Command pool from which m_cmdBuf was allocated
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-
-	///@brief Command buffer for sample conversion
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 
 	///@brief Compute pipeline for converting raw ADC codes to float32 samples
 	std::unique_ptr<ComputePipeline> m_conversionPipeline;

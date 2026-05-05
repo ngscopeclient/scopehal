@@ -78,6 +78,43 @@ Oscilloscope::~Oscilloscope()
 	m_pendingWaveforms.clear();
 }
 
+/**
+	@brief Initializes the Vulkan queue and command buffer
+
+	Cannot be called from the Oscilloscope constructor because we want the actual class name for debugUtils usage
+ */
+void Oscilloscope::InitVulkanQueue(const char* debugName)
+{
+	string name = string(debugName) + ".queue";
+	m_queue = g_vkQueueManager->GetComputeQueue(name.c_str());
+
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		m_queue->GetQueue()->m_family );
+	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
+	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
+		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+
+	if(g_hasDebugUtils)
+	{
+		name = string(debugName) + ".pool";
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandPool,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
+				name.c_str()));
+
+		name = string(debugName) + ".cmdbuf";
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
+				name.c_str()));
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
