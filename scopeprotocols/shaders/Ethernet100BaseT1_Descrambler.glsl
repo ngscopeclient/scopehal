@@ -79,7 +79,7 @@ void main()
 	//Off buffer entirely? Stop
 	if(instart >= len)
 	{
-		vstarts[nthread] = 0;
+		vstarts[nthread*maxOutputPerThread] = 0;
 		return;
 	}
 
