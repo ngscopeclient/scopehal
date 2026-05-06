@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,18 +37,32 @@
 #define IDTable_h
 
 #include "SerializableObject.h"
+#include <type_traits>
 
 /**
 	@brief Bidirectional table mapping integer IDs in scopesession files to object pointers
 	@ingroup core
 
-	No type information is stored, the caller is responsible for knowing what type of object is being stored
-	in the table.
-
-	TODO: can we store RTTI info along with the objects to sanity check that we're using the right kind of object
+	Pointers must be SerializableObject derived to ensure type safety
  */
-class IDTable : public Bijection<uintptr_t, SerializableObject*>
+class IDTable
 {
+public:
+
+	///@brief Type of the forward map
+	typedef std::map<uintptr_t, SerializableObject*, std::less<uintptr_t> > forwardType;
+
+	///@brief Type of the reverse map
+	typedef std::map<SerializableObject*, uintptr_t, std::less<SerializableObject*> > reverseType;
+
+	///@brief Get an iterator to the start of the forward map
+	typename forwardType::const_iterator begin()
+	{ return m_forwardMap.begin(); }
+
+	///@brief Get an iterator to the end of the forward map
+	typename forwardType::const_iterator end()
+	{ return m_forwardMap.end(); }
+
 public:
 	IDTable()
 	: m_nextID(1)
@@ -69,7 +83,8 @@ public:
 			return m_reverseMap[p];
 
 		uint32_t id = m_nextID ++;
-		Bijection::emplace(id, p);
+		m_forwardMap[id] = p;
+		m_reverseMap[p] = id;
 		return id;
 	}
 
@@ -82,7 +97,8 @@ public:
 	void emplace(uintptr_t id, SerializableObject* p)
 	{
 		ReserveID(id);
-		Bijection::emplace(id, p);
+		m_forwardMap[id] = p;
+		m_reverseMap[p] = id;
 	}
 
 	/**
@@ -111,13 +127,11 @@ public:
 		@brief Type-safe object lookup
 	 */
 	template<class T>
-	T Lookup(uintptr_t id)
-	{ return dynamic_cast<T>(m_forwardMap[id]); }
-
-	///@brief Legacy object lookup
-	[[deprecated]]
-	SerializableObject* operator[](uintptr_t key)
-	{ return m_forwardMap[key]; }
+	T* Lookup(uintptr_t id)
+	{
+		static_assert(std::is_base_of_v<SerializableObject, T> == true);
+		return dynamic_cast<T*>(m_forwardMap[id]);
+	}
 
 	///@brief Forward lookup
 	uintptr_t operator[](SerializableObject* key)
@@ -126,17 +140,62 @@ public:
 	/**
 		@brief Deletes all entries from the table
 	 */
-	virtual void clear()
+	void clear()
 	{
 		m_forwardMap.clear();
 		m_reverseMap.clear();
 		m_nextID = 1;
 	}
 
+	/**
+		@brief Erase an entry given a forward key
+
+		@param key	The object to remove
+	 */
+	void erase(uintptr_t key)
+	{
+		auto value = m_forwardMap[key];
+		m_forwardMap.erase(key);
+		m_reverseMap.erase(value);
+	}
+
+	/**
+		@brief Erase an entry given a reverse key
+
+		@param key	The object to remove
+	 */
+	void erase(SerializableObject* key)
+	{
+		auto value = m_reverseMap[key];
+		m_reverseMap.erase(key);
+		m_forwardMap.erase(value);
+	}
+
+	/**
+		@brief Replaces one value with another, keeping the keys identical
+	 */
+	void replace(SerializableObject* oldval, SerializableObject* newval)
+	{
+		uintptr_t key = m_reverseMap[oldval];
+		m_reverseMap.erase(oldval);
+		m_forwardMap[key] = newval;
+		m_reverseMap[newval] = key;
+	}
+
+	///@brief Return the number of entries in the bijection
+	size_t size() const
+	{ return m_forwardMap.size(); }
+
 protected:
 
 	///@brief Index of the next ID to be assigned
 	uintptr_t m_nextID;
+
+	///@brief Map of object-to-object in the forward direction
+	forwardType m_forwardMap;
+
+	///@brief Map of object-to-object in the reverse direction
+	reverseType m_reverseMap;
 };
 
 #endif

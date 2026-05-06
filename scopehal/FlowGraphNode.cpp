@@ -409,7 +409,7 @@ void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
 
 		SetInput(
 			it.first.as<string>(),
-			StreamDescriptor(table.Lookup<OscilloscopeChannel*>(index), stream),
+			StreamDescriptor(table.Lookup<OscilloscopeChannel>(index), stream),
 			true
 			);
 	}
