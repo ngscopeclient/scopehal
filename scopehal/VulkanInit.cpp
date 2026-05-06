@@ -754,6 +754,7 @@ void VulkanCreateDevice(
 	vk::PhysicalDeviceVulkan12Features featuresVulkan12;
 	vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
 	vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT featuresAtomicFloat;
+	vk::PhysicalDevicePortabilitySubsetFeaturesKHR portabilityFeatures;
 	void* pNext = nullptr;
 	if(device.getFeatures().shaderFloat64)
 	{
@@ -887,6 +888,12 @@ void VulkanCreateDevice(
 		{
 			hasPortabilitySubset = true;
 			LogDebug("Device has VK_KHR_portability_subset, requesting it\n");
+
+			//Ask for the features we plan to use
+			portabilityFeatures.events = true;
+			portabilityFeatures.pNext = pNext;
+			pNext = &portabilityFeatures;
+			LogDebug("Requesting events support in portability subset\n");
 		}
 		if(!strcmp(&ext.extensionName[0], "VK_KHR_shader_non_semantic_info"))
 		{
