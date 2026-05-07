@@ -51,7 +51,7 @@ CommandLineDriver::~CommandLineDriver()
 }
 
 size_t CommandLineDriver::ConverseMultiple(
-	const string commandString,
+	const string& commandString,
 	std::vector<string> &readLines,
 	bool hasEcho,
 	function<void(float)> progress,
@@ -104,7 +104,7 @@ string CommandLineDriver::ConverseSingle(const std::string& commandString, bool 
 }
 
 string CommandLineDriver::ConverseString(
-	const string commandString,
+	const string& commandString,
 	function<void(float)> progress,
 	size_t expecedLines)
 {
