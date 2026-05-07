@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,13 +62,13 @@ public:
 	virtual bool IsCommandBatchingSupported() override;
 	virtual bool IsConnected() override;
 
-	std::string GetManufacturerName()
+	const std::string& GetManufacturerName()
 	{ return m_manufacturerName; }
 
-	std::string GetProductName()
+	const std::string& GetProductName()
 	{ return m_productName; }
 
-	std::string GetSerialNumber()
+	const std::string& GetSerialNumber()
 	{ return m_serialNumber; }
 
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();

@@ -2020,7 +2020,7 @@ public:
 		@brief Dump the raw contents of the buffer to a file for debugging
 	 */
 	__attribute__((noinline))
-	void DebugDumpToFile(std::string fname)
+	void DebugDumpToFile(const std::string& fname)
 	{
 		FILE* fp = fopen(fname.c_str(), "wb");
 		if(!fp)

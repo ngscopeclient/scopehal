@@ -902,16 +902,12 @@ protected:
 	std::map<std::string, FilterParameter*> m_diagnosticValues;
 	// Pointers are expected to be to members of this class; not dynamically allocated
 
-	void AddDiagnosticLog(std::string message)
-	{
-		m_diagnosticLogMessages.push_back(message);
-	}
+	void AddDiagnosticLog(const std::string& message)
+	{ m_diagnosticLogMessages.push_back(message); }
 
 public:
 	bool HasPendingDiagnosticLogMessages()
-	{
-		return !m_diagnosticLogMessages.empty();
-	}
+	{ return !m_diagnosticLogMessages.empty(); }
 
 	std::string PopPendingDiagnosticLogMessage()
 	{
