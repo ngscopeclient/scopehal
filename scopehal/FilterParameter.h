@@ -134,7 +134,7 @@ public:
 	/**
 		@brief Returns the value of the parameter interpreted as a file path
 	 */
-	std::string GetFileName() const
+	const std::string& GetFileName() const
 	{ return m_string; }
 
 	void SetBoolVal(bool b);

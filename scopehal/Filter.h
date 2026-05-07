@@ -209,10 +209,6 @@ public:
 	virtual void AddRef() override;
 	virtual void Release() override;
 
-	///@brief Returns the current reference count
-	size_t GetRefCount()
-	{ return m_refcount; }
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Accessors
 

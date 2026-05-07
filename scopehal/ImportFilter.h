@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,7 +56,7 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	///@brief Returns the name of the parameter for our file name
-	std::string GetFileNameParameter()
+	const std::string& GetFileNameParameter()
 	{ return m_fpname; }
 
 protected:

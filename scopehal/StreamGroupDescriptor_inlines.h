@@ -50,7 +50,7 @@ inline Unit StreamGroupDescriptor::GetYAxisUnits()
 		return m_channels[0]->GetYAxisUnits(0);
 }
 
-inline std::string StreamGroupDescriptor::GetName() const
+inline const std::string& StreamGroupDescriptor::GetName() const
 {
 	return m_groupName;
 }

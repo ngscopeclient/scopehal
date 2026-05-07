@@ -49,17 +49,17 @@ public:
 	: m_groupName("NULL")
 	{}
 
-	StreamGroupDescriptor(const std::string groupName,const std::vector<OscilloscopeChannel*>& channels)
+	StreamGroupDescriptor(const std::string& groupName, const std::vector<OscilloscopeChannel*>& channels)
 		: m_groupName(groupName)
 		, m_channels(channels)
 	{
-		assert(!m_channels.empty());		
+		assert(!m_channels.empty());
 	}
 
 	operator bool() const
 	{ return (!m_channels.empty()); }
 
-	std::string GetName() const;
+	const std::string& GetName() const;
 
 	std::string m_groupName;
 	std::vector<OscilloscopeChannel*> m_channels;

@@ -2000,7 +2000,7 @@ public:
 
 		@param name	Name of the buffer
 	 */
-	void SetName(std::string name)
+	void SetName(const std::string& name)
 	{
 		//Early out if name hasn't actually changed
 		if(m_name == name)
