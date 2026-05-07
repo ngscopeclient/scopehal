@@ -1063,13 +1063,13 @@ void VulkanCreateDevice(
  */
 bool VulkanInit(bool skipGLFW)
 {
-	LogDebug("Initializing Vulkan\n");
-	LogIndenter li;
-
 	//Note if asan is active
 	#ifdef __SANITIZE_ADDRESS__
-	LogDebug("Compiled with AddressSanitizer\n");
+	LogNotice("Compiled with AddressSanitizer\n");
 	#endif
+
+	LogDebug("Initializing Vulkan\n");
+	LogIndenter li;
 
 	try
 	{
