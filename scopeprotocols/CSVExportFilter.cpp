@@ -112,11 +112,24 @@ void CSVExportFilter::Export()
 	{
 		auto mode = static_cast<ExportMode_t>(m_parameters[m_mode].GetIntVal());
 
+		string filename = m_parameters[m_fname].GetFileName();
+		if(filename.empty()){
+			AddErrorMessage("Output file","CSV Output filename is blank");
+			return;
+		}
+
+
 		bool append = (mode == MODE_CONTINUOUS_APPEND) || (mode == MODE_MANUAL_APPEND);
 		if(append)
-			m_fp = fopen(m_parameters[m_fname].GetFileName().c_str(), "ab");
+			m_fp = fopen(filename.c_str(), "ab");
 		else
-			m_fp = fopen(m_parameters[m_fname].GetFileName().c_str(), "wb");
+			m_fp = fopen(filename.c_str(), "wb");
+
+		if(!m_fp){
+			AddErrorMessage("I/O error","Error opening file: "+filename);
+			LogError("CSVExportFilter: fopen() returned null trying to open file %s\n",filename.c_str());
+			return;
+		}
 
 		//See if file is empty. If so, write header
 		fseek(m_fp, 0, SEEK_END);
