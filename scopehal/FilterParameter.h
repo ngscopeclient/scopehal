@@ -128,7 +128,7 @@ public:
 	/**
 		@brief Access to the underlying pattern
 	 */
-	std::vector<T8B10BSymbol> Get8B10BPattern()
+	const std::vector<T8B10BSymbol>& Get8B10BPattern()
 	{ return m_8b10bPattern; }
 
 	/**

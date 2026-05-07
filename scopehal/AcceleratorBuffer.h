@@ -804,8 +804,12 @@ public:
 			}
 
 			//Trivially copyable types can be done more efficiently in a block
+			//cppcheck doesn't realize this path is unreachable so suppress it
 			else
+			{
+				//cppcheck-suppress memsetClass
 				memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+			}
 		}
 		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
 
@@ -902,12 +906,13 @@ protected:
 
 					//Trivially copyable types can be done more efficiently in a block
 					//gcc warns about this even though we only call this code if the type is trivially copyable,
-					//so disable the warning.
+					//so disable the warning. Ditto for cppcheck.
 					else
 					{
 						#pragma GCC diagnostic push
 						#pragma GCC diagnostic ignored "-Wclass-memaccess"
 
+						//cppcheck-suppress memsetClass
 						memcpy(m_cpuPtr, pOld, m_size * sizeof(T));
 
 						#pragma GCC diagnostic pop
@@ -1145,7 +1150,11 @@ public:
 
 		//Trivially copyable types can be done more efficiently in a block
 		else
+		{
+			//this path is unreachable if not trivially copyable, but cppcheck complains about it anyway
+			//cppcheck-suppress memsetClass
 			memmove(m_cpuPtr, m_cpuPtr+1, sizeof(T) * (m_size-1));
+		}
 
 		resize(m_size - 1);
 

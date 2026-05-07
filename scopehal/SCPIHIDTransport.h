@@ -52,6 +52,9 @@ public:
 	virtual ~SCPIHIDTransport();
 
 	virtual std::string GetConnectionString() override;
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::string GetTransportName();
 
 	virtual bool SendCommand(const std::string& cmd) override;
