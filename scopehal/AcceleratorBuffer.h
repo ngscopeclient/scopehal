@@ -1043,11 +1043,20 @@ protected:
 	//PrepareForCpuAccess() *must* be called prior to calling any of these methods.
 public:
 
+	//Reject static analysis error here
+	//Compile time sanitizer checks don't understand Vulkan allocations and think the buffer is always 0 bytes
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Werror=array-bounds"
+
+	///@brief Index the CPU side buffer
 	const T& operator[](size_t i) const
 	{ return m_cpuPtr[i]; }
 
+	///@brief Index the CPU side buffer
 	T& operator[](size_t i)
 	{ return m_cpuPtr[i]; }
+
+	#pragma GCC diagnostic pop
 
 	/**
 		@brief Adds a new element to the end of the container, allocating space if needed
