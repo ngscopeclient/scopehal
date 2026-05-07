@@ -1046,7 +1046,7 @@ public:
 	//Reject static analysis error here
 	//Compile time sanitizer checks don't understand Vulkan allocations and think the buffer is always 0 bytes
 	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Werror=array-bounds"
+	#pragma GCC diagnostic ignored "-Warray-bounds"
 
 	///@brief Index the CPU side buffer
 	const T& operator[](size_t i) const
