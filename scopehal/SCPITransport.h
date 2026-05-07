@@ -58,6 +58,8 @@ public:
 	virtual std::string GetConnectionString() =0;
 	virtual std::string GetName() =0;
 
+	virtual bool SetTimeouts(unsigned int txUs, unsigned int rxUs);
+
 	/*
 		Queued command API
 

@@ -185,3 +185,7 @@ std::vector<TransportEndpoint> SCPIUARTTransport::EnumTransportEndpoints()
 	}
 	return result;
 }
+
+bool SCPIUARTTransport::SetTimeouts(unsigned int txUs, unsigned int rxUs){\
+	return m_uart.SetTimeouts(txUs,rxUs);
+}
