@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,11 +54,11 @@ public:
 		@param rate	The baud rate, in Hz
 	 */
 	void SetBitRate(int64_t rate)
-	{ m_parameters[m_bitRateName].SetIntVal(rate); }
+	{ m_bitRate.SetIntVal(rate); }
 
 	///@brief Returns the nominal CDR PLL data rate
 	int64_t GetBitRate()
-	{ return m_parameters[m_bitRateName].GetIntVal(); }
+	{ return m_bitRate.GetIntVal(); }
 
 	///@brief Automatically calculates the bit rate of the incoming signal, if possible
 	void CalculateBitRate()
@@ -73,10 +73,6 @@ public:
 
 	///@brief Queries hardware PLL lock status
 	bool IsCDRLocked();
-
-	///@brief Gets the name of the bit rate parameter
-	const std::string GetBitRateName()
-	{ return m_bitRateName; }
 
 	/**
 		@brief RX equalizer settings for LeCroy SDA 8Zi GTX trigger board
@@ -120,7 +116,7 @@ public:
 
 	///@brief Gets the position of the trigger, relative to the serial bit pattern
 	TriggerPosition GetTriggerPosition()
-	{ return static_cast<TriggerPosition>(m_parameters[m_positionName].GetIntVal()); }
+	{ return static_cast<TriggerPosition>(m_position.GetIntVal()); }
 
 	/**
 		@brief Sets the position of the trigger, relative to the serial bit pattern
@@ -128,7 +124,7 @@ public:
 		@param p	Desired trigger position (start or end)
 	 */
 	void SetTriggerPosition(TriggerPosition p)
-	{ m_parameters[m_positionName].SetIntVal(p); }
+	{ m_position.SetIntVal(p); }
 
 	/**
 		@brief Gets the RX equalizer mode
@@ -136,7 +132,7 @@ public:
 		TODO: we should refactor this to be more generic
 	 */
 	LeCroyEqualizerMode GetEqualizerMode()
-	{ return static_cast<LeCroyEqualizerMode>(m_parameters[m_lecroyEqName].GetIntVal()); }
+	{ return static_cast<LeCroyEqualizerMode>(m_lecroyEq.GetIntVal()); }
 
 	/**
 		@brief Sets the RX equalizer mode
@@ -144,11 +140,11 @@ public:
 		TODO: we should refactor this to be more generic
 	 */
 	void SetEqualizerMode(LeCroyEqualizerMode mode)
-	{ m_parameters[m_lecroyEqName].SetIntVal(mode); }
+	{ m_lecroyEq.SetIntVal(mode); }
 
 	///@brief Gets the polarity inversion
 	Polarity GetPolarity()
-	{ return static_cast<Polarity>(m_parameters[m_polarityName].GetIntVal()); }
+	{ return static_cast<Polarity>(m_polarity.GetIntVal()); }
 
 	/**
 		@brief Gets the polarity inversion
@@ -156,21 +152,13 @@ public:
 		@param mode	Polarity inversion mode
 	 */
 	void SetPolarity(Polarity mode)
-	{ m_parameters[m_polarityName].SetIntVal(mode); }
+	{ m_polarity.SetIntVal(mode); }
 
 protected:
-
-	///@brief Name of the bit rate parameter
-	std::string m_bitRateName;
-
-	///@brief Name of the trigger position parameter
-	std::string m_positionName;
-
-	///@brief Name of the equalizer mode parameter
-	std::string m_lecroyEqName;
-
-	///@brief Name of the polarity inversion parameter
-	std::string m_polarityName;
+	FilterParameter& m_bitRate;
+	FilterParameter& m_position;
+	FilterParameter& m_lecroyEq;
+	FilterParameter& m_polarity;
 
 	///@brief Signal requesting an auto-baud calculation
 	sigc::signal<void()> m_calculateBitRateSignal;

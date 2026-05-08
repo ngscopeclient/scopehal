@@ -53,10 +53,6 @@ public:
 
 	virtual std::string GetConnectionString() override;
 
-	//This is intentionally not virtual since it's a static method used by enumeration
-	//cppcheck-suppress duplInheritedMember
-	static std::string GetTransportName();
-
 	virtual bool SendCommand(const std::string& cmd) override;
 	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
 	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
@@ -74,6 +70,11 @@ public:
 	const std::string& GetSerialNumber()
 	{ return m_serialNumber; }
 
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::string GetTransportName();
+
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
 	TRANSPORT_INITPROC(SCPIHIDTransport)
