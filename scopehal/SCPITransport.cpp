@@ -307,3 +307,9 @@ vector<TransportEndpoint> SCPITransport::EnumEndpoints(string transport)
 	LogError("Invalid transport name \"%s\"\n", transport.c_str());
 	return std::vector<TransportEndpoint>();
 }
+
+// Default implementation returns no endpoints
+vector<TransportEndpoint> SCPITransport::EnumTransportEndpoints()
+{
+	return vector<TransportEndpoint>();
+}
