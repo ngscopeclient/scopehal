@@ -721,10 +721,16 @@ public:
 	 __attribute__((noinline))
 	 void CopyFrom(const std::vector<T>& rhs)
 	 {
-		 PrepareForCpuAccess();
-		 resize(rhs.size());
-		 memcpy(m_cpuPtr, &rhs[0], m_size * sizeof(T));
-		 MarkModifiedFromCpu();
+		assert(std::is_trivially_copyable<T>::value);
+
+		PrepareForCpuAccess();
+		resize(rhs.size());
+
+		//This function should never be used if T isn't trivially copyable but cppcheck doesn't realize that
+		//cppcheck-suppress memsetClass
+		memcpy(m_cpuPtr, &rhs[0], m_size * sizeof(T));
+
+		MarkModifiedFromCpu();
 	 }
 
 	/**
@@ -751,8 +757,12 @@ public:
 			}
 
 			//Trivially copyable types can be done more efficiently in a block
+			//cppcheck doesn't realize this path is unreachable so suppress it
 			else
+			{
+				//cppcheck-suppress memsetClass
 				memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+			}
 		}
 		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
 
@@ -1114,8 +1124,12 @@ public:
 		}
 
 		//Trivially copyable types can be done more efficiently in a block
+		//cppcheck doesn't realize this path is unreachable so suppress it
 		else
+		{
+			//cppcheck-suppress memsetClass
 			memmove(m_cpuPtr+1, m_cpuPtr, sizeof(T) * (cursize));
+		}
 
 		//Insert the new first element
 		m_cpuPtr[0] = value;
