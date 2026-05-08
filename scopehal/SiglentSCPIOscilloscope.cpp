@@ -4841,7 +4841,7 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
+void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType)
 {
 	switch(m_protocolId)
 	{

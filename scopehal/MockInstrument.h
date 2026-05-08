@@ -73,12 +73,6 @@ public:
 
 protected:
 
-	//standard *IDN? fields
-	std::string m_name;
-	std::string m_vendor;
-	std::string m_serial;
-	std::string m_fwVersion;
-
 	//Simulated transport information
 	std::string m_transportName;
 	std::string m_driver;

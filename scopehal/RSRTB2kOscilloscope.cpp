@@ -1519,7 +1519,7 @@ void RSRTB2kOscilloscope::PullEdgeTrigger()
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void RSRTB2kOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string /* trigType */)
+void RSRTB2kOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string& /* trigType */)
 {
 	//LogTrace("\n");
 	switch(trig->GetType())
