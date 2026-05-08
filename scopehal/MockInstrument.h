@@ -65,7 +65,11 @@ public:
 	virtual std::string GetSerial() const override;
 
 	// Serialization
+
+	//This is called by Instrument::m_serializers and is not virtual
+	//cppcheck-suppress duplInheritedMember
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+
 	void ClearWarnings(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 
 	// SCPI
