@@ -135,7 +135,6 @@ public:
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);
 
 	static std::vector<TransportEndpoint> EnumEndpoints(std::string transport);
-	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
 protected:
 	void RateLimitingWait();
