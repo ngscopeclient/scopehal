@@ -95,11 +95,15 @@ protected:
 	/**
 		@brief Load instrument and channel configuration from a save file
 	 */
+	//This is called by Instrument::m_loaders and is not virtual
+	//cppcheck-suppress duplInheritedMember
 	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 
 	/**
 		@brief Validate instrument and channel configuration from a save file
 	 */
+	//This is called by Instrument::m_preloaders and is not virtual
+	//cppcheck-suppress duplInheritedMember
 	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
 
 protected:
