@@ -86,7 +86,7 @@ public:
 
 protected:
 	/**
-		@brief Serializes this spectrometer's configuration to a YAML node.
+		@brief Serializes this SDR's configuration to a YAML node.
 	 */
 	//This is called by Instrument::m_serializers and is not virtual
 	//cppcheck-suppress duplInheritedMember
@@ -112,7 +112,10 @@ public:
 	typedef std::shared_ptr<SCPISDR> (*SDRCreateProcType)(SCPITransport*);
 	static void DoAddDriverClass(std::string name, SDRCreateProcType proc);
 
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static void EnumDrivers(std::vector<std::string>& names);
+
 	static std::shared_ptr<SCPISDR> CreateSDR(std::string driver, SCPITransport* transport);
 
 	//Class enumeration

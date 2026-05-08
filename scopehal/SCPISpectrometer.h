@@ -91,6 +91,8 @@ protected:
 	/**
 		@brief Serializes this spectrometer's configuration to a YAML node.
 	 */
+	//This is called by Instrument::m_serializers and is not virtual
+	//cppcheck-suppress duplInheritedMember
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 
 	/**
