@@ -338,7 +338,7 @@ void LeCroyOscilloscope::DetectOptions()
 		LogDebug("  %-20s %-25s %-35s %-20s\n", "Code", "Type", "Description", "Action");
 		if(options.empty())
 			LogDebug("* None\n");
-		for(auto o : options)
+		for(auto& o : options)
 		{
 			string type = "Unknown";
 			string desc = "Unknown";
@@ -2711,22 +2711,30 @@ map<int, SparseDigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(stri
 	//Quick and dirty string searching. We only care about a small fraction of the XML
 	//so no sense bringing in a full parser.
 	tmp = data.substr(data.find("<HorPerStep>") + 12);
-	tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
+	auto oend = tmp.find("</HorPerStep>");
+	if(oend != string::npos)
+		tmp.resize(oend);
 	float interval = atof(tmp.c_str()) * FS_PER_SECOND;
 	//LogDebug("Sample interval: %.2f fs\n", interval);
 
 	tmp = data.substr(data.find("<HorStart>") + 10);
-	tmp = tmp.substr(0, tmp.find("</HorStart>"));
+	oend = tmp.find("</HorStart>");
+	if(oend != string::npos)
+		tmp.resize(oend);
 	float horstart = atof(tmp.c_str()) * FS_PER_SECOND;
 
 	tmp = data.substr(data.find("<NumSamples>") + 12);
-	tmp = tmp.substr(0, tmp.find("</NumSamples>"));
+	oend = tmp.find("</NumSamples>");
+	if(oend != string::npos)
+		tmp.resize(oend);
 	size_t num_samples = atoi(tmp.c_str());
 	//LogDebug("Expecting %d samples\n", num_samples);
 
 	//Extract the raw trigger timestamp (nanoseconds since Jan 1 2000)
 	tmp = data.substr(data.find("<FirstEventTime>") + 16);
-	tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
+	oend = tmp.find("</FirstEventTime>");
+	if(oend != string::npos)
+		tmp.resize(oend);
 	int64_t timestamp;
 	if(1 != sscanf(tmp.c_str(), "%" PRId64, &timestamp))
 		return ret;
@@ -5721,7 +5729,7 @@ void LeCroyOscilloscope::PushPatternCondition(const string& path, Trigger::Condi
 	}
 }
 
-void LeCroyOscilloscope::PushFloat(string path, float f)
+void LeCroyOscilloscope::PushFloat(const string& path, float f)
 {
 	char tmp[128];
 	snprintf(

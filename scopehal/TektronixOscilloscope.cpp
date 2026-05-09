@@ -2721,7 +2721,7 @@ float TektronixOscilloscope::ReadTriggerLevelMSO56(OscilloscopeChannel* chan)
 
 	size_t off = reply.find(";");
 	if(off != string::npos)
-		reply = reply.substr(0, off);
+		reply.resize(off);
 
 	return stof(reply);
 }

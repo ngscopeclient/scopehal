@@ -276,11 +276,11 @@ protected:
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushDropoutTrigger(DropoutTrigger* trig);
-	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType);
 	void PushGlitchTrigger(GlitchTrigger* trig);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
@@ -324,7 +324,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	std::vector<SparseDigitalWaveform*> ProcessDigitalWaveform(
 		const std::vector<uint8_t>& data,
 		size_t datalen,
@@ -333,7 +333,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
