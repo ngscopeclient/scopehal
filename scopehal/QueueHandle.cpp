@@ -39,7 +39,7 @@
 using namespace std;
 extern bool g_hasDebugUtils;
 
-QueueHandle::QueueHandle(std::shared_ptr<QueueWrapper>& queue, string name)
+QueueHandle::QueueHandle(std::shared_ptr<QueueWrapper>& queue, const string& name)
 	: m_queue(queue)
 	, m_fence(make_unique<vk::raii::Fence>(*queue->GetDevice(), vk::FenceCreateInfo()))
 	, m_fenceBusy(false)

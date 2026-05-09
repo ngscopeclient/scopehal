@@ -56,6 +56,7 @@ WaterfallWaveform::~WaterfallWaveform()
 
 Waterfall::Waterfall(const string& color)
 	: Filter(color, CAT_RF)
+	, m_offsetHz(0)
 	, m_width(1)
 	, m_height(1)
 	, m_maxwidth("Max width")

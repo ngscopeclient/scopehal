@@ -310,4 +310,5 @@ void TRCImportFilter::OnFileNameChanged()
 	}
 
 	LogTrace("Loaded %zu samples\n", wfm->size());
+	fclose(fp);
 }

@@ -92,7 +92,7 @@ protected:
 	bool SendWriteValueCommand(Command command, double value);
 	double SendReadValueCommand(Command command);
 	std::string SendSimpleCommand(Command command);
-	std::string SendCommand(Command command, std::string commandString);
+	std::string SendCommand(Command command, const std::string& commandString);
 
 	// PSU state
 	bool m_on = false;

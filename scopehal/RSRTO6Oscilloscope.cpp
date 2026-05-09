@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -706,7 +706,7 @@ Oscilloscope::TriggerMode RSRTO6Oscilloscope::PollTrigger()
 	// return m_triggerArmed ? TRIGGER_MODE_TRIGGERED : TRIGGER_MODE_STOP;
 }
 
-template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, string chname)
+template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, const string& chname)
 {
 	//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
 	string reply = m_transport->SendCommandImmediateWithReply(chname + ":DATA:HEAD?; *WAI");

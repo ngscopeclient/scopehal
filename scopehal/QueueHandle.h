@@ -57,7 +57,7 @@ class QueueHandle
 {
 public:
 
-	QueueHandle(std::shared_ptr<QueueWrapper>& queue, std::string name);
+	QueueHandle(std::shared_ptr<QueueWrapper>& queue, const std::string& name);
 	~QueueHandle();
 
 	/// Submit the given command buffer on the queue

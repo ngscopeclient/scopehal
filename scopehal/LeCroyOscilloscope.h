@@ -360,9 +360,6 @@ protected:
 	///@brief True if the scope has reported it is in fact in the arm state
 	bool m_triggerReallyArmed;
 
-	///@brief True if current trigger is a single-shot and should not re-arm
-	bool m_triggerOneShot;
-
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;

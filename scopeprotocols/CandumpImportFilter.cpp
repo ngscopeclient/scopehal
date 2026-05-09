@@ -38,16 +38,16 @@ using namespace std;
 
 CandumpImportFilter::CandumpImportFilter(const string& color)
 	: PacketDecoder(color, CAT_GENERATION)
-	, m_datarate("Data Rate")
+	, m_filePath(m_parameters["LogFile"])
+	, m_datarate(m_parameters["Data Rate"])
 {
-	m_fpname = "Log File";
-	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_fpname].m_fileFilterMask = "*.log";
-	m_parameters[m_fpname].m_fileFilterName = "Candump log files (*.log)";
-	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &CandumpImportFilter::OnFileNameChanged));
+	m_filePath = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
+	m_filePath.m_fileFilterMask = "*.log";
+	m_filePath.m_fileFilterName = "Candump log files (*.log)";
+	m_filePath.signal_changed().connect(sigc::mem_fun(*this, &CandumpImportFilter::OnFileNameChanged));
 
-	m_parameters[m_datarate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_datarate].SetIntVal(500 * 1000);
+	m_datarate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_datarate.SetIntVal(500 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,7 +81,7 @@ Filter::DataLocation CandumpImportFilter::GetInputLocation()
 
 void CandumpImportFilter::SetDefaultName()
 {
-	auto fname = m_parameters[m_fpname].ToString();
+	auto fname = m_filePath.ToString();
 
 	char hwname[256];
 	snprintf(hwname, sizeof(hwname), "%s", BaseName(fname).c_str());
@@ -94,7 +94,7 @@ void CandumpImportFilter::OnFileNameChanged()
 	ClearErrors();
 	ClearPackets();
 
-	auto fname = m_parameters[m_fpname].ToString();
+	auto fname = m_filePath.ToString();
 	if(fname.empty())
 	{
 		AddErrorMessage("Missing inputs", "No file name specified");
@@ -119,7 +119,7 @@ void CandumpImportFilter::OnFileNameChanged()
 	cap->PrepareForCpuAccess();
 
 	//Calculate length of a single bit on the bus
-	int64_t baud = m_parameters[m_datarate].GetIntVal();
+	int64_t baud = m_datarate.GetIntVal();
 	int64_t ui = FS_PER_SECOND / baud;
 
 	//Read the file and process line by line

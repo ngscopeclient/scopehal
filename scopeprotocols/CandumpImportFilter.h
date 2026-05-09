@@ -51,8 +51,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(CandumpImportFilter)
 
 protected:
-	std::string m_fpname;
-	std::string m_datarate;
+	FilterParameter& m_filePath;
+	FilterParameter& m_datarate;
 
 	void OnFileNameChanged();
 };

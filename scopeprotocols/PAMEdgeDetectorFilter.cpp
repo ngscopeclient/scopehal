@@ -578,8 +578,7 @@ void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
 	for(size_t i=0; i<levels.size(); i++)
 	{
 		auto pname = string("Level ") + to_string(i);
-		if(m_parameters.find(pname) == m_parameters.end())
-			m_parameters[pname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+		m_parameters.try_emplace(pname, FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS)));
 		m_parameters[pname].SetFloatVal(levels[i]);
 
 		LogTrace("Final level %zu = %f\n", i, levels[i]);
