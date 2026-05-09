@@ -755,7 +755,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleDepthsNonInterleaved()
 	string depths = m_transport->SendCommandQueuedWithReply("ACQ:DEPTHS?");
 
 	auto split = explode(depths, ',');
-	for(auto s : split)
+	for(auto& s : split)
 		ret.push_back(stol(s));
 
 	return ret;

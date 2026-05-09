@@ -2135,7 +2135,7 @@ float LeCroyOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
 void LeCroyOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
 {
 	string cmd = string("VBS 'app.wavesource.DutyCycle = ") + to_string(duty * 100) + "'";
-	m_transport->SendCommandQueued(cmd.c_str());
+	m_transport->SendCommandQueued(cmd);
 }
 
 float LeCroyOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
@@ -2147,7 +2147,7 @@ float LeCroyOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
 void LeCroyOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
 {
 	string cmd = string("VBS 'app.WaveSource.amplitude = ") + to_string(amplitude) + "'";
-	m_transport->SendCommandQueued(cmd.c_str());
+	m_transport->SendCommandQueued(cmd);
 }
 
 float LeCroyOscilloscope::GetFunctionChannelOffset(int /*chan*/)
@@ -2159,7 +2159,7 @@ float LeCroyOscilloscope::GetFunctionChannelOffset(int /*chan*/)
 void LeCroyOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
 {
 	string cmd = string("VBS 'app.WaveSource.Offset = ") + to_string(offset) + "'";
-	m_transport->SendCommandQueued(cmd.c_str());
+	m_transport->SendCommandQueued(cmd);
 }
 
 float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
@@ -2171,7 +2171,7 @@ float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
 void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 {
 	string cmd = string("VBS 'app.WaveSource.Frequency = ") + to_string(hz) + "'";
-	m_transport->SendCommandQueued(cmd.c_str());
+	m_transport->SendCommandQueued(cmd);
 }
 
 FunctionGenerator::WaveShape LeCroyOscilloscope::GetFunctionChannelShape(int /*chan*/)
@@ -2245,7 +2245,7 @@ void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float fs)
 	char tmp[32];
 	snprintf(tmp, sizeof(tmp), "%.10f", fs * SECONDS_PER_FS);
 	string cmd = string("VBS 'app.wavesource.risetime = ") + tmp + "'";
-	m_transport->SendCommandQueued(cmd.c_str());
+	m_transport->SendCommandQueued(cmd);
 }
 
 float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
@@ -2259,7 +2259,7 @@ void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float fs)
 	char tmp[32];
 	snprintf(tmp, sizeof(tmp), "%.10f", fs * SECONDS_PER_FS);
 	string cmd = string("VBS 'app.wavesource.falltime = ") + tmp + "'";
-	m_transport->SendCommandQueued(cmd.c_str());
+	m_transport->SendCommandQueued(cmd);
 }
 
 FunctionGenerator::OutputImpedance LeCroyOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)

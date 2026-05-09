@@ -4213,7 +4213,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 /**
 	@brief Reads the source of a trigger from the instrument
  */
-void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
+void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, const string& triggerModeName, bool isUart)
 {
 	string reply = Trim(isUart ? converse(":TRIGGER:UART:RXS?") : converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
 	auto chan = GetOscilloscopeChannelByHwName(reply);
@@ -5145,7 +5145,7 @@ void SiglentSCPIOscilloscope::PushCondition(const string& path, Trigger::Conditi
 	}
 }
 
-void SiglentSCPIOscilloscope::PushFloat(string path, float f)
+void SiglentSCPIOscilloscope::PushFloat(const string& path, float f)
 {
 	sendOnly("%s %1.2E", path.c_str(), f);
 }

@@ -231,7 +231,7 @@ protected:
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType);
 	void PushLineTrigger(LineTrigger* trig);
 	void PushRiseTimeTrigger(RSRTB2kRiseTimeTrigger* trig);

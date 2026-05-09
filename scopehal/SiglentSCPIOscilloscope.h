@@ -281,7 +281,7 @@ protected:
 	void PullSlewRateTrigger();
 	void PullUartTrigger();
 	void PullWindowTrigger();
-	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
+	void PullTriggerSource(Trigger* trig, const std::string& triggerModeName, bool isUart);
 
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
@@ -291,7 +291,7 @@ protected:
 	void PushGlitchTrigger(GlitchTrigger* trig);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);

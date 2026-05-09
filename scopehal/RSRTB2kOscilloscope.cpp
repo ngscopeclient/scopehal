@@ -139,7 +139,7 @@ bool RSRTB2kOscilloscope::sendWithAck(const char* fmt, ...)
     std::string result(opString);
     result += ";*OPC?";
 
-	ret = m_transport->SendCommandQueuedWithReply(result.c_str(), false);
+	ret = m_transport->SendCommandQueuedWithReply(result, false);
 	//~ LogDebug("RTB2k: sendWithAck() -> %s >%s<\n", result.c_str(), ret.c_str());
 	return (ret == "1");
 }
@@ -1295,7 +1295,7 @@ void RSRTB2kOscilloscope::PushCondition(const string& path, Trigger::Condition c
 	}
 }
 
-void RSRTB2kOscilloscope::PushFloat(string path, float f)
+void RSRTB2kOscilloscope::PushFloat(const string& path, float f)
 {
 	sendOnly("%s %1.5E", path.c_str(), f);
 }
