@@ -136,7 +136,7 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 		opts.push_back(substr);
 	}
 
-	for (auto app : opts)
+	for (auto& app : opts)
 	{
 		if (app == "B1")
 		{

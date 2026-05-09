@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -146,6 +146,8 @@ void RigolDP8xxPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool en
 
 bool RigolDP8xxPowerSupply::GetPowerOvercurrentShutdownEnabled(int chan)
 {
+	//It's better to do an extra lookup than an extra round trip to the hardware here
+	//cppcheck-suppress stlFindInsert
 	if (m_overcurrentProtectionEnabled.find(chan) == m_overcurrentProtectionEnabled.end())
 	{
 		m_overcurrentProtectionEnabled[chan] =

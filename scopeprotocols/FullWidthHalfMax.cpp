@@ -154,16 +154,12 @@ void FullWidthHalfMax::Refresh(
 			float half_max = din_norm[index] / 2;
 
 			// Calculate the distance from the peak to its half maximum on x-axis in forward direction
-			for(offset = index; (din_norm[offset] > half_max) && (offset < len); offset++)
-			{
+			for(offset = index; (offset < len) && (din_norm[offset] > half_max); offset++)
 				width++;
-			}
 
 			// Calculate the distance from the peak to its half maximum on x-axis in backward direction
 			for(offset = index; (din_norm[offset] > half_max) && (offset >= 0); offset--)
-			{
 				width++;
-			}
 
 			int64_t fwhm = width * din->m_timescale;
 

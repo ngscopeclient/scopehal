@@ -163,7 +163,8 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 		ui_width_samples += jt->second;
 		ui_width += jt->first * jt->second;
 	}
-	ui_width /= ui_width_samples;
+	if(ui_width_samples)
+		ui_width /= ui_width_samples;
 	LogTrace("Averaged UI width estimate: %" PRId64 "\n", ui_width);
 
 	ui_width *= 1000;	//convert back to fs

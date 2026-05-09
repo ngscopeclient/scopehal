@@ -717,7 +717,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 	string rates = m_transport->SendCommandQueuedWithReply("ACQ:RATES?");
 
 	auto split = explode(rates, ',');
-	for(auto s : split)
+	for(auto& s : split)
 		ret.push_back(stol(s));
 
 	return ret;

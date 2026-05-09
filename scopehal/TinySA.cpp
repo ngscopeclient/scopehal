@@ -130,7 +130,7 @@ TinySA::~TinySA()
    @param length the length of binary data expected from the device
    @return size_t the number of bytes actually read from the device
  */
-size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length)
+size_t TinySA::ConverseBinary(const string& commandString, vector<uint8_t>& data, size_t length)
 {
 	string header;
 	bool inHeader = true;

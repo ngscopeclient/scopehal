@@ -84,7 +84,7 @@ protected:
 		TINY_SA_ULTRA
 	};
 
-	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length);
+	size_t ConverseBinary(const std::string& commandString, std::vector<uint8_t> &data, size_t length);
 	int64_t ConverseRbwValue(bool sendValue = false, int64_t value = 0);
 
 	std::string GetChannelColor(size_t i);

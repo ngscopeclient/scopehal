@@ -276,13 +276,14 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	reply = reply.substr(1, reply.size() - 2); // Chop off quotes
 	vector<string> apps;
 	stringstream s_stream(reply);
-	while(s_stream.good()) {
+	while(s_stream.good())
+	{
 		string substr;
 		getline(s_stream, substr, ',');
 		apps.push_back(substr);
 	}
 
-	for (auto app : apps)
+	for (auto& app : apps)
 	{
 		if (app == "DVM")
 		{

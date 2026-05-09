@@ -110,6 +110,7 @@ void CSVImportFilter::OnFileNameChanged()
 	char* buf = new char[flen+1];
 	if(flen != fread(buf, 1, flen, fp))
 	{
+		fclose(fp);
 		delete[] buf;
 		AddErrorMessage("Bad file", string("Failed to read contents of file ") + fname);
 		return;
