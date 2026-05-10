@@ -68,11 +68,11 @@ public:
 		TODO: look into a background thread or something that's automatically launched by the transport to do this
 		after some kind of fixed timeout?
 	 */
-	void SendCommandQueued(const std::string& cmd);
-	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true);
-	void SendCommandImmediate(std::string cmd);
-	std::string SendCommandImmediateWithReply(std::string cmd, bool endOnSemicolon = true);
-	void* SendCommandImmediateWithRawBlockReply(std::string cmd, size_t& len);
+	void SendCommandQueued(const std::string& cmd, std::chrono::milliseconds settle_time = std::chrono::milliseconds(0));
+	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true, std::chrono::milliseconds settle_time = std::chrono::milliseconds(0));
+	void SendCommandImmediate(std::string cmd, std::chrono::milliseconds settle_time = std::chrono::milliseconds(0));
+	std::string SendCommandImmediateWithReply(std::string cmd, bool endOnSemicolon = true, std::chrono::milliseconds settle_time = std::chrono::milliseconds(0));
+	void* SendCommandImmediateWithRawBlockReply(std::string cmd, size_t& len, std::chrono::milliseconds settle_time = std::chrono::milliseconds(0));
 	bool FlushCommandQueue();
 
 	//Manual mutex locking for ReadRawData() etc
@@ -97,6 +97,19 @@ public:
 		should be used if at all possible.
 
 		Once rate limiting is enabled on a transport, it cannot be disabled.
+
+		Invidual commands can be rate limited with the parameter `settle_time` in each Send*() call. If `settle_time`
+		is set to 0 (default value) it will default to the time specified in the rate limiting (if enabled). If
+		`settle_time` is set to anything else than 0, then this time will be used to block all subsequent message for
+		the specified amount of time.
+
+		Note that `settle_time` will always override the rate limit, even when a lower value is used.
+
+		When using `settle_time` on a write only call, it will block for the specified amount of time after the command
+		is sent.
+
+		When using `settle_time` on a request, the message will be sent, a reply will be read back immidiately, and
+		then the blocking will take place as the last step.
 	 */
 	void EnableRateLimiting(std::chrono::milliseconds interval)
 	{
@@ -138,7 +151,7 @@ public:
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
 protected:
-	void RateLimitingWait();
+	void RateLimitingWait(std::chrono::milliseconds settle_time = std::chrono::milliseconds(0));
 
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
@@ -150,7 +163,7 @@ protected:
 	//Queued commands waiting to be sent
 	std::mutex m_queueMutex;
 	std::recursive_mutex m_netMutex;
-	std::list<std::string> m_txQueue;
+	std::list<std::pair<std::string, std::chrono::milliseconds>> m_txQueue;
 
 	//Set of commands that are OK to deduplicate
 	std::set<std::string> m_dedupCommands;
