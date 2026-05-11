@@ -55,7 +55,7 @@ SCPITransport::~SCPITransport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPITransport::DoAddTransportClass(string name, CreateProcType proc, EnumEndpointsProcType eproc)
+void SCPITransport::DoAddTransportClass(const string& name, CreateProcType proc, EnumEndpointsProcType eproc)
 {
 	m_createprocs[name] = proc;
 	m_enumEndpointsProcs[name] = eproc;
@@ -194,7 +194,7 @@ bool SCPITransport::FlushCommandQueue()
 		LogTrace("%zu commands being flushed\n", tmp.size());
 
 	lock_guard<recursive_mutex> lock(m_netMutex);
-	for(auto str : tmp)
+	for(auto& str : tmp)
 	{
 		if(m_rateLimitingEnabled)
 			RateLimitingWait();

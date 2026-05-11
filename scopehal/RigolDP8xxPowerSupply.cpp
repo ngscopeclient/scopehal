@@ -148,10 +148,11 @@ bool RigolDP8xxPowerSupply::GetPowerOvercurrentShutdownEnabled(int chan)
 {
 	if (m_overcurrentProtectionEnabled.find(chan) == m_overcurrentProtectionEnabled.end())
 	{
-		//It's better to do an extra lookup than an extra round trip to the hardware here
-		//cppcheck-suppress stlFindInsert
-		m_overcurrentProtectionEnabled[chan] = m_transport->SendCommandQueuedWithReply(
-			SOURCENAME(chan) + ":CURRENT:PROTECTION:STATE?") == "ON";
+		m_overcurrentProtectionEnabled[chan] =
+
+			//It's better to do an extra lookup than an extra round trip to the hardware here
+			//cppcheck-suppress stlFindInsert
+			m_transport->SendCommandQueuedWithReply(SOURCENAME(chan) + ":CURRENT:PROTECTION:STATE?") == "ON";
 	}
 
 	return m_overcurrentProtectionEnabled[chan];

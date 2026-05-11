@@ -129,7 +129,7 @@ public:
 public:
 	typedef SCPITransport* (*CreateProcType)(const std::string& args);
 	typedef std::vector<TransportEndpoint> (*EnumEndpointsProcType)();
-	static void DoAddTransportClass(std::string name, CreateProcType proc, EnumEndpointsProcType eproc);
+	static void DoAddTransportClass(const std::string& name, CreateProcType proc, EnumEndpointsProcType eproc);
 
 	static void EnumTransports(std::vector<std::string>& names);
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);

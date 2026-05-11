@@ -219,7 +219,7 @@ std::string ReadFile(const std::string& path);
 std::string ReadDataFile(const std::string& relpath);
 std::vector<uint32_t> ReadDataFileUint32(const std::string& relpath);
 std::string FindDataFile(const std::string& relpath);
-void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+void GetTimestampOfFile(const std::string& path, time_t& timestamp, int64_t& fs);
 
 std::string to_string_sci(double d);
 std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);

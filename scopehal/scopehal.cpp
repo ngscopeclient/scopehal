@@ -441,7 +441,7 @@ void InitializePlugins()
 	snprintf(tmp, sizeof(tmp), "%s/.scopehal/plugins", getenv("HOME"));
 	search_dirs.push_back(tmp);
 
-	for(auto dir : search_dirs)
+	for(auto& dir : search_dirs)
 	{
 		DIR* hdir = opendir(dir.c_str());
 		LogDebug("Searching for plugins in %s\n", dir.c_str());
@@ -918,7 +918,7 @@ string FindDataFile(const string& relpath)
 		return relpath;
 	}
 
-	for(auto dir : g_searchPaths)
+	for(auto& dir : g_searchPaths)
 	{
 		string path = dir + "/" + relpath;
 		fp = fopen(path.c_str(), "rb");
@@ -932,7 +932,7 @@ string FindDataFile(const string& relpath)
 	return "";
 }
 
-void GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
+void GetTimestampOfFile(const string& path, time_t& timestamp, int64_t& fs)
 {
 	//TODO: Add Windows equivalent
 	#ifndef _WIN32

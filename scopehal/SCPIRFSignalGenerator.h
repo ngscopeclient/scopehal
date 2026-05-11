@@ -44,10 +44,10 @@ public:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPIRFSignalGenerator> (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, VSGCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPIRFSignalGenerator> CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIRFSignalGenerator> CreateRFSignalGenerator(const std::string& driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration

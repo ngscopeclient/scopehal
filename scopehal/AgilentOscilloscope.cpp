@@ -185,7 +185,7 @@ AgilentOscilloscope::~AgilentOscilloscope()
 
 	@param channel	The channel to configure
  */
-void AgilentOscilloscope::ConfigureWaveform(string channel)
+void AgilentOscilloscope::ConfigureWaveform(const string& channel)
 {
 	//Select the channel to apply settings to
 	//NOTE: this also enables the channel
@@ -605,7 +605,7 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 
 	@return			Raw waveform data
  */
-vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
+vector<uint8_t> AgilentOscilloscope::GetWaveformData(const string& channel)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":WAV:SOUR " + channel);
@@ -637,7 +637,7 @@ vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 
 	@return			Preamble data
  */
-AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
+AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(const string& channel)
 {
 	WaveformPreamble ret;
 	string reply;

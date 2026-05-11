@@ -208,12 +208,12 @@ private:
 		double yreference;
 	};
 
-	void ConfigureWaveform(std::string channel);
+	void ConfigureWaveform(const std::string& channel);
 	bool IsAnalogChannel(size_t i);
 	size_t GetDigitalPodIndex(size_t i);
 	std::string GetDigitalPodName(size_t i);
-	std::vector<uint8_t> GetWaveformData(std::string channel);
-	WaveformPreamble GetWaveformPreamble(std::string channel);
+	std::vector<uint8_t> GetWaveformData(const std::string& channel);
+	WaveformPreamble GetWaveformPreamble(const std::string& channel);
 	void ProcessDigitalWaveforms(
 		std::map<int, std::vector<WaveformBase*>> &pending_waveforms,
 		std::vector<uint8_t> &data, WaveformPreamble &preamble,

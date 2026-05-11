@@ -37,12 +37,8 @@
 using namespace std;
 
 Averager::Averager()
+	: m_computePipeline(make_unique<ComputePipeline>("shaders/ReductionSum.spv", 2, sizeof(ReductionSumPushConstants)))
 {
-	m_computePipeline = make_unique<ComputePipeline>(
-		"shaders/ReductionSum.spv",
-		2,
-		sizeof(ReductionSumPushConstants));
-
 	//we need this readable from the CPU to do the final summation
 	m_temporaryResults.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_temporaryResults.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);

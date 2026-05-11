@@ -42,6 +42,8 @@ SerialTrigger::SerialTrigger(Oscilloscope* scope)
 	, m_pattern(m_parameters["Pattern"])
 	, m_pattern2(m_parameters["Pattern 2"])
 {
+	//We initialize the reference in the initializer list but then have to construct it separately
+	//cppcheck-suppress useInitializationList
 	m_radix = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_radix.AddEnumValue("ASCII", RADIX_ASCII);
 	m_radix.AddEnumValue("Binary", RADIX_BINARY);
