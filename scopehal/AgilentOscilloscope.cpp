@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -1391,7 +1391,7 @@ void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 	@param path		SCPI path of the parameter to set
 	@param cond		Trigger condition
  */
-void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
+void AgilentOscilloscope::PushCondition(const string& path, Trigger::Condition cond)
 {
 	string cond_str;
 	switch(cond)
@@ -1417,7 +1417,7 @@ void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
 	@param path		SCPI path of the parameter to set
 	@param f		The value to send
  */
-void AgilentOscilloscope::PushFloat(string path, float f)
+void AgilentOscilloscope::PushFloat(const string& path, float f)
 {
 	m_transport->SendCommand(path + " " + to_string_sci(f));
 }
@@ -1428,7 +1428,7 @@ void AgilentOscilloscope::PushFloat(string path, float f)
 	@param path		SCPI path of the parameter to set
 	@param slope	The desired slope
  */
-void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
+void AgilentOscilloscope::PushSlope(const string& path, EdgeTrigger::EdgeType slope)
 {
 	string slope_str;
 	switch(slope)
@@ -1457,7 +1457,7 @@ void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
 	@param path		SCPI path of the parameter to set
 	@param slope	The desired slope
  */
-void AgilentOscilloscope::PushSlope(string path, NthEdgeBurstTrigger::EdgeType slope)
+void AgilentOscilloscope::PushSlope(const string& path, NthEdgeBurstTrigger::EdgeType slope)
 {
 	string slope_str;
 	switch(slope)

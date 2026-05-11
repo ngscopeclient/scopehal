@@ -44,10 +44,10 @@ public:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPIPowerSupply> (*PowerCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, PowerCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, PowerCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPIPowerSupply> CreatePowerSupply(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIPowerSupply> CreatePowerSupply(const std::string& driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration

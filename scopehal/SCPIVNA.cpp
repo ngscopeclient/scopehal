@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,7 +49,7 @@ SCPIVNA::~SCPIVNA()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPIVNA::DoAddDriverClass(string name, VNACreateProcType proc)
+void SCPIVNA::DoAddDriverClass(const string& name, VNACreateProcType proc)
 {
 	m_vnacreateprocs[name] = proc;
 }
@@ -60,7 +60,7 @@ void SCPIVNA::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPIVNA> SCPIVNA::CreateVNA(string driver, SCPITransport* transport)
+shared_ptr<SCPIVNA> SCPIVNA::CreateVNA(const string& driver, SCPITransport* transport)
 {
 	if(m_vnacreateprocs.find(driver) != m_vnacreateprocs.end())
 		return m_vnacreateprocs[driver](transport);

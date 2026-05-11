@@ -114,13 +114,13 @@ protected:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPISDR> (*SDRCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, SDRCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, SDRCreateProcType proc);
 
 	//This is intentionally not virtual since it's a static method used by enumeration
 	//cppcheck-suppress duplInheritedMember
 	static void EnumDrivers(std::vector<std::string>& names);
 
-	static std::shared_ptr<SCPISDR> CreateSDR(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPISDR> CreateSDR(const std::string& driver, SCPITransport* transport);
 
 	//Class enumeration
 	typedef std::map< std::string, SDRCreateProcType > SDRCreateMapType;

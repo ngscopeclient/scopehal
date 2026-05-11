@@ -2566,7 +2566,7 @@ void MagnovaOscilloscope::PullTrigger()
 /**
 	@brief Reads the source of a trigger from the instrument
  */
-void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
+void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, const string& triggerModeName, bool isUart)
 {
 	string reply;
 	if(!isUart)

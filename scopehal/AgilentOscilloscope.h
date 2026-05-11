@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -183,10 +183,10 @@ protected:
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
-	void PushCondition(std::string path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
-	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
-	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
+	void PushCondition(const std::string& path, Trigger::Condition cond);
+	void PushFloat(const std::string& path, float f);
+	void PushSlope(const std::string& path, EdgeTrigger::EdgeType slope);
+	void PushSlope(const std::string& path, NthEdgeBurstTrigger::EdgeType slope);
 
 private:
 

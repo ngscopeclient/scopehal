@@ -270,7 +270,7 @@ protected:
 	void PullWindowTrigger();
 	void PullGlitchTrigger();
 	void PullNthEdgeBurstTrigger();
-	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
+	void PullTriggerSource(Trigger* trig, const std::string& triggerModeName, bool isUart);
 
 	void GetTriggerSlope(Trigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);

@@ -2703,7 +2703,7 @@ map<int, SparseDigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(stri
 
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
-	tmp = tmp.substr(0, 16);
+	tmp.resize(16);
 	bool enabledChannels[16];
 	for(int i=0; i<16; i++)
 		enabledChannels[i] = (tmp[i] == '1');
@@ -2775,7 +2775,9 @@ map<int, SparseDigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(stri
 
 	//Pull out the actual binary data (Base64 coded)
 	tmp = data.substr(data.find("<BinaryData>") + 12);
-	tmp = tmp.substr(0, tmp.find("</BinaryData>"));
+	auto iend = tmp.find("</BinaryData>");
+	if(iend != string::npos)
+		tmp.resize(iend);
 
 	//Decode the base64
 	base64_decodestate bstate;

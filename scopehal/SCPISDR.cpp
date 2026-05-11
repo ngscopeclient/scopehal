@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,7 +52,7 @@ SCPISDR::~SCPISDR()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPISDR::DoAddDriverClass(string name, SDRCreateProcType proc)
+void SCPISDR::DoAddDriverClass(const string& name, SDRCreateProcType proc)
 {
 	m_sdrcreateprocs[name] = proc;
 }
@@ -63,7 +63,7 @@ void SCPISDR::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPISDR> SCPISDR::CreateSDR(string driver, SCPITransport* transport)
+shared_ptr<SCPISDR> SCPISDR::CreateSDR(const string& driver, SCPITransport* transport)
 {
 	if(m_sdrcreateprocs.find(driver) != m_sdrcreateprocs.end())
 		return m_sdrcreateprocs[driver](transport);
