@@ -112,9 +112,6 @@ protected:
 	bool m_sampleRateValid;
 	uint64_t m_sampleRate;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 
 	void GetTriggerSlope(DCAEdgeTrigger* trig, const std::string& reply);

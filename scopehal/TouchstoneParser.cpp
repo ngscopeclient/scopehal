@@ -261,7 +261,7 @@ bool TouchstoneParser::Load(const string& fname, SParameters& params)
 bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& f)
 {
 	//eat spaces
-	while(isspace(buf[i]) && (i < len) )
+	while((i < len) && isspace(buf[i]) )
 		i++;
 	if(i >= len)
 		return false;
@@ -270,7 +270,7 @@ bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& 
 	f = atof(buf + i);
 
 	//eat digits
-	while(!isspace(buf[i]) && (i < len) )
+	while((i < len) && !isspace(buf[i]) )
 		i++;
 	return true;
 

@@ -66,7 +66,11 @@ protected:
 	Socket m_socket;
 
 public:
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::string GetDriverNameInternal();
+
 	OSCILLOSCOPE_INITPROC(LeCroyFWPOscilloscope)
 };
 

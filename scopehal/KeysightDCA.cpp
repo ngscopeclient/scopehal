@@ -41,8 +41,6 @@ using namespace std;
 KeysightDCA::KeysightDCA(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 
 	// Color the channels based on Agilent's standard color sequence (yellow-green-violet-pink)

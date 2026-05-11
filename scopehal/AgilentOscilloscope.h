@@ -175,9 +175,9 @@ protected:
 	void PullNthEdgeBurstTrigger();
 	void PullPulseWidthTrigger();
 
-	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
-	void GetTriggerSlope(NthEdgeBurstTrigger* trig, std::string reply);
-	Trigger::Condition GetCondition(std::string reply);
+	void GetTriggerSlope(EdgeTrigger* trig, const std::string& reply);
+	void GetTriggerSlope(NthEdgeBurstTrigger* trig, const std::string& reply);
+	Trigger::Condition GetCondition(const std::string& reply);
 	void GetProbeType(size_t i);
 
 	void PushEdgeTrigger(EdgeTrigger* trig);

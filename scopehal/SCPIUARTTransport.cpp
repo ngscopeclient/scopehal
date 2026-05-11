@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -172,11 +172,11 @@ bool SCPIUARTTransport::IsCommandBatchingSupported()
 	return false;
 }
 
-std::vector<TransportEndpoint> SCPIUARTTransport::EnumTransportEndpoints()
+vector<TransportEndpoint> SCPIUARTTransport::EnumTransportEndpoints()
 {
-	std::vector<TransportEndpoint> result;
+	vector<TransportEndpoint> result;
 	auto uarts = UART::EnumerateUarts();
-	for(auto uart : uarts)
+	for(auto& uart : uarts)
 	{
 		TransportEndpoint endpoint;
 		endpoint.path = uart.port;

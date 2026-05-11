@@ -147,10 +147,8 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	LogDebug("Installed options:\n");
 	if(options.empty())
 		LogDebug("* None\n");
-	for(auto opt : options)
-	{
+	for(auto& opt : options)
 		LogDebug("* %s\n", opt.c_str());
-	}
 
 	// If the MSO option is enabled, add digital channels
 	if (options.find("MSO") != options.end())
@@ -1220,7 +1218,7 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 	@param trig		Trigger to configure
 	@param reply	Response from the instrument
  */
-void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, const string& reply)
 {
 	if (reply == "POS")
 		trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -1240,7 +1238,7 @@ void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 	@param trig		Trigger to configure
 	@param reply	Response from the instrument
  */
-void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string reply)
+void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, const string& reply)
 {
 	if (reply == "POS")
 		trig->SetSlope(NthEdgeBurstTrigger::EDGE_RISING);
@@ -1255,15 +1253,15 @@ void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string repl
 
 	@param reply	Response from the instrument
  */
-Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
+Trigger::Condition AgilentOscilloscope::GetCondition(const string& reply)
 {
-	reply = Trim(reply);
+	auto sreply = Trim(reply);
 
-	if(reply == "LESS")
+	if(sreply == "LESS")
 		return Trigger::CONDITION_LESS;
-	else if(reply == "GRE")
+	else if(sreply == "GRE")
 		return Trigger::CONDITION_GREATER;
-	else if(reply == "RANG")
+	else if(sreply == "RANG")
 		return Trigger::CONDITION_BETWEEN;
 
 	//unknown

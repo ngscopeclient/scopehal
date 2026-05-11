@@ -1052,7 +1052,7 @@ void AntikernelLabsTriggerCrossbar::MeasureHBathtub(size_t i)
 	auto data = explode(reply, ',');
 	vector<float> values;
 	float tmp;
-	for(auto num : data)
+	for(auto& num : data)
 	{
 		sscanf(num.c_str(), "%f", &tmp);
 

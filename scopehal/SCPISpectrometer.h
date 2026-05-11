@@ -117,12 +117,12 @@ protected:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPISpectrometer> (*SpectrometerCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, SpectrometerCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, SpectrometerCreateProcType proc);
 
 	//This is intentionally not virtual since it's a static method used by enumeration
 	//cppcheck-suppress duplInheritedMember
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPISpectrometer> CreateSpectrometer(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPISpectrometer> CreateSpectrometer(const std::string& driver, SCPITransport* transport);
 
 	//Class enumeration
 	typedef std::map< std::string, SpectrometerCreateProcType > SpectrometerCreateMapType;

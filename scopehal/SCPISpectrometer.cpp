@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,7 +52,7 @@ SCPISpectrometer::~SCPISpectrometer()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPISpectrometer::DoAddDriverClass(string name, SpectrometerCreateProcType proc)
+void SCPISpectrometer::DoAddDriverClass(const string& name, SpectrometerCreateProcType proc)
 {
 	m_spectrometercreateprocs[name] = proc;
 }
@@ -63,7 +63,7 @@ void SCPISpectrometer::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPISpectrometer> SCPISpectrometer::CreateSpectrometer(string driver, SCPITransport* transport)
+shared_ptr<SCPISpectrometer> SCPISpectrometer::CreateSpectrometer(const string& driver, SCPITransport* transport)
 {
 	if(m_spectrometercreateprocs.find(driver) != m_spectrometercreateprocs.end())
 		return m_spectrometercreateprocs[driver](transport);

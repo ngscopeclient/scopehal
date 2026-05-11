@@ -70,7 +70,7 @@ Oscilloscope::~Oscilloscope()
 		m_trigger = NULL;
 	}
 
-	for(auto set : m_pendingWaveforms)
+	for(auto& set : m_pendingWaveforms)
 	{
 		for(auto& it : set)
 			delete it.second;

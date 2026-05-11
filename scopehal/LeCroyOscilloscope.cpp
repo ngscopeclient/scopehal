@@ -73,7 +73,6 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasNrzTrigger(false)
 	, m_hasXdev(false)
 	, m_maxBandwidth(10000)
-	, m_triggerArmed(false)
 	, m_triggerReallyArmed(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
@@ -1396,7 +1395,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	string reply;
 	{
 		reply = Trim(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING?"));
-		reply = reply.substr(0,3);
+		reply.resize(3);
 	}
 
 	//Check if we have an active probe connected

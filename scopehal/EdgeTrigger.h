@@ -81,6 +81,7 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetTriggerName();
+
 	TRIGGER_INITPROC(EdgeTrigger);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

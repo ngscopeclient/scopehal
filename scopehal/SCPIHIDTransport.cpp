@@ -172,7 +172,7 @@ std::vector<TransportEndpoint> SCPIHIDTransport::EnumTransportEndpoints()
 	char buffer[512];
 	std::set<string> paths;
 
-	for(auto device : devices)
+	for(auto& device : devices)
 	{
 		snprintf(buffer, sizeof(buffer), "%x:%x:%s",device.vendorId,device.productId,device.serialNumber.c_str());
 		string path = string(buffer);
