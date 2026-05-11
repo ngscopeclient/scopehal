@@ -72,7 +72,7 @@ Oscilloscope::~Oscilloscope()
 
 	for(auto set : m_pendingWaveforms)
 	{
-		for(auto it : set)
+		for(auto& it : set)
 			delete it.second;
 	}
 	m_pendingWaveforms.clear();
@@ -86,7 +86,7 @@ Oscilloscope::~Oscilloscope()
 void Oscilloscope::InitVulkanQueue(const char* debugName)
 {
 	string name = string(debugName) + ".queue";
-	m_queue = g_vkQueueManager->GetComputeQueue(name.c_str());
+	m_queue = g_vkQueueManager->GetComputeQueue(name);
 
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -118,7 +118,7 @@ void Oscilloscope::InitVulkanQueue(const char* debugName)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void Oscilloscope::DoAddDriverClass(string name, CreateProcType proc)
+void Oscilloscope::DoAddDriverClass(const string& name, CreateProcType proc)
 {
 	m_createprocs[name] = proc;
 }
@@ -129,7 +129,7 @@ void Oscilloscope::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<Oscilloscope> Oscilloscope::CreateOscilloscope(string driver, SCPITransport* transport)
+shared_ptr<Oscilloscope> Oscilloscope::CreateOscilloscope(const string& driver, SCPITransport* transport)
 {
 	if(m_createprocs.find(driver) != m_createprocs.end())
 		return m_createprocs[driver](transport);

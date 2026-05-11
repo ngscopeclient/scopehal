@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,31 +37,28 @@ using namespace std;
 
 SerialTrigger::SerialTrigger(Oscilloscope* scope)
 	: Trigger(scope)
-	, m_radixname("Radix")
-	, m_conditionname("Condition")
-	, m_patternname("Pattern")
-	, m_pattern2name("Pattern 2")
+	, m_radix(m_parameters["Radix"])
+	, m_condition(m_parameters["Condition"])
+	, m_pattern(m_parameters["Pattern"])
+	, m_pattern2(m_parameters["Pattern 2"])
 {
-	//CreateInput("din");
+	m_radix = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_radix.AddEnumValue("ASCII", RADIX_ASCII);
+	m_radix.AddEnumValue("Binary", RADIX_BINARY);
+	m_radix.AddEnumValue("Hex", RADIX_HEX);
 
-	m_parameters[m_radixname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_radixname].AddEnumValue("ASCII", RADIX_ASCII);
-	m_parameters[m_radixname].AddEnumValue("Binary", RADIX_BINARY);
-	m_parameters[m_radixname].AddEnumValue("Hex", RADIX_HEX);
+	m_pattern = FilterParameter(FilterParameter::TYPE_STRING, Unit(Unit::UNIT_COUNTS));
+	m_pattern2 = FilterParameter(FilterParameter::TYPE_STRING, Unit(Unit::UNIT_COUNTS));
 
-	m_parameters[m_patternname] = FilterParameter(FilterParameter::TYPE_STRING, Unit(Unit::UNIT_COUNTS));
-
-	m_parameters[m_pattern2name] = FilterParameter(FilterParameter::TYPE_STRING, Unit(Unit::UNIT_COUNTS));
-
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("==", CONDITION_EQUAL);
-	m_parameters[m_conditionname].AddEnumValue("!=", CONDITION_NOT_EQUAL);
-	m_parameters[m_conditionname].AddEnumValue("<", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("<=", CONDITION_LESS_OR_EQUAL);
-	m_parameters[m_conditionname].AddEnumValue(">", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue(">=", CONDITION_GREATER_OR_EQUAL);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
-	m_parameters[m_conditionname].AddEnumValue("Not Between", CONDITION_NOT_BETWEEN);
+	m_condition = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_condition.AddEnumValue("==", CONDITION_EQUAL);
+	m_condition.AddEnumValue("!=", CONDITION_NOT_EQUAL);
+	m_condition.AddEnumValue("<", CONDITION_LESS);
+	m_condition.AddEnumValue("<=", CONDITION_LESS_OR_EQUAL);
+	m_condition.AddEnumValue(">", CONDITION_GREATER);
+	m_condition.AddEnumValue(">=", CONDITION_GREATER_OR_EQUAL);
+	m_condition.AddEnumValue("Between", CONDITION_BETWEEN);
+	m_condition.AddEnumValue("Not Between", CONDITION_NOT_BETWEEN);
 }
 
 SerialTrigger::~SerialTrigger()
@@ -75,7 +72,7 @@ SerialTrigger::~SerialTrigger()
 /**
 	@brief Converts a pattern from ASCII ternary (0-1-x) to a more display-friendly format
  */
-void SerialTrigger::SetPatterns(string p1, string p2, bool ignore_p2)
+void SerialTrigger::SetPatterns(const string& p1, const string& p2, bool ignore_p2)
 {
 	//Try to figure out the best radix to use for display.
 	bool has_xs = false;
@@ -162,40 +159,40 @@ void SerialTrigger::SetPatterns(string p1, string p2, bool ignore_p2)
 	if(!has_xs && !has_nonprint)
 	{
 		SetRadix(RADIX_ASCII);
-		m_parameters[m_patternname].ParseString(tmp1);
+		m_pattern.ParseString(tmp1);
 		if(ignore_p2)
-			m_parameters[m_pattern2name].ParseString("");
+			m_pattern2.ParseString("");
 		else
-			m_parameters[m_pattern2name].ParseString(tmp2);
+			m_pattern2.ParseString(tmp2);
 	}
 
 	//No Xs, or aligned Xs? Use hex
 	else if(!has_unaligned_xs)
 	{
 		SetRadix(RADIX_HEX);
-		m_parameters[m_patternname].ParseString(h1);
+		m_pattern.ParseString(h1);
 		if(ignore_p2)
-			m_parameters[m_pattern2name].ParseString("");
+			m_pattern2.ParseString("");
 		else
-			m_parameters[m_pattern2name].ParseString(h2);
+			m_pattern2.ParseString(h2);
 	}
 
 	//Unaligned X bits, use binary
 	else
 	{
 		SetRadix(RADIX_BINARY);
-		m_parameters[m_patternname].ParseString(p1);
+		m_pattern.ParseString(p1);
 		if(ignore_p2)
-			m_parameters[m_pattern2name].ParseString("");
+			m_pattern2.ParseString("");
 		else
-			m_parameters[m_pattern2name].ParseString(p2);
+			m_pattern2.ParseString(p2);
 	}
 }
 
 /**
 	@brief Converts a pattern in the current radix back to ASCII ternary
  */
-string SerialTrigger::FormatPattern(string str)
+string SerialTrigger::FormatPattern(const string& str)
 {
 	string ret;
 

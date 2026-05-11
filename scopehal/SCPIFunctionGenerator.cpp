@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,7 +48,7 @@ SCPIFunctionGenerator::~SCPIFunctionGenerator()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPIFunctionGenerator::DoAddDriverClass(string name, GeneratorCreateProcType proc)
+void SCPIFunctionGenerator::DoAddDriverClass(const string& name, GeneratorCreateProcType proc)
 {
 	m_gencreateprocs[name] = proc;
 }
@@ -59,7 +59,7 @@ void SCPIFunctionGenerator::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPIFunctionGenerator> SCPIFunctionGenerator::CreateFunctionGenerator(string driver, SCPITransport* transport)
+shared_ptr<SCPIFunctionGenerator> SCPIFunctionGenerator::CreateFunctionGenerator(const string& driver, SCPITransport* transport)
 {
 	if(m_gencreateprocs.find(driver) != m_gencreateprocs.end())
 		return m_gencreateprocs[driver](transport);

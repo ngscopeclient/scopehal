@@ -44,10 +44,10 @@ public:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPIFunctionGenerator> (*GeneratorCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, GeneratorCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, GeneratorCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPIFunctionGenerator> CreateFunctionGenerator(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIFunctionGenerator> CreateFunctionGenerator(const std::string& driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration

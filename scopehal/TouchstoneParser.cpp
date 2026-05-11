@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,7 +64,7 @@ TouchstoneParser::~TouchstoneParser()
 
 	@return	True on success, false on failure
  */
-bool TouchstoneParser::Load(string fname, SParameters& params)
+bool TouchstoneParser::Load(const string& fname, SParameters& params)
 {
 	params.Clear();
 

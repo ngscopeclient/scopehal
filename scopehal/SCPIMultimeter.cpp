@@ -48,7 +48,7 @@ SCPIMultimeter::~SCPIMultimeter()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPIMultimeter::DoAddDriverClass(string name, MeterCreateProcType proc)
+void SCPIMultimeter::DoAddDriverClass(const string& name, MeterCreateProcType proc)
 {
 	m_metercreateprocs[name] = proc;
 }
@@ -59,7 +59,7 @@ void SCPIMultimeter::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPIMultimeter> SCPIMultimeter::CreateMultimeter(string driver, SCPITransport* transport)
+shared_ptr<SCPIMultimeter> SCPIMultimeter::CreateMultimeter(const string& driver, SCPITransport* transport)
 {
 	if(m_metercreateprocs.find(driver) != m_metercreateprocs.end())
 		return m_metercreateprocs[driver](transport);

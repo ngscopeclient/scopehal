@@ -43,10 +43,10 @@ public:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPIMiscInstrument> (*MiscCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, MiscCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, MiscCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPIMiscInstrument> CreateInstrument(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIMiscInstrument> CreateInstrument(const std::string& driver, SCPITransport* transport);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage

@@ -986,10 +986,10 @@ public:
 
 public:
 	typedef std::shared_ptr<Oscilloscope> (*CreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, CreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, CreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<Oscilloscope> CreateOscilloscope(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<Oscilloscope> CreateOscilloscope(const std::string& driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration

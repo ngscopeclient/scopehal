@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,33 +52,33 @@ public:
 	};
 
 	void SetCondition(Condition cond)
-	{ m_parameters[m_conditionname].SetIntVal(cond); }
+	{ m_condition.SetIntVal(cond); }
 
 	Condition GetCondition()
-	{ return (Condition) m_parameters[m_conditionname].GetIntVal(); }
+	{ return (Condition) m_condition.GetIntVal(); }
 
 	void SetRadix(Radix rad)
-	{ m_parameters[m_radixname].SetIntVal(rad); }
+	{ m_radix.SetIntVal(rad); }
 
 	Radix GetRadix()
-	{ return (Radix) m_parameters[m_radixname].GetIntVal(); }
+	{ return (Radix) m_radix.GetIntVal(); }
 
-	void SetPatterns(std::string p1, std::string p2, bool ignore_p2);
+	void SetPatterns(const std::string& p1, const std::string& p2, bool ignore_p2);
 
 	std::string GetPattern1()
-	{ return FormatPattern(m_parameters[m_patternname].ToString()); }
+	{ return FormatPattern(m_pattern.ToString()); }
 
 	std::string GetPattern2()
-	{ return FormatPattern(m_parameters[m_pattern2name].ToString()); }
+	{ return FormatPattern(m_pattern2.ToString()); }
 
 protected:
 
-	std::string FormatPattern(std::string str);
+	std::string FormatPattern(const std::string& str);
 
-	std::string m_radixname;
-	std::string m_conditionname;
-	std::string m_patternname;
-	std::string m_pattern2name;
+	FilterParameter m_radix;
+	FilterParameter m_condition;
+	FilterParameter m_pattern;
+	FilterParameter m_pattern2;
 };
 
 #endif
