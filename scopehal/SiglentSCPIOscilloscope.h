@@ -365,8 +365,6 @@ protected:
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 	bool m_triggerForced;
 
 	// Pagination state
@@ -426,6 +424,9 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

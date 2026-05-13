@@ -280,8 +280,6 @@ protected:
 	//Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 	bool m_triggerForced;
 
 	//Cached configuration

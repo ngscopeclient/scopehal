@@ -123,9 +123,7 @@ protected:
 	int64_t m_triggerOffset;
 	bool m_triggerOffsetValid;
 
-	bool m_triggerArmed;
 	bool m_triggerWasLive;
-	bool m_triggerOneShot;
 
 	bool m_liveMode;
 
@@ -149,6 +147,9 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {
@@ -186,6 +187,7 @@ public:
 		}},
 		};
 	}
+
 	OSCILLOSCOPE_INITPROC(RigolOscilloscope)
 };
 
