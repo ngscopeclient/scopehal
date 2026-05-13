@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,23 +37,22 @@ using namespace std;
 
 TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_highlevel(m_parameters["High Level"])
+	, m_lowlevel(m_parameters["Low Level"])
+	, m_measurementType(m_parameters["Measurement Type"])
 {
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("din");
 
-	m_measurement_typename = "Measurement Type";
-	m_parameters[m_measurement_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_measurement_typename].AddEnumValue("High Level", HIGH_LEVEL);
-	m_parameters[m_measurement_typename].AddEnumValue("Low Level", LOW_LEVEL);
-	m_parameters[m_measurement_typename].AddEnumValue("Both", BOTH);
+	m_measurementType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_measurementType.AddEnumValue("High Level", HIGH_LEVEL);
+	m_measurementType.AddEnumValue("Low Level", LOW_LEVEL);
+	m_measurementType.AddEnumValue("Both", BOTH);
 
-	m_highlevel = "High Level";
-	m_parameters[m_highlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-
-	m_lowlevel = "Low Level";
-	m_parameters[m_lowlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_highlevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_lowlevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,9 +67,7 @@ bool TimeOutsideLevelMeasurement::ValidateChannel(size_t i, StreamDescriptor str
 		return false;
 
 	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-	{
 		return true;
-	}
 
 	return false;
 }
@@ -101,14 +98,14 @@ void TimeOutsideLevelMeasurement::Refresh()
 	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 
-	float highlevel = m_parameters[m_highlevel].GetFloatVal();
-	float lowlevel = m_parameters[m_lowlevel].GetFloatVal();
+	float highlevel = m_highlevel.GetFloatVal();
+	float lowlevel = m_lowlevel.GetFloatVal();
 
 	int64_t hightime = 0;
 	int64_t lowtime = 0;
 	size_t length = uadin->m_samples.size();
 
-	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
+	auto measurement_type = m_measurementType.GetEnumVal<MeasurementType>();
 
 	bool processhigh = (measurement_type == HIGH_LEVEL) || (measurement_type == BOTH);
 	bool processlow = (measurement_type == LOW_LEVEL) || (measurement_type == BOTH);

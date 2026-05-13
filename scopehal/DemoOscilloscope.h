@@ -158,12 +158,6 @@ protected:
 		CHANNEL_MODE_NOISE_LPF
 	};
 
-	///@brief True if trigger is armed
-	bool m_triggerArmed;
-
-	///@brief True if most recent trigger arm was a single-shot trigger
-	bool m_triggerOneShot;
-
 	///@brief Current frequency within the sweep for channel 2
 	float m_sweepFreq;
 
@@ -186,6 +180,9 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

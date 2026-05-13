@@ -52,9 +52,7 @@ using namespace std;
 DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
-	, m_extTrigger(NULL)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
+	, m_extTrigger(nullptr)
 {
 	for(int i=0; i<4; i++)
 	{
