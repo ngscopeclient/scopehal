@@ -49,7 +49,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(AutocorrelationFilter)
 
 protected:
-	std::string m_maxDeltaName;
+	FilterParameter& m_maxDelta;
 };
 
 #endif
