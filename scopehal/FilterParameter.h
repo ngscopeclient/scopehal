@@ -120,6 +120,25 @@ public:
 	{ return m_intval; }
 
 	/**
+		@brief Returns the value of the parameter interpreted as an enum
+	 */
+	template<class T>
+	T GetEnumVal() const
+	{
+		//Make sure it's a valid enum member
+		//If not, return the first valid value
+		if(m_reverseEnumMap.find(m_intval) == m_reverseEnumMap.end())
+		{
+			LogWarning("Attempted to convert value %" PRIi64 " to a %s but it is not a legal enum member\n",
+				m_intval,
+				typeid(T).name());
+			return static_cast<T>(m_reverseEnumMap.begin()->first);
+		}
+
+		return static_cast<T>(m_intval);
+	}
+
+	/**
 		@brief Returns the value of the parameter interpreted as a floating point number
 	 */
 	float GetFloatVal() const
