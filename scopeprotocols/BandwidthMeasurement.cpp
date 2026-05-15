@@ -37,13 +37,13 @@ using namespace std;
 
 BandwidthMeasurement::BandwidthMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
-	, m_reference("Reference Level")
+	, m_reference(m_parameters["Reference Level"])
 {
 	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("din");
 
-	m_parameters[m_reference] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
-	m_parameters[m_reference].SetFloatVal(0);
+	m_reference = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_reference.SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +95,7 @@ void BandwidthMeasurement::Refresh(
 	PrepareForCpuAccess(sin, uin);
 
 	int64_t bw = 0;
-	float threshold = m_parameters[m_reference].GetFloatVal() - 3;
+	float threshold = m_reference.GetFloatVal() - 3;
 	for(size_t i=0; i < len; i++)
 	{
 		auto cur = GetValue(sin, uin, i);

@@ -49,7 +49,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(BandwidthMeasurement)
 
 protected:
-	std::string m_reference;
+	FilterParameter& m_reference;
 };
 
 #endif
