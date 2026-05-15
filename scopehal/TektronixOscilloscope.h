@@ -376,12 +376,6 @@ protected:
 	///@brief Starting index for spectrum channels
 	size_t m_spectrumChannelBase;
 
-	///@brief True if trigger is armed, false if idle
-	bool m_triggerArmed;
-
-	///@brief True if trigger is single or forced, false if continuous
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullPulseWidthTrigger();

@@ -54,8 +54,6 @@ using namespace std;
 AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport, true, 30000000) //Some models (DSOX2024A at least) take ~10 seconds to respond after network connection
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
 	std::string model_number = m_model;

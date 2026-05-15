@@ -166,9 +166,6 @@ protected:
 	std::map<size_t, int> m_channelBandwidthLimits;
 	std::map<size_t, double> m_channelAttenuations;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
 	bool m_sampleRateValid;
 	uint64_t m_sampleRate;
 	bool m_sampleDepthValid;

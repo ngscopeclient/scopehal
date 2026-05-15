@@ -49,8 +49,6 @@ using namespace std;
 RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 	int nchans = 0;
 

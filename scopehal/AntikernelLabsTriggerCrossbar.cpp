@@ -60,9 +60,8 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	, m_eyeScanInProgress(false)
 	, m_activeScanChannel(0)
 	, m_activeScanProgress(0)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(true)
 {
+	m_triggerOneShot = true;
 	m_laChannelEnabled[0] = false;
 	m_laChannelEnabled[1] = false;
 }

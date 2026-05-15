@@ -165,12 +165,6 @@ protected:
 	///@brief Acquisition sample rate
 	uint64_t m_sampleRate;
 
-	///@brief True if trigger is armed, false if idle
-	bool m_triggerArmed;
-
-	///@brief True if trigger is one-shot (single or forced), false if idle
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 	void PullNthEdgeBurstTrigger();
 	void PullPulseWidthTrigger();
