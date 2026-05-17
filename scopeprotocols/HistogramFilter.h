@@ -59,10 +59,10 @@ public:
 	PROTOCOL_DECODER_INITPROC(HistogramFilter)
 
 protected:
-	std::string m_autorangeName;
-	std::string m_minName;
-	std::string m_maxName;
-	std::string m_binSizeName;
+	FilterParameter& m_autorange;
+	FilterParameter& m_pmin;
+	FilterParameter& m_pmax;
+	FilterParameter& m_binSize;
 
 	float m_midpoint;
 	float m_range;

@@ -37,29 +37,29 @@ using namespace std;
 
 HistogramFilter::HistogramFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_autorangeName("Autorange?")
-	, m_minName("Min Value")
-	, m_maxName("Max Value")
-	, m_binSizeName("Bin Size")
+	, m_autorange(m_parameters["Autorange?"])
+	, m_pmin(m_parameters["Min Value"])
+	, m_pmax(m_parameters["Max Value"])
+	, m_binSize(m_parameters["Bin Size"])
 	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_COUNTS_SCI), "data", Stream::STREAM_TYPE_ANALOG);
 
 	m_streams[0].m_flags = Stream::STREAM_DO_NOT_INTERPOLATE | Stream::STREAM_FILL_UNDER;
 
-	m_parameters[m_autorangeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_autorangeName].AddEnumValue("Autorange", 1);
-	m_parameters[m_autorangeName].AddEnumValue("Manual Range", 0);
-	m_parameters[m_autorangeName].SetIntVal(1);
+	m_autorange = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_autorange.AddEnumValue("Autorange", 1);
+	m_autorange.AddEnumValue("Manual Range", 0);
+	m_autorange.SetIntVal(1);
 
-	m_parameters[m_minName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_minName].SetIntVal(0);
+	m_pmin = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_pmin.SetIntVal(0);
 
-	m_parameters[m_maxName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_maxName].SetIntVal(100);
+	m_pmax = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_pmax.SetIntVal(100);
 
-	m_parameters[m_binSizeName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_binSizeName].SetIntVal(100);
+	m_binSize = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_binSize.SetIntVal(100);
 	// Retain existing default behavior of 100fs bins
 
 	//Set up channels
@@ -175,9 +175,9 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	}
 	else
 		m_xAxisUnit = xunit;
-	m_parameters[m_minName].SetUnit(xunit);
-	m_parameters[m_maxName].SetUnit(xunit);
-	m_parameters[m_binSizeName].SetUnit(m_xAxisUnit);
+	m_pmin.SetUnit(xunit);
+	m_pmax.SetUnit(xunit);
+	m_binSize.SetUnit(m_xAxisUnit);
 
 	//GPU side min/max
 	float nmin;
@@ -192,7 +192,7 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
 
 	bool reallocate = false;
-	bool autorange = (m_parameters[m_autorangeName].GetIntVal() != 0);
+	bool autorange = (m_autorange.GetIntVal() != 0);
 	if(autorange)
 	{
 		//If the signal is outside our current range, extend our range
@@ -215,8 +215,8 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	}
 	else
 	{
-		float newMin = m_parameters[m_minName].GetFloatVal();
-		float newMax = m_parameters[m_maxName].GetFloatVal();
+		float newMin = m_pmin.GetFloatVal();
+		float newMax = m_pmax.GetFloatVal();
 
 		m_min = newMin;
 		m_max = newMax;
@@ -230,7 +230,7 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	bool didClipRange = (nmin < m_min) || (nmax > m_max);
 
 	//Automatically choose a plausible bin size if autoranging, otherwise use what the user chose.
-	float requestedBinSize = m_parameters[m_binSizeName].GetFloatVal();
+	float requestedBinSize = m_binSize.GetFloatVal();
 	float range = (m_max - m_min) * scale;
 	if(autorange)
 		requestedBinSize = range / 500;
