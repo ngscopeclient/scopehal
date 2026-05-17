@@ -105,7 +105,7 @@ void CSVImportFilter::OnFileNameChanged()
 		return;
 	}
 	fseek(fp, 0, SEEK_END);
-	__off_t flen = ftello(fp);
+	off_t flen = ftello(fp);
 	if(flen < 0)
 	{
 		AddErrorMessage("Bad file", string("Failed to seek file ") + fname);
@@ -114,7 +114,7 @@ void CSVImportFilter::OnFileNameChanged()
 	}
 	fseek(fp, 0, SEEK_SET);
 	char* buf = new char[flen+1];
-	if(flen != static_cast<__off_t>(fread(buf, 1, flen, fp)))
+	if(flen != static_cast<off_t>(fread(buf, 1, flen, fp)))
 	{
 		fclose(fp);
 		delete[] buf;
