@@ -144,7 +144,7 @@ void PcapngImportFilter::OnFileNameChanged()
 		{
 			fclose(fp);
 			return;
-			]
+		}
 		LogTrace("blocktype %d blocklen %d\n", blocktype, blocklen);
 
 		//Interface Definition Block
