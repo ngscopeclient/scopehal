@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -58,7 +58,7 @@ PCIeGen3LogicalDecoder::~PCIeGen3LogicalDecoder()
 
 bool PCIeGen3LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	size_t nports = m_parameters[m_portCountName].GetIntVal();
@@ -68,6 +68,8 @@ bool PCIeGen3LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string PCIeGen3LogicalDecoder::GetProtocolName()
 {
 	return "PCIe Gen 3/4/5 Logical";

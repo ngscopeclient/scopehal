@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -113,13 +113,19 @@ void PcapngImportFilter::OnFileNameChanged()
 
 	//Section Header Block
 	if(!ValidateSHB(fp))
+	{
+		fclose(fp);
 		return;
+	}
 
 	//Read trailing block length (and discard for now)
 	//TODO: verify it's correct
 	uint32_t blocklen;
 	if(1 != fread(&blocklen, sizeof(blocklen), 1, fp))
+	{
+		fclose(fp);
 		return;
+	}
 
 	//Read and process packet blocks
 	bool gotEPB = false;
@@ -130,20 +136,32 @@ void PcapngImportFilter::OnFileNameChanged()
 
 		uint32_t blocktype;
 		if(1 != fread(&blocktype, sizeof(blocktype), 1, fp))
+		{
+			fclose(fp);
 			return;
+		}
 		if(1 != fread(&blocklen, sizeof(blocklen), 1, fp))
+		{
+			fclose(fp);
 			return;
+			]
 		LogTrace("blocktype %d blocklen %d\n", blocktype, blocklen);
 
 		//Interface Definition Block
 		if(blocktype == 1)
 		{
 			if(!ReadIDB(fp))
+			{
+				fclose(fp);
 				return;
+			}
 
 			//read and discard trailing block size
 			if(1 != fread(&blocklen, sizeof(blocklen), 1, fp))
+			{
+				fclose(fp);
 				return;
+			}
 		}
 
 		//Enhanced Packet Block: start of data stream
@@ -156,6 +174,7 @@ void PcapngImportFilter::OnFileNameChanged()
 		else
 		{
 			LogWarning("Unknown block type %d\n", blocktype);
+			fclose(fp);
 			return;
 		}
 
@@ -163,6 +182,7 @@ void PcapngImportFilter::OnFileNameChanged()
 	if(!gotEPB)
 	{
 		LogWarning("Didn't get an Enhanced Packet Block, nothing to do\n");
+		fclose(fp);
 		return;
 	}
 
@@ -829,12 +849,18 @@ bool PcapngImportFilter::ReadIDB(FILE* fp)
 			default:
 				LogWarning("Unknown IDB option %d\n", optid);
 				for(size_t i=0; i<optlen; i++)
-					fread(&tmp, 1, 1, fp);
+				{
+					if(1 != fread(&tmp, 1, 1, fp))
+						return false;
+				}
 		}
 
 		//Read and discard padding until 32-bit aligned
 		while(ftell(fp) & 3)
-			fread(&tmp, 1, 1, fp);
+		{
+			if(1 != fread(&tmp, 1, 1, fp))
+				return false;
+		}
 	}
 
 	return true;
@@ -930,12 +956,18 @@ bool PcapngImportFilter::ValidateSHB(FILE* fp)
 			default:
 				LogWarning("Unknown SHB option %d\n", optid);
 				for(size_t i=0; i<optlen; i++)
-					fread(&tmp, 1, 1, fp);
+				{
+					if(1 != fread(&tmp, 1, 1, fp))
+						return false;
+				}
 		}
 
 		//Read and discard padding until 32-bit aligned
 		while(ftell(fp) & 3)
-			fread(&tmp, 1, 1, fp);
+		{
+			if(1 != fread(&tmp, 1, 1, fp))
+				return false;
+		}
 	}
 
 	return true;
@@ -943,14 +975,10 @@ bool PcapngImportFilter::ValidateSHB(FILE* fp)
 
 string PcapngImportFilter::ReadFixedLengthString(uint16_t len, FILE* fp)
 {
-	//TODO: make this more efficient
 	string ret;
-	char tmp;
-	for(size_t i=0; i<len; i++)
-	{
-		fread(&tmp, 1, 1, fp);
-		ret += tmp;
-	}
+	ret.resize(len);
+	if(len != fread(&ret[0], 1, len, fp))
+		return "";
 	return ret;
 }
 
