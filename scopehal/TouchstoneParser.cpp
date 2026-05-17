@@ -95,13 +95,14 @@ bool TouchstoneParser::Load(const string& fname, SParameters& params)
 	fseek(fp, 0, SEEK_END);
 	size_t len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
-	char* buf = new char[len];
+	char* buf = new char[len + 1];
 	if(len != fread(buf, 1, len, fp))
 	{
 		delete[] buf;
 		fclose(fp);
 		return false;
 	}
+	buf[len] = '\0';
 	fclose(fp);
 
 	//Main parsing loop
