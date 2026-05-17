@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ngscopeclient                                                                                                        *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,11 +53,9 @@ NanoVNA::NanoVNA(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
 	, CommandLineDriver(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_rbw(1000)
 {
-	
+
 	m_maxResponseSize = 100*1024;
 	 // 30s has a sweep with low rbw can take several minutes and we may have to wait that long between each data reception)
 	m_communicationTimeout = 30;
@@ -333,14 +331,14 @@ bool NanoVNA::AcquireData()
 	size_t pages;
 	size_t pageSize;
 	if(npoints > m_maxDeviceSampleDepth)
-	{	
+	{
 		// We will paginate with 101 points pages and one point overlaping between each page
 		pages = (npoints-1)/100;
 		pageSpan = span / pages;
 		pageSize = 101;
 	}
 	else
-	{	
+	{
 		// Single page sweep
 		pages = 1;
 		pageSize = npoints;

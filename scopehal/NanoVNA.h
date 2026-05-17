@@ -100,9 +100,6 @@ protected:
 
 	std::string GetChannelColor(size_t i);
 
-	bool m_triggerArmed = false;
-	bool m_triggerOneShot = false;
-
 	int64_t m_sampleDepth = 0;
 	size_t m_maxDeviceSampleDepth = 0;
 	int64_t m_rbw = 0;

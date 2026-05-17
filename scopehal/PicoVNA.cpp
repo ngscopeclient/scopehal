@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ngscopeclient                                                                                                        *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,8 +52,6 @@ using namespace std;
 PicoVNA::PicoVNA(SCPITransport* transport)
 	: SCPIDevice(transport, true)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(true)
 	, m_rbw(1)
 {
 	//Set up VNA in a known configuration (returns "OK", ignore reply but need to read it to stay synced)
