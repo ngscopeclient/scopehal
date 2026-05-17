@@ -52,6 +52,8 @@ EthernetSGMIIDecoder::EthernetSGMIIDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string EthernetSGMIIDecoder::GetProtocolName()
 {
 	return "Ethernet - SGMII";

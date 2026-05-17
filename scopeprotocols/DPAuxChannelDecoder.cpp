@@ -2213,7 +2213,7 @@ string DPAuxWaveform::GetText(size_t i)
 			break;
 
 		case DPAuxSymbol::TYPE_LEN:
-			snprintf(tmp, sizeof(tmp), "Len: %d", s.m_data + 1);	//length is offset by one since len=0 makes no sense
+			snprintf(tmp, sizeof(tmp), "Len: %u", s.m_data + 1);	//length is offset by one since len=0 makes no sense
 			break;
 
 		case DPAuxSymbol::TYPE_ADDRESS:

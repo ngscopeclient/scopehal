@@ -337,7 +337,7 @@ void I2CDecoder::Refresh(
 		InnerLoop(usda, sscl, cap);
 	else if(ssda && sscl)
 		InnerLoop(ssda, sscl, cap);
-	else /*if(ssda && uscl)*/
+	else if(ssda && uscl)
 		InnerLoop(ssda, uscl, cap);
 
 	cap->MarkModifiedFromCpu();

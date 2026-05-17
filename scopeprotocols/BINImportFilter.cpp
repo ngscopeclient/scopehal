@@ -118,7 +118,7 @@ void BINImportFilter::OnFileNameChanged()
 
 		//Parse waveform header
 		WaveHeader wh;
-		f.copy((char*)&wh, sizeof(WaveHeader), fpos);
+		f.copy(reinterpret_cast<char*>(&wh), sizeof(WaveHeader), fpos);
 		fpos += sizeof(WaveHeader);	//do not trust reported length in f.size
 
 		//TODO: make this metadata readable somewhere via properties etc
@@ -160,7 +160,7 @@ void BINImportFilter::OnFileNameChanged()
 
 		//Grab the initial data header and figure out what it is
 		DataHeader dh;
-		f.copy((char*)&dh, sizeof(DataHeader), fpos);
+		f.copy(reinterpret_cast<char*>(&dh), sizeof(DataHeader), fpos);
 
 		//Digital logic waveform
 		if(wh.type == 6)
@@ -188,7 +188,7 @@ void BINImportFilter::OnFileNameChanged()
 				LogIndenter li_b;
 
 				//Parse waveform data header
-				f.copy((char*)&dh, sizeof(DataHeader), fpos);
+				f.copy(reinterpret_cast<char*>(&dh), sizeof(DataHeader), fpos);
 				fpos += sizeof(DataHeader);
 
 				LogDebug("Data Type:      %i\n", dh.type);
@@ -254,7 +254,7 @@ void BINImportFilter::OnFileNameChanged()
 				LogIndenter li_b;
 
 				//Parse waveform data header
-				f.copy((char*)&dh, sizeof(DataHeader), fpos);
+				f.copy(reinterpret_cast<char*>(&dh), sizeof(DataHeader), fpos);
 				fpos += sizeof(DataHeader);
 
 				LogDebug("Data Type:      %i\n", dh.type);

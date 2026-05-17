@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -341,6 +341,11 @@ void PipelineCacheManager::SaveToDisk()
 		LogTrace("Saving shader %s (%zu bytes)\n", fname.c_str(), vec.size());
 
 		FILE* fp = fopen(fname.c_str(), "wb");
+		if(!fp)
+		{
+			LogWarning("Open cache output file failed (%s)\n", fname.c_str());
+			continue;
+		}
 
 		//Write the cache header
 		header.len = vec.size();

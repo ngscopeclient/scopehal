@@ -291,7 +291,6 @@ void ACRMSMeasurement::DoRefreshUniform(
 	{
 		cap->PrepareForCpuAccess();
 		edges.PrepareForCpuAccess();
-		temp = 0;
 		for(size_t i = 0; i < (elen - 2); i += 2)
 		{
 			//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity

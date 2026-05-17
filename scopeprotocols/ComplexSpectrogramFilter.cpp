@@ -90,6 +90,8 @@ bool ComplexSpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string ComplexSpectrogramFilter::GetProtocolName()
 {
 	return "Complex Spectrogram";

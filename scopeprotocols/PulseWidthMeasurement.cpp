@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -128,7 +128,7 @@ void PulseWidthMeasurement::Refresh()
 	cap->PrepareForCpuAccess();
 
 	//Create the output for amplitude waveform for analog inputs only
-	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : NULL;
+	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : nullptr;
 	if(cap1)
 	{
 		cap1->m_timescale = 1;
@@ -212,7 +212,9 @@ void PulseWidthMeasurement::Refresh()
 
 	m_streams[2].m_value = sum.GetSum() / nedges;
 
-	if(sadin || uadin)
+	//check for cap1 should be redundant as it's only allocated if we have an analog input
+	//but static analysis complains and it's not a critical path so why not check to be safe
+	if( (sadin || uadin) && cap1 )
 	{
 		//Set amplitude output waveform
 		SetData(cap1, 1);
