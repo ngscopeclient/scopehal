@@ -176,10 +176,7 @@ void DPhyDataDecoder::Refresh(
 				//LP-11 is a STOP sequence. The partial packet before this point can be safely discarded.
 				//Emit an "IDLE" state for the duration of the LP-11.
 				if(cur_data.m_type == DPhySymbol::STATE_LP11)
-				{
 					state = STATE_IDLE;
-					timestamp = tend;
-				}
 				break;	//end STATE_UNKNOWN
 
 			//Link is idle, wait for a start-of-transmission or escape sequence
@@ -195,8 +192,6 @@ void DPhyDataDecoder::Refresh(
 					cap->m_offsets.push_back(data->m_offsets[idata]);
 					cap->m_durations.push_back(data->m_durations[idata]);
 					cap->m_samples.push_back(DPhyDataSymbol(DPhyDataSymbol::TYPE_SOT));
-
-					timestamp = tend;
 				}
 
 				break;	//end STATE_IDLE
@@ -209,7 +204,6 @@ void DPhyDataDecoder::Refresh(
 					//Ignore any LP states other than LP-11 which resets us
 					case DPhySymbol::STATE_LP11:
 						state = STATE_IDLE;
-						timestamp = tend;
 						break;
 
 					//If we see HS-0, we're in the sync stage
@@ -230,7 +224,6 @@ void DPhyDataDecoder::Refresh(
 				if(cur_data.m_type == DPhySymbol::STATE_LP11)
 				{
 					state = STATE_IDLE;
-					timestamp = tend;
 					break;
 				}
 

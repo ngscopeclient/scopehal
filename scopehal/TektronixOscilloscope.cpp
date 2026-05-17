@@ -241,7 +241,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		//MSO5 does not appear to have an external trigger input
 		//except in low-profile rackmount models (not yet supported)
 		case FAMILY_MSO5:
-			m_extTrigChannel = NULL;
+			m_extTrigChannel = nullptr;
 			break;
 
 		//MSO6 calls it AUX, not EXT
@@ -1241,7 +1241,7 @@ string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
-	if(chan == m_extTrigChannel)
+	if((m_extTrigChannel != nullptr) && (chan == m_extTrigChannel) )
 		return m_extTrigChannel->GetHwname();
 
 	//Spectrum channels don't have separate names from the time domain ones.

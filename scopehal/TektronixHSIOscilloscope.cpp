@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -71,6 +71,8 @@ TektronixHSIOscilloscope::~TektronixHSIOscilloscope()
 // Accessors
 
 ///@brief Return the constant driver name "tektronix.hsi"
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string TektronixHSIOscilloscope::GetDriverNameInternal()
 {
 	return "tektronix.hsi";

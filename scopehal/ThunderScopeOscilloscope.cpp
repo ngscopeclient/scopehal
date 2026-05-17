@@ -399,7 +399,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//Get the de-facto hardware capture rate.
 	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
+	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
 		return false;
 
 	if(keep)
@@ -424,9 +424,9 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 
 		//Grab the next free buffer
@@ -446,7 +446,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			auto buf = abuf->GetCpuPointer();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 
 			float scale = config[0];
@@ -456,7 +456,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			offset *= GetChannelAttenuation(chnum);
 
 			bool clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 
 			if(!m_transport->ReadRawData(sizeof(dataType), (uint8_t*)&dataType))

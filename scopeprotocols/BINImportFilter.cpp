@@ -85,7 +85,7 @@ void BINImportFilter::OnFileNameChanged()
 	uint32_t fpos = 0;
 
 	FileHeader fh;
-	f.copy((char*)&fh, sizeof(FileHeader), fpos);
+	f.copy(reinterpret_cast<char*>(&fh), sizeof(FileHeader), fpos);
 	fpos += sizeof(FileHeader);
 
 	//Get vendor from file signature

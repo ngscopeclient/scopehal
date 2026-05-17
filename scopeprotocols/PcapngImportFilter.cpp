@@ -133,6 +133,11 @@ void PcapngImportFilter::OnFileNameChanged()
 	while(!feof(fp))
 	{
 		blockstart = ftell(fp);
+		if(blockstart < 0)
+		{
+			fclose(fp);
+			return;
+		}
 
 		uint32_t blocktype;
 		if(1 != fread(&blocktype, sizeof(blocktype), 1, fp))
@@ -235,6 +240,11 @@ bool PcapngImportFilter::LoadSocketCAN(FILE* fp)
 	while(!feof(fp))
 	{
 		auto blockstart = ftell(fp);
+		if(blockstart < 0)
+		{
+			fclose(fp);
+			return false;
+		}
 
 		if(1 != fread(&blocktype, sizeof(blocktype), 1, fp))
 			return false;
@@ -859,10 +869,10 @@ bool PcapngImportFilter::ReadIDB(FILE* fp)
 		while(1)
 		{
 			auto pos = ftell(fp);
-			if( (pos & 3) == 0)
-				break;
 			if(pos < 0)
 				return false;
+			if( (pos & 3) == 0)
+				break;
 			if(1 != fread(&tmp, 1, 1, fp))
 				return false;
 		}
@@ -971,10 +981,10 @@ bool PcapngImportFilter::ValidateSHB(FILE* fp)
 		while(1)
 		{
 			auto pos = ftell(fp);
-			if( (pos & 3) == 0)
-				break;
 			if(pos < 0)
 				return false;
+			if( (pos & 3) == 0)
+				break;
 			if(1 != fread(&tmp, 1, 1, fp))
 				return false;
 		}

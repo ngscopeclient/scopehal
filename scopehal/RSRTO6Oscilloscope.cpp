@@ -62,12 +62,9 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 		LogFatal("rs.rto6 driver only appropriate for RTO6");
 	}
 
-	SCPISocketTransport* sockettransport = NULL;
-
-	if (!(sockettransport = dynamic_cast<SCPISocketTransport*>(transport)))
-	{
+	//TODO: better error handling here this shouldn't abort
+	if(dynamic_cast<SCPISocketTransport*>(transport) == nullptr)
 		LogFatal("rs.rto6 driver requires 'lan' transport");
-	}
 
 	// RTO6 always has four analog channels
 	m_analogChannelCount = 4;

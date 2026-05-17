@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -375,12 +375,12 @@ bool UHDBridgeSDR::AcquireData()
 	{
 		//Read the number of samples in the buffer (may be different from current depth if we just changed it)
 		uint64_t depth;
-		if(!m_transport->ReadRawData(sizeof(depth), (uint8_t*)&depth))
+		if(!m_transport->ReadRawData(sizeof(depth), reinterpret_cast<uint8_t*>(&depth)))
 			return false;
 
 		//Get the sample rate
 		int64_t sample_hz;
-		if(!m_transport->ReadRawData(sizeof(sample_hz), (uint8_t*)&sample_hz))
+		if(!m_transport->ReadRawData(sizeof(sample_hz), reinterpret_cast<uint8_t*>(&sample_hz)))
 			return false;
 		int64_t fs_per_sample = FS_PER_SECOND / sample_hz;
 
@@ -390,7 +390,7 @@ bool UHDBridgeSDR::AcquireData()
 		//TODO: stream timestamp from the server
 
 		size_t readlen = depth * sizeof(float) * 2;
-		if(!m_transport->ReadRawData(readlen, (uint8_t*)buf))
+		if(!m_transport->ReadRawData(readlen, reinterpret_cast<uint8_t*>(buf)))
 		{
 			Unit hz(Unit::UNIT_HZ);
 			LogDebug("fail to read data (readlen = %zu, sample_hz = %s, depth = %" PRIu64 ")\n",

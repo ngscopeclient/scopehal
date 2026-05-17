@@ -138,72 +138,111 @@ void PulseWidthMeasurement::Refresh()
 	size_t elen = edges.size();
 	KahanSummation sum;
 	int64_t nedges = 0;
-	for(size_t i=0; i < (elen - 2); i+= 2)
+
+	//Analog path
+	if(cap1)
 	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+1];
-
-		int64_t delta = end - start;
-
-		//Push pulse width information
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(delta);
-		cap->m_samples.push_back(delta);
-
-		// Find amplitude information for the pulses
 		if(uadin)
 		{
-			int64_t start_index = (start - din->m_triggerPhase) / din->m_timescale;
-			int64_t end_index = (end - din->m_triggerPhase) / din->m_timescale;
-			max_value = average_voltage;
-
-			// Find out the maximum value of the pulse within boundary of the detected pulse
-			for (int64_t j = start_index; j < end_index; j++)
+			for(size_t i=0; i < (elen - 2); i+= 2)
 			{
-				if(uadin->m_samples[j] > max_value)
-					max_value = uadin->m_samples[j];
+				//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+				int64_t start = edges[i];
+				int64_t end = edges[i+1];
+
+				int64_t delta = end - start;
+
+				//Push pulse width information
+				cap->m_offsets.push_back(start);
+				cap->m_durations.push_back(delta);
+				cap->m_samples.push_back(delta);
+
+				// Find amplitude information for the pulses
+				int64_t start_index = (start - din->m_triggerPhase) / din->m_timescale;
+				int64_t end_index = (end - din->m_triggerPhase) / din->m_timescale;
+				max_value = average_voltage;
+
+				// Find out the maximum value of the pulse within boundary of the detected pulse
+				for (int64_t j = start_index; j < end_index; j++)
+				{
+					if(uadin->m_samples[j] > max_value)
+						max_value = uadin->m_samples[j];
+				}
+
+				//Push amplitude information
+				cap1->m_offsets.push_back(start);
+				cap1->m_durations.push_back(delta);
+				cap1->m_samples.push_back(max_value);
+
+				nedges ++;
+				sum += delta;
 			}
-
-			//Push amplitude information
-			cap1->m_offsets.push_back(start);
-			cap1->m_durations.push_back(delta);
-			cap1->m_samples.push_back(max_value);
-
-			nedges ++;
-			sum += delta;
 		}
-		else if (sadin)
+
+		else if(sadin)
 		{
-			int64_t start_offs = (start - din->m_triggerPhase) / din->m_timescale;
-			int64_t end_offs = (end - din->m_triggerPhase) / din->m_timescale;
-			max_value = average_voltage;
-
-			//Parse the waveform to get to a detected pulse
-			for (size_t j = temp; j < sadin->size(); j++)
+			for(size_t i=0; i < (elen - 2); i+= 2)
 			{
-				// Find out maximum value of the pulse within boundary of the detected pulse
-				if ((sadin->m_offsets[j] >= start_offs) && (sadin->m_offsets[j] <= end_offs))
+				//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+				int64_t start = edges[i];
+				int64_t end = edges[i+1];
+
+				int64_t delta = end - start;
+
+				//Push pulse width information
+				cap->m_offsets.push_back(start);
+				cap->m_durations.push_back(delta);
+				cap->m_samples.push_back(delta);
+
+				// Find amplitude information for the pulses
+				int64_t start_offs = (start - din->m_triggerPhase) / din->m_timescale;
+				int64_t end_offs = (end - din->m_triggerPhase) / din->m_timescale;
+				max_value = average_voltage;
+
+				//Parse the waveform to get to a detected pulse
+				for (size_t j = temp; j < sadin->size(); j++)
 				{
-					if(sadin->m_samples[j] > max_value)
-						max_value = sadin->m_samples[j];
+					// Find out maximum value of the pulse within boundary of the detected pulse
+					if ((sadin->m_offsets[j] >= start_offs) && (sadin->m_offsets[j] <= end_offs))
+					{
+						if(sadin->m_samples[j] > max_value)
+							max_value = sadin->m_samples[j];
+					}
+
+					//End of one pulse reached. Record j, so that next time we start from this index for next pulse if any
+					else if (sadin->m_offsets[j] > end_offs)
+					{
+						temp = j;
+						break;
+					}
 				}
 
-				//End of one pulse reached. Record j, so that next time we start from this index for next pulse if any
-				else if (sadin->m_offsets[j] > end_offs)
-				{
-					temp = j;
-					break;
-				}
+				//Push amplitude information
+				cap1->m_offsets.push_back(start);
+				cap1->m_durations.push_back(delta);
+				cap1->m_samples.push_back(max_value);
+
+				nedges ++;
+				sum += delta;
 			}
+		}
+	}
 
-			//Push amplitude information
-			cap1->m_offsets.push_back(start);
-			cap1->m_durations.push_back(delta);
-			cap1->m_samples.push_back(max_value);
+	//Digital path
+	else
+	{
+		for(size_t i=0; i < (elen - 2); i+= 2)
+		{
+			//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+			int64_t start = edges[i];
+			int64_t end = edges[i+1];
 
-			nedges ++;
-			sum += delta;
+			int64_t delta = end - start;
+
+			//Push pulse width information
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(delta);
+			cap->m_samples.push_back(delta);
 		}
 	}
 

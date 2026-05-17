@@ -558,7 +558,9 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Super easy, it comes across the wire in IEEE754 already!
 		cap->Resize(length);
 		cap->PrepareForCpuAccess();
-		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)cap->m_samples.GetCpuPointer());
+		m_transport->ReadRawData(
+			length*sizeof(float),
+			reinterpret_cast<unsigned char*>(cap->m_samples.GetCpuPointer()));
 		cap->MarkSamplesModifiedFromCpu();
 
 		//Discard trailing newline
