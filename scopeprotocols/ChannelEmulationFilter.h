@@ -44,6 +44,8 @@ public:
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::string GetProtocolName();
 
 	PROTOCOL_DECODER_INITPROC(ChannelEmulationFilter)
