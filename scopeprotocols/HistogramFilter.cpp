@@ -192,7 +192,6 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
 
 	bool reallocate = false;
-	float range = m_max - m_min;
 	bool autorange = (m_parameters[m_autorangeName].GetIntVal() != 0);
 	if(autorange)
 	{
@@ -203,7 +202,7 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 			m_max = max(nmax, m_max);
 
 			//Extend the range by a bit to avoid constant reallocation
-			range = m_max - m_min;
+			float range = m_max - m_min;
 			m_min -= 0.05 * range;
 			m_max += 0.05 * range;
 
@@ -228,13 +227,11 @@ void HistogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	reallocate |= (cap == nullptr);
 	// Always need to reallocate if don't have an output yet
 
-	//Calculate range in Y axis units
-	range = (m_max - m_min) * scale;
-
 	bool didClipRange = (nmin < m_min) || (nmax > m_max);
 
 	//Automatically choose a plausible bin size if autoranging, otherwise use what the user chose.
 	float requestedBinSize = m_parameters[m_binSizeName].GetFloatVal();
+	float range = (m_max - m_min) * scale;
 	if(autorange)
 		requestedBinSize = range / 500;
 	size_t bins = ceil(range) / requestedBinSize;

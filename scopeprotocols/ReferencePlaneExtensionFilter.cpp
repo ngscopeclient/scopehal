@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -98,7 +98,7 @@ void ReferencePlaneExtensionFilter::Refresh()
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -117,11 +117,16 @@ void ReferencePlaneExtensionFilter::Refresh()
 				auto mag_out = SetupSparseOutputWaveform(smag_in, imag, 0, 0);
 				mag_out->m_samples.CopyFrom(smag_in->m_samples);
 			}
-			else
+			else if(umag_in)
 			{
 				auto mag_out = SetupEmptyUniformAnalogOutputWaveform(umag_in, imag);
 				mag_out->Resize(umag_in->size());
 				mag_out->m_samples.CopyFrom(umag_in->m_samples);
+			}
+			else
+			{
+				SetData(nullptr, 0);
+				return;
 			}
 
 			//Copy magnitude gain/offset

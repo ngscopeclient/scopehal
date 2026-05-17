@@ -856,8 +856,13 @@ bool PcapngImportFilter::ReadIDB(FILE* fp)
 		}
 
 		//Read and discard padding until 32-bit aligned
-		while(ftell(fp) & 3)
+		while(1)
 		{
+			auto pos = ftell(fp);
+			if( (pos & 3) == 0)
+				break;
+			if(pos < 0)
+				return false;
 			if(1 != fread(&tmp, 1, 1, fp))
 				return false;
 		}
@@ -963,8 +968,13 @@ bool PcapngImportFilter::ValidateSHB(FILE* fp)
 		}
 
 		//Read and discard padding until 32-bit aligned
-		while(ftell(fp) & 3)
+		while(1)
 		{
+			auto pos = ftell(fp);
+			if( (pos & 3) == 0)
+				break;
+			if(pos < 0)
+				return false;
 			if(1 != fread(&tmp, 1, 1, fp))
 				return false;
 		}

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -125,6 +125,10 @@ class SPIFlashDecoder : public PacketDecoder
 public:
 	SPIFlashDecoder(const std::string& color);
 	virtual ~SPIFlashDecoder();
+
+	//not copyable or assignable
+	SPIFlashDecoder(const SPIFlashDecoder& rhs) =delete;
+	SPIFlashDecoder& operator=(const SPIFlashDecoder& rhs) =delete;
 
 	virtual void Refresh() override;
 

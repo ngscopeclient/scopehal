@@ -133,7 +133,7 @@ public:
 
 	ScratchBuffer()
 		: m_ptr(nullptr)
-		//don't initialize id
+		, m_pool(static_cast<ID>(0))
 	{}
 
 	ScratchBuffer(ID id)

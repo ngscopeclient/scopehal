@@ -103,7 +103,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 
 	int64_t hightime = 0;
 	int64_t lowtime = 0;
-	size_t length = uadin->m_samples.size();
+	size_t length = din->size();
 
 	auto measurement_type = m_measurementType.GetEnumVal<MeasurementType>();
 

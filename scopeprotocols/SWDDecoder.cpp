@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -188,8 +188,8 @@ void SWDDecoder::Refresh()
 					cap->m_durations.push_back(stateLen);
 					tstart = off + dur;
 					i += c_magic_seqlen - 1;
-					dur = samples.m_durations[i];
-					off = samples.m_offsets[i] - dur / 2;
+					//dur = samples.m_durations[i];
+					//off = samples.m_offsets[i] - dur / 2;
 
 					switch(current_word)
 					{
