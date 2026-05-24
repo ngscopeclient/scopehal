@@ -52,9 +52,19 @@ void main()
 	if(i >= depth)
 		return;
 
-	double two_pi = 6.28318530717;
-	double theta = (i * double(cycles_per_sample)) * two_pi;
-	theta = mod(theta, two_pi) + startphase;
+	float two_pi = 6.28318530717;
 
-	dout[i] = bias + (scale * sin(float(theta)));
+	//Calculate the phase shift for a large block of samples and apply that first
+	uint blocksize = 32768;
+	uint iblock = i / blocksize;
+	uint fblock = i - (iblock * blocksize);
+	float blocktmp = blocksize * cycles_per_sample;
+	float blockfrac = blocktmp - round(blocktmp);
+
+	//Then add the fractional phase within the block
+	float frac = (blockfrac * iblock) + (fblock * cycles_per_sample);
+
+	//Now that we have the fractional phase,
+	//computing the sine can be done in the float32 domain without loss of precision
+	dout[i] = bias + (scale * sin(frac*two_pi + startphase));
 }
