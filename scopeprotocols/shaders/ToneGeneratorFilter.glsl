@@ -37,7 +37,7 @@ layout(std430, binding=0) restrict writeonly buffer buf_dout
 
 layout(std430, push_constant) uniform constants
 {
-	double radians_per_sample;
+	float cycles_per_sample;
 	uint depth;
 	float bias;
 	float scale;
@@ -52,7 +52,9 @@ void main()
 	if(i >= depth)
 		return;
 
-	double theta = i * radians_per_sample + startphase;
-	theta = mod(theta, 6.28318530717);
+	double two_pi = 6.28318530717;
+	double theta = (i * double(cycles_per_sample)) * two_pi;
+	theta = mod(theta, two_pi) + startphase;
+
 	dout[i] = bias + (scale * sin(float(theta)));
 }

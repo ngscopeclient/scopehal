@@ -38,7 +38,7 @@
 class ToneGeneratorConstants
 {
 public:
-	double		radians_per_sample;
+	float		cycles_per_sample;
 	uint32_t	depth;
 	float		bias;
 	float		scale;
