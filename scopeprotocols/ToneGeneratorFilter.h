@@ -38,7 +38,7 @@
 class ToneGeneratorConstants
 {
 public:
-	float		cycles_per_sample;
+	uint32_t	fpfreq;
 	uint32_t	depth;
 	float		bias;
 	float		scale;

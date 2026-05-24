@@ -133,14 +133,17 @@ void ToneGeneratorFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 	cap->m_startFemtoseconds = fs;
 	cap->Resize(depth);
 
-	double cycles_per_sample = freq * 1.0 / samplerate;
-
 	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	float scale = amplitude / 2;
 
-	//Push onstants
+	//Convert cycles per sample into a fixed-point value so we can use natural uint32 overflow to do the modulus
+	//with no loss of precision
+	double cycles_per_sample = freq * 1.0 / samplerate;
+	uint32_t fpfreq = round(0xffffffff * cycles_per_sample);
+
+	//Push constants
 	ToneGeneratorConstants cfg;
-	cfg.cycles_per_sample = cycles_per_sample;
+	cfg.fpfreq = fpfreq;
 	cfg.depth = depth;
 	cfg.bias = bias;
 	cfg.scale = scale;
