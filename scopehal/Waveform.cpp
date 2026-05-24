@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -167,7 +167,7 @@ optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zer
 		return {};
 
 	//Find the approximate index of the sample of interest and interpolate the cursor position
-	bool out_of_range;
+	bool out_of_range = false;
 	size_t index = GetIndexNearestAtOrBeforeTimestamp(waveform, time_fs, out_of_range);
 
 	if(out_of_range)
@@ -208,7 +208,7 @@ optional<bool> GetDigitalValueAtTime(WaveformBase* waveform, int64_t time_fs)
 		return {};
 
 	//Find the approximate index of the sample of interest and interpolate the cursor position
-	bool out_of_range;
+	bool out_of_range = false;
 	size_t index = GetIndexNearestAtOrBeforeTimestamp(waveform, time_fs, out_of_range);
 
 	if(out_of_range)
@@ -237,7 +237,7 @@ optional<string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs)
 		return {};
 
 	//Find the approximate index of the sample of interest and interpolate the cursor position
-	bool out_of_range;
+	bool out_of_range = false;
 	size_t index = GetIndexNearestAtOrBeforeTimestamp(waveform, time_fs, out_of_range);
 
 	if(out_of_range)

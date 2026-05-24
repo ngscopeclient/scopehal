@@ -172,6 +172,8 @@ bool SCPIUARTTransport::IsCommandBatchingSupported()
 	return false;
 }
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 vector<TransportEndpoint> SCPIUARTTransport::EnumTransportEndpoints()
 {
 	vector<TransportEndpoint> result;

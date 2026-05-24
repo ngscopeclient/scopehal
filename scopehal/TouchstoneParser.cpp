@@ -91,10 +91,18 @@ bool TouchstoneParser::Load(const string& fname, SParameters& params)
 	}
 	params.Allocate(nports);
 
-	//Read entire file into working buffer
+	//Get length
 	fseek(fp, 0, SEEK_END);
 	size_t len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
+	if(len == 0)
+	{
+		LogError("S-parameter file %s is empty\n", fname.c_str());
+		fclose(fp);
+		return false;
+	}
+
+	//Read entire file into working buffer
 	char* buf = new char[len + 1];
 	if(len != fread(buf, 1, len, fp))
 	{

@@ -752,7 +752,7 @@ void VulkanCreateDevice(
 	vk::PhysicalDevice16BitStorageFeatures features16bit;
 	vk::PhysicalDevice8BitStorageFeatures features8bit;
 	vk::PhysicalDeviceVulkan12Features featuresVulkan12;
-	vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
+	//vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
 	vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT featuresAtomicFloat;
 	vk::PhysicalDevicePortabilitySubsetFeaturesKHR portabilityFeatures;
 	void* pNext = nullptr;

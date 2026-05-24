@@ -39,6 +39,10 @@ public:
 	SCPIDevice(SCPITransport* transport, bool identify = true, unsigned int identify_timeout_us = 5000000);
 	virtual ~SCPIDevice();
 
+	//not copyable or assignable
+	SCPIDevice(const SCPIDevice& rhs) =delete;
+	SCPIDevice& operator=(const SCPIDevice& rhs) =delete;
+
 	SCPITransport* GetTransport() const
 	{ return m_transport; }
 

@@ -55,6 +55,9 @@ using namespace std;
 EyeMask::EyeMask()
 	: m_hitrate(0)
 	, m_timebaseIsRelative(false)
+	, m_width(0)
+	, m_height(0)
+	, m_bitmapDirty(false)
 {
 }
 

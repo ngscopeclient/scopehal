@@ -727,16 +727,25 @@ uint64_t prev_pow2(uint64_t v)
  */
 string ReadFile(const string& path)
 {
-	//Read the file
+	//Open it
 	FILE* fp = fopen(path.c_str(), "rb");
 	if(!fp)
 	{
 		LogWarning("ReadFile: Could not open file \"%s\"\n", path.c_str());
 		return "";
 	}
+
+	//Get the length and bail if it's empty
 	fseek(fp, 0, SEEK_END);
 	size_t fsize = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
+	if(fsize == 0)
+	{
+		fclose(fp);
+		return "";
+	}
+
+	//Read the file contents
 	char* buf = new char[fsize + 1];
 	if(fsize != fread(buf, 1, fsize, fp))
 	{
@@ -823,8 +832,9 @@ void InitializeSearchPaths()
 
 	//Local directories preferred over system ones
 #ifndef _WIN32
-	string home = getenv("HOME");
-	g_searchPaths.push_back(home + "/.scopehal");
+	auto phome = getenv("HOME");
+	if(phome)
+		g_searchPaths.push_back(string(phome) + "/.scopehal");
 	g_searchPaths.push_back("/usr/local/share/ngscopeclient");
 	g_searchPaths.push_back("/usr/local/share/scopehal");
 	g_searchPaths.push_back("/usr/share/ngscopeclient");

@@ -74,6 +74,7 @@ public:
 	//cppcheck-suppress duplInheritedMember
 	static std::string GetTransportName();
 
+	//This is intentionally not virtual since it's a static method used by enumeration
 	//cppcheck-suppress duplInheritedMember
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
