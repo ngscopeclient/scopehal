@@ -232,6 +232,11 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_SDA_3K;
 		m_maxBandwidth = 3000;
 	}
+	else if(m_model.find("SDA6") == 0)
+	{
+		m_modelid = MODEL_SDA_6K;
+		m_maxBandwidth = 6000;	//TODO is this correct
+	}
 	else if(m_model.find("SDA7") == 0)
 	{
 		if(m_model.find("ZI-A") != string::npos)
@@ -930,6 +935,7 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 		//SDA3010 have 4 channels despite a model number ending in 0
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
+		case MODEL_SDA_6K:
 			nchans = 4;
 			break;
 
@@ -1305,6 +1311,7 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 	switch(m_modelid)
 	{
 		case MODEL_DDA_5K:
+		case MODEL_SDA_3K:
 		case MODEL_HDO_9K:
 		case MODEL_SDA_3K:
 		case MODEL_HDO_4KA:
@@ -1506,6 +1513,13 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 
 	switch(m_modelid)
 	{
+		//Copied from DDA5K for now, is this right?
+		case MODEL_SDA_6K:
+			ret.push_back(1000);
+			ret.push_back(3000);
+			ret.push_back(4000);
+			break;
+
 		//Only one DDA5 model is known to exist, no need for bandwidth check
 		case MODEL_DDA_5K:
 			ret.push_back(1000);
@@ -3280,6 +3294,16 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		//Some scopes can go faster
 		switch(m_modelid)
 		{
+			//TODO: is this right? copied from DDA5K
+			case MODEL_SDA_6K:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				break;
+
 			case MODEL_DDA_5K:
 				ret.push_back(200 * m);
 				ret.push_back(500 * m);
@@ -3497,6 +3521,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 		switch(m_modelid)
 		{
+			//TODO
+			case MODEL_SDA_6KL:
+				break;
+
 			//TODO: are there any options between 10M and 24M? is there a 20M?
 			//TODO: XXL option gives 48M
 			case MODEL_DDA_5K:
@@ -3639,6 +3667,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		//DDA5 is weird, not a power of two
 		//TODO: XXL option gives 100M, with 48M on all channels
 		case MODEL_DDA_5K:
+
+		case MODEL_SDA_6K:
 		case MODEL_HDO_4KA:
 		case MODEL_HDO_9K:
 		case MODEL_WAVERUNNER_8K:
@@ -3828,6 +3858,7 @@ void LeCroyOscilloscope::EnableTriggerOutput()
 	//Pulse width setting is not supported on older scopes
 	switch(m_modelid)
 	{
+		case MODEL_SDA_6K:
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
 		case MODEL_SDA_8ZI:
@@ -4697,7 +4728,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 
 	//Level
 	string tmp;
-	if(m_modelid == MODEL_DDA_5K)
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
 		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.TrigLevel'");
 	else
 		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
@@ -4706,7 +4737,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	//TODO: OptimizeForHF (changes hysteresis for fast signals)
 
 	//Slope
-	if(m_modelid == MODEL_DDA_5K)
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
 	{
 		//Get trigger source
 		auto src = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Source'"));
@@ -5454,7 +5485,7 @@ void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 {
 	//Level
-	if(m_modelid == MODEL_DDA_5K)
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
 		PushFloat("app.Acquisition.Trigger.TrigLevel", GetTriggerLevelWithInversion(trig));
 	else
 		PushFloat(tree + ".Level", GetTriggerLevelWithInversion(trig));
@@ -5480,7 +5511,7 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 			return;
 	}
 
-	if(m_modelid == MODEL_DDA_5K)
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
 	{
 		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
 		m_transport->SendCommandQueued(
