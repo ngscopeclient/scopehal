@@ -30,8 +30,6 @@
 #version 460
 #pragma shader_stage(compute)
 
-#define M_PI 3.1415926535
-
 layout(std430, binding=0) restrict readonly buffer buf_inIO
 {
 	float din[];
@@ -49,9 +47,9 @@ layout(std430, binding=2) restrict writeonly buffer buf_doutQ
 
 layout(std430, push_constant) uniform constants
 {
+	uint fpfreq;
 	uint	size;
 	float trigger_phase_rad;
-	float lo_rad_per_sample;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -62,13 +60,15 @@ void main()
 	if(i >= size)
 		return;
 
-	//We get loss of precision error here if we do this naively though...
-	double base = double(lo_rad_per_sample) * double(i);
-	float frac = float(mod(base, 2*M_PI));
+	//Get the fractional phase using integer math with implicit mod 2^32 to handle wrapping
+	uint fpfrac = i * fpfreq;
+	const float fix_to_float = 1.0 / 4294967295.0;
+	float frac = float(fpfrac) * fix_to_float;
+	float two_pi = 6.28318530717;
+	float phase = trigger_phase_rad + frac*two_pi;
 
-	float phase = trigger_phase_rad + /*lo_rad_per_sample * i*/ frac;
+	//Do the actual downconversion
 	float samp = din[i];
-
 	doutI[i] = samp * sin(phase);
 	doutQ[i] = samp * cos(phase);
 }
