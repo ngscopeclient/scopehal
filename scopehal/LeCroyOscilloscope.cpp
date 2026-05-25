@@ -1313,7 +1313,6 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
 		case MODEL_HDO_9K:
-		case MODEL_SDA_3K:
 		case MODEL_HDO_4KA:
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_8K_HD:		//TODO: seems like multiple levels of interleaving possible
@@ -3522,7 +3521,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 		switch(m_modelid)
 		{
 			//TODO
-			case MODEL_SDA_6KL:
+			case MODEL_SDA_6K:
 				break;
 
 			//TODO: are there any options between 10M and 24M? is there a 20M?
