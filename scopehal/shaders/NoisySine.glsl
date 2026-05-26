@@ -62,22 +62,23 @@ void main()
 	const float twopi = 2 * 3.1415926535;
 
 	//Create the output
-	uint lcgState = rngSeed + nthread;
+	uint state = rngSeed + nthread*13;
 	for(uint i=istart; i <= iend; i += 2)
 	{
-		//Generate two pseudorandom uint32's with the first being nonzero
-		//Use glibc rand() parameters
+		//Generate two pseudorandom uint32's with the first being nonzero, using xorshift32
 		uint rngOut[2] = {0, 0};
 		uint rngmax = 0xffffff;
 		for(uint j=0; j<2; j++)
 		{
 			while(rngOut[j] == 0)
 			{
-				lcgState = ( (lcgState * 1103515245) + 12345 ) & 0x7fffffff;
-				rngOut[j] = lcgState & rngmax;
+				uint x = state;
+				x ^= (x << 13);
+				x ^= (x >> 17);
+				x ^= (x << 5);
+				state = x;
 
-				if(j == 1)
-					break;
+				rngOut[j] = x & rngmax;
 			}
 		}
 
