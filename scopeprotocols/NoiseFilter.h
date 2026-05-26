@@ -37,6 +37,14 @@
 
 #include <random>
 
+class NoiseFilterConstants
+{
+public:
+	uint32_t size;
+	uint32_t rngSeed;
+	float sigma;
+};
+
 class NoiseFilter : public Filter
 {
 public:
@@ -52,11 +60,11 @@ public:
 	PROTOCOL_DECODER_INITPROC(NoiseFilter)
 
 protected:
-	void CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma);
-
 	FilterParameter& m_stdev;
 
 	std::mt19937 m_twister;
+
+	ComputePipeline m_computePipeline;
 };
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,98 +27,66 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "NoiseFilter.h"
-#ifdef __x86_64__
-#include <immintrin.h>
-#include "avx_mathfun.h"
-#endif
+#version 430
+#pragma shader_stage(compute)
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-NoiseFilter::NoiseFilter(const string& color)
-	: Filter(color, CAT_GENERATION)
-	, m_stdev(m_parameters["Deviation"])
-	, m_twister(rand())
-	, m_computePipeline("shaders/NoiseFilter.spv", 2, sizeof(NoiseFilterConstants))
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	float din[];
+};
 
-	m_stdev = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_stdev.SetFloatVal(0.005);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool NoiseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-	if(stream.m_channel == nullptr)
-		return false;
+	float dout[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string NoiseFilter::GetProtocolName()
+layout(std430, push_constant) uniform constants
 {
-	return "Noise";
-}
+	uint size;
+	uint rngSeed;
+	float sigma;
+};
 
-Filter::DataLocation NoiseFilter::GetInputLocation()
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void NoiseFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
-{
-	//Make sure we've got valid inputs
-	//TODO: sparse path
-	ClearErrors();
-	if(!VerifyAllInputsOKAndUniformAnalog())
-	{
-		AddErrorMessage("Invalid input", "Expected uniform analog input");
-		SetData(nullptr, 0);
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(2*i >= size)
 		return;
+
+	//Generate two pseudorandom uint32's with the first being nonzero, using xorshift32
+	uint state = rngSeed + i*13;
+	uint rngOut[2] = {0, 0};
+	uint rngmax = 0xffffff;
+	for(uint j=0; j<2; j++)
+	{
+		while(rngOut[j] == 0)
+		{
+			uint x = state;
+			x ^= (x << 13);
+			x ^= (x >> 17);
+			x ^= (x << 5);
+			state = x;
+
+			rngOut[j] = x & rngmax;
+		}
 	}
 
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
-	size_t len = din->size();
+	//Convert the random ints to floats in [0, 1]
+	float u1 = float(rngOut[0]) / float(rngmax);
+	float u2 = float(rngOut[1]) / float(rngmax);
 
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
-	cap->Resize(len);
+	//Convert to uniform distribution using Box-Muller
+	const float twopi = 2 * 3.1415926535;
+	float mag = sigma * sqrt(-2 * log(u1));
+	float noise0 = mag * cos(twopi * u2);
+	float noise1 = mag * sin(twopi * u2);
 
-	cmdBuf.begin({});
+	uint base = 2*i;
+	dout[base] = din[base] + noise0;
 
-	//Push constants
-	NoiseFilterConstants cfg;
-	cfg.size = len;
-	cfg.rngSeed = m_twister();
-	cfg.sigma = m_stdev.GetFloatVal();
-
-	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-	const uint32_t compute_block_count = GetComputeBlockCount(len, 64 * 2);	//2 samples per thread
-	m_computePipeline.Dispatch(cmdBuf, cfg,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
-
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
-	cap->MarkModifiedFromGpu();
+	base = 2*i + 1;
+	if(base < size)
+		dout[base] = din[base] + noise1;
 }
