@@ -241,10 +241,7 @@ bool PcapngImportFilter::LoadSocketCAN(FILE* fp)
 	{
 		auto blockstart = ftell(fp);
 		if(blockstart < 0)
-		{
-			fclose(fp);
 			return false;
-		}
 
 		if(1 != fread(&blocktype, sizeof(blocktype), 1, fp))
 			return false;
@@ -865,6 +862,10 @@ bool PcapngImportFilter::ReadIDB(FILE* fp)
 				}
 		}
 
+		//Stop if we hit the end
+		if(feof(fp))
+			break;
+
 		//Read and discard padding until 32-bit aligned
 		while(1)
 		{
@@ -976,6 +977,10 @@ bool PcapngImportFilter::ValidateSHB(FILE* fp)
 						return false;
 				}
 		}
+
+		//Stop if we hit the end
+		if(feof(fp))
+			break;
 
 		//Read and discard padding until 32-bit aligned
 		while(1)

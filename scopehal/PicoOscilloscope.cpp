@@ -354,7 +354,7 @@ void PicoOscilloscope::IdentifyHardware()
 			m_picoHasAwg = true;
 			m_picoHasBwlimiter = false;
 			m_awgBufferSize = 8192;
-			if(m_model[4] == 'B')
+			if((m_model.size() > 4) && (m_model[4] == 'B'))
 				m_awgBufferSize = 32768;
 
 			if(m_model.find("MSO") != string::npos)
@@ -917,14 +917,17 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 		//Digital pod
 		else
 		{
-			int16_t* buf = new int16_t[memdepth];
-
 			float trigphase;
-			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
+			if(!m_transport->ReadRawData(sizeof(trigphase), reinterpret_cast<uint8_t*>(&trigphase)))
 				return false;
 			trigphase = -trigphase * fs_per_sample;
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
+
+			int16_t* buf = new int16_t[memdepth];
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(buf)))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			if(!keep)
 				continue;
@@ -934,6 +937,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			{
 				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
 						 chnum);
+				delete[] buf;
 				return false;
 			}
 

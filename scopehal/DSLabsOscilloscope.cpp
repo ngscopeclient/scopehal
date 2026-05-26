@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -380,7 +380,10 @@ bool DSLabsOscilloscope::AcquireData()
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			{
+				delete[] buf;
 				return false;
+			}
 			float scale = config[0];
 			float offset = config[1];
 			float trigphase = -config[2] * fs_per_sample;
@@ -389,12 +392,18 @@ bool DSLabsOscilloscope::AcquireData()
 
 			bool clipping;
 			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			//TODO: stream timestamp from the server
 
 			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			//Create our waveform
 			auto cap = new UniformAnalogWaveform;
@@ -417,10 +426,16 @@ bool DSLabsOscilloscope::AcquireData()
 			int32_t first_sample;
 
 			if(!m_transport->ReadRawData(sizeof(first_sample), (uint8_t*)&first_sample))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), (uint8_t*)buf))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			//Create buffers for output waveforms
 			auto cap = new SparseDigitalWaveform;

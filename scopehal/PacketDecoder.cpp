@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,10 +30,12 @@
 #include "scopehal.h"
 #include "PacketDecoder.h"
 
+using namespace std;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Color schemes
 
-std::string PacketDecoder::m_backgroundColors[PROTO_STANDARD_COLOR_COUNT] =
+string PacketDecoder::m_backgroundColors[PROTO_STANDARD_COLOR_COUNT] =
 {
 	"#101010",		//PROTO_COLOR_DEFAULT
 	"#800000",		//PROTO_COLOR_ERROR
@@ -52,6 +54,8 @@ Packet::Packet()
 	, m_len(0)
 	, m_displayForegroundColor("#ffffff")
 	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::PROTO_COLOR_DEFAULT])
+	, m_displayForegroundColorPacked(0)
+	, m_displayBackgroundColorPacked(0)
 	, m_packedColorsValid(false)
 {
 }

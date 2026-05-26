@@ -2067,7 +2067,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*>> pending_waveforms;
-	double start = GetTime();
 	time_t ttime = 0;
 	double basetime = 0;
 	double h_off_frac = 0;
@@ -2086,7 +2085,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	//Acquire the data (but don't parse it)
 
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
-	start = GetTime();
+	double start = GetTime();
 
 	switch(m_protocolId)
 	{

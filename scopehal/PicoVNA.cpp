@@ -183,24 +183,24 @@ bool PicoVNA::AcquireData()
 	{
 		//Read the packet header
 		//This is inefficient but the VNA is so slow the overhead is insignificant
-		if(!m_transport->ReadRawData(sizeof(format), (uint8_t*)&format))
+		if(!m_transport->ReadRawData(sizeof(format), reinterpret_cast<uint8_t*>(&format)))
 			return false;
 		if(format != 0)
 		{
 			LogError("Expected data format %d, got %d\n", 0, format);
 			exit(1);
 		}
-		if(!m_transport->ReadRawData(sizeof(numActiveChannels), (uint8_t*)&numActiveChannels))
+		if(!m_transport->ReadRawData(sizeof(numActiveChannels), reinterpret_cast<uint8_t*>(&numActiveChannels)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(sweepStartmHz), (uint8_t*)&sweepStartmHz))
+		if(!m_transport->ReadRawData(sizeof(sweepStartmHz), reinterpret_cast<uint8_t*>(&sweepStartmHz)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(sweepStopmHz), (uint8_t*)&sweepStopmHz))
+		if(!m_transport->ReadRawData(sizeof(sweepStopmHz), reinterpret_cast<uint8_t*>(&sweepStopmHz)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(numPoints), (uint8_t*)&numPoints))
+		if(!m_transport->ReadRawData(sizeof(numPoints), reinterpret_cast<uint8_t*>(&numPoints)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(updateFirstSample), (uint8_t*)&updateFirstSample))
+		if(!m_transport->ReadRawData(sizeof(updateFirstSample), reinterpret_cast<uint8_t*>(&updateFirstSample)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(updateLastSample), (uint8_t*)&updateLastSample))
+		if(!m_transport->ReadRawData(sizeof(updateLastSample), reinterpret_cast<uint8_t*>(&updateLastSample)))
 			return false;
 
 		//Sanity check
@@ -289,13 +289,13 @@ bool PicoVNA::AcquireData()
 			//Finally, time to read sample data!
 			if(!m_transport->ReadRawData(
 				sizeof(double)*numSamplesInBlock,
-				(uint8_t*)&mags[rxPort][txPort][updateFirstSample]))
+				reinterpret_cast<uint8_t*>(&mags[rxPort][txPort][updateFirstSample])))
 			{
 				return false;
 			}
 			if(!m_transport->ReadRawData(
 				sizeof(double)*numSamplesInBlock,
-				(uint8_t*)&angles[rxPort][txPort][updateFirstSample]))
+				reinterpret_cast<uint8_t*>(&angles[rxPort][txPort][updateFirstSample])))
 			{
 				return false;
 			}

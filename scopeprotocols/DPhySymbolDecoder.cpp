@@ -137,7 +137,6 @@ void DPhySymbolDecoder::Refresh(
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
-	DPhySymbol::type last_state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type nextstate = state;
 
@@ -302,7 +301,7 @@ void DPhySymbolDecoder::Refresh(
 				if(nsize)
 				{
 					nlast = nsize-1;
-					last_state = cap->m_samples[nlast].m_type;
+					auto last_state = cap->m_samples[nlast].m_type;
 					samestate = (nsize && last_state == nextstate);
 
 					//If changing, extend the pre-glitch sample to the start of this sample
@@ -332,8 +331,6 @@ void DPhySymbolDecoder::Refresh(
 			cap->m_samples.push_back(nextstate);
 			state = nextstate;
 		}
-
-		last_state = state;
 	}
 
 	cap->MarkModifiedFromCpu();

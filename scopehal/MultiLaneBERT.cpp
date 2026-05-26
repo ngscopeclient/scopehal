@@ -54,6 +54,9 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 {
 	//Set a very long socket timeout because initial connection creation takes forever
 	auto socktrans = dynamic_cast<SCPISocketTransport*>(transport);
+	if(!socktrans)
+		LogFatal("MultiLaneBERT requires a SCPISocketTransport\n");
+
 	unsigned int timeoutSec = 30;
 	unsigned int timeoutUs = timeoutSec * 1000 * 1000;
 	if(socktrans)

@@ -374,18 +374,18 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	uint64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
 		return false;
 
 	//Get the de-facto trigger position.
 	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), (uint8_t*)&trigger_fs))
+	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
 		return false;
 
 	{
@@ -459,14 +459,14 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 
-			if(!m_transport->ReadRawData(sizeof(dataType), (uint8_t*)&dataType))
+			if(!m_transport->ReadRawData(sizeof(dataType), reinterpret_cast<uint8_t*>(&dataType)))
 				return false;
 
 			//TODO: stream timestamp from the server
 			uint32_t depth = memdepth * sizeof(int8_t);
 			if(dataType == DATATYPE_I16)
 				depth = memdepth * sizeof(int16_t);
-			if(!m_transport->ReadRawData(depth, (uint8_t*)buf))
+			if(!m_transport->ReadRawData(depth, reinterpret_cast<uint8_t*>(buf)))
 				return false;
 			abuf->MarkModifiedFromCpu();
 

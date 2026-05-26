@@ -190,7 +190,7 @@ void NCOFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 		cap->MarkModifiedFromCpu();
 	}
 
-	else
+	else if(sfreq)
 	{
 		cap->PrepareForCpuAccess();
 		sfreq->PrepareForCpuAccess();
@@ -211,5 +211,10 @@ void NCOFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 		}
 
 		cap->MarkModifiedFromCpu();
+	}
+
+	else
+	{
+		AddErrorMessage("Missing inputs", "Expected sparse or uniform frequency waveform at input");
 	}
 }
