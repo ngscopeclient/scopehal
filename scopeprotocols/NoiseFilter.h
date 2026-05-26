@@ -42,7 +42,8 @@ class NoiseFilter : public Filter
 public:
 	NoiseFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -53,7 +54,7 @@ public:
 protected:
 	void CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma);
 
-	std::string m_stdevname;
+	FilterParameter& m_stdev;
 
 	std::mt19937 m_twister;
 };

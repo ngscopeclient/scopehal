@@ -41,14 +41,14 @@ using namespace std;
 
 NoiseFilter::NoiseFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_stdevname("Deviation")
+	, m_stdev(m_parameters["Deviation"])
 	, m_twister(rand())
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_parameters[m_stdevname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stdevname].SetFloatVal(0.005);
+	m_stdev = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_stdev.SetFloatVal(0.005);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ NoiseFilter::NoiseFilter(const string& color)
 
 bool NoiseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -73,15 +73,21 @@ string NoiseFilter::GetProtocolName()
 	return "Noise";
 }
 
+Filter::DataLocation NoiseFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void NoiseFilter::Refresh()
+void NoiseFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -89,7 +95,7 @@ void NoiseFilter::Refresh()
 	din->PrepareForCpuAccess();
 	size_t len = din->size();
 
-	float stdev = m_parameters[m_stdevname].GetFloatVal();
+	float stdev = m_stdev.GetFloatVal();
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->Resize(len);
 	cap->PrepareForCpuAccess();
