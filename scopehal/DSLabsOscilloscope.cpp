@@ -371,7 +371,7 @@ bool DSLabsOscilloscope::AcquireData()
 
 		// LogDebug("ch%ld: Receive %ld samples\n", chnum, memdepth);
 
-		uint8_t* buf = new uint8_t[memdepth];
+		uint8_t* buf = nullptr;
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
@@ -380,10 +380,7 @@ bool DSLabsOscilloscope::AcquireData()
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
-			{
-				delete[] buf;
 				return false;
-			}
 			float scale = config[0];
 			float offset = config[1];
 			float trigphase = -config[2] * fs_per_sample;
@@ -392,13 +389,10 @@ bool DSLabsOscilloscope::AcquireData()
 
 			bool clipping;
 			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
-			{
-				delete[] buf;
 				return false;
-			}
 
 			//TODO: stream timestamp from the server
-
+			buf = new uint8_t[memdepth];
 			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
 			{
 				delete[] buf;
@@ -426,11 +420,9 @@ bool DSLabsOscilloscope::AcquireData()
 			int32_t first_sample;
 
 			if(!m_transport->ReadRawData(sizeof(first_sample), (uint8_t*)&first_sample))
-			{
-				delete[] buf;
 				return false;
-			}
 
+			buf = new uint8_t[memdepth];
 			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), (uint8_t*)buf))
 			{
 				delete[] buf;
