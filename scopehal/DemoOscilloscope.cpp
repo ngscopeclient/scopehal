@@ -451,6 +451,11 @@ bool DemoOscilloscope::IsADCModeConfigurable()
 	return true;
 }
 
+bool DemoOscilloscope::IsADCModePerChannel()
+{
+	return true;
+}
+
 vector<Oscilloscope::AnalogBank> DemoOscilloscope::GetAnalogBanks()
 {
 	vector<AnalogBank> ret;

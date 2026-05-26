@@ -110,6 +110,7 @@ public:
 	virtual bool CanInterleave() override;
 
 	virtual bool IsADCModeConfigurable() override;
+	virtual bool IsADCModePerChannel() override;
 	virtual std::vector<std::string> GetADCModeNames(size_t channel) override;
 	virtual size_t GetADCMode(size_t channel) override;
 	virtual void SetADCMode(size_t channel, size_t mode) override;
