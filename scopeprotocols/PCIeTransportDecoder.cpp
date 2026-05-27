@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,10 +60,10 @@ PCIeTransportDecoder::~PCIeTransportDecoder()
 
 bool PCIeTransportDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<PCIeDataLinkWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<PCIeDataLinkWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -74,28 +74,44 @@ string PCIeTransportDecoder::GetProtocolName()
 	return "PCIe Transport";
 }
 
+Filter::DataLocation PCIeTransportDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PCIeTransportDecoder::Refresh()
+void PCIeTransportDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	ClearPackets();
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PCIeTransportDecoder::Refresh");
+	#endif
+	ClearErrors();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
+
 	auto data = dynamic_cast<PCIeDataLinkWaveform*>(GetInputWaveform(0));
+	if(!data)
+	{
+		AddErrorMessage("Invalid input", "Expected a PCIe data link waveform");
+		SetData(nullptr, 0);
+		return;
+	}
 	data->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new PCIeTransportWaveform;
-	cap->m_timescale = data->m_timescale;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<PCIeTransportWaveform>(data, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	enum
 	{
