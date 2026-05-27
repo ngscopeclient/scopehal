@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,15 +43,15 @@ using namespace std;
 
 PCIeDataLinkDecoder::PCIeDataLinkDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
-	, m_framingMode("Framing Mode")
+	, m_framingMode(m_parameters["Framing Mode"])
 {
 	//Set up channels
 	CreateInput("logical");
 
-	m_parameters[m_framingMode] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_framingMode].AddEnumValue("Gen 1/2", MODE_GEN12);
-	m_parameters[m_framingMode].AddEnumValue("Gen 3/4/5", MODE_GEN345);
-	m_parameters[m_framingMode].SetIntVal(MODE_GEN12);
+	m_framingMode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_framingMode.AddEnumValue("Gen 1/2", MODE_GEN12);
+	m_framingMode.AddEnumValue("Gen 3/4/5", MODE_GEN345);
+	m_framingMode.SetIntVal(MODE_GEN12);
 }
 
 PCIeDataLinkDecoder::~PCIeDataLinkDecoder()
@@ -64,10 +64,10 @@ PCIeDataLinkDecoder::~PCIeDataLinkDecoder()
 
 bool PCIeDataLinkDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<PCIeLogicalWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<PCIeLogicalWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -78,28 +78,37 @@ string PCIeDataLinkDecoder::GetProtocolName()
 	return "PCIe Data Link";
 }
 
+Filter::DataLocation PCIeDataLinkDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PCIeDataLinkDecoder::Refresh()
+void PCIeDataLinkDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PCIeDataLinkDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 	auto data = dynamic_cast<PCIeLogicalWaveform*>(GetInputWaveform(0));
 	data->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new PCIeDataLinkWaveform;
-	cap->m_timescale = data->m_timescale;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<PCIeDataLinkWaveform>(data, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	enum
 	{
@@ -125,9 +134,9 @@ void PCIeDataLinkDecoder::Refresh()
 	uint8_t dllp_type = 0;
 	uint8_t dllp_data[3] = {0};
 
-	Packet* pack = NULL;
+	Packet* pack = nullptr;
 
-	auto mode = static_cast<FramingMode>(m_parameters[m_framingMode].GetIntVal());
+	auto mode = m_framingMode.GetEnumVal<FramingMode>();
 
 	for(size_t i=0; i<len; i++)
 	{
