@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,8 @@ class PAM4DemodulatorFilter : public Filter
 public:
 	PAM4DemodulatorFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -49,9 +50,9 @@ public:
 	PROTOCOL_DECODER_INITPROC(PAM4DemodulatorFilter)
 
 protected:
-	std::string m_lowerThreshName;
-	std::string m_midThreshName;
-	std::string m_upperThreshName;
+	FilterParameter& m_lowerThresh;
+	FilterParameter& m_midThresh;
+	FilterParameter& m_upperThresh;
 };
 
 #endif

@@ -114,7 +114,9 @@ Filter::DataLocation NCOFilter::GetInputLocation()
 	return LOC_DONTCARE;
 }
 
-void NCOFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void NCOFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("NCOFilter::Refresh");

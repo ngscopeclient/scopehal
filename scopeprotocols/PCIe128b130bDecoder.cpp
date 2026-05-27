@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,7 +54,7 @@ PCIe128b130bDecoder::PCIe128b130bDecoder(const string& color)
 
 bool PCIe128b130bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -68,15 +68,29 @@ string PCIe128b130bDecoder::GetProtocolName()
 	return "128b/130b";
 }
 
+Filter::DataLocation PCIe128b130bDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PCIe128b130bDecoder::Refresh()
+void PCIe128b130bDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PCIe128b130bDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	//Get the input data
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 	auto din = GetInputWaveform(0);
@@ -85,10 +99,8 @@ void PCIe128b130bDecoder::Refresh()
 	clkin->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new PCIe128b130bWaveform;
+	auto cap = SetupEmptyWaveform<PCIe128b130bWaveform>(din, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
 	//Record the value of the data stream at each clock edge
@@ -217,7 +229,6 @@ void PCIe128b130bDecoder::Refresh()
 		cap->m_samples.push_back(PCIe128b130bSymbol(type, symbols, len));
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
