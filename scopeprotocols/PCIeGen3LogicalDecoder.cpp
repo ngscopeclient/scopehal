@@ -61,7 +61,7 @@ bool PCIeGen3LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == nullptr)
 		return false;
 
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_portCount.GetIntVal();
 	if( (i <= nports) && (dynamic_cast<PCIe128b130bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
 
@@ -75,40 +75,61 @@ string PCIeGen3LogicalDecoder::GetProtocolName()
 	return "PCIe Gen 3/4/5 Logical";
 }
 
+Filter::DataLocation PCIeGen3LogicalDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PCIeGen3LogicalDecoder::Refresh()
+void PCIeGen3LogicalDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PCIeGen2LogicalDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get all of the inputs
-	ssize_t nports = m_parameters[m_portCountName].GetIntVal();
+	ssize_t nports = m_portCount.GetIntVal();
 	vector<PCIe128b130bWaveform*> inputs;
 	for(ssize_t i=0; i<nports; i++)
 	{
 		auto din = dynamic_cast<PCIe128b130bWaveform*>(GetInputWaveform(i));
+
+		if(!din)
+		{
+			AddErrorMessage("Invalid input", "Expected a 128b/130b waveform");
+			SetData(nullptr, 0);
+			return;
+		}
+
 		inputs.push_back(din);
 		din->PrepareForCpuAccess();
 	}
 
-	if(nports == 0)
+	if( (nports <= 0) || (nports > 32) )
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid configuration", "Expected 1-32 lanes");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Create the capture
 	//Output is time aligned with the input
-	auto cap = new PCIeLogicalWaveform;
 	auto in0 = inputs[0];
+	auto cap = SetupEmptyWaveform<PCIeLogicalWaveform>(in0, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = in0->m_startTimestamp;
-	cap->m_startFemtoseconds = in0->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
@@ -481,7 +502,6 @@ void PCIeGen3LogicalDecoder::Refresh()
 			break;
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 

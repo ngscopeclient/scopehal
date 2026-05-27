@@ -47,7 +47,8 @@ public:
 	PCIeGen3LogicalDecoder(const std::string& color);
 	virtual ~PCIeGen3LogicalDecoder();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	//This is intentionally not virtual since it's a static method used by enumeration
 	//cppcheck-suppress duplInheritedMember
