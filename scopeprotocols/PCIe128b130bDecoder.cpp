@@ -46,7 +46,6 @@ PCIe128b130bDecoder::PCIe128b130bDecoder(const string& color)
 {
 	AddProtocolStream("data");
 	CreateInput("data");
-	CreateInput("clk");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,28 +86,21 @@ void PCIe128b130bDecoder::Refresh(
 	ClearErrors();
 
 	//Get the input data
-	if(!VerifyAllInputsOK())
+	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		AddErrorMessage("Missing input", "Expected a sparse digital waveform");
 		SetData(nullptr, 0);
 		return;
 	}
-	auto din = GetInputWaveform(0);
-	auto clkin = GetInputWaveform(1);
 	din->PrepareForCpuAccess();
-	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = SetupEmptyWaveform<PCIe128b130bWaveform>(din, 0);
-	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
 
-	//Record the value of the data stream at each clock edge
-	SparseDigitalWaveform data;
-	SampleOnAnyEdgesBase(din, clkin, data);
-
 	//Look at each phase and figure out block alignment
-	size_t end = data.size() - 130;
+	size_t end = din->size() - 130;
 	size_t best_offset = 0;
 	size_t best_errors = end;
 	for(size_t offset=0; offset < 130; offset ++)
@@ -116,7 +108,7 @@ void PCIe128b130bDecoder::Refresh(
 		size_t errors = 0;
 		for(size_t i=offset; i<end; i+= 130)
 		{
-			if(data.m_samples[i] == data.m_samples[i+1])
+			if(din->m_samples[i] == din->m_samples[i+1])
 				errors ++;
 		}
 
@@ -135,8 +127,8 @@ void PCIe128b130bDecoder::Refresh(
 	{
 		//Extract the header bits
 		uint8_t header =
-			(data.m_samples[i] ? 2 : 0) |
-			(data.m_samples[i+1] ? 1 : 0);
+			(din->m_samples[i] ? 2 : 0) |
+			(din->m_samples[i+1] ? 1 : 0);
 
 		//Figure out type
 		PCIe128b130bSymbol::type_t type;
@@ -158,7 +150,7 @@ void PCIe128b130bDecoder::Refresh(
 		{
 			uint8_t tmp = 0;
 			for(size_t k=0; k<8; k++)
-				tmp |= (data.m_samples[i + j*8 + k + 2] << ( /* 7- */ k) );
+				tmp |= (din->m_samples[i + j*8 + k + 2] << ( /* 7- */ k) );
 			symbols[j] = tmp;
 		}
 
@@ -205,8 +197,8 @@ void PCIe128b130bDecoder::Refresh(
 			}
 		}
 
-		int64_t tstart = data.m_offsets[i] - data.m_durations[i]/2;
-		int64_t tend = data.m_offsets[i+130];
+		int64_t tstart = din->m_offsets[i] - din->m_durations[i]/2;
+		int64_t tend = din->m_offsets[i+130];
 
 		//Scrambler not locked? Prefer to extend existing symbol
 		if(type == PCIe128b130bSymbol::TYPE_SCRAMBLER_DESYNCED)
@@ -225,14 +217,14 @@ void PCIe128b130bDecoder::Refresh(
 
 		//No, add a new symbol
 		cap->m_offsets.push_back(tstart);
-		cap->m_durations.push_back(tend - data.m_offsets[i]);
+		cap->m_durations.push_back(tend - din->m_offsets[i]);
 		cap->m_samples.push_back(PCIe128b130bSymbol(type, symbols, len));
 	}
 
 	cap->MarkModifiedFromCpu();
 }
 
-std::string PCIe128b130bWaveform::GetColor(size_t i)
+string PCIe128b130bWaveform::GetColor(size_t i)
 {
 	const PCIe128b130bSymbol& s = m_samples[i];
 
