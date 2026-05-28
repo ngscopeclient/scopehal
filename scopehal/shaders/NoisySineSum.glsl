@@ -37,6 +37,8 @@ layout(std430, binding=0) restrict writeonly buffer buf_dout
 
 layout(std430, push_constant) uniform constants
 {
+	uint fpfreqA;
+	uint fpfreqB;
 	uint numSamples;
 	uint samplesPerThread;
 	uint rngSeed;
@@ -44,8 +46,6 @@ layout(std430, push_constant) uniform constants
 	float startPhase2;
 	float scale;
 	float sigma;
-	float radiansPerSample1;
-	float radiansPerSample2;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -61,7 +61,7 @@ void main()
 	if(iend >= numSamples)
 		iend = numSamples - 1;
 
-	const float twopi = 2 * 3.1415926535;
+	float two_pi = 6.28318530717;
 
 	//Create the output
 	uint lcgState = rngSeed + nthread;
@@ -89,18 +89,30 @@ void main()
 
 		//Convert to uniform distribution using Box-Muller
 		float mag = sigma * sqrt(-2 * log(u1));
-		float noise0 = mag * cos(twopi * u2);
-		float noise1 = mag * sin(twopi * u2);
+		float noise0 = mag * cos(two_pi * u2);
+		float noise1 = mag * sin(two_pi * u2);
+
+		//Get the fractional phase using integer math with implicit mod 2^32 to handle wrapping
+		const float fix_to_float = 1.0 / 4294967295.0;
+		uint fpfrac0A = i * fpfreqA;
+		uint fpfrac1A = (i + 1) * fpfreqA;
+		float frac0A = float(fpfrac0A) * fix_to_float;
+		float frac1A = float(fpfrac1A) * fix_to_float;
+
+		uint fpfrac0B = i * fpfreqB;
+		uint fpfrac1B = (i + 1) * fpfreqB;
+		float frac0B = float(fpfrac0B) * fix_to_float;
+		float frac1B = float(fpfrac1B) * fix_to_float;
 
 		//Generate the output (second sample needs separate bounds check)
 		dout[i] = scale *
 			(
-				sin(i * radiansPerSample1 + startPhase1) + sin(i * radiansPerSample2 + startPhase2)
+				sin(frac0A*two_pi + startPhase1) + sin(frac0B*two_pi + startPhase2)
 			) + noise0;
 		if(i+1 <= iend)
 		{
 			dout[i+1] = scale *
-				(sin((i+1) * radiansPerSample1 + startPhase1) + sin((i+1) * radiansPerSample2 + startPhase2)) +
+				(sin(frac1A*two_pi + startPhase1) + sin(frac1B*two_pi + startPhase2)) +
 				noise1;
 		}
 	}
