@@ -219,15 +219,15 @@ protected:
 	{
 		PeakDetector::FindPeaks(
 			cap,
-			m_parameters[m_numpeaksname].GetIntVal(),
-			m_parameters[m_peakwindowname].GetFloatVal(),
+			m_numpeaks.GetIntVal(),
+			m_peakwindow.GetFloatVal(),
 			GetYAxisUnits(0).IsLogarithmic(),
 			cmdBuf,
 			queue);
 	}
 
-	std::string m_numpeaksname;
-	std::string m_peakwindowname;
+	FilterParameter& m_numpeaks;
+	FilterParameter& m_peakwindow;
 };
 
 #endif

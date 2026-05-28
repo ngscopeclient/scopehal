@@ -50,7 +50,7 @@ PeriodMeasurement::PeriodMeasurement(const string& color)
 
 bool PeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -67,15 +67,27 @@ string PeriodMeasurement::GetProtocolName()
 	return "Period";
 }
 
+Filter::DataLocation PeriodMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PeriodMeasurement::Refresh()
+void PeriodMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PeriodMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -102,7 +114,8 @@ void PeriodMeasurement::Refresh()
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "Need at least one full cycle");
+		SetData(nullptr, 0);
 		return;
 	}
 
