@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,13 +37,13 @@ layout(std430, binding=0) restrict writeonly buffer buf_dout
 
 layout(std430, push_constant) uniform constants
 {
+	uint fpfreq;
 	uint numSamples;
 	uint samplesPerThread;
 	uint rngSeed;
 	float startPhase;
 	float scale;
 	float sigma;
-	float radiansPerSample;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -59,7 +59,7 @@ void main()
 	if(iend >= numSamples)
 		iend = numSamples - 1;
 
-	const float twopi = 2 * 3.1415926535;
+	float two_pi = 6.28318530717;
 
 	//Create the output
 	uint state = rngSeed + nthread*13;
@@ -88,12 +88,19 @@ void main()
 
 		//Convert to uniform distribution using Box-Muller
 		float mag = sigma * sqrt(-2 * log(u1));
-		float noise0 = mag * cos(twopi * u2);
-		float noise1 = mag * sin(twopi * u2);
+		float noise0 = mag * cos(two_pi * u2);
+		float noise1 = mag * sin(two_pi * u2);
+
+		//Get the fractional phase using integer math with implicit mod 2^32 to handle wrapping
+		const float fix_to_float = 1.0 / 4294967295.0;
+		uint fpfrac0 = i * fpfreq;
+		uint fpfrac1 = (i + 1) * fpfreq;
+		float frac0 = float(fpfrac0) * fix_to_float;
+		float frac1 = float(fpfrac1) * fix_to_float;
 
 		//Generate the output (second sample needs separate bounds check)
-		dout[i] = scale * sin(i * radiansPerSample + startPhase) + noise0;
+		dout[i] = scale * sin(frac0*two_pi + startPhase) + noise0;
 		if(i+1 <= iend)
-			dout[i+1] = scale * sin((i+1) * radiansPerSample + startPhase) + noise1;
+			dout[i+1] = scale * sin(frac1*two_pi + startPhase) + noise1;
 	}
 }

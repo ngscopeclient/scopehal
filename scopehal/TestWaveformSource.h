@@ -52,13 +52,13 @@ struct __attribute__((packed)) DegradeSerialDataPushConstants
 
 struct __attribute__((packed)) NoisySinePushConstants
 {
+	uint32_t fpfreq;
 	uint32_t numSamples;
 	uint32_t samplesPerThread;
 	uint32_t rngSeed;
 	float startPhase;
 	float scale;
 	float sigma;
-	float radiansPerSample;
 };
 
 struct __attribute__((packed)) NoisySineSumPushConstants
