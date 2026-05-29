@@ -35,6 +35,9 @@
 #ifndef PeriodMeasurement_h
 #define PeriodMeasurement_h
 
+#include "../scopehal/Averager.h"
+#include "../scopehal/LevelCrossingDetector.h"
+
 class PeriodMeasurement : public Filter
 {
 public:
@@ -48,6 +51,10 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(PeriodMeasurement)
+
+protected:
+	Averager m_averager;
+	LevelCrossingDetector m_detector;
 };
 
 #endif

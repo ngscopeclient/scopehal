@@ -97,19 +97,20 @@ void PeriodMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at 50% of full scale range
 	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
+		m_detector.FindZeroCrossings(uadin, m_averager.Average(uadin, cmdBuf, queue), cmdBuf, queue);
 	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
+		m_detector.FindZeroCrossings(sadin, m_averager.Average(sadin, cmdBuf, queue), cmdBuf, queue);
 
 	//Just find edges in digital signals
 	else if(uddin)
-		FindZeroCrossings(uddin, edges);
+		m_detector.FindZeroCrossings(uddin, cmdBuf, queue);
 	else
-		FindZeroCrossings(sddin, edges);
+		m_detector.FindZeroCrossings(sddin, cmdBuf, queue);
+
+	auto& edges = m_detector.GetResults();
 
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
@@ -124,7 +125,9 @@ void PeriodMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
 
+	//CPU side loop
 	size_t elen = edges.size();
+	edges.PrepareForCpuAccess();
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -137,9 +140,6 @@ void PeriodMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		cap->m_durations.push_back(round(delta));
 		cap->m_samples.push_back(delta);
 	}
-
-	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
 
 	//For the scalar average output, find the total number of zero crossings and divide by the spacing
