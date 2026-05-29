@@ -519,6 +519,7 @@ void ClockRecoveryFilter::Refresh(
 	if(!generatedSquarewaveOnGPU)
 	{
 		//TODO: GPU this where possible and don't do a separate sampling pass
+		cap->PrepareForCpuAccess();
 		if(uadin)
 			SampleOnAnyEdges(uadin, cap, *dynamic_cast<SparseAnalogWaveform*>(scap), false);
 		else if(sadin)
@@ -527,6 +528,7 @@ void ClockRecoveryFilter::Refresh(
 			SampleOnAnyEdges(uddin, cap, *dynamic_cast<SparseDigitalWaveform*>(scap), false);
 		else if(sddin)
 			SampleOnAnyEdges(sddin, cap, *dynamic_cast<SparseDigitalWaveform*>(scap), false);
+		scap->MarkModifiedFromCpu();
 	}
 
 	//Update output sample type
@@ -749,6 +751,7 @@ void ClockRecoveryFilter::InnerLoopWithNoGating(
 	//Predict how many edges we're going to need and allocate space in advance
 	//(capture length divided by expected UI length plus 1M extra samples as of margin)
 	int64_t expectedNumEdges = (edges[edgemax] / initialPeriod) + 1000000;
+	cap.m_offsets.resize(0);
 	cap.Reserve(expectedNumEdges);
 
 	int64_t tlast = 0;
