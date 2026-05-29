@@ -2674,7 +2674,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 				compute_block_count / 32768 + 1);
 
 			m_cmdBuf->end();
-			m_queue->Submit(*m_cmdBuf);
+			m_queue->SubmitAndBlock(*m_cmdBuf);
 
 			cap->MarkSamplesModifiedFromGpu();
 		}
@@ -2698,7 +2698,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 				compute_block_count / 32768 + 1);
 
 			m_cmdBuf->end();
-			m_queue->Submit(*m_cmdBuf);
+			m_queue->SubmitAndBlock(*m_cmdBuf);
 
 			cap->MarkSamplesModifiedFromGpu();
 		}
