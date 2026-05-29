@@ -88,7 +88,8 @@ void main()
 		uint next = ( (state >> 14) ^ (state >> 13) ) & 1;
 		state = (state << 1) | next;
 
-		if(next == uint(din[i]))
+		//Zero out error flags for beginning of the output
+		if( (next == uint(din[i])) || (i < 15) )
 			dout[i] = uint8_t(0);
 		else
 			dout[i] = uint8_t(1);

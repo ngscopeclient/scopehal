@@ -112,20 +112,14 @@ void main()
 	if(endpos > count)
 		endpos = count;
 
-	//Zero out error flags for beginning of the output
-	if(nthread == 0)
-	{
-		for(uint i=0; i<PRBS_BITS; i++)
-			dout[i] = uint8_t(0);
-	}
-
 	//PRBS verification
 	for(uint i=startpos; i<endpos; i++)
 	{
 		uint next = ( (state >> 30) ^ (state >> 27) ) & 1;
 		state = (state << 1) | next;
 
-		if(next == uint(din[i]))
+		//Zero out error flags for beginning of the output
+		if( (next == uint(din[i])) || (i < 31) )
 			dout[i] = uint8_t(0);
 		else
 			dout[i] = uint8_t(1);
