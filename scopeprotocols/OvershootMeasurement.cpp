@@ -37,12 +37,21 @@ using namespace std;
 
 OvershootMeasurement::OvershootMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_VOLTS), "max", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,9 +108,22 @@ void OvershootMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
-	//Figure out the nominal top of the waveform
-	float top = GetTopVoltage(sdin, udin);
-	float base = GetBaseVoltage(sdin, udin);
+	//Figure out the nominal high and low points of the waveform
+	float base;
+	float top;
+	Filter::GetBaseAndTopVoltage(
+		cmdBuf,
+		queue,
+		m_minmaxPipeline,
+		m_histogramPipeline,
+		m_minbuf,
+		m_maxbuf,
+		m_histogramBuf,
+		sdin,
+		udin,
+		base,
+		top);
+
 	float midpoint = (top+base)/2;
 
 	//Create the output
