@@ -302,6 +302,8 @@ void ClockRecoveryFilter::Refresh(
 			//TODO: try to tune this based on waveform depth more dynamically/continuously?
 			if(din->size() >= (100 * 1000 * 1000) )
 				numThreads *= 8;
+			if(din->size() < (5 * 1000 * 1000) )
+				numThreads /= 4;
 
 			const uint64_t blockSize = 64;
 			const uint64_t numBlocks = numThreads / blockSize;
