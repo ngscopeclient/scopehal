@@ -95,7 +95,7 @@ void EyeWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 
 	//Make sure we've got valid inputs
 	ClearErrors();
-	if(!VerifyAllInputsOK())
+	if(!VerifyAllInputsOK(true))
 	{
 		if(!GetInput(0))
 			AddErrorMessage("Missing inputs", "No signal input connected");
