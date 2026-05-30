@@ -315,8 +315,12 @@ void ClockRecoveryFilter::Refresh(
 			uint64_t lastEdgesPadded = lastNumEdges + 2*numThreads;
 			baselineEdgeCount = max(baselineEdgeCount, lastEdgesPadded);
 
-			for(uint64_t maxEdges = baselineEdgeCount; maxEdges <= realMaxEdges; maxEdges *= 2)
+			for(uint64_t maxEdges = baselineEdgeCount; maxEdges < (din->size() - 1); maxEdges *= 2)
 			{
+				//On the last iteration, due to rounding we can go slightly above realMaxEdges
+				if(maxEdges > realMaxEdges)
+					maxEdges = realMaxEdges;
+
 				//Allocate thread output buffers
 				const uint64_t numStateValuesPerThread = 3;
 				ScratchBuffer_int64_t firstPassTimestamps(ScratchBufferManager::I64_GPU_WAVEFORM);
