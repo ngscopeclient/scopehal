@@ -122,6 +122,10 @@ void EyeWaveform::Normalize(
 	shared_ptr<ComputePipeline> normalizeScalePipe,
 	AcceleratorBuffer<int64_t>& nmaxBuf)
 {
+	//Early out if nothing to do
+	if(m_accumdata.empty())
+		return;
+
 	//GPU reduction
 	const uint32_t threadsPerBlock = 64;
 	cmdBuf.begin({});

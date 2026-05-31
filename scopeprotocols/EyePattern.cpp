@@ -239,7 +239,17 @@ void EyePattern::Refresh(
 	//Initialize the capture
 	//TODO: timestamps? do we need those?
 	if(cap == nullptr)
+	{
+		//Make sure we have a plausible size
+		if( (m_width == 0) || (m_height == 0) )
+		{
+			AddErrorMessage("Invalid size", "Requested size has zero width or height");
+			SetData(nullptr, 0);
+			return;
+		}
+
 		cap = ReallocateWaveform();
+	}
 	cap->m_saturationLevel = m_parameters[m_saturationName].GetFloatVal();
 	cap->m_numLevels = m_parameters[m_numLevelsName].GetIntVal();
 	int64_t* data = cap->GetAccumData();
