@@ -61,6 +61,12 @@ string ReferencePlaneExtensionFilter::GetProtocolName()
 	return "Reference Plane Extension";
 }
 
+Filter::DataLocation ReferencePlaneExtensionFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Main filter processing
 
@@ -93,11 +99,19 @@ void ReferencePlaneExtensionFilter::OnPortCountChanged()
 	m_parametersChangedSignal.emit();
 }
 
-void ReferencePlaneExtensionFilter::Refresh()
+void ReferencePlaneExtensionFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ReferencePlaneExtensionFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -125,6 +139,7 @@ void ReferencePlaneExtensionFilter::Refresh()
 			}
 			else
 			{
+				AddErrorMessage("Invalid input", "Expected sparse or uniform analog");
 				SetData(nullptr, 0);
 				return;
 			}
