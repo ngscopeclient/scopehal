@@ -155,13 +155,14 @@ void RiseMeasurement::Refresh(
 	cap->PrepareForCpuAccess();
 
 	float last = 1e20;
-	double tedge = 0;
+	int64_t tedgeInt = 0;
+	float tedgeFrac = 0;
 
 	int state = 0;
 	int64_t tlast = 0;
 
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
-	double sum = 0;
+	KahanSummation sum;
 	int64_t num = 0;
 	for(size_t i=0; i < len; i++)
 	{
@@ -173,7 +174,8 @@ void RiseMeasurement::Refresh(
 		{
 			if( (cur > vstart) && (last <= vstart) )
 			{
-				tedge = tnow - din->m_timescale + InterpolateTime(sdin, udin, i-1, vstart)*din->m_timescale;
+				tedgeInt = tnow - din->m_timescale;
+				tedgeFrac = InterpolateTime(sdin, udin, i-1, vstart)*din->m_timescale;
 				state = 1;
 			}
 		}
@@ -183,10 +185,12 @@ void RiseMeasurement::Refresh(
 		{
 			if( (cur > vend) && (last <= vend) )
 			{
-				double dt = InterpolateTime(sdin, udin, i-1, vend)*din->m_timescale + tnow - din->m_timescale - tedge;
+				int64_t dtInt = (tnow - din->m_timescale) - tedgeInt;
+				float dtFrac = InterpolateTime(sdin, udin, i-1, vend)*din->m_timescale - tedgeFrac;
+				float dt = dtInt + dtFrac;
 
 				cap->m_offsets.push_back(tlast);
-				cap->m_durations.push_back(tnow-tlast);
+				cap->m_durations.push_back(tnow - tlast);
 				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
@@ -203,5 +207,5 @@ void RiseMeasurement::Refresh(
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 
-	m_streams[1].m_value = sum / num;
+	m_streams[1].m_value = sum.GetSum() / num;
 }
