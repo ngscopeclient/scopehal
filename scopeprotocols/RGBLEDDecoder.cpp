@@ -87,17 +87,21 @@ void RGBLEDDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("RGBLEDDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
-	LogTrace("Refresh\n");
-	LogIndenter li;
-
-	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
+
+	LogTrace("Refresh\n");
+	LogIndenter li;
 
 	//Get the input data
 	auto din = GetInputWaveform(0);
