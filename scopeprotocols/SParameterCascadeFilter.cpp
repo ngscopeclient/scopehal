@@ -44,8 +44,8 @@ SParameterCascadeFilter::SParameterCascadeFilter(const string& color)
 	: SParameterFilter(color, CAT_RF)
 {
 	//Set up output ports
-	m_parameters[m_portCountName].MarkHidden();
-	m_parameters[m_portCountName].SetIntVal(2);
+	m_portCount.MarkHidden();
+	m_portCount.SetIntVal(2);
 	SetupStreams();
 
 	//Create our input ports
@@ -95,7 +95,7 @@ void SParameterCascadeFilter::RefreshPorts()
 bool SParameterCascadeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	//All inputs are required
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//Validate port count

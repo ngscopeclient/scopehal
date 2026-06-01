@@ -45,7 +45,7 @@ using namespace std;
 ReferencePlaneExtensionFilter::ReferencePlaneExtensionFilter(const string& color)
 	: SParameterFilter(color, CAT_RF)
 {
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &ReferencePlaneExtensionFilter::OnPortCountChanged));
+	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &ReferencePlaneExtensionFilter::OnPortCountChanged));
 	OnPortCountChanged();
 }
 
@@ -75,7 +75,7 @@ Filter::DataLocation ReferencePlaneExtensionFilter::GetInputLocation()
  */
 void ReferencePlaneExtensionFilter::OnPortCountChanged()
 {
-	size_t nports_cur = m_parameters[m_portCountName].GetIntVal();
+	size_t nports_cur = m_portCount.GetIntVal();
 	size_t nports_old = m_portParamNames.size();
 
 	//Delete old parameters
@@ -116,7 +116,7 @@ void ReferencePlaneExtensionFilter::Refresh(
 		return;
 	}
 
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_portCount.GetIntVal();
 	for(size_t to=0; to<nports; to++)
 	{
 		for(size_t from=0; from<nports; from++)

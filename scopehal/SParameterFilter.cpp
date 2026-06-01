@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,11 +40,11 @@ using namespace std;
 
 SParameterFilter::SParameterFilter(const string& color, Category cat)
 	: SParameterSourceFilter(color, cat)
-	, m_portCountName("Port Count")
+	, m_portCount(m_parameters["Port Count"])
 {
-	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_portCountName].SetIntVal(2);
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &SParameterFilter::RefreshPorts));
+	m_portCount = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_portCount.SetIntVal(2);
+	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &SParameterFilter::RefreshPorts));
 
 	RefreshPorts();
 }
@@ -57,11 +57,11 @@ SParameterFilter::~SParameterFilter()
 bool SParameterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	//All inputs are required
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//Must be a valid port number (assume we take a single set of s-params as input)
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_portCount.GetIntVal();
 	if(i >= (2*nports*nports) )
 		return false;
 
@@ -88,11 +88,11 @@ bool SParameterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 void SParameterFilter::RefreshPorts()
 {
-	m_params.Allocate(m_parameters[m_portCountName].GetIntVal());
+	m_params.Allocate(m_portCount.GetIntVal());
 	SetupStreams();
 
 	//Create new inputs
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_portCount.GetIntVal();
 	for(size_t to = 0; to < nports; to++)
 	{
 		for(size_t from = 0; from < nports; from ++)

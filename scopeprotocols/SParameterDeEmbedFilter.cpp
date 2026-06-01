@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,8 +45,8 @@ SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 	, m_knownSide("Known Side")
 {
 	//Set up output ports
-	m_parameters[m_portCountName].MarkHidden();
-	m_parameters[m_portCountName].SetIntVal(2);
+	m_portCount.MarkHidden();
+	m_portCount.SetIntVal(2);
 	SetupStreams();
 
 	//Create our input ports
@@ -101,7 +101,7 @@ void SParameterDeEmbedFilter::RefreshPorts()
 bool SParameterDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	//All inputs are required
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//Validate port count
