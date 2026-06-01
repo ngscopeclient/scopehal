@@ -281,21 +281,14 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 			shared_lock<shared_mutex> lock(g_vulkanActivityMutex);
 
 			//Make sure the filter's inputs are where we need them
-			auto loc = f->GetInputLocation();
-			if(loc != Filter::LOC_DONTCARE)
+			bool expectCpuInput = (f->GetInputLocation() == Filter::LOC_CPU);
+			if(expectCpuInput)
 			{
-				bool expectGpuInput = (loc == Filter::LOC_GPU);
-				bool expectCpuInput = (loc == Filter::LOC_CPU);
 				for(size_t j=0; j<f->GetInputCount(); j++)
 				{
 					auto data = f->GetInput(j).GetData();
 					if(data)
-					{
-						if(expectGpuInput)
-							data->PrepareForGpuAccess();
-						else if(expectCpuInput)
-							data->PrepareForCpuAccess();
-					}
+						data->PrepareForCpuAccess();
 				}
 			}
 

@@ -114,7 +114,6 @@ void FlowGraphNode::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 	The default implementation returns CPU.
 
 	@return		LOC_CPU: if the filter assumes input waveforms are readable from the CPU
-				LOC_GPU: if the filter assumes input waveforms are readable from the GPU
 				LOC_DONTCARE: if the filter manages its own input memory, or can work with either CPU or GPU input
  */
 FlowGraphNode::DataLocation FlowGraphNode::GetInputLocation()

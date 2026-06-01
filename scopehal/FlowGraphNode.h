@@ -123,7 +123,6 @@ public:
 	enum DataLocation
 	{
 		LOC_CPU,
-		LOC_GPU,
 		LOC_DONTCARE
 	};
 
