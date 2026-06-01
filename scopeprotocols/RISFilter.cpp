@@ -83,7 +83,9 @@ void RISFilter::ClearSweeps()
 	SetData(nullptr, 0);
 }
 
-void RISFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void RISFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	/*
 	//Make sure we've got valid inputs
