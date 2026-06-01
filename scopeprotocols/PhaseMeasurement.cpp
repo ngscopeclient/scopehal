@@ -113,10 +113,6 @@ void PhaseMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 		return;
 	}
 
-	//180ms base
-	//50 with gpu base/top
-	//40 with gpu level crossing
-
 	auto din = GetInputWaveform(0);
 	din->PrepareForCpuAccess();
 
