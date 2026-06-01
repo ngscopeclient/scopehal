@@ -75,15 +75,26 @@ string PulseWidthMeasurement::GetProtocolName()
 	return "Pulse Width";
 }
 
+Filter::DataLocation PulseWidthMeasurement::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PulseWidthMeasurement::Refresh()
+void PulseWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PulseWidthMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -93,31 +104,36 @@ void PulseWidthMeasurement::Refresh()
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
 	float average_voltage = 0;
 	float max_value;
 	size_t temp = 0;
 
+	//Midpoint is 50% of full scale range
+	//TODO: do base/top instead?
 	if(uadin)
-		average_voltage = GetAvgVoltage(uadin);
+		average_voltage = m_averager.Average(uadin, cmdBuf, queue);
 	else if(sadin)
-		average_voltage = GetAvgVoltage(sadin);
+		average_voltage = m_averager.Average(sadin, cmdBuf, queue);
 
-	//Auto-threshold analog signals at 50% of full scale range
+	//Auto-threshold analog signals
 	if(uadin)
-		FindZeroCrossings(uadin, average_voltage, edges);
+		m_detector.FindZeroCrossings(uadin, average_voltage, cmdBuf, queue);
 	else if(sadin)
-		FindZeroCrossings(sadin, average_voltage, edges);
+		m_detector.FindZeroCrossings(sadin, average_voltage, cmdBuf, queue);
 
 	//Just find edges in digital signals
 	else if(uddin)
-		FindZeroCrossings(uddin, edges);
+		m_detector.FindZeroCrossings(uddin, cmdBuf, queue);
 	else
-		FindZeroCrossings(sddin, edges);
+		m_detector.FindZeroCrossings(sddin, cmdBuf, queue);
+
+	auto& edges = m_detector.GetResults();
+	edges.PrepareForCpuAccess();
 
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
+		AddErrorMessage("Empty input", "Expected two or more level crossings at input");
 		SetData(nullptr, 0);
 		return;
 	}
