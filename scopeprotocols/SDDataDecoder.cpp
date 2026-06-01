@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,7 +63,7 @@ string SDDataDecoder::GetProtocolName()
 
 bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 5) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -75,17 +75,30 @@ bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
+Filter::DataLocation SDDataDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SDDataDecoder::Refresh()
+void SDDataDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SDDataDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
-	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -117,14 +130,12 @@ void SDDataDecoder::Refresh()
 	len = min(len, d3.size());
 
 	//Create the capture
-	auto cap = new SDDataWaveform;
+	auto cap = SetupEmptyWaveform<SDDataWaveform>(clk, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
-	Packet* pack = NULL;
-	Packet* last_cmdbus_packet = NULL;
+	Packet* pack = nullptr;
+	Packet* last_cmdbus_packet = nullptr;
 
 	//Loop over the data and look for transactions
 	enum
@@ -255,8 +266,6 @@ void SDDataDecoder::Refresh()
 				break;
 		}
 	}
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }

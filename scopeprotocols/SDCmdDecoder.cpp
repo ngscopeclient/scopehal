@@ -92,6 +92,7 @@ void SDCmdDecoder::Refresh(
 		nvtx3::scoped_range nrange("SDCmdDecoder::Refresh");
 	#endif
 	ClearErrors();
+	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
@@ -99,8 +100,6 @@ void SDCmdDecoder::Refresh(
 		SetData(nullptr, 0);
 		return;
 	}
-
-	ClearPackets();
 
 	//Sample the input data
 	auto cmd = GetInputWaveform(0);
