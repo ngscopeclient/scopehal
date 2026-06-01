@@ -42,7 +42,7 @@ using namespace std;
 
 SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 	: SParameterFilter(color, CAT_RF)
-	, m_knownSide("Known Side")
+	, m_knownSide(m_parameters["Known Side"])
 {
 	//Set up output ports
 	m_portCount.MarkHidden();
@@ -72,10 +72,10 @@ SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 		}
 	}
 
-	m_parameters[m_knownSide] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_knownSide].AddEnumValue("Left (Port 1)", SIDE_LEFT);
-	m_parameters[m_knownSide].AddEnumValue("Right (Port 2)", SIDE_RIGHT);
-	m_parameters[m_knownSide].SetIntVal(SIDE_LEFT);
+	m_knownSide = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_knownSide.AddEnumValue("Left (Port 1)", SIDE_LEFT);
+	m_knownSide.AddEnumValue("Right (Port 2)", SIDE_RIGHT);
+	m_knownSide.SetIntVal(SIDE_LEFT);
 }
 
 SParameterDeEmbedFilter::~SParameterDeEmbedFilter()
@@ -129,13 +129,26 @@ bool SParameterDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	return true;
 }
 
-
-void SParameterDeEmbedFilter::Refresh()
+Filter::DataLocation SParameterDeEmbedFilter::GetInputLocation()
 {
-	//Make sure we've got valid inputs
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void SParameterDeEmbedFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SParameterDeEmbedFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -169,7 +182,7 @@ void SParameterDeEmbedFilter::Refresh()
 	s22o.resize(npoints);
 
 	//Figure out which network is known
-	bool knownIsA = (m_parameters[m_knownSide].GetIntVal() == SIDE_LEFT);
+	bool knownIsA = (m_knownSide.GetEnumVal<Side>() == SIDE_LEFT);
 
 	//Do the actual de-embed
 	for(size_t i=0; i<npoints;i++)

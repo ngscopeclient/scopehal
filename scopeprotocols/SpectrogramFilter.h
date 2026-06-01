@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -122,10 +122,10 @@ protected:
 	float m_range;
 	float m_offset;
 
-	std::string m_windowName;
-	std::string m_fftLengthName;
-	std::string m_rangeMinName;
-	std::string m_rangeMaxName;
+	FilterParameter& m_window;
+	FilterParameter& m_fftLength;
+	FilterParameter& m_rangeMin;
+	FilterParameter& m_rangeMax;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -123,12 +123,25 @@ bool SParameterCascadeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	return true;
 }
 
-
-void SParameterCascadeFilter::Refresh()
+Filter::DataLocation SParameterCascadeFilter::GetInputLocation()
 {
-	//Make sure we've got valid inputs
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
+void SParameterCascadeFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
+{
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SParameterCascadeFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
