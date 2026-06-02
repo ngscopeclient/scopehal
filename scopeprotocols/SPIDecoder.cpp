@@ -102,7 +102,6 @@ void SPIDecoder::Refresh(
 		return;
 	}
 
-
 	//Get the input data
 	auto clk = GetInputWaveform(0);
 	auto csn = GetInputWaveform(1);

@@ -130,7 +130,8 @@ public:
 	SPIFlashDecoder(const SPIFlashDecoder& rhs) =delete;
 	SPIFlashDecoder& operator=(const SPIFlashDecoder& rhs) =delete;
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	std::vector<std::string> GetHeaders() override;
 
@@ -157,12 +158,11 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
 
-
 	static std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
 
 protected:
-	std::string m_typename;
-	std::string m_outfile;
+	FilterParameter& m_type;
+	FilterParameter& m_outfile;
 
 	std::string m_cachedfname;
 	FILE* m_fpOut;
