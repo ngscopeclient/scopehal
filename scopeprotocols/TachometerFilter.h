@@ -35,6 +35,9 @@
 #ifndef TachometerFilter_h
 #define TachometerFilter_h
 
+#include "../scopehal/Averager.h"
+#include "../scopehal/LevelCrossingDetector.h"
+
 class TachometerFilter : public Filter
 {
 public:
@@ -51,6 +54,9 @@ public:
 
 protected:
 	FilterParameter& m_ticks;
+
+	Averager m_averager;
+	LevelCrossingDetector m_edgedet;
 };
 
 #endif

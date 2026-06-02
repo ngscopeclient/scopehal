@@ -102,15 +102,23 @@ void TachometerFilter::Refresh(
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
-	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = GetAvgVoltage(sdin, udin);
-
 	//Timestamps of the edges
-	vector<int64_t> edges;
-	FindZeroCrossings(sdin, udin, midpoint, edges);
+	if(sdin)
+		m_edgedet.FindZeroCrossings(sdin, m_averager.Average(sdin, cmdBuf, queue), cmdBuf, queue);
+	else if(udin)
+		m_edgedet.FindZeroCrossings(udin, m_averager.Average(udin, cmdBuf, queue), cmdBuf, queue);
+	else
+	{
+		AddErrorMessage("Invalid input", "Expected a sparse or uniform analog waveform");
+		SetData(nullptr, 0);
+		return;
+	}
+	auto& edges = m_edgedet.GetResults();
+	edges.PrepareForCpuAccess();
+
 	if(edges.size() < 2)
 	{
-		SetData(nullptr, 0);
+		AddErrorMessage("Input too short", "Need at least two edges in the waveform");
 		return;
 	}
 
