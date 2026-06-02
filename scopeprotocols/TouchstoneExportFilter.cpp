@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,29 +37,29 @@ using namespace std;
 
 TouchstoneExportFilter::TouchstoneExportFilter(const string& color)
 	: ExportFilter(color)
-	, m_portCount("Ports")
-	, m_freqUnit("Frequency unit")
-	, m_format("Format")
+	, m_portCount(m_parameters["Ports"])
+	, m_freqUnit(m_parameters["Frequency unit"])
+	, m_format(m_parameters["Format"])
 {
-	m_parameters[m_fname].m_fileFilterMask = "*.s*p";
-	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
+	m_fname.m_fileFilterMask = "*.s*p";
+	m_fname.m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
 
-	m_parameters[m_portCount] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_portCount].signal_changed().connect(sigc::mem_fun(*this, &TouchstoneExportFilter::OnPortCountChanged));
-	m_parameters[m_portCount].SetIntVal(2);
+	m_portCount] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &TouchstoneExportFilter::OnPortCountChanged));
+	m_portCount.SetIntVal(2);
 
-	m_parameters[m_freqUnit] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_freqUnit].AddEnumValue("Hz", SParameters::FREQ_HZ);
-	m_parameters[m_freqUnit].AddEnumValue("kHz", SParameters::FREQ_KHZ);
-	m_parameters[m_freqUnit].AddEnumValue("MHz", SParameters::FREQ_MHZ);
-	m_parameters[m_freqUnit].AddEnumValue("GHz", SParameters::FREQ_GHZ);
-	m_parameters[m_freqUnit].SetIntVal(SParameters::FREQ_MHZ);
+	m_freqUnit] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_freqUnit.AddEnumValue("Hz", SParameters::FREQ_HZ);
+	m_freqUnit.AddEnumValue("kHz", SParameters::FREQ_KHZ);
+	m_freqUnit.AddEnumValue("MHz", SParameters::FREQ_MHZ);
+	m_freqUnit.AddEnumValue("GHz", SParameters::FREQ_GHZ);
+	m_freqUnit.SetIntVal(SParameters::FREQ_MHZ);
 
-	m_parameters[m_format] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_format].AddEnumValue("Mag / angle", SParameters::FORMAT_MAG_ANGLE);
-	m_parameters[m_format].AddEnumValue("dB / angle", SParameters::FORMAT_DBMAG_ANGLE);
-	m_parameters[m_format].AddEnumValue("Real / imaginary", SParameters::FORMAT_REAL_IMAGINARY);
-	m_parameters[m_format].SetIntVal(SParameters::FORMAT_MAG_ANGLE);
+	m_format] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_format.AddEnumValue("Mag / angle", SParameters::FORMAT_MAG_ANGLE);
+	m_format.AddEnumValue("dB / angle", SParameters::FORMAT_DBMAG_ANGLE);
+	m_format.AddEnumValue("Real / imaginary", SParameters::FORMAT_REAL_IMAGINARY);
+	m_format.SetIntVal(SParameters::FORMAT_MAG_ANGLE);
 
 	OnPortCountChanged();
 }
@@ -69,7 +69,7 @@ TouchstoneExportFilter::TouchstoneExportFilter(const string& color)
 
 bool TouchstoneExportFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
@@ -114,14 +114,14 @@ string TouchstoneExportFilter::GetProtocolName()
 
 void TouchstoneExportFilter::Export()
 {
-	LogTrace("Exporting Touchstone data to %s\n", m_parameters[m_fname].GetFileName().c_str());
+	LogTrace("Exporting Touchstone data to %s\n", m_fname.GetFileName().c_str());
 	LogIndenter li;
 
 	//Touchstone files don't support appending, that makes no sense. So always close and rewrite the file
 	Clear();
 
 	//Create the output parameters
-	auto nports = m_parameters[m_portCount].GetIntVal();
+	auto nports = m_portCount.GetIntVal();
 	SParameters params;
 	params.Allocate(nports);
 
@@ -195,7 +195,7 @@ void TouchstoneExportFilter::Export()
 
 	//Done, save it
 	params.SaveToFile(
-		m_parameters[m_fname].GetFileName(),
+		m_fname.GetFileName(),
 		format,
 		freqUnit);
 }
@@ -203,7 +203,7 @@ void TouchstoneExportFilter::Export()
 void TouchstoneExportFilter::OnPortCountChanged()
 {
 	//Add new ports
-	size_t portCount = m_parameters[m_portCount].GetIntVal();
+	size_t portCount = m_portCount.GetIntVal();
 	size_t sizeNew = portCount * portCount*2;
 	size_t sizeOld = m_inputs.size();
 	for(size_t i=sizeOld; i<sizeNew; i++)
