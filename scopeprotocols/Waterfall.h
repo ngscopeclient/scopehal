@@ -75,6 +75,7 @@ public:
 	Waterfall(const Waterfall&) =delete;
 	Waterfall& operator=(const Waterfall&) =delete;
 
+	virtual DataLocation GetInputLocation() override;
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
@@ -104,7 +105,7 @@ protected:
 	size_t m_width;
 	size_t m_height;
 
-	std::string m_maxwidth;
+	FilterParameter& m_maxwidth;
 
 	ComputePipeline m_computePipeline;
 };
