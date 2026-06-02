@@ -30,7 +30,9 @@
 /**
 	@file
 	@author Frederic BORRY
-	@brief Helper class for command line drivers: provides helper methods for command line based communication with devices like NanoVNA or TinySA
+	@brief Helper class for command line drivers
+
+	Provides helper methods for command line based communication with devices like NanoVNA or TinySA
 
 	@ingroup core
  */
@@ -42,7 +44,10 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-CommandLineDriver::CommandLineDriver(SCPITransport* transport) : SCPIDevice(transport, false)
+CommandLineDriver::CommandLineDriver(SCPITransport* transport)
+	: SCPIDevice(transport, false)
+	, m_maxResponseSize(0)
+	, m_communicationTimeout(0)
 {
 }
 
@@ -186,7 +191,7 @@ bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop,[[
 	return setValue && ((origStartValue != sweepStart) || (origStopValue != sweepStop));
 }
 
-std::string CommandLineDriver::DrainTransport()
+string CommandLineDriver::DrainTransport()
 {
 	string result;
 	char tmp = ' ';

@@ -125,6 +125,8 @@ string MockInstrument::GetSerial() const
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+//This is called by Instrument::m_serializers and is not virtual
+//cppcheck-suppress duplInheritedMember
 void MockInstrument::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
 {
 	node["transport"] = GetTransportName();

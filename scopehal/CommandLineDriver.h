@@ -75,11 +75,11 @@ protected:
    	   @return size_t the number of lines received from the device
 	 */
 	size_t ConverseMultiple(
-	    const std::string& commandString,
-	    std::vector<std::string> &readLines,
-	    bool hasEcho = true,
-	    std::function<void(float)> progress = nullptr,
-	    size_t expecedLines = 0);
+		const std::string& commandString,
+		std::vector<std::string> &readLines,
+		bool hasEcho = true,
+		std::function<void(float)> progress = nullptr,
+		size_t expecedLines = 0);
 
 	/**
    	   @brief Set and/or read the sweep values from the device
@@ -115,9 +115,9 @@ protected:
    	   @return std::string a string containing all the response from the device (may contain several lines separated by \r \n)
 	 */
 	std::string ConverseString(
-	    const std::string& commandString,
-	    std::function<void(float)> progress = nullptr,
-	    size_t expecedLines = 0);
+		const std::string& commandString,
+		std::function<void(float)> progress = nullptr,
+		size_t expecedLines = 0);
 
 	/**
    	   @brief Consume any pending data from the transport layer

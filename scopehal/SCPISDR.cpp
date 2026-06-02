@@ -57,6 +57,8 @@ void SCPISDR::DoAddDriverClass(const string& name, SDRCreateProcType proc)
 	m_sdrcreateprocs[name] = proc;
 }
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 void SCPISDR::EnumDrivers(vector<string>& names)
 {
 	for(auto it=m_sdrcreateprocs.begin(); it != m_sdrcreateprocs.end(); ++it)
@@ -237,17 +239,23 @@ void SCPISDR::SetChannelOffset(size_t i, size_t stream, float offset)
 // Serialization
 
 //TODO Implement SCPISDR serialization
+//This is called by Instrument::m_serializers and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISDR::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
 	//node["integration"] = GetIntegrationTime();
 }
 
+//This is called by Instrument::m_preloaders and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISDR::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
 {
 	//if(node["integration"])
 	//	SetIntegrationTime(node["integration"].as<int64_t>());
 }
 
+//This is called by Instrument::m_loaders and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISDR::DoPreLoadConfiguration(
 	int version,
 	const YAML::Node& node,

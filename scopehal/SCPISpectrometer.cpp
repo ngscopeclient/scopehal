@@ -57,6 +57,8 @@ void SCPISpectrometer::DoAddDriverClass(const string& name, SpectrometerCreatePr
 	m_spectrometercreateprocs[name] = proc;
 }
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::EnumDrivers(vector<string>& names)
 {
 	for(auto it=m_spectrometercreateprocs.begin(); it != m_spectrometercreateprocs.end(); ++it)
@@ -236,17 +238,23 @@ void SCPISpectrometer::SetChannelOffset(size_t i, size_t stream, float offset)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+//This is called by Instrument::m_serializers and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
 {
 	node["integration"] = GetIntegrationTime();
 }
 
+//This is called by Instrument::m_loaders and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
 {
 	if(node["integration"])
 		SetIntegrationTime(node["integration"].as<int64_t>());
 }
 
+//This is called by Instrument::m_preloaders and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::DoPreLoadConfiguration(
 	int /*version*/,
 	const YAML::Node& /*node*/,
