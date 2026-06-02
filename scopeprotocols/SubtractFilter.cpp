@@ -53,7 +53,7 @@ SubtractFilter::~SubtractFilter()
 
 bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i >= 2)
@@ -81,6 +81,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range range("SubtractFilter::Refresh");
 	#endif
+	ClearErrors();
 
 	//Set units as early as possible so we can spawn in the same plot as our parent signal when creating a filter
 	if(GetInput(0))
@@ -98,7 +99,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		DoRefreshScalarScalar();
 	else if(veca)
 		DoRefreshScalarVector(1, 0);
-	else
+	else /* if vecb */
 		DoRefreshScalarVector(0, 1);
 }
 
@@ -118,7 +119,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or invalid");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -134,7 +136,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
 		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Inconsistent units", "Both inputs must have the same X and Y axis unit");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -180,6 +183,7 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	//Mixed sparse/uniform not allowed
 	else
 	{
+		AddErrorMessage("Inconsistent types", "Mixing sparse and uniform inputs is not supported");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -251,6 +255,7 @@ void SubtractFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 	auto din = GetInputWaveform(iVector);
 	if(!din)
 	{
+		AddErrorMessage("Missing input", "Input vector is null or missing");
 		SetData(nullptr, 0);
 		return;
 	}

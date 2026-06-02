@@ -82,15 +82,29 @@ string SWDDecoder::GetProtocolName()
 	return "SWD";
 }
 
+Filter::DataLocation SWDDecoder::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SWDDecoder::Refresh()
+void SWDDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SWDDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -101,11 +115,9 @@ void SWDDecoder::Refresh()
 	data->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new SWDWaveform;
+	auto cap = SetupEmptyWaveform<SWDWaveform>(clk, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	//Sample SWDIO on SWCLK edges
 	SparseDigitalWaveform samples;
@@ -435,7 +447,6 @@ void SWDDecoder::Refresh()
 
 		last_dur = dur;
 	}
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }
