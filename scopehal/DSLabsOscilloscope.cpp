@@ -364,9 +364,9 @@ bool DSLabsOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 
 		// LogDebug("ch%ld: Receive %ld samples\n", chnum, memdepth);
@@ -379,7 +379,7 @@ bool DSLabsOscilloscope::AcquireData()
 			abufs.push_back(buf);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -388,12 +388,12 @@ bool DSLabsOscilloscope::AcquireData()
 			offset *= GetChannelAttenuation(chnum);
 
 			bool clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 
 			//TODO: stream timestamp from the server
 			buf = new uint8_t[memdepth];
-			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), reinterpret_cast<uint8_t*>(buf)))
 			{
 				delete[] buf;
 				return false;
@@ -419,11 +419,11 @@ bool DSLabsOscilloscope::AcquireData()
 		{
 			int32_t first_sample;
 
-			if(!m_transport->ReadRawData(sizeof(first_sample), (uint8_t*)&first_sample))
+			if(!m_transport->ReadRawData(sizeof(first_sample), reinterpret_cast<uint8_t*>(&first_sample)))
 				return false;
 
 			buf = new uint8_t[memdepth];
-			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), buf))
 			{
 				delete[] buf;
 				return false;

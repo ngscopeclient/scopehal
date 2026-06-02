@@ -792,7 +792,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 		// Request a reasonably-sized buffer as this may cause RAM allocation in recv(2)
 		const size_t block_size = 50e6;
 
-		unsigned char* dest_buf = (unsigned char*)cap->m_samples.GetCpuPointer();
+		auto dest_buf = reinterpret_cast<unsigned char*>(cap->m_samples.GetCpuPointer());
 
 		LogDebug(" - Begin transfer of %zu bytes\n", length);
 

@@ -309,7 +309,7 @@ bool HaasoscopePro::AcquireData()
 
 	//Get the de-facto hardware capture rate.
 	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
+	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
 		return false;
 	LogTrace("HaasoscopePro got wfms_s %f \n",wfms_s);
 	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
@@ -331,9 +331,9 @@ bool HaasoscopePro::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 		LogTrace("HaasoscopePro got memdepth %" PRIu64 " \n", memdepth);
 
@@ -348,7 +348,7 @@ bool HaasoscopePro::AcquireData()
 			auto buf = abuf->GetCpuPointer();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -359,13 +359,13 @@ bool HaasoscopePro::AcquireData()
 			offset *= GetChannelAttenuation(chnum);
 
 			uint8_t clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 			LogTrace("HaasoscopePro got clipping %d \n", clipping);
 
 			//FIXME: stream timestamp from the server
 
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(buf)))
 				return false;
 			LogTrace("HaasoscopePro got data bytes... %d %d %d ...\n", buf[0],buf[1],buf[2]);
 			abuf->MarkModifiedFromCpu();

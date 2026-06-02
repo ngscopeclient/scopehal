@@ -126,7 +126,13 @@ bool MockOscilloscope::IsTriggerArmed()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void MockOscilloscope::DoPreLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table, ConfigWarningList& /*warnings*/)
+//This is intentionally not virtual since it's called by Instrument::m_preloaders
+//cppcheck-suppress duplInheritedMember
+void MockOscilloscope::DoPreLoadConfiguration(
+	[[maybe_unused]] int version,
+	const YAML::Node& node,
+	IDTable& table,
+	[[maybe_unused]] ConfigWarningList& warnings)
 {
 	//Load the channels
 	auto& chans = node["channels"];

@@ -817,14 +817,14 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 	#pragma pack(pop)
 
 	//Read global waveform settings (independent of each channel)
-	if(!m_transport->ReadRawData(sizeof(wfmhdrs), (uint8_t*)&wfmhdrs))
+	if(!m_transport->ReadRawData(sizeof(wfmhdrs), reinterpret_cast<uint8_t*>(&wfmhdrs)))
 		return false;
 	uint16_t numChannels = wfmhdrs.numChannels;
 	int64_t fs_per_sample = wfmhdrs.fs_per_sample;
 
 	//Acknowledge receipt of this waveform
 	m_lastSeq = wfmhdrs.sequence;
-	m_transport->SendRawData(4, (uint8_t*)&m_lastSeq);
+	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
 
 	//Acquire data for each channel
 	size_t chnum;
@@ -842,7 +842,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 		size_t tmp[2];
 
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(tmp), (uint8_t*)&tmp))
+		if(!m_transport->ReadRawData(sizeof(tmp), reinterpret_cast<uint8_t*>(&tmp)))
 			return false;
 		chnum = tmp[0];
 		memdepth = tmp[1];
@@ -860,7 +860,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			abuf->PrepareForCpuAccess();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 			float scale = config[0];
 			float offset = config[1];

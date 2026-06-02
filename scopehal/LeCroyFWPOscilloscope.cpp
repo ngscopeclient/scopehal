@@ -129,6 +129,8 @@ LeCroyFWPOscilloscope::~LeCroyFWPOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Object creation / enumeration
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string LeCroyFWPOscilloscope::GetDriverNameInternal()
 {
 	return "lecroy_fwp";

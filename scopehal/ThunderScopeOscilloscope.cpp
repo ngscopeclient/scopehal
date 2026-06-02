@@ -355,11 +355,11 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//Read Version No.
 	uint8_t version;
-	if(!m_transport->ReadRawData(sizeof(version), (uint8_t*)&version))
+	if(!m_transport->ReadRawData(sizeof(version), reinterpret_cast<uint8_t*>(&version)))
 		return false;
 
 	//Read the sequence number of the current waveform
-	if(!m_transport->ReadRawData(sizeof(m_lastSeq), (uint8_t*)&m_lastSeq))
+	if(!m_transport->ReadRawData(sizeof(m_lastSeq), reinterpret_cast<uint8_t*>(&m_lastSeq)))
 		return false;
 
 	//Acknowledge receipt of this waveform
@@ -497,9 +497,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			//Kick off the GPU-side processing of the waveform to run nonblocking while we download the next
 			//Wait for any previous waveform processing to finish first, since we're reusing the command buffer
 			//and not using push descriptors
-			if(!keep)
-			{}
-			else if(dataType == DATATYPE_I8)
+			if(dataType == DATATYPE_I8)
 			{
 				m_queue->WaitIdle();
 

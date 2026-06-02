@@ -367,7 +367,9 @@ string MagnovaOscilloscope::GetDriverNameInternal()
 	return "magnova";
 }
 
-std::vector<SCPIInstrumentModel> MagnovaOscilloscope::GetDriverSupportedModels()
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
+vector<SCPIInstrumentModel> MagnovaOscilloscope::GetDriverSupportedModels()
 {
 	return {
 	{"Magnova", {
