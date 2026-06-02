@@ -41,21 +41,21 @@ TouchstoneExportFilter::TouchstoneExportFilter(const string& color)
 	, m_freqUnit(m_parameters["Frequency unit"])
 	, m_format(m_parameters["Format"])
 {
-	m_fname.m_fileFilterMask = "*.s*p";
-	m_fname.m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
+	m_parameters[m_fname].m_fileFilterMask = "*.s*p";
+	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
 
-	m_portCount] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_portCount = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &TouchstoneExportFilter::OnPortCountChanged));
 	m_portCount.SetIntVal(2);
 
-	m_freqUnit] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_freqUnit = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_freqUnit.AddEnumValue("Hz", SParameters::FREQ_HZ);
 	m_freqUnit.AddEnumValue("kHz", SParameters::FREQ_KHZ);
 	m_freqUnit.AddEnumValue("MHz", SParameters::FREQ_MHZ);
 	m_freqUnit.AddEnumValue("GHz", SParameters::FREQ_GHZ);
 	m_freqUnit.SetIntVal(SParameters::FREQ_MHZ);
 
-	m_format] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_format = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_format.AddEnumValue("Mag / angle", SParameters::FORMAT_MAG_ANGLE);
 	m_format.AddEnumValue("dB / angle", SParameters::FORMAT_DBMAG_ANGLE);
 	m_format.AddEnumValue("Real / imaginary", SParameters::FORMAT_REAL_IMAGINARY);
@@ -76,7 +76,7 @@ bool TouchstoneExportFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//Validate port index
-	size_t portCount = m_parameters[m_portCount].GetIntVal();
+	size_t portCount = m_portCount.GetIntVal();
 	if(i >= (portCount*portCount*2) )
 		return false;
 
@@ -114,7 +114,7 @@ string TouchstoneExportFilter::GetProtocolName()
 
 void TouchstoneExportFilter::Export()
 {
-	LogTrace("Exporting Touchstone data to %s\n", m_fname.GetFileName().c_str());
+	LogTrace("Exporting Touchstone data to %s\n", m_parameters[m_fname].GetFileName().c_str());
 	LogIndenter li;
 
 	//Touchstone files don't support appending, that makes no sense. So always close and rewrite the file
@@ -190,12 +190,12 @@ void TouchstoneExportFilter::Export()
 		}
 	}
 
-	auto format = static_cast<SParameters::ParameterFormat>(m_parameters[m_format].GetIntVal());
-	auto freqUnit = static_cast<SParameters::FreqUnit>(m_parameters[m_freqUnit].GetIntVal());
+	auto format = m_format.GetEnumVal<SParameters::ParameterFormat>();
+	auto freqUnit = m_freqUnit.GetEnumVal<SParameters::FreqUnit>();
 
 	//Done, save it
 	params.SaveToFile(
-		m_fname.GetFileName(),
+		m_parameters[m_fname].GetFileName(),
 		format,
 		freqUnit);
 }

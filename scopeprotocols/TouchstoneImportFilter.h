@@ -40,7 +40,7 @@ class TouchstoneImportFilter : public SParameterSourceFilter
 public:
 	TouchstoneImportFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName() override;
