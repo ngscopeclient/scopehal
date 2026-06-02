@@ -76,7 +76,8 @@ class USB2PMADecoder : public Filter
 public:
 	USB2PMADecoder(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -90,12 +91,12 @@ public:
 	};
 
 	void SetSpeed(Speed s)
-	{ m_parameters[m_speedname].SetIntVal(s); }
+	{ m_speed.SetIntVal(s); }
 
 	PROTOCOL_DECODER_INITPROC(USB2PMADecoder)
 
 protected:
-	std::string m_speedname;
+	FilterParameter& m_speed;
 };
 
 #endif
