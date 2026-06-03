@@ -65,15 +65,15 @@ public:
 	{ m_lowerLevel.SetIntVal(bound); }
 
 	int64_t GetUpperBound()
-	{ return m_upperLevel.GetIntVal(); }
+	{ return m_upperPulseLevel.GetIntVal(); }
 
 	void SetUpperBound(int64_t bound)
-	{ m_upperLevel.SetIntVal(bound); }
+	{ m_upperPulseLevel.SetIntVal(bound); }
 
 protected:
 	FilterParameter& m_condition;
 	FilterParameter& m_lowerLevel;
-	FilterParameter& m_upperLevel;
+	FilterParameter& m_upperPulseLevel;
 };
 
 #endif

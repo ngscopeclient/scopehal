@@ -42,11 +42,11 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	: EdgeTrigger(scope)
 	, m_condition(m_parameters["Condition"])
 	, m_lowerLevel(m_parameters["Lower Bound"])
-	, m_upperLevel(m_parameters["Upper Bound"])
+	, m_upperPulseLevel(m_parameters["Upper Bound"])
 {
 	m_lowerLevel = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_upperLevel = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_upperPulseLevel = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
 	m_condition = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_condition.AddEnumValue("Less than", CONDITION_LESS);
