@@ -54,6 +54,8 @@ void SCPIVNA::DoAddDriverClass(const string& name, VNACreateProcType proc)
 	m_vnacreateprocs[name] = proc;
 }
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 void SCPIVNA::EnumDrivers(vector<string>& names)
 {
 	for(auto it=m_vnacreateprocs.begin(); it != m_vnacreateprocs.end(); ++it)

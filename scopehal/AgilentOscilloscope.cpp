@@ -172,6 +172,12 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			chan->SetDefaultDisplayName();
 		}
 	}
+
+	//Clear config cache
+	m_sampleRateValid = false;
+	m_sampleRate = 0;
+	m_sampleDepthValid = false;
+	m_sampleDepth = 0;
 }
 
 AgilentOscilloscope::~AgilentOscilloscope()
@@ -234,7 +240,7 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_sampleDepthValid = false;
 
 	delete m_trigger;
-	m_trigger = NULL;
+	m_trigger = nullptr;
 }
 
 /**

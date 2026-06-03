@@ -308,9 +308,9 @@ bool DigilentOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 		double* buf = new double[memdepth];
 
@@ -319,12 +319,12 @@ bool DigilentOscilloscope::AcquireData()
 		{
 			abufs.push_back(buf);
 
-			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
+			if(!m_transport->ReadRawData(sizeof(trigphase), reinterpret_cast<uint8_t*>(&trigphase)))
 				return false;
 
 			//TODO: stream timestamp from the server
 
-			if(!m_transport->ReadRawData(memdepth * sizeof(double), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(double), reinterpret_cast<uint8_t*>(buf)))
 				return false;
 
 			//Create our waveform
@@ -339,10 +339,10 @@ bool DigilentOscilloscope::AcquireData()
 			s[GetOscilloscopeChannel(chnum)] = cap;
 		}
 
-		/*
 		//Digital pod
 		else
 		{
+			/*
 			float trigphase;
 			if(!m_transport->ReadRawData((uint8_t*)&trigphase, sizeof(trigphase)))
 				return false;
@@ -419,11 +419,10 @@ bool DigilentOscilloscope::AcquireData()
 				cap->m_offsets.shrink_to_fit();
 				cap->m_durations.shrink_to_fit();
 				cap->m_samples.shrink_to_fit();
-			}
+			}*/
 
 			delete[] buf;
 		}
-		*/
 	}
 
 	//Process analog captures in parallel

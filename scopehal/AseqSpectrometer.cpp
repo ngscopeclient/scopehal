@@ -267,7 +267,7 @@ bool AseqSpectrometer::AcquireData()
 	float* buf = new float[npoints];
 
 	//Pull the data from the server
-	if(!m_transport->ReadRawData(npoints * sizeof(float), (uint8_t*)buf))
+	if(!m_transport->ReadRawData(npoints * sizeof(float), reinterpret_cast<uint8_t*>(buf)))
 		return false;
 
 	//Flip the samples around so the lowest wavelength is at the left, then display as a sparse waveform

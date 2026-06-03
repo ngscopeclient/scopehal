@@ -60,10 +60,37 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	, m_eyeScanInProgress(false)
 	, m_activeScanChannel(0)
 	, m_activeScanProgress(0)
+	, m_maxLogicDepth(0)
 {
+	//Default dummy values to make static analyzer happy before we pull real values from hardware
 	m_triggerOneShot = true;
-	m_laChannelEnabled[0] = false;
-	m_laChannelEnabled[1] = false;
+
+	m_triggerInChannelBase = 0;
+	m_triggerBidirChannelBase = 0;
+	m_triggerOutChannelBase = 0;
+	m_txChannelBase = 0;
+	m_rxChannelBase = 0;
+
+	for(int i=0; i<2; i++)
+	{
+		m_laChannelEnabled[i] = false;
+		m_rxClkDiv[i] = 1;
+		m_rxDataRate[i] = 0;
+		m_txDataRate[i] = 0;
+		m_scanDepth[i] = 0;
+		m_txPreCursor[i] = 0;
+		m_txPostCursor[i] = 0;
+		m_txEnable[i] = 0;
+		m_txDrive[i] = 0;
+		m_txInvert[i] = false;
+		m_rxInvert[i] = false;
+	}
+
+	for(int i=0; i<12; i++)
+	{
+		m_trigThreshold[i] = 0;
+		m_trigDrive[i] = 0;
+	}
 }
 
 AntikernelLabsTriggerCrossbar::~AntikernelLabsTriggerCrossbar()
