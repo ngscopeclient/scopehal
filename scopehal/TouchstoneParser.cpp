@@ -103,7 +103,7 @@ bool TouchstoneParser::Load(const string& fname, SParameters& params)
 	}
 
 	//Overflow check
-	size_t sizeWithNull = fsize + 1;
+	size_t sizeWithNull = len + 1;
 	if(sizeWithNull == 0)
 	{
 		LogError("S-parameter file %s has invalid size\n", fname.c_str());
