@@ -363,7 +363,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		return false;
 
 	//Acknowledge receipt of this waveform
-	m_transport->SendRawData(4, (uint8_t*)&m_lastSeq);
+	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
 
 	if(!keep)
 		LogTrace("Dropping waveform %u\n",m_lastSeq);

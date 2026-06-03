@@ -212,7 +212,7 @@ bool LeCroyFWPOscilloscope::AcquireData()
 	for(int i=0; i<4; i++)
 	{
 		//Grab the waveform header
-		if(!m_socket.RecvLooped((uint8_t*)&headers[i], sizeof(WaveformHeader)))
+		if(!m_socket.RecvLooped(reinterpret_cast<uint8_t*>(&headers[i]), sizeof(WaveformHeader)))
 			return false;
 	}
 
@@ -224,7 +224,7 @@ bool LeCroyFWPOscilloscope::AcquireData()
 			m_rawWaveformBuffers[i].resize(headers[i].numSamples);
 			m_rawWaveformBuffers[i].PrepareForCpuAccess();
 			if(!m_socket.RecvLooped(
-				(uint8_t*)m_rawWaveformBuffers[i].GetCpuPointer(),
+				reinterpret_cast<uint8_t*>(m_rawWaveformBuffers[i].GetCpuPointer()),
 				headers[i].numSamples * sizeof(int16_t)))
 			{
 				return false;

@@ -278,24 +278,24 @@ bool HaasoscopePro::AcquireData()
 
 	//Read the sequence number of the current waveform
 	uint32_t seqnum;
-	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
+	if(!m_transport->ReadRawData(sizeof(seqnum), reinterpret_cast<uint8_t*>(&seqnum)))
 		return false;
 	LogTrace("HaasoscopePro got seqnum %d \n",seqnum); // Note: run ngscopeclient with --debug to see these
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	uint64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
 		return false;
 
 	//Get the de-facto trigger position.
 	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), (uint8_t*)&trigger_fs))
+	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
 		return false;
 
 	{

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -164,10 +164,10 @@ void GWInstekGPDX303SPowerSupply::SetPowerVoltage(int chan, double volts)
 	if(!m_model.empty() && m_model.back() == 'D')
 	{
 		// The GPD-3303D only claims to support 100mV voltage granularity
-		snprintf(cmd, sizeof(cmd), "VSET%u:%.1f", chan+1, volts);
+		snprintf(cmd, sizeof(cmd), "VSET%d:%.1f", chan+1, volts);
 	}
 	else
-		snprintf(cmd, sizeof(cmd), "VSET%u:%.3f", chan+1, volts);
+		snprintf(cmd, sizeof(cmd), "VSET%d:%.3f", chan+1, volts);
 	m_transport->SendCommandQueued(cmd);
 }
 
@@ -177,10 +177,10 @@ void GWInstekGPDX303SPowerSupply::SetPowerCurrent(int chan, double amps)
 	if(!m_model.empty() && m_model.back() == 'D')
 	{
 		// The GPD-3303D only claims to support 10mA current granularity
-		snprintf(cmd, sizeof(cmd), "ISET%u:%.2f", chan+1, amps);
+		snprintf(cmd, sizeof(cmd), "ISET%d:%.2f", chan+1, amps);
 	}
 	else
-		snprintf(cmd, sizeof(cmd), "ISET%u:%.3f", chan+1, amps);
+		snprintf(cmd, sizeof(cmd), "ISET%d:%.3f", chan+1, amps);
 	m_transport->SendCommandQueued(cmd);
 }
 
