@@ -102,8 +102,17 @@ bool TouchstoneParser::Load(const string& fname, SParameters& params)
 		return false;
 	}
 
+	//Overflow check
+	size_t sizeWithNull = fsize + 1;
+	if(sizeWithNull == 0)
+	{
+		LogError("S-parameter file %s has invalid size\n", fname.c_str());
+		fclose(fp);
+		return "";
+	}
+
 	//Read entire file into working buffer
-	char* buf = new char[len + 1];
+	char* buf = new char[sizeWithNull];
 	if(len != fread(buf, 1, len, fp))
 	{
 		delete[] buf;

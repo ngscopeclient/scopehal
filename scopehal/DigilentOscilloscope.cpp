@@ -282,13 +282,13 @@ bool DigilentOscilloscope::AcquireData()
 {
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
 		return false;
 
 	//Acquire data for each channel

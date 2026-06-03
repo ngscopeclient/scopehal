@@ -38,6 +38,9 @@ using namespace std;
 RemoteBridgeOscilloscope::RemoteBridgeOscilloscope(SCPITransport* transport, bool identify)
 	: SCPIDevice(transport, identify)
 	, SCPIOscilloscope()
+	, m_triggerOffset(0)
+	, m_srate(0)
+	, m_mdepth(0)
 {
 
 }

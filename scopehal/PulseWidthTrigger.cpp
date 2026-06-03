@@ -71,6 +71,8 @@ PulseWidthTrigger::~PulseWidthTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string PulseWidthTrigger::GetTriggerName()
 {
 	return "Pulse Width";

@@ -70,6 +70,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 	m_triggerOutChannelBase = 0;
 	m_txChannelBase = 0;
 	m_rxChannelBase = 0;
+	m_triggerOffsetSamples = 0;
 
 	for(int i=0; i<2; i++)
 	{
@@ -84,6 +85,7 @@ AntikernelLabsTriggerCrossbar::AntikernelLabsTriggerCrossbar(SCPITransport* tran
 		m_txDrive[i] = 0;
 		m_txInvert[i] = false;
 		m_rxInvert[i] = false;
+		m_txPattern[i] = PATTERN_PRBS7;
 	}
 
 	for(int i=0; i<12; i++)
