@@ -312,26 +312,28 @@ bool DigilentOscilloscope::AcquireData()
 			return false;
 		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
-		double* buf = new double[memdepth];
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
 		{
-			abufs.push_back(buf);
-
 			if(!m_transport->ReadRawData(sizeof(trigphase), reinterpret_cast<uint8_t*>(&trigphase)))
 				return false;
 
 			//TODO: stream timestamp from the server
-
+			double* buf = new double[memdepth];
 			if(!m_transport->ReadRawData(memdepth * sizeof(double), reinterpret_cast<uint8_t*>(buf)))
+			{
+				delete[] buf;
 				return false;
+			}
+
+			abufs.push_back(buf);
 
 			//Create our waveform
-			auto cap = new UniformAnalogWaveform;
+			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
-			cap->m_startTimestamp = time(NULL);
+			cap->m_startTimestamp = time(nullptr);
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
@@ -419,9 +421,10 @@ bool DigilentOscilloscope::AcquireData()
 				cap->m_offsets.shrink_to_fit();
 				cap->m_durations.shrink_to_fit();
 				cap->m_samples.shrink_to_fit();
-			}*/
+			}
 
 			delete[] buf;
+			*/
 		}
 	}
 

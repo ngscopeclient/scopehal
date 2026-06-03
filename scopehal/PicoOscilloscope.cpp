@@ -881,7 +881,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
-			cap->m_startTimestamp = time(NULL);
+			cap->m_startTimestamp = time(nullptr);
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
 
