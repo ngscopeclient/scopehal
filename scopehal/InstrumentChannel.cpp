@@ -174,3 +174,13 @@ double InstrumentChannel::GetDownloadStartTime()
 {
 	return 0.0;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Filter graph stubs
+
+void InstrumentChannel::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+
+}

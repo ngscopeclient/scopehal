@@ -75,12 +75,6 @@ string PCIeGen3LogicalDecoder::GetProtocolName()
 	return "PCIe Gen 3/4/5 Logical";
 }
 
-Filter::DataLocation PCIeGen3LogicalDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

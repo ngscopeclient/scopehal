@@ -90,12 +90,6 @@ void PointSampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		m_streams[0].m_value = sample.value();
 }
 
-Filter::DataLocation PointSampleFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 string PointSampleFilter::GetProtocolName()
 {
 	return "Point Sample";

@@ -66,7 +66,7 @@ SWDDecoder::SWDDecoder(const string& color) : Filter(color, CAT_BUS)
 
 bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if((i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -80,12 +80,6 @@ bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string SWDDecoder::GetProtocolName()
 {
 	return "SWD";
-}
-
-Filter::DataLocation SWDDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

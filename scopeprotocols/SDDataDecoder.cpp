@@ -69,16 +69,10 @@ bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if( (i < 5) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
-	if( (i == 5) && (dynamic_cast<SDCmdDecoder*>(stream.m_channel) != NULL) )
+	if( (i == 5) && (dynamic_cast<SDCmdDecoder*>(stream.m_channel) != nullptr) )
 		return true;
 
 	return false;
-}
-
-Filter::DataLocation SDDataDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

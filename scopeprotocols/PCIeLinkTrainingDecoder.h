@@ -130,7 +130,6 @@ public:
 	virtual ~PCIeLinkTrainingDecoder();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	virtual std::vector<std::string> GetHeaders() override;
 	virtual bool GetShowDataColumn() override;

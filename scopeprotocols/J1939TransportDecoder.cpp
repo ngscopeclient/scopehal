@@ -81,12 +81,6 @@ string J1939TransportDecoder::GetProtocolName()
 	return "J1939 Transport";
 }
 
-Filter::DataLocation J1939TransportDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

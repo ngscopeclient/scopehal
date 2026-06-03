@@ -117,12 +117,6 @@ string CouplerDeEmbedFilter::GetProtocolName()
 	return "Coupler De-Embed";
 }
 
-Filter::DataLocation CouplerDeEmbedFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

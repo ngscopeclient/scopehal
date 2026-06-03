@@ -107,12 +107,6 @@ bool Ethernet100BaseT1Decoder::ValidateChannel(size_t i, StreamDescriptor stream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-Filter::DataLocation Ethernet100BaseT1Decoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX

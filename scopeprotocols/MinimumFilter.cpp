@@ -110,11 +110,6 @@ void MinimumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHan
 	}
 }
 
-Filter::DataLocation MinimumFilter::GetInputLocation()
-{
-	return LOC_DONTCARE;
-}
-
 string MinimumFilter::GetProtocolName()
 {
 	return "Minimum";

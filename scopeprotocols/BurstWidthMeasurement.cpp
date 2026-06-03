@@ -76,12 +76,6 @@ string BurstWidthMeasurement::GetProtocolName()
 	return "Burst Width";
 }
 
-Filter::DataLocation BurstWidthMeasurement::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

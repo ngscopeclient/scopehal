@@ -44,7 +44,6 @@ public:
 	~AddFilter();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 

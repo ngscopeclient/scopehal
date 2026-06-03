@@ -70,7 +70,7 @@ bool PCIeGen2LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	size_t nports = m_portCount.GetIntVal();
-	if( (i <= nports) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i <= nports) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -79,12 +79,6 @@ bool PCIeGen2LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string PCIeGen2LogicalDecoder::GetProtocolName()
 {
 	return "PCIe Gen 1/2 Logical";
-}
-
-Filter::DataLocation PCIeGen2LogicalDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -80,12 +80,6 @@ string PAM4DemodulatorFilter::GetProtocolName()
 	return "PAM4 Demodulator";
 }
 
-Filter::DataLocation PAM4DemodulatorFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

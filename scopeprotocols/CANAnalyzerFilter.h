@@ -45,7 +45,6 @@ public:
 	std::vector<std::string> GetHeaders() override;
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 

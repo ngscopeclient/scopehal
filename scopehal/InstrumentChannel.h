@@ -265,6 +265,8 @@ public:
 	/// returns the start time of a download, if we are DOWNLOAD_IN_PROGRESS; undefined, otherwise
 	virtual double GetDownloadStartTime();
 
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+
 protected:
 
 	virtual void ClearStreams();

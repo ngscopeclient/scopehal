@@ -231,12 +231,6 @@ public:
 	 */
 	virtual void ClearSweeps();
 
-	[[deprecated]]
-	virtual void Refresh() override;
-
-	//GPU accelerated refresh method
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling
 

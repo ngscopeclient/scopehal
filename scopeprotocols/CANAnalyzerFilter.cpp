@@ -65,12 +65,6 @@ vector<string> CANAnalyzerFilter::GetHeaders()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-Filter::DataLocation CANAnalyzerFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 bool CANAnalyzerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == nullptr)

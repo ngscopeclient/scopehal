@@ -89,7 +89,6 @@ public:
 	virtual ~VICPDecoder();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	std::vector<std::string> GetHeaders() override;
 

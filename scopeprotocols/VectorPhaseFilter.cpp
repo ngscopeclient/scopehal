@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -67,12 +67,6 @@ bool VectorPhaseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string VectorPhaseFilter::GetProtocolName()
 {
 	return "Vector Phase";
-}
-
-Filter::DataLocation VectorPhaseFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

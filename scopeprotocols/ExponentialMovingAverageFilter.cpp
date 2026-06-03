@@ -201,9 +201,3 @@ void ExponentialMovingAverageFilter::Refresh(
 	cap->m_timescale			= din->m_timescale;
 	cap->m_revision ++;
 }
-
-Filter::DataLocation ExponentialMovingAverageFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}

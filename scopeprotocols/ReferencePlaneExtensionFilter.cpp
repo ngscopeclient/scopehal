@@ -61,12 +61,6 @@ string ReferencePlaneExtensionFilter::GetProtocolName()
 	return "Reference Plane Extension";
 }
 
-Filter::DataLocation ReferencePlaneExtensionFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Main filter processing
 

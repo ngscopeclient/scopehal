@@ -80,12 +80,6 @@ string J1939PDUDecoder::GetProtocolName()
 	return "J1939 PDU";
 }
 
-Filter::DataLocation J1939PDUDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

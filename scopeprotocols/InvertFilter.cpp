@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -71,12 +71,6 @@ void InvertFilter::SetDefaultName()
 	snprintf(hwname, sizeof(hwname), "-%s", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
-}
-
-Filter::DataLocation InvertFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

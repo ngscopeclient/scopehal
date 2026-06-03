@@ -69,12 +69,6 @@ string TwoPortShuntThroughFilter::GetProtocolName()
 	return "2-Port Shunt Through";
 }
 
-Filter::DataLocation TwoPortShuntThroughFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

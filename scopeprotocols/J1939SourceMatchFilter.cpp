@@ -83,12 +83,6 @@ string J1939SourceMatchFilter::GetProtocolName()
 	return "J1939 Source Match";
 }
 
-Filter::DataLocation J1939SourceMatchFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

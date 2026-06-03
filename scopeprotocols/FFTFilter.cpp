@@ -76,7 +76,7 @@ FFTFilter::~FFTFilter()
 
 bool FFTFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -111,12 +111,6 @@ void FFTFilter::SetOffset(float offset, size_t /*stream*/)
 string FFTFilter::GetProtocolName()
 {
 	return "FFT";
-}
-
-Filter::DataLocation FFTFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

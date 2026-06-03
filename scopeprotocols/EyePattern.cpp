@@ -168,11 +168,6 @@ float EyePattern::GetOffset(size_t /*stream*/)
 	return -m_parameters[m_centerName].GetFloatVal();
 }
 
-FlowGraphNode::DataLocation EyePattern::GetInputLocation()
-{
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

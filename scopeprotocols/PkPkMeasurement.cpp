@@ -75,12 +75,6 @@ string PkPkMeasurement::GetProtocolName()
 	return "Peak-To-Peak";
 }
 
-Filter::DataLocation PkPkMeasurement::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

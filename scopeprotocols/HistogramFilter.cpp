@@ -111,12 +111,6 @@ string HistogramFilter::GetProtocolName()
 	return "Histogram";
 }
 
-Filter::DataLocation HistogramFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 float HistogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

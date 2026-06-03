@@ -103,12 +103,6 @@ void SawtoothGeneratorFilter::OnUnitChanged()
 	m_bias.SetUnit(unit);
 }
 
-Filter::DataLocation SawtoothGeneratorFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

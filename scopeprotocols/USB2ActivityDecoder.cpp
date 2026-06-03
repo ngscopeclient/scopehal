@@ -65,12 +65,6 @@ string USB2ActivityDecoder::GetProtocolName()
 	return "USB 1.x/2.0 Activity";
 }
 
-Filter::DataLocation USB2ActivityDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

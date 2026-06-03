@@ -52,7 +52,7 @@ TrendFilter::TrendFilter(const string& color)
 
 bool TrendFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -70,12 +70,6 @@ bool TrendFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string TrendFilter::GetProtocolName()
 {
 	return "Trend";
-}
-
-Filter::DataLocation TrendFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -73,12 +73,6 @@ string USB2PMADecoder::GetProtocolName()
 	return "USB 1.x/2.0 PMA";
 }
 
-Filter::DataLocation USB2PMADecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

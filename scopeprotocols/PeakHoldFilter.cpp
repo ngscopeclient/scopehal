@@ -71,12 +71,6 @@ void PeakHoldFilter::ClearSweeps()
 	SetData(nullptr, 0);
 }
 
-Filter::DataLocation PeakHoldFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -101,12 +101,6 @@ void TDRFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-Filter::DataLocation TDRFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

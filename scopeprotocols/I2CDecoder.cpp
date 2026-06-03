@@ -78,12 +78,6 @@ vector<string> I2CDecoder::GetHeaders()
 	return ret;
 }
 
-Filter::DataLocation I2CDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

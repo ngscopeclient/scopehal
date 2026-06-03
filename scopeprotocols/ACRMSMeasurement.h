@@ -64,7 +64,6 @@ public:
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-	virtual DataLocation GetInputLocation() override;
 
 protected:
 	void DoRefreshSparse(SparseAnalogWaveform* wfm);

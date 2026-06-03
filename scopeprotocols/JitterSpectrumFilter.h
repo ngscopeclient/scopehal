@@ -44,7 +44,6 @@ public:
 	virtual ~JitterSpectrumFilter();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 

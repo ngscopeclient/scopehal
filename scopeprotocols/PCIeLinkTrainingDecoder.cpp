@@ -62,10 +62,10 @@ PCIeLinkTrainingDecoder::~PCIeLinkTrainingDecoder()
 
 bool PCIeLinkTrainingDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -91,12 +91,6 @@ vector<string> PCIeLinkTrainingDecoder::GetHeaders()
 bool PCIeLinkTrainingDecoder::GetShowDataColumn()
 {
 	return false;
-}
-
-Filter::DataLocation PCIeLinkTrainingDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

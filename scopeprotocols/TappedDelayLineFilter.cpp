@@ -86,7 +86,7 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 
 bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -101,12 +101,6 @@ bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string TappedDelayLineFilter::GetProtocolName()
 {
 	return "Tapped Delay Line";
-}
-
-Filter::DataLocation TappedDelayLineFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

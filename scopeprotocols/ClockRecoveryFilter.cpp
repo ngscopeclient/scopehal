@@ -862,9 +862,3 @@ void ClockRecoveryFilter::FillSquarewaveAVX2(SparseDigitalWaveform& cap)
 	}
 }
 #endif /* __x86_64__ */
-
-Filter::DataLocation ClockRecoveryFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}

@@ -85,12 +85,6 @@ string DPhySymbolDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-Filter::DataLocation DPhySymbolDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 void DPhySymbolDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)

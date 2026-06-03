@@ -139,12 +139,6 @@ float ConstellationFilter::GetOffset(size_t /*stream*/)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-Filter::DataLocation ConstellationFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 void ConstellationFilter::ClearSweeps()
 {
 	SetData(nullptr, 0);

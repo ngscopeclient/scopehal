@@ -56,7 +56,7 @@ string MilStd1553Decoder::GetProtocolName()
 
 bool MilStd1553Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG))
@@ -74,12 +74,6 @@ vector<string> MilStd1553Decoder::GetHeaders()
 	ret.push_back("Status");
 	ret.push_back("Len");
 	return ret;
-}
-
-Filter::DataLocation MilStd1553Decoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -47,7 +47,7 @@ class ImportFilter : public Filter
 public:
 	ImportFilter(const std::string& color, Unit xunit = Unit(Unit::UNIT_FS));
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	virtual void SetDefaultName() override;
 

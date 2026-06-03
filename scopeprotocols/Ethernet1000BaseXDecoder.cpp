@@ -68,12 +68,6 @@ bool Ethernet1000BaseXDecoder::ValidateChannel(size_t i, StreamDescriptor stream
 	return false;
 }
 
-Filter::DataLocation Ethernet1000BaseXDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

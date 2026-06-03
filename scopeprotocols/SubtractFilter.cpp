@@ -311,9 +311,3 @@ void SubtractFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 		cap->MarkModifiedFromCpu();
 	}
 }
-
-Filter::DataLocation SubtractFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}

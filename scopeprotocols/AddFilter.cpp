@@ -290,9 +290,3 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	}
 
 }
-
-Filter::DataLocation AddFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}

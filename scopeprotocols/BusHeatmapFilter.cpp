@@ -80,12 +80,6 @@ bool BusHeatmapFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
-Filter::DataLocation BusHeatmapFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

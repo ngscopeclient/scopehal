@@ -67,12 +67,6 @@ string PCIe128b130bDecoder::GetProtocolName()
 	return "128b/130b";
 }
 
-Filter::DataLocation PCIe128b130bDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

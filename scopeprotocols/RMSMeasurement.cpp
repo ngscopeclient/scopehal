@@ -70,12 +70,6 @@ string RMSMeasurement::GetProtocolName()
 	return "RMS";
 }
 
-Filter::DataLocation RMSMeasurement::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

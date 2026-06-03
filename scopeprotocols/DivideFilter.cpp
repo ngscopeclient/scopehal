@@ -55,7 +55,7 @@ DivideFilter::DivideFilter(const string& color)
 
 bool DivideFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i >= 2)
@@ -73,12 +73,6 @@ bool DivideFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string DivideFilter::GetProtocolName()
 {
 	return "Divide";
-}
-
-Filter::DataLocation DivideFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
