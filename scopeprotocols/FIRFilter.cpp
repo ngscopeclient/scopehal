@@ -230,58 +230,22 @@ void FIRFilter::DoFilterKernel(
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
-	if(g_gpuFilterEnabled)
-	{
-		cmdBuf.begin({});
+	cmdBuf.begin({});
 
-		FIRFilterArgs args;
-		args.end = din->size() - m_coefficients.size();
-		args.filterlen = m_coefficients.size();
+	FIRFilterArgs args;
+	args.end = din->size() - m_coefficients.size();
+	args.filterlen = m_coefficients.size();
 
-		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, m_coefficients, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
-		const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
-		m_computePipeline.Dispatch(cmdBuf, args,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, m_coefficients, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+	const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
+	m_computePipeline.Dispatch(cmdBuf, args,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
-		cap->m_samples.MarkModifiedFromGpu();
-	}
-
-	else
-	{
-		din->PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		DoFilterKernelGeneric(din, cap);
-
-		cap->MarkModifiedFromCpu();
-	}
-}
-
-/**
-	@brief Performs a FIR filter (does not assume symmetric)
- */
-void FIRFilter::DoFilterKernelGeneric(
-	UniformAnalogWaveform* din,
-	UniformAnalogWaveform* cap)
-{
-	//Setup
-	size_t len = din->size();
-	size_t filterlen = m_coefficients.size();
-	size_t end = len - filterlen;
-
-	//Do the filter
-	for(size_t i=0; i<end; i++)
-	{
-		float v = 0;
-		for(size_t j=0; j<filterlen; j++)
-			v += din->m_samples[i + j] * m_coefficients[j];
-
-		cap->m_samples[i]	= v;
-	}
+	cap->m_samples.MarkModifiedFromGpu();
 }

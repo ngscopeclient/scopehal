@@ -1152,9 +1152,6 @@ bool VulkanInit(bool skipGLFW)
 
 	LogDebug("\n");
 
-	//If we get here, everything is good
-	g_gpuFilterEnabled = true;
-
 	//Initialize the glsl compiler since vkFFT does JIT generation of kernels
 	if(1 != glslang_initialize_process())
 		LogError("Failed to initialize glslang compiler\n");

@@ -201,13 +201,6 @@ atomic<int64_t> AcceleratorBufferPerformanceCounters::m_deviceDeviceCopiesSkippe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
-	@brief True if filters can use GPU acceleration
-
-	Will be deprecated soon since Vulkan is now a mandatory core part of the application
- */
-bool g_gpuFilterEnabled = false;
-
 vector<string> g_searchPaths;
 
 void VulkanCleanup();

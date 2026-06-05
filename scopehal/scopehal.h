@@ -94,7 +94,6 @@ extern bool g_hasAvx2;
 #endif
 
 //Enable flags for various Vulkan features
-extern bool g_gpuFilterEnabled;
 extern bool g_hasShaderFloat64;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderAtomicInt64;

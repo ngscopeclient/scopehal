@@ -78,10 +78,6 @@ protected:
 	void CalculateFilterCoefficients(float fa, float fb, float stopbandAtten, FIRFilterType type)
 	{ CalculateFIRCoefficients(fa, fb, stopbandAtten, type, m_coefficients); }
 
-	void DoFilterKernelGeneric(
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap);
-
 	FilterParameter& m_filterType;
 	FilterParameter& m_filterLength;
 	FilterParameter& m_stopbandAtten;
