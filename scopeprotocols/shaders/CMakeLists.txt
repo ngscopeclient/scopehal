@@ -73,6 +73,7 @@ add_compute_shaders(
 		FIRFilter.glsl
 		FrequencyMeasurement.glsl
 		InvertFilter.glsl
+		InvertFilterDigital.glsl
 		IQDemuxFilter.glsl
 		IQDemuxFilterAlignment.glsl
 		Magnitude.glsl

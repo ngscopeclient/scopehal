@@ -27,31 +27,34 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of InvertFilter
- */
-#ifndef InvertFilter_h
-#define InvertFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class InvertFilter : public Filter
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-public:
-	InvertFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName() override;
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
-	PROTOCOL_DECODER_INITPROC(InvertFilter)
-
-protected:
-	ComputePipeline m_computePipeline;
-	ComputePipeline m_digitalComputePipeline;
+	uint din[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_dout
+{
+	uint dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//Bounds check
+	//Input is guaranteed to be padded up to multiple of 4 bytes so safe to read/write the padding
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i*4 >= size)
+		return;
+
+	//SIMD flip of the low bit in each byte lane
+	dout[i] = din[i] ^ 0x01010101;
+}
