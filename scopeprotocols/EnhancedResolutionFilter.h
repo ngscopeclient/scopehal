@@ -64,8 +64,8 @@ protected:
 		BITS_3P0
 	};
 
-	std::string m_cutoffFreqName;
-	std::string m_bitsName;
+	FilterParameter& m_cutoffFreq;
+	FilterParameter& m_bits;
 
 	void UpdateCutoff();
 };

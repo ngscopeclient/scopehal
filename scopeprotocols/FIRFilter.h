@@ -59,16 +59,19 @@ public:
 		UniformAnalogWaveform* cap);
 
 	FIRFilterType GetFilterType()
-	{ return static_cast<FIRFilterType>(m_parameters[m_filterTypeName].GetIntVal()); }
+	{ return m_filterType.GetEnumVal<FIRFilterType>(); }
 
 	void SetFilterType(FIRFilterType type)
-	{ m_parameters[m_filterTypeName].SetIntVal(type); }
+	{ m_filterType.SetIntVal(type); }
 
 	void SetFreqLow(float freq)
-	{ m_parameters[m_freqLowName].SetFloatVal(freq); }
+	{ m_freqLow.SetFloatVal(freq); }
 
 	void SetFreqHigh(float freq)
-	{ m_parameters[m_freqHighName].SetFloatVal(freq); }
+	{ m_freqHigh.SetFloatVal(freq); }
+
+	AcceleratorBuffer<float>& GetCoefficients()
+	{ return m_coefficients; }
 
 protected:
 
@@ -79,11 +82,11 @@ protected:
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
 
-	std::string m_filterTypeName;
-	std::string m_filterLengthName;
-	std::string m_stopbandAttenName;
-	std::string m_freqLowName;
-	std::string m_freqHighName;
+	FilterParameter& m_filterType;
+	FilterParameter& m_filterLength;
+	FilterParameter& m_stopbandAtten;
+	FilterParameter& m_freqLow;
+	FilterParameter& m_freqHigh;
 
 	ComputePipeline m_computePipeline;
 

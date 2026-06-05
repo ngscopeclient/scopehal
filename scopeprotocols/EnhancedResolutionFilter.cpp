@@ -37,31 +37,31 @@ using namespace std;
 
 EnhancedResolutionFilter::EnhancedResolutionFilter(const string& color)
 	: FIRFilter(color)
-	, m_cutoffFreqName("Cutoff Frequency")
-	, m_bitsName("Bits")
+	, m_cutoffFreq(m_parameters["Cutoff Frequency"])
+	, m_bits(m_parameters["Bits"])
 {
-	m_parameters[m_filterTypeName].MarkHidden();
-	m_parameters[m_filterLengthName].MarkHidden();
-	m_parameters[m_stopbandAttenName].MarkHidden();
-	m_parameters[m_freqLowName].MarkHidden();
-	m_parameters[m_freqHighName].MarkHidden();
+	m_filterType.MarkHidden();
+	m_filterLength.MarkHidden();
+	m_stopbandAtten.MarkHidden();
+	m_freqLow.MarkHidden();
+	m_freqHigh.MarkHidden();
 
-	m_parameters[m_bitsName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_bitsName].AddEnumValue("0.5", BITS_0P5);
-	m_parameters[m_bitsName].AddEnumValue("1.0", BITS_1P0);
-	m_parameters[m_bitsName].AddEnumValue("1.5", BITS_1P5);
-	m_parameters[m_bitsName].AddEnumValue("2.0", BITS_2P0);
-	m_parameters[m_bitsName].AddEnumValue("2.5", BITS_2P5);
-	m_parameters[m_bitsName].AddEnumValue("3.0", BITS_3P0);
-	m_parameters[m_bitsName].SetIntVal(BITS_0P5);
-	m_parameters[m_bitsName].signal_changed().connect(sigc::mem_fun(*this, &EnhancedResolutionFilter::OnBitsChanged));
+	m_bits = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_bits.AddEnumValue("0.5", BITS_0P5);
+	m_bits.AddEnumValue("1.0", BITS_1P0);
+	m_bits.AddEnumValue("1.5", BITS_1P5);
+	m_bits.AddEnumValue("2.0", BITS_2P0);
+	m_bits.AddEnumValue("2.5", BITS_2P5);
+	m_bits.AddEnumValue("3.0", BITS_3P0);
+	m_bits.SetIntVal(BITS_0P5);
+	m_bits.signal_changed().connect(sigc::mem_fun(*this, &EnhancedResolutionFilter::OnBitsChanged));
 
-	m_parameters[m_cutoffFreqName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_cutoffFreqName].SetFloatVal(0);
+	m_cutoffFreq = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_cutoffFreq.SetFloatVal(0);
 
-	m_parameters[m_cutoffFreqName].MarkReadOnly();
+	m_cutoffFreq.MarkReadOnly();
 
-	m_parameters[m_filterTypeName].SetIntVal(FILTER_TYPE_LOWPASS);
+	m_filterType.SetIntVal(FILTER_TYPE_LOWPASS);
 
 	OnBitsChanged();
 }
@@ -80,7 +80,7 @@ void EnhancedResolutionFilter::SetDefaultName()
 {
 	string name = string("Eres(") + GetInputDisplayName(0) + ", ";
 
-	switch(m_parameters[m_bitsName].GetIntVal())
+	switch(m_bits.GetEnumVal<ExtraBits>())
 	{
 		case BITS_0P5:
 			name += "0.5";
@@ -140,7 +140,7 @@ void EnhancedResolutionFilter::UpdateCutoff()
 	//Cutoff frequency depends on bit resolution
 	//Each extra half bit of resolution divides the cutoff frequency by 2
 	float freq = 0;
-	switch(m_parameters[m_bitsName].GetIntVal())
+	switch(m_bits.GetEnumVal<ExtraBits>())
 	{
 		case BITS_0P5:
 			freq = nyquist / 2;
@@ -167,6 +167,6 @@ void EnhancedResolutionFilter::UpdateCutoff()
 			break;
 	}
 
-	m_parameters[m_cutoffFreqName].SetFloatVal(freq);
-	m_parameters[m_freqHighName].SetFloatVal(freq);
+	m_cutoffFreq.SetFloatVal(freq);
+	m_freqHigh.SetFloatVal(freq);
 }
