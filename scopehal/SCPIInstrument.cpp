@@ -84,11 +84,10 @@ string SCPIInstrument::GetSerial() const
 	return m_serial;
 }
 
-void SCPIInstrument::DoAddDriverClass(string name, GetTransportsProcType proc)
+void SCPIInstrument::DoAddDriverClass(const string& name, GetTransportsProcType proc)
 {
 	m_getTransportProcs[name] = proc;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
@@ -103,7 +102,7 @@ void SCPIInstrument::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Static functions
 
-std::vector<SCPIInstrumentModel> SCPIInstrument::GetSupportedModels(std::string driver)
+std::vector<SCPIInstrumentModel> SCPIInstrument::GetSupportedModels(const string& driver)
 {
 	if(m_getTransportProcs.find(driver) != m_getTransportProcs.end())
 		return m_getTransportProcs[driver]();

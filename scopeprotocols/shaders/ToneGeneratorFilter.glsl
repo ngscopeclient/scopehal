@@ -37,7 +37,7 @@ layout(std430, binding=0) restrict writeonly buffer buf_dout
 
 layout(std430, push_constant) uniform constants
 {
-	double radians_per_sample;
+	uint fpfreq;
 	uint depth;
 	float bias;
 	float scale;
@@ -52,7 +52,13 @@ void main()
 	if(i >= depth)
 		return;
 
-	double theta = i * radians_per_sample + startphase;
-	theta = mod(theta, 6.28318530717);
-	dout[i] = bias + (scale * sin(float(theta)));
+	//Get the fractional phase using integer math with implicit mod 2^32 to handle wrapping
+	uint fpfrac = i * fpfreq;
+	const float fix_to_float = 1.0 / 4294967295.0;
+	float frac = float(fpfrac) * fix_to_float;
+
+	//Now that we have the fractional phase,
+	//computing the sine can be done in the float32 domain without loss of precision
+	float two_pi = 6.28318530717;
+	dout[i] = bias + (scale * sin(frac*two_pi + startphase));
 }

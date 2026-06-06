@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,11 +42,11 @@ using namespace std;
 
 SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 	: SParameterFilter(color, CAT_RF)
-	, m_knownSide("Known Side")
+	, m_knownSide(m_parameters["Known Side"])
 {
 	//Set up output ports
-	m_parameters[m_portCountName].MarkHidden();
-	m_parameters[m_portCountName].SetIntVal(2);
+	m_portCount.MarkHidden();
+	m_portCount.SetIntVal(2);
 	SetupStreams();
 
 	//Create our input ports
@@ -72,10 +72,10 @@ SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 		}
 	}
 
-	m_parameters[m_knownSide] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_knownSide].AddEnumValue("Left (Port 1)", SIDE_LEFT);
-	m_parameters[m_knownSide].AddEnumValue("Right (Port 2)", SIDE_RIGHT);
-	m_parameters[m_knownSide].SetIntVal(SIDE_LEFT);
+	m_knownSide = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_knownSide.AddEnumValue("Left (Port 1)", SIDE_LEFT);
+	m_knownSide.AddEnumValue("Right (Port 2)", SIDE_RIGHT);
+	m_knownSide.SetIntVal(SIDE_LEFT);
 }
 
 SParameterDeEmbedFilter::~SParameterDeEmbedFilter()
@@ -101,7 +101,7 @@ void SParameterDeEmbedFilter::RefreshPorts()
 bool SParameterDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	//All inputs are required
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//Validate port count
@@ -129,13 +129,20 @@ bool SParameterDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	return true;
 }
 
-
-void SParameterDeEmbedFilter::Refresh()
+void SParameterDeEmbedFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SParameterDeEmbedFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -169,7 +176,7 @@ void SParameterDeEmbedFilter::Refresh()
 	s22o.resize(npoints);
 
 	//Figure out which network is known
-	bool knownIsA = (m_parameters[m_knownSide].GetIntVal() == SIDE_LEFT);
+	bool knownIsA = (m_knownSide.GetEnumVal<Side>() == SIDE_LEFT);
 
 	//Do the actual de-embed
 	for(size_t i=0; i<npoints;i++)

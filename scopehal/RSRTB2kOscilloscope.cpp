@@ -74,8 +74,6 @@ RSRTB2kOscilloscope::RSRTB2kOscilloscope(SCPITransport* transport)
 	, m_hasCanTrigger(false)
 	, m_hasLinTrigger(false)
 	, m_maxBandwidth(70)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
@@ -139,7 +137,7 @@ bool RSRTB2kOscilloscope::sendWithAck(const char* fmt, ...)
     std::string result(opString);
     result += ";*OPC?";
 
-	ret = m_transport->SendCommandQueuedWithReply(result.c_str(), false);
+	ret = m_transport->SendCommandQueuedWithReply(result, false);
 	//~ LogDebug("RTB2k: sendWithAck() -> %s >%s<\n", result.c_str(), ret.c_str());
 	return (ret == "1");
 }
@@ -1295,7 +1293,7 @@ void RSRTB2kOscilloscope::PushCondition(const string& path, Trigger::Condition c
 	}
 }
 
-void RSRTB2kOscilloscope::PushFloat(string path, float f)
+void RSRTB2kOscilloscope::PushFloat(const string& path, float f)
 {
 	sendOnly("%s %1.5E", path.c_str(), f);
 }
@@ -1519,7 +1517,7 @@ void RSRTB2kOscilloscope::PullEdgeTrigger()
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void RSRTB2kOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string /* trigType */)
+void RSRTB2kOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string& /* trigType */)
 {
 	//LogTrace("\n");
 	switch(trig->GetType())

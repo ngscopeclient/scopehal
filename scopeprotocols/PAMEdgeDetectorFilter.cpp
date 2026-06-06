@@ -39,6 +39,10 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
 	, m_order(m_parameters["PAM Order"])
 	, m_baud(m_parameters["Symbol rate"])
+	, m_edgeIndexes("PAMEdgeDetectorFilter.m_edgeIndexes")
+	, m_edgeCount("PAMEdgeDetectorFilter.m_edgeCount")
+	, m_edgeIndexesScratch("PAMEdgeDetectorFilter.m_edgeIndexesScratch")
+	, m_edgeStatesScratch("PAMEdgeDetectorFilter.m_edgeStatesScratch")
 {
 	AddDigitalStream("data");
 
@@ -56,7 +60,6 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 
 		m_edgeIndexesScratch.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 		m_edgeStatesScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
-		m_edgeRisingScratch.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
 
 		//Use pinned memory for output buffers to avoid separate copy operations
 		m_edgeCount.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_UNLIKELY);
@@ -99,12 +102,6 @@ bool PAMEdgeDetectorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string PAMEdgeDetectorFilter::GetProtocolName()
 {
 	return "PAM Edge Detector";
-}
-
-Filter::DataLocation PAMEdgeDetectorFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,10 +173,12 @@ void PAMEdgeDetectorFilter::Refresh(
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
+	cap->Rename("PAMEdgeDetectorFilter.data");
 
 	//Grab temporary buffers we're going to use
 	ScratchBuffer_uint8_t edgeStates(ScratchBufferManager::U8_GPU_WAVEFORM);
 	ScratchBuffer_uint8_t edgeRising(ScratchBufferManager::U8_GPU_WAVEFORM);
+	ScratchBuffer_uint8_t edgeRisingScratch(ScratchBufferManager::U8_GPU_WAVEFORM);
 
 	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
@@ -200,7 +199,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		//Allocate output space
 		m_edgeIndexesScratch.resize(len);
 		m_edgeStatesScratch.resize(len);
-		m_edgeRisingScratch.resize(len);
+		edgeRisingScratch->resize(len);
 
 		m_edgeIndexes.resize(len);
 		edgeStates->resize(len);
@@ -224,18 +223,18 @@ void PAMEdgeDetectorFilter::Refresh(
 		m_firstPassComputePipeline->BindBufferNonblocking(1, m_thresholds, cmdBuf);
 		m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
 		m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
-		m_firstPassComputePipeline->BindBufferNonblocking(4, m_edgeRisingScratch, cmdBuf, true);
+		m_firstPassComputePipeline->BindBufferNonblocking(4, *edgeRisingScratch, cmdBuf, true);
 		m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 		m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 		m_edgeIndexesScratch.MarkModifiedFromGpu();
 		m_edgeStatesScratch.MarkModifiedFromGpu();
-		m_edgeRisingScratch.MarkModifiedFromGpu();
+		edgeRisingScratch->MarkModifiedFromGpu();
 
 		//Run the second pass
 		m_secondPassComputePipeline->BindBufferNonblocking(0, m_edgeIndexesScratch, cmdBuf);
 		m_secondPassComputePipeline->BindBufferNonblocking(1, m_edgeStatesScratch, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(2, m_edgeRisingScratch, cmdBuf);
+		m_secondPassComputePipeline->BindBufferNonblocking(2, *edgeRisingScratch, cmdBuf);
 		m_secondPassComputePipeline->BindBufferNonblocking(3, m_edgeIndexes, cmdBuf, true);
 		m_secondPassComputePipeline->BindBufferNonblocking(4, *edgeStates, cmdBuf, true);
 		m_secondPassComputePipeline->BindBufferNonblocking(5, *edgeRising, cmdBuf, true);
@@ -573,8 +572,7 @@ void PAMEdgeDetectorFilter::AutoLevel(UniformAnalogWaveform* din)
 	for(size_t i=0; i<levels.size(); i++)
 	{
 		auto pname = string("Level ") + to_string(i);
-		if(m_parameters.find(pname) == m_parameters.end())
-			m_parameters[pname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+		m_parameters.try_emplace(pname, FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS)));
 		m_parameters[pname].SetFloatVal(levels[i]);
 
 		LogTrace("Final level %zu = %f\n", i, levels[i]);

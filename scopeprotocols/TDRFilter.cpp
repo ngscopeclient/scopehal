@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,29 +37,34 @@ using namespace std;
 
 TDRFilter::TDRFilter(const string& color)
 	: Filter(color, CAT_ANALYSIS)
+	, m_mode(m_parameters["Output Format"])
+	, m_portImpedance(m_parameters["Port impedance"])
+	, m_stepStartVoltage(m_parameters["Step start"])
+	, m_stepEndVoltage(m_parameters["Step end"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("voltage");
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
+	m_mode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_mode.AddEnumValue("Reflection coefficient", MODE_RHO);
+	m_mode.AddEnumValue("Impedance", MODE_IMPEDANCE);
+	m_mode.SetIntVal(MODE_IMPEDANCE);
 
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
+	m_portImpedance = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
+	m_portImpedance.SetFloatVal(50);
 
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
+	m_stepStartVoltage = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_stepStartVoltage.SetFloatVal(0);
 
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
+	m_stepEndVoltage = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_stepEndVoltage.SetFloatVal(1);
 
 	m_oldMode = MODE_IMPEDANCE;
+}
+
+TDRFilter::~TDRFilter()
+{
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +72,7 @@ TDRFilter::TDRFilter(const string& color)
 
 bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -87,7 +92,7 @@ string TDRFilter::GetProtocolName()
 void TDRFilter::SetDefaultName()
 {
 	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
+	if(m_mode.GetEnumVal<OutputMode>() == MODE_IMPEDANCE)
 		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
 	else
 		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
@@ -99,23 +104,31 @@ void TDRFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void TDRFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TDRFilter::Refresh");
+	#endif
+	ClearErrors();
+
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	auto len = din->size();
 
 	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
+	auto mode = m_mode.GetEnumVal<OutputMode>();
+	auto z0 = m_portImpedance.GetFloatVal();
+	auto vlo = m_stepStartVoltage.GetFloatVal();
+	auto vhi = m_stepEndVoltage.GetFloatVal();
 	auto pulseAmplitude = (vhi - vlo);
 
 	//Set up units

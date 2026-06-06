@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,8 +56,6 @@ using namespace std;
 AseqSpectrometer::AseqSpectrometer(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 	//Create the output channel
 	auto chan = new AseqSpectrometerChannel(
@@ -269,7 +267,7 @@ bool AseqSpectrometer::AcquireData()
 	float* buf = new float[npoints];
 
 	//Pull the data from the server
-	if(!m_transport->ReadRawData(npoints * sizeof(float), (uint8_t*)buf))
+	if(!m_transport->ReadRawData(npoints * sizeof(float), reinterpret_cast<uint8_t*>(buf)))
 		return false;
 
 	//Flip the samples around so the lowest wavelength is at the left, then display as a sparse waveform

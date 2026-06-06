@@ -1,9 +1,8 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,8 +75,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_dmmMode(Multimeter::DC_VOLTAGE)
 	, m_digitalChannelBase(0)
 	, m_digitalChannelCount(0)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_maxBandwidth(1000)
 	, m_hasDVM(false)
 	, m_hasAFG(false)
@@ -244,7 +241,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		//MSO5 does not appear to have an external trigger input
 		//except in low-profile rackmount models (not yet supported)
 		case FAMILY_MSO5:
-			m_extTrigChannel = NULL;
+			m_extTrigChannel = nullptr;
 			break;
 
 		//MSO6 calls it AUX, not EXT
@@ -277,13 +274,14 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	reply = reply.substr(1, reply.size() - 2); // Chop off quotes
 	vector<string> apps;
 	stringstream s_stream(reply);
-	while(s_stream.good()) {
+	while(s_stream.good())
+	{
 		string substr;
 		getline(s_stream, substr, ',');
 		apps.push_back(substr);
 	}
 
-	for (auto app : apps)
+	for (auto& app : apps)
 	{
 		if (app == "DVM")
 		{
@@ -315,34 +313,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	//Figure out what probes we have connected
 	DetectProbes();
 
-	//Create Vulkan objects for peak detection
-	m_queue = g_vkQueueManager->GetComputeQueue("TektronixOscilloscope.queue");
-	vk::CommandPoolCreateInfo poolInfo(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		m_queue->m_family );
-	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-
-	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
-	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
-		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-
-	if(g_hasDebugUtils)
-	{
-		string poolname = "TektronixOscilloscope.pool";
-		string bufname = "TektronixOscilloscope.cmdbuf";
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandPool,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
-				poolname.c_str()));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
-				bufname.c_str()));
-	}
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("TektronixOscilloscope");
 }
 
 TektronixOscilloscope::~TektronixOscilloscope()
@@ -1269,7 +1241,7 @@ string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
-	if(chan == m_extTrigChannel)
+	if((m_extTrigChannel != nullptr) && (chan == m_extTrigChannel) )
 		return m_extTrigChannel->GetHwname();
 
 	//Spectrum channels don't have separate names from the time domain ones.
@@ -2747,7 +2719,7 @@ float TektronixOscilloscope::ReadTriggerLevelMSO56(OscilloscopeChannel* chan)
 
 	size_t off = reply.find(";");
 	if(off != string::npos)
-		reply = reply.substr(0, off);
+		reply.resize(off);
 
 	return stof(reply);
 }

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,7 +30,9 @@
 /**
 	@file
 	@author Frederic BORRY
-	@brief Helper class for command line drivers: provides helper methods for command line based communication with devices like NanoVNA or TinySA
+	@brief Helper class for command line drivers
+
+	Provides helper methods for command line based communication with devices like NanoVNA or TinySA
 
 	@ingroup core
  */
@@ -42,7 +44,10 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-CommandLineDriver::CommandLineDriver(SCPITransport* transport) : SCPIDevice(transport, false)
+CommandLineDriver::CommandLineDriver(SCPITransport* transport)
+	: SCPIDevice(transport, false)
+	, m_maxResponseSize(0)
+	, m_communicationTimeout(0)
 {
 }
 
@@ -50,7 +55,12 @@ CommandLineDriver::~CommandLineDriver()
 {
 }
 
-size_t CommandLineDriver::ConverseMultiple(const std::string commandString, std::vector<string> &readLines, bool hasEcho, std::function<void(float)> progress, size_t expecedLines)
+size_t CommandLineDriver::ConverseMultiple(
+	const string& commandString,
+	std::vector<string> &readLines,
+	bool hasEcho,
+	function<void(float)> progress,
+	size_t expecedLines)
 {
 	stringstream ss(ConverseString(commandString,progress,expecedLines));
 	string curLine;
@@ -78,7 +88,7 @@ size_t CommandLineDriver::ConverseMultiple(const std::string commandString, std:
 	return size;
 }
 
-std::string CommandLineDriver::ConverseSingle(const std::string commandString, bool hasEcho)
+string CommandLineDriver::ConverseSingle(const std::string& commandString, bool hasEcho)
 {
 	stringstream ss(ConverseString(commandString));
 	string result;
@@ -98,7 +108,10 @@ std::string CommandLineDriver::ConverseSingle(const std::string commandString, b
 	return result;
 }
 
-std::string CommandLineDriver::ConverseString(const std::string commandString, std::function<void(float)> progress, size_t expecedLines)
+string CommandLineDriver::ConverseString(
+	const string& commandString,
+	function<void(float)> progress,
+	size_t expecedLines)
 {
 	string result = "";
 	// Lock guard
@@ -111,7 +124,7 @@ std::string CommandLineDriver::ConverseString(const std::string commandString, s
 	size_t linesRead = 0;
 	double start = GetTime();
 	while(true)
-	{	
+	{
 		// Consume response until we find the end delimiter
 		if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
 		{
@@ -178,13 +191,13 @@ bool CommandLineDriver::ConverseSweep(int64_t &sweepStart, int64_t &sweepStop,[[
 	return setValue && ((origStartValue != sweepStart) || (origStopValue != sweepStop));
 }
 
-std::string CommandLineDriver::DrainTransport()
+string CommandLineDriver::DrainTransport()
 {
 	string result;
 	char tmp = ' ';
 	size_t bytesRead = 0;
 	while(true)
-	{	
+	{
 		// Consume response until we find the end delimiter
 		if(!m_transport->ReadRawData(1,(unsigned char*)&tmp))
 		{

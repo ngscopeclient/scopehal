@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,7 +45,7 @@ class TappedDelayLineFilter : public Filter
 public:
 	TappedDelayLineFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -75,15 +75,15 @@ protected:
 		UniformAnalogWaveform* cap);
 #endif
 
-	std::string m_tapDelayName;
-	std::string m_tap0Name;
-	std::string m_tap1Name;
-	std::string m_tap2Name;
-	std::string m_tap3Name;
-	std::string m_tap4Name;
-	std::string m_tap5Name;
-	std::string m_tap6Name;
-	std::string m_tap7Name;
+	FilterParameter& m_tapDelay;
+	FilterParameter& m_tap0;
+	FilterParameter& m_tap1;
+	FilterParameter& m_tap2;
+	FilterParameter& m_tap3;
+	FilterParameter& m_tap4;
+	FilterParameter& m_tap5;
+	FilterParameter& m_tap6;
+	FilterParameter& m_tap7;
 };
 
 #endif

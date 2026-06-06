@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,7 +45,7 @@ public:
 	QSGMIIDecoder(const std::string& color);
 	virtual ~QSGMIIDecoder();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -54,7 +54,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(QSGMIIDecoder)
 
 protected:
-	std::string m_displayformat;
+	FilterParameter& m_displayformat;
 };
 
 #endif

@@ -230,7 +230,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 	std::shared_ptr<QueueHandle> queue(g_vkQueueManager->GetComputeQueue("FilterGraphExecutor[" + to_string(i) + "].queue"));
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		queue->m_family );
+		queue->GetQueue()->m_family );
 	vk::raii::CommandPool pool(*g_vkComputeDevice, poolInfo);
 
 	vk::CommandBufferAllocateInfo bufinfo(*pool, vk::CommandBufferLevel::ePrimary, 1);
@@ -279,25 +279,6 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		while( (f = GetNextRunnableNode()) != nullptr)
 		{
 			shared_lock<shared_mutex> lock(g_vulkanActivityMutex);
-
-			//Make sure the filter's inputs are where we need them
-			auto loc = f->GetInputLocation();
-			if(loc != Filter::LOC_DONTCARE)
-			{
-				bool expectGpuInput = (loc == Filter::LOC_GPU);
-				bool expectCpuInput = (loc == Filter::LOC_CPU);
-				for(size_t j=0; j<f->GetInputCount(); j++)
-				{
-					auto data = f->GetInput(j).GetData();
-					if(data)
-					{
-						if(expectGpuInput)
-							data->PrepareForGpuAccess();
-						else if(expectCpuInput)
-							data->PrepareForCpuAccess();
-					}
-				}
-			}
 
 			//Actually execute the filter
 			double start = GetTime();

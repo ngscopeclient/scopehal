@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,10 +53,10 @@ VICPDecoder::~VICPDecoder()
 
 bool VICPDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i < 2) && (dynamic_cast<TCPWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i < 2) && (dynamic_cast<TCPWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -89,14 +89,22 @@ bool VICPDecoder::GetShowDataColumn()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void VICPDecoder::Refresh()
+void VICPDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("VICPDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
 	auto tx = dynamic_cast<TCPWaveform*>(GetInputWaveform(0));
 	auto rx = dynamic_cast<TCPWaveform*>(GetInputWaveform(1));
 	if( (tx == nullptr) || (rx == nullptr) )
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -104,13 +112,10 @@ void VICPDecoder::Refresh()
 	rx->PrepareForCpuAccess();
 
 	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
-	auto cap = new VICPWaveform;
+	auto cap = SetupEmptyWaveform<VICPWaveform>(tx, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = tx->m_startTimestamp;
-	cap->m_startFemtoseconds = tx->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	size_t txlen = tx->m_samples.size();
 	size_t rxlen = rx->m_samples.size();
@@ -162,7 +167,7 @@ void VICPDecoder::Refresh()
 			//Try continuing an existing TCP segment as a new frame.
 			if(continuing && (sym.m_type != TCPSymbol::TYPE_DATA) )
 			{
-				continuing = false;
+				//continuing = false;
 				break;
 			}
 
@@ -478,7 +483,7 @@ void VICPDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-std::string VICPWaveform::GetColor(size_t i)
+string VICPWaveform::GetColor(size_t i)
 {
 	const VICPSymbol& s = m_samples[i];
 
@@ -545,11 +550,11 @@ string VICPWaveform::GetText(size_t i)
 
 
 		case VICPSymbol::TYPE_VERSION:
-			snprintf(tmp, sizeof(tmp), "Version %d", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Version %u", s.m_data);
 			return string(tmp);
 
 		case VICPSymbol::TYPE_SEQ:
-			snprintf(tmp, sizeof(tmp), "Seq %d", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Seq %u", s.m_data);
 			return string(tmp);
 
 		case VICPSymbol::TYPE_RESERVED:
@@ -559,7 +564,7 @@ string VICPWaveform::GetText(size_t i)
 				return "ERROR";
 
 		case VICPSymbol::TYPE_LENGTH:
-			snprintf(tmp, sizeof(tmp), "Len %d", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Len %u", s.m_data);
 			return string(tmp);
 
 		case VICPSymbol::TYPE_DATA:
@@ -579,5 +584,5 @@ bool VICPDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)
 
 Packet* VICPDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
 {
-	return NULL;
+	return nullptr;
 }

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,8 +39,9 @@ class TDRFilter : public Filter
 {
 public:
 	TDRFilter(const std::string& color);
+	virtual ~TDRFilter();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName() override;
@@ -58,10 +59,10 @@ protected:
 
 	OutputMode m_oldMode;
 
-	std::string m_modeName;
-	std::string m_portImpedanceName;
-	std::string m_stepStartVoltageName;
-	std::string m_stepEndVoltageName;
+	FilterParameter& m_mode;
+	FilterParameter& m_portImpedance;
+	FilterParameter& m_stepStartVoltage;
+	FilterParameter& m_stepEndVoltage;
 };
 
 #endif

@@ -90,15 +90,19 @@ void main()
 	//Find starting sample index
 	uint writebase = 0;
 	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
-		writebase += idxIn[i];
+		writebase += min(idxIn[i], outputPerThread);
 
 	//Find number of samples to copy
 	uint numSamples = idxIn[gl_GlobalInvocationID.x];
 
+	//Clamp invalid size values from previous shader (should never happen but just to be safe)
+	if(numSamples >= outputPerThread)
+		numSamples = outputPerThread;
+
 	//Actually do the copy
 	for(uint i=0; i<numSamples; i++)
 	{
-		uint readbase = (i + 1) * outputPerThread + gl_GlobalInvocationID.x;
+		uint readbase = (i + 1) * numThreads + gl_GlobalInvocationID.x;
 
 		idxOut[writebase + i] = idxIn[readbase];
 		statesOut[writebase + i] = statesIn[readbase];

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,14 +50,14 @@ PeakDetector::~PeakDetector()
 
 PeakDetectionFilter::PeakDetectionFilter(const string& color, Category cat)
 	: Filter(color, cat, Unit(Unit::UNIT_HZ))
-	, m_numpeaksname("Number of Peaks")
-	, m_peakwindowname("Peak Window")
+	, m_numpeaks(m_parameters["Number of Peaks"])
+	, m_peakwindow(m_parameters["Peak Window"])
 {
-	m_parameters[m_numpeaksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_numpeaksname].SetIntVal(10);
+	m_numpeaks = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_numpeaks.SetIntVal(10);
 
-	m_parameters[m_peakwindowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_peakwindowname].SetFloatVal(500000); //500 kHz between peaks
+	m_peakwindow = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_peakwindow.SetFloatVal(500000); //500 kHz between peaks
 }
 
 PeakDetectionFilter::~PeakDetectionFilter()

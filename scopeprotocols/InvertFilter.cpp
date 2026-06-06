@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,6 +38,7 @@ using namespace std;
 InvertFilter::InvertFilter(const string& color)
 	: Filter(color, CAT_MATH)
 	, m_computePipeline("shaders/InvertFilter.spv", 2, sizeof(uint32_t))
+	, m_digitalComputePipeline("shaders/InvertFilterDigital.spv", 2, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
@@ -52,6 +53,8 @@ bool InvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -73,12 +76,6 @@ void InvertFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-Filter::DataLocation InvertFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -87,6 +84,7 @@ void InvertFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHand
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("InvertFilter::Refresh");
 	#endif
+	ClearErrors();
 
 	//Make sure we've got valid inputs
 	auto din = GetInputWaveform(0);
@@ -104,42 +102,97 @@ void InvertFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHand
 	size_t len = din->size();
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
 
 	//Early out if no data (this is a legal no-op)
 	if(len == 0)
 	{
+		//no AddErrorMessage this is officially supported
 		SetData(nullptr, 0);
 		return;
 	}
 
-	cmdBuf.begin({});
-
-	//Sparse path
-	//TODO: copy offsets GPU side
-	if(sdin)
+	//Analog path
+	if(udin || sdin)
 	{
-		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
-		cap->Resize(len);
-		m_computePipeline.BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-		cap->m_samples.MarkModifiedFromGpu();
+		cmdBuf.begin({});
+
+		//Sparse path
+		//TODO: copy offsets GPU side
+		if(sdin)
+		{
+			auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
+			cap->Resize(len);
+			m_computePipeline.BindBufferNonblocking(0, sdin->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+			cap->m_samples.MarkModifiedFromGpu();
+		}
+
+		//Uniform path
+		else if(udin)
+		{
+			auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
+			cap->Resize(len);
+			m_computePipeline.BindBufferNonblocking(0, udin->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+			cap->m_samples.MarkModifiedFromGpu();
+		}
+
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
 	}
 
-	//Uniform path
-	else if(udin)
+	//Digital path
+	else if(uddin || sddin)
 	{
-		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
-		cap->Resize(len);
-		m_computePipeline.BindBufferNonblocking(0, udin->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
-		cap->m_samples.MarkModifiedFromGpu();
+		cmdBuf.begin({});
+
+		//Sparse path
+		//TODO: copy offsets GPU side
+		if(sddin)
+		{
+			auto cap = SetupSparseDigitalOutputWaveform(sddin, 0, 0, 0);
+			cap->Resize(len);
+			m_digitalComputePipeline.BindBufferNonblocking(0, sddin->m_samples, cmdBuf);
+			m_digitalComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+			cap->m_samples.MarkModifiedFromGpu();
+		}
+
+		//Uniform path
+		else if(uddin)
+		{
+			auto cap = SetupEmptyUniformDigitalOutputWaveform(uddin, 0);
+			cap->Resize(len);
+			m_digitalComputePipeline.BindBufferNonblocking(0, uddin->m_samples, cmdBuf);
+			m_digitalComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+			cap->m_samples.MarkModifiedFromGpu();
+		}
+
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64 * 4);	//4 samples per thread
+		m_digitalComputePipeline.Dispatch(cmdBuf, (uint32_t)len,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL;
 	}
 
-	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-	m_computePipeline.Dispatch(cmdBuf, (uint32_t)len,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
+	//Makes no sense whatever it is
+	else
+	{
+		AddErrorMessage("Invalid input", "Expected analog or digital waveform input");
 
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
+		SetData(nullptr, 0);
+		return;
+	}
 }

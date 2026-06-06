@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,18 +52,20 @@ SCPISpectrometer::~SCPISpectrometer()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPISpectrometer::DoAddDriverClass(string name, SpectrometerCreateProcType proc)
+void SCPISpectrometer::DoAddDriverClass(const string& name, SpectrometerCreateProcType proc)
 {
 	m_spectrometercreateprocs[name] = proc;
 }
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::EnumDrivers(vector<string>& names)
 {
 	for(auto it=m_spectrometercreateprocs.begin(); it != m_spectrometercreateprocs.end(); ++it)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPISpectrometer> SCPISpectrometer::CreateSpectrometer(string driver, SCPITransport* transport)
+shared_ptr<SCPISpectrometer> SCPISpectrometer::CreateSpectrometer(const string& driver, SCPITransport* transport)
 {
 	if(m_spectrometercreateprocs.find(driver) != m_spectrometercreateprocs.end())
 		return m_spectrometercreateprocs[driver](transport);
@@ -236,17 +238,23 @@ void SCPISpectrometer::SetChannelOffset(size_t i, size_t stream, float offset)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+//This is called by Instrument::m_serializers and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
 {
 	node["integration"] = GetIntegrationTime();
 }
 
+//This is called by Instrument::m_loaders and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
 {
 	if(node["integration"])
 		SetIntegrationTime(node["integration"].as<int64_t>());
 }
 
+//This is called by Instrument::m_preloaders and is not virtual
+//cppcheck-suppress duplInheritedMember
 void SCPISpectrometer::DoPreLoadConfiguration(
 	int /*version*/,
 	const YAML::Node& /*node*/,

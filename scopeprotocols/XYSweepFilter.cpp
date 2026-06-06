@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -58,7 +58,7 @@ XYSweepFilter::XYSweepFilter(const string& color)
 
 bool XYSweepFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 3) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
@@ -83,13 +83,21 @@ void XYSweepFilter::ClearSweeps()
 	SetData(nullptr, 0);
 }
 
-void XYSweepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
+void XYSweepFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("XYSweepFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	//Make sure we've got valid inputs
 	auto wx = GetInput(0);
 	auto wy = GetInput(1);
 	if(!wx || !wy)
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or null");
 		SetData(nullptr, 0);
 		return;
 	}

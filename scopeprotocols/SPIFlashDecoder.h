@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -126,7 +126,11 @@ public:
 	SPIFlashDecoder(const std::string& color);
 	virtual ~SPIFlashDecoder();
 
-	virtual void Refresh() override;
+	//not copyable or assignable
+	SPIFlashDecoder(const SPIFlashDecoder& rhs) =delete;
+	SPIFlashDecoder& operator=(const SPIFlashDecoder& rhs) =delete;
+
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	std::vector<std::string> GetHeaders() override;
 
@@ -153,12 +157,11 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
 
-
 	static std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
 
 protected:
-	std::string m_typename;
-	std::string m_outfile;
+	FilterParameter& m_type;
+	FilterParameter& m_outfile;
 
 	std::string m_cachedfname;
 	FILE* m_fpOut;

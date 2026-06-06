@@ -76,15 +76,11 @@ bool JitterSpectrumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string JitterSpectrumFilter::GetProtocolName()
 {
 	return "Jitter Spectrum";
-}
-
-Filter::DataLocation JitterSpectrumFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,7 +159,8 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 		ui_width_samples += jt->second;
 		ui_width += jt->first * jt->second;
 	}
-	ui_width /= ui_width_samples;
+	if(ui_width_samples)
+		ui_width /= ui_width_samples;
 	LogTrace("Averaged UI width estimate: %" PRId64 "\n", ui_width);
 
 	ui_width *= 1000;	//convert back to fs

@@ -252,6 +252,12 @@ bool g_vulkanDeviceIsAnyMesa = false;
  */
 bool g_vulkanDeviceIsMoltenVK = false;
 
+/**
+	@brief Indicates that the Vulkan driver is an Apple paravirtualization device
+	@ingroup vksupport
+ */
+bool g_vulkanDeviceIsApplePV = false;
+
 void VulkanCleanup();
 
 bool VulkanInitInstance(
@@ -275,7 +281,10 @@ void VulkanCreateDevice(
 	@brief Do context-level Vulkan initialization
 	@ingroup vksupport
 
-	@param skipGLFW Do not initialize GLFW
+	@param skipGLFW Do not initialize GLFW.
+
+	This is needed for headless use of libscopehal in unit tests or ATE applications, which may be executed on a
+	machine that does not have a display server running
  */
 bool VulkanInitInstance(
 	bool skipGLFW,
@@ -333,7 +342,7 @@ bool VulkanInitInstance(
 		LogDebug("Vulkan 1.2 support not available\n");
 
 	if(skipGLFW)
-		LogDebug("Skipping GLFW init to work around gtk gl/vulkan interop bug\n");
+		LogDebug("Skipping GLFW init, windowing system support will not be available\n");
 	else
 	{
 		//Log glfw version
@@ -721,6 +730,12 @@ void VulkanCreateDevice(
 			case vk::DriverId::eMoltenvk:
 				g_vulkanDeviceIsMoltenVK = true;
 				LogDebug("Driver: vk::DriverId::eMoltenvk\n");
+
+				if(!strcmp(&properties.deviceName[0], "Apple Paravirtual device"))
+				{
+					LogDebug("Apple paravirtual device detected\n");
+					g_vulkanDeviceIsApplePV = true;
+				}
 				break;
 
 			case vk::DriverId::eNvidiaProprietary:
@@ -737,8 +752,9 @@ void VulkanCreateDevice(
 	vk::PhysicalDevice16BitStorageFeatures features16bit;
 	vk::PhysicalDevice8BitStorageFeatures features8bit;
 	vk::PhysicalDeviceVulkan12Features featuresVulkan12;
-	vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
+	//vk::PhysicalDeviceShaderAtomicInt64Features featuresAtomicInt64;
 	vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT featuresAtomicFloat;
+	vk::PhysicalDevicePortabilitySubsetFeaturesKHR portabilityFeatures;
 	void* pNext = nullptr;
 	if(device.getFeatures().shaderFloat64)
 	{
@@ -872,6 +888,12 @@ void VulkanCreateDevice(
 		{
 			hasPortabilitySubset = true;
 			LogDebug("Device has VK_KHR_portability_subset, requesting it\n");
+
+			//Ask for the features we plan to use
+			portabilityFeatures.events = true;
+			portabilityFeatures.pNext = pNext;
+			pNext = &portabilityFeatures;
+			LogDebug("Requesting events support in portability subset\n");
 		}
 		if(!strcmp(&ext.extensionName[0], "VK_KHR_shader_non_semantic_info"))
 		{
@@ -1023,7 +1045,7 @@ void VulkanCreateDevice(
 	//Make a CommandPool for transfers
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		g_vkTransferQueue->m_family );
+		g_vkTransferQueue->GetQueue()->m_family );
 	g_vkTransferCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 	//Make a CommandBuffer for memory transfers that we can use implicitly during buffer management
@@ -1041,6 +1063,11 @@ void VulkanCreateDevice(
  */
 bool VulkanInit(bool skipGLFW)
 {
+	//Note if asan is active
+	#ifdef __SANITIZE_ADDRESS__
+	LogNotice("Compiled with AddressSanitizer\n");
+	#endif
+
 	LogDebug("Initializing Vulkan\n");
 	LogIndenter li;
 
@@ -1124,9 +1151,6 @@ bool VulkanInit(bool skipGLFW)
 	}
 
 	LogDebug("\n");
-
-	//If we get here, everything is good
-	g_gpuFilterEnabled = true;
 
 	//Initialize the glsl compiler since vkFFT does JIT generation of kernels
 	if(1 != glslang_initialize_process())

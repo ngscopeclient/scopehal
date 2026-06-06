@@ -119,6 +119,13 @@ Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+void Trigger::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	//nothing to do
+}
+
 YAML::Node Trigger::SerializeConfiguration(IDTable& table)
 {
 	int id = table.emplace(this);

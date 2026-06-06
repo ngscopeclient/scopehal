@@ -38,6 +38,8 @@ using namespace std;
 
 AreaMeasurement::AreaMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_measurementType(m_parameters["Measurement Type"])
+	, m_areaType(m_parameters["Area Type"])
 {
 	AddStream(Unit(Unit::UNIT_VOLT_SEC), "data", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "final", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -45,15 +47,13 @@ AreaMeasurement::AreaMeasurement(const string& color)
 	//Set up channels
 	CreateInput("din");
 
-	m_measurement_typename = "Measurement Type";
-	m_parameters[m_measurement_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_measurement_typename].AddEnumValue("Full Record", FULL_RECORD);
-	m_parameters[m_measurement_typename].AddEnumValue("Per Cycle", CYCLE_AREA);
+	m_measurementType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_measurementType.AddEnumValue("Full Record", FULL_RECORD);
+	m_measurementType.AddEnumValue("Per Cycle", CYCLE_AREA);
 
-	m_area_typename = "Area Type";
-	m_parameters[m_area_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_area_typename].AddEnumValue("True Area", TRUE_AREA);
-	m_parameters[m_area_typename].AddEnumValue("Absolute Area", ABSOLUTE_AREA);
+	m_areaType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_areaType.AddEnumValue("True Area", TRUE_AREA);
+	m_areaType.AddEnumValue("Absolute Area", ABSOLUTE_AREA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,8 +110,8 @@ void AreaMeasurement::Refresh(
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto length = din->size();
 
-	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
-	AreaType area_type = (AreaType)m_parameters[m_area_typename].GetIntVal();
+	MeasurementType measurement_type = m_measurementType.GetEnumVal<MeasurementType>();
+	AreaType area_type = m_areaType.GetEnumVal<AreaType>();
 
 	if (measurement_type == FULL_RECORD)
 	{

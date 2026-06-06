@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,10 +48,10 @@ TCPDecoder::TCPDecoder(const string& color)
 
 bool TCPDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<IPv4Waveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<IPv4Waveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	//TODO: support IPv6
@@ -70,11 +70,20 @@ string TCPDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TCPDecoder::Refresh()
+void TCPDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TCPDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -84,13 +93,8 @@ void TCPDecoder::Refresh()
 	size_t len = din->m_samples.size();
 
 	//Loop over the events and process stuff
-	auto cap = new TCPWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_triggerPhase = din->m_triggerPhase;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<TCPWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	int state = 0;
 	int option_len = 0;

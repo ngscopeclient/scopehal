@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,29 +37,29 @@ using namespace std;
 
 QuadratureDecoder::QuadratureDecoder(const string& color)
 	: Filter(color, CAT_MISC)
+	, m_pulserate(m_parameters["Pulses per rev"])
+	, m_interp(m_parameters["Interpolation"])
+	, m_rev(m_parameters["Revolutions"])
+	, m_debounce(m_parameters["Debounce Cooldown"])
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("A");
 	CreateInput("B");
 	//CreateInput("Reset");
 
-	m_pulseratename = "Pulses per rev";
-	m_parameters[m_pulseratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_pulseratename].SetFloatVal(0);
+	m_pulserate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_pulserate.SetFloatVal(0);
 
-	m_interpname = "Interpolation";
-	m_parameters[m_interpname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_interpname].AddEnumValue("None", INTERP_NONE);
-	m_parameters[m_interpname].AddEnumValue("Linear", INTERP_LINEAR);
+	m_interp = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_interp.AddEnumValue("None", INTERP_NONE);
+	m_interp.AddEnumValue("Linear", INTERP_LINEAR);
 
-	m_revname = "Revolutions";
-	m_parameters[m_revname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_revname].AddEnumValue("Single", MODE_SINGLE_REV);
-	m_parameters[m_revname].AddEnumValue("Multi", MODE_MULTI_REV);
+	m_rev = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_rev.AddEnumValue("Single", MODE_SINGLE_REV);
+	m_rev.AddEnumValue("Multi", MODE_MULTI_REV);
 
-	m_debouncename = "Debounce Cooldown";
-	m_parameters[m_debouncename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_debouncename].ParseString("1 ms");
+	m_debounce = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_debounce.ParseString("1 ms");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +67,7 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 
 bool QuadratureDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -87,12 +87,20 @@ string QuadratureDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void QuadratureDecoder::Refresh()
+void QuadratureDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("QuadratureDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -106,11 +114,11 @@ void QuadratureDecoder::Refresh()
 	auto ua = dynamic_cast<UniformDigitalWaveform*>(a);
 	auto ub = dynamic_cast<UniformDigitalWaveform*>(b);
 
-	float phase_per_pulse = 360 / m_parameters[m_pulseratename].GetFloatVal();
+	float phase_per_pulse = 360 / m_pulserate.GetFloatVal();
 
-	InterpolationMode mode = (InterpolationMode)m_parameters[m_interpname].GetIntVal();
-	RevMode rmode = (RevMode)m_parameters[m_revname].GetIntVal();
-	int64_t debounce_fs = m_parameters[m_debouncename].GetIntVal();
+	auto mode = m_interp.GetEnumVal<InterpolationMode>();
+	auto rmode = m_rev.GetEnumVal<RevMode>();
+	int64_t debounce_fs = m_debounce.GetIntVal();
 	int64_t debounce_samples = debounce_fs / a->m_timescale;
 
 	//Create the output waveform
@@ -260,7 +268,10 @@ void QuadratureDecoder::Refresh()
 				//Add a new sample for the edge
 				cap->m_offsets.push_back(timestamp-1);
 				cap->m_durations.push_back(1);
-				cap->m_samples.push_back(cap->m_samples[ilast]);
+				auto lastval = cap->m_samples[ilast];	//need to explicitly pass-by-value here
+														//because reference will be invalidated when push_back
+														//calls resize()
+				cap->m_samples.push_back(lastval);
 
 				//Add a new sample for the point
 				cap->m_offsets.push_back(timestamp);
@@ -284,8 +295,10 @@ void QuadratureDecoder::Refresh()
 	//If less than 2 samples, stop
 	if(cap->m_durations.size() < 2)
 	{
+		AddErrorMessage("Missing input", "Need at least two pulses to decode");
+
 		delete cap;
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 

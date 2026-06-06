@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -112,16 +112,13 @@ protected:
 	bool m_sampleRateValid;
 	uint64_t m_sampleRate;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 
-	void GetTriggerSlope(DCAEdgeTrigger* trig, std::string reply);
+	void GetTriggerSlope(DCAEdgeTrigger* trig, const std::string& reply);
 
 	void PushEdgeTrigger(DCAEdgeTrigger* trig);
-	void PushFloat(std::string path, float f);
-	void PushSlope(std::string path, DCAEdgeTrigger::EdgeType slope);
+	void PushFloat(const std::string& path, float f);
+	void PushSlope(const std::string& path, DCAEdgeTrigger::EdgeType slope);
 
 private:
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
@@ -139,14 +136,14 @@ private:
 		double yreference;
 	};
 
-	void ConfigureWaveform(std::string channel);
-	void AddTriggerSource(std::string hwname, std::string displayname);
+	void ConfigureWaveform(const std::string& channel);
+	void AddTriggerSource(const std::string& hwname, const std::string& displayname);
 	int GetLastError();
 	bool IsAnalogChannel(size_t i);
-	bool IsChannelPresent(std::string name);
-	bool IsModulePresent(std::string name);
-	std::vector<int8_t> GetWaveformData(std::string channel);
-	WaveformPreamble GetWaveformPreamble(std::string channel);
+	bool IsChannelPresent(const std::string& name);
+	bool IsModulePresent(const std::string& name);
+	std::vector<int8_t> GetWaveformData(const std::string& channel);
+	WaveformPreamble GetWaveformPreamble(const std::string& channel);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
 

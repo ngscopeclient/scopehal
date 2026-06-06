@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,18 +37,18 @@ using namespace std;
 
 WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_sampleRate("Sample Rate")
-	, m_edgeTime("Transition Time")
+	, m_sampleRate(m_parameters["Sample Rate"])
+	, m_edgeTime(m_parameters["Transition Time"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("data");
 	CreateInput("clk");
 
-	m_parameters[m_edgeTime] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_edgeTime].SetIntVal(10 * 1000);
+	m_edgeTime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_edgeTime.SetIntVal(10 * 1000);
 
-	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_sampleRate].SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));	//100 Gsps
+	m_sampleRate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_sampleRate.SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));	//100 Gsps
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
 
 bool WaveformGenerationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -91,11 +91,20 @@ float WaveformGenerationFilter::GetMinLevel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void WaveformGenerationFilter::Refresh()
+void WaveformGenerationFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("WaveformGenerationFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -109,14 +118,14 @@ void WaveformGenerationFilter::Refresh()
 	samples.PrepareForCpuAccess();
 	SampleOnAnyEdgesBase(din, clkin, samples);
 
-	size_t rate = m_parameters[m_sampleRate].GetIntVal();
+	size_t rate = m_sampleRate.GetIntVal();
 	if(rate == 0)
 	{
 		SetData(NULL, 0);
 		return;
 	}
 	size_t samplePeriod = FS_PER_SECOND / rate;
-	size_t edgeTime = m_parameters[m_edgeTime].GetIntVal();
+	size_t edgeTime = m_edgeTime.GetIntVal();
 	size_t edgeSamples = floor(edgeTime / samplePeriod);
 
 	//Configure output waveform

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,45 +40,45 @@ using namespace std;
 
 TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_tapDelayName("Tap Delay")
-	, m_tap0Name("Tap Value 0")
-	, m_tap1Name("Tap Value 1")
-	, m_tap2Name("Tap Value 2")
-	, m_tap3Name("Tap Value 3")
-	, m_tap4Name("Tap Value 4")
-	, m_tap5Name("Tap Value 5")
-	, m_tap6Name("Tap Value 6")
-	, m_tap7Name("Tap Value 7")
+	, m_tapDelay(m_parameters["Tap Delay"])
+	, m_tap0(m_parameters["Tap Value 0"])
+	, m_tap1(m_parameters["Tap Value 1"])
+	, m_tap2(m_parameters["Tap Value 2"])
+	, m_tap3(m_parameters["Tap Value 3"])
+	, m_tap4(m_parameters["Tap Value 4"])
+	, m_tap5(m_parameters["Tap Value 5"])
+	, m_tap6(m_parameters["Tap Value 6"])
+	, m_tap7(m_parameters["Tap Value 7"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
-	m_parameters[m_tapDelayName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_tapDelayName].SetIntVal(200000);
+	m_tapDelay = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_tapDelay.SetIntVal(200000);
 
-	m_parameters[m_tap0Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap0Name].SetFloatVal(1);
+	m_tap0 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap0.SetFloatVal(1);
 
-	m_parameters[m_tap1Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap1Name].SetFloatVal(0);
+	m_tap1 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap1.SetFloatVal(0);
 
-	m_parameters[m_tap2Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap2Name].SetFloatVal(0);
+	m_tap2 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap2.SetFloatVal(0);
 
-	m_parameters[m_tap3Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap3Name].SetFloatVal(0);
+	m_tap3 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap3.SetFloatVal(0);
 
-	m_parameters[m_tap4Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap4Name].SetFloatVal(0);
+	m_tap4 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap4.SetFloatVal(0);
 
-	m_parameters[m_tap5Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap5Name].SetFloatVal(0);
+	m_tap5 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap5.SetFloatVal(0);
 
-	m_parameters[m_tap6Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap6Name].SetFloatVal(0);
+	m_tap6 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap6.SetFloatVal(0);
 
-	m_parameters[m_tap7Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap7Name].SetFloatVal(0);
+	m_tap7 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_tap7.SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 
 bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -106,20 +106,29 @@ string TappedDelayLineFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TappedDelayLineFilter::Refresh()
+void TappedDelayLineFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Get the input data
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TappedDelayLineFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInput(0).GetData());
 	if(!din)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	size_t len = din->size();
 	if(len < 8)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "At least eight input samples are required");
+		SetData(nullptr, 0);
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
@@ -128,7 +137,7 @@ void TappedDelayLineFilter::Refresh()
 	din->PrepareForCpuAccess();
 
 	//Set up output
-	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();
+	int64_t tap_delay = m_tapDelay.GetIntVal();
 	const int64_t tap_count = 8;
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	size_t outlen = len -  (tap_count * samples_per_tap);
@@ -139,14 +148,14 @@ void TappedDelayLineFilter::Refresh()
 	//Extract tap values
 	float taps[8] =
 	{
-		m_parameters[m_tap0Name].GetFloatVal(),
-		m_parameters[m_tap1Name].GetFloatVal(),
-		m_parameters[m_tap2Name].GetFloatVal(),
-		m_parameters[m_tap3Name].GetFloatVal(),
-		m_parameters[m_tap4Name].GetFloatVal(),
-		m_parameters[m_tap5Name].GetFloatVal(),
-		m_parameters[m_tap6Name].GetFloatVal(),
-		m_parameters[m_tap7Name].GetFloatVal()
+		m_tap0.GetFloatVal(),
+		m_tap1.GetFloatVal(),
+		m_tap2.GetFloatVal(),
+		m_tap3.GetFloatVal(),
+		m_tap4.GetFloatVal(),
+		m_tap5.GetFloatVal(),
+		m_tap6.GetFloatVal(),
+		m_tap7.GetFloatVal()
 	};
 
 	//Run the actual filter

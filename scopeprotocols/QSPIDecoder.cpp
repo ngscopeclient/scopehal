@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,6 +60,8 @@ QSPIDecoder::QSPIDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string QSPIDecoder::GetProtocolName()
 {
 	return "Quad SPI";
@@ -67,7 +69,7 @@ string QSPIDecoder::GetProtocolName()
 
 bool QSPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -79,12 +81,17 @@ bool QSPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void QSPIDecoder::Refresh()
+void QSPIDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("QSPIDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -96,12 +103,15 @@ void QSPIDecoder::Refresh()
 	auto data1 = GetInputWaveform(4);
 	auto data0 = GetInputWaveform(5);
 
-	clk->PrepareForCpuAccess();
-	csn->PrepareForCpuAccess();
-	data3->PrepareForCpuAccess();
-	data2->PrepareForCpuAccess();
-	data1->PrepareForCpuAccess();
-	data0->PrepareForCpuAccess();
+	cmdBuf.begin({});
+	clk->PrepareForCpuAccessNonblocking(cmdBuf);
+	csn->PrepareForCpuAccessNonblocking(cmdBuf);
+	data3->PrepareForCpuAccessNonblocking(cmdBuf);
+	data2->PrepareForCpuAccessNonblocking(cmdBuf);
+	data1->PrepareForCpuAccessNonblocking(cmdBuf);
+	data0->PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
 	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clk);
 	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clk);
@@ -117,11 +127,9 @@ void QSPIDecoder::Refresh()
 	auto sdata3 = dynamic_cast<SparseDigitalWaveform*>(data3);
 
 	//Create the capture
-	auto cap = new SPIWaveform;
+	auto cap = SetupEmptyWaveform<SPIWaveform>(clk, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 
 	//TODO: packets based on CS# pulses
@@ -283,6 +291,5 @@ void QSPIDecoder::Refresh()
 		AdvanceToTimestampScaled(sdata3, udata3, idata[3], datalen[3], timestamp);
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }

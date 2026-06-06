@@ -94,7 +94,6 @@ extern bool g_hasAvx2;
 #endif
 
 //Enable flags for various Vulkan features
-extern bool g_gpuFilterEnabled;
 extern bool g_hasShaderFloat64;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderAtomicInt64;
@@ -219,7 +218,7 @@ std::string ReadFile(const std::string& path);
 std::string ReadDataFile(const std::string& relpath);
 std::vector<uint32_t> ReadDataFileUint32(const std::string& relpath);
 std::string FindDataFile(const std::string& relpath);
-void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+void GetTimestampOfFile(const std::string& path, time_t& timestamp, int64_t& fs);
 
 std::string to_string_sci(double d);
 std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
@@ -267,6 +266,14 @@ struct ConvertRawSamplesShaderArgs
 	float offset;
 };
 
+struct ConvertRawSamplesOffsetShaderArgs
+{
+	uint32_t size;
+	float gain;
+	float offset;
+	uint32_t inputBufferOffset;
+};
+
 //Vulkan global stuff
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
@@ -277,10 +284,11 @@ extern std::unique_ptr<QueueManager> g_vkQueueManager;
 extern bool g_vulkanDeviceIsIntelMesa;
 extern bool g_vulkanDeviceIsAnyMesa;
 extern bool g_vulkanDeviceIsMoltenVK;
+extern bool g_vulkanDeviceIsApplePV;
 extern uint32_t g_vkPinnedMemoryHeap;
 extern uint32_t g_vkLocalMemoryHeap;
 extern bool g_vulkanDeviceHasUnifiedMemory;
-extern std::shared_mutex g_vulkanActivityMutex;;
+extern std::shared_mutex g_vulkanActivityMutex;
 
 //Validation helper for templates
 //Throws compile-time error if specialized for false since there's no implementation

@@ -37,13 +37,13 @@ using namespace std;
 
 AutocorrelationFilter::AutocorrelationFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_maxDelta(m_parameters["Max offset"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_maxDeltaName = "Max offset";
-	m_parameters[m_maxDeltaName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_maxDeltaName].SetIntVal(1000);
+	m_maxDelta = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_maxDelta.SetIntVal(1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +94,7 @@ void AutocorrelationFilter::Refresh(
 	SetYAxisUnits(m_inputs[0].m_channel->GetYAxisUnits(0), 0);
 
 	//Sanity check range
-	size_t range = m_parameters[m_maxDeltaName].GetIntVal();
+	size_t range = m_maxDelta.GetIntVal();
 	if( len <= range)
 	{
 		if(!GetInput(0))

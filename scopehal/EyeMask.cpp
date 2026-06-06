@@ -55,6 +55,9 @@ using namespace std;
 EyeMask::EyeMask()
 	: m_hitrate(0)
 	, m_timebaseIsRelative(false)
+	, m_width(0)
+	, m_height(0)
+	, m_bitmapDirty(false)
 {
 }
 
@@ -200,7 +203,7 @@ void EyeMask::RenderForAnalysis(
 	//Draw each polygon
 	m_canvas->set_color( canvas_ity::fill_style, 1.0f, 1.0f, 1.0f, 1.0f );
 	float ypixoff = height / 2;
-	for(auto poly : m_polygons)
+	for(auto& poly : m_polygons)
 	{
 		for(size_t i=0; i<poly.m_points.size(); i++)
 		{

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,7 +50,7 @@ RMSMeasurement::RMSMeasurement(const string& color)
 
 bool RMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -73,12 +73,17 @@ string RMSMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void RMSMeasurement::Refresh()
+void RMSMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("RMSMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -110,30 +115,30 @@ void RMSMeasurement::Refresh()
 	//Divide by total number of samples and take the square root to get the final AC RMS
 	m_streams[1].m_value = sqrt(temp / length);
 
-	//Now we can do the cycle-by-cycle value
+	//Now we can set up for the cycle-by-cycle value
 	temp = 0;
-	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at average value
 	//TODO: make threshold configurable?
-	float threshold = GetAvgVoltage(sadin, uadin);
 	if(uadin)
-		FindZeroCrossings(uadin, threshold, edges);
+		m_detector.FindZeroCrossings(uadin, m_averager.Average(uadin, cmdBuf, queue), cmdBuf, queue);
 	else if(sadin)
-		FindZeroCrossings(sadin, threshold, edges);
+		m_detector.FindZeroCrossings(sadin, m_averager.Average(sadin, cmdBuf, queue), cmdBuf, queue);
+	auto& edges = m_detector.GetResults();
+	edges.PrepareForCpuAccess();
+	size_t elen = edges.size();
 
-	//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
-	if(edges.size() < 2)
+	//We need at least one full cycle of the waveform to have a meaningful RMS Measurement
+	if(elen < 2)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "Need at least one full cycle in the input waveform");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Create the output as a sparse waveform
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->PrepareForCpuAccess();
-
-	size_t elen = edges.size();
 
 	for(size_t i = 0; i < (elen - 2); i += 2)
 	{

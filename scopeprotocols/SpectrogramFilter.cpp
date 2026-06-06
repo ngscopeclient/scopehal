@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,10 +55,10 @@ SpectrogramWaveform::~SpectrogramWaveform()
 
 SpectrogramFilter::SpectrogramFilter(const string& color)
 	: Filter(color, CAT_RF)
-	, m_windowName("Window")
-	, m_fftLengthName("FFT length")
-	, m_rangeMinName("Range Min")
-	, m_rangeMaxName("Range Max")
+	, m_window(m_parameters["Window"])
+	, m_fftLength(m_parameters["FFT length"])
+	, m_rangeMin(m_parameters["Range Min"])
+	, m_rangeMax(m_parameters["Range Max"])
 	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
@@ -75,31 +75,31 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_cachedFFTLength = 0;
 	m_cachedFFTNumBlocks = 0;
 
-	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
-	m_parameters[m_windowName].AddEnumValue("Hamming", FFTFilter::FFTFilter::WINDOW_HAMMING);
-	m_parameters[m_windowName].AddEnumValue("Hann", FFTFilter::FFTFilter::WINDOW_HANN);
-	m_parameters[m_windowName].AddEnumValue("Rectangular", FFTFilter::FFTFilter::WINDOW_RECTANGULAR);
-	m_parameters[m_windowName].SetIntVal(FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
+	m_window = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_window.AddEnumValue("Blackman-Harris", FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
+	m_window.AddEnumValue("Hamming", FFTFilter::FFTFilter::WINDOW_HAMMING);
+	m_window.AddEnumValue("Hann", FFTFilter::FFTFilter::WINDOW_HANN);
+	m_window.AddEnumValue("Rectangular", FFTFilter::FFTFilter::WINDOW_RECTANGULAR);
+	m_window.SetIntVal(FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
 
-	m_parameters[m_fftLengthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_fftLengthName].AddEnumValue("64", 64);
-	m_parameters[m_fftLengthName].AddEnumValue("128", 128);
-	m_parameters[m_fftLengthName].AddEnumValue("256", 256);
-	m_parameters[m_fftLengthName].AddEnumValue("512", 512);
-	m_parameters[m_fftLengthName].AddEnumValue("1024", 1024);
-	m_parameters[m_fftLengthName].AddEnumValue("2048", 2048);
-	m_parameters[m_fftLengthName].AddEnumValue("4096", 4096);
-	m_parameters[m_fftLengthName].AddEnumValue("8192", 8192);
-	m_parameters[m_fftLengthName].AddEnumValue("16384", 16384);
-	m_parameters[m_fftLengthName].AddEnumValue("32768", 32768);
-	m_parameters[m_fftLengthName].SetIntVal(512);
+	m_fftLength = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_fftLength.AddEnumValue("64", 64);
+	m_fftLength.AddEnumValue("128", 128);
+	m_fftLength.AddEnumValue("256", 256);
+	m_fftLength.AddEnumValue("512", 512);
+	m_fftLength.AddEnumValue("1024", 1024);
+	m_fftLength.AddEnumValue("2048", 2048);
+	m_fftLength.AddEnumValue("4096", 4096);
+	m_fftLength.AddEnumValue("8192", 8192);
+	m_fftLength.AddEnumValue("16384", 16384);
+	m_fftLength.AddEnumValue("32768", 32768);
+	m_fftLength.SetIntVal(512);
 
-	m_parameters[m_rangeMaxName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
-	m_parameters[m_rangeMaxName].SetFloatVal(-10);
+	m_rangeMax = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
+	m_rangeMax.SetFloatVal(-10);
 
-	m_parameters[m_rangeMinName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
-	m_parameters[m_rangeMinName].SetFloatVal(-50);
+	m_rangeMin = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
+	m_rangeMin.SetFloatVal(-50);
 }
 
 SpectrogramFilter::~SpectrogramFilter()
@@ -111,7 +111,7 @@ SpectrogramFilter::~SpectrogramFilter()
 
 bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -123,22 +123,22 @@ bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float SpectrogramFilter::GetOffset(size_t /*stream*/)
+float SpectrogramFilter::GetOffset([[maybe_unused]] size_t stream)
 {
 	return m_offset;
 }
 
-float SpectrogramFilter::GetVoltageRange(size_t /*stream*/)
+float SpectrogramFilter::GetVoltageRange([[maybe_unused]] size_t stream)
 {
 	return m_range;
 }
 
-void SpectrogramFilter::SetVoltageRange(float range, size_t /*stream*/)
+void SpectrogramFilter::SetVoltageRange(float range, [[maybe_unused]] size_t stream)
 {
 	m_range = range;
 }
 
-void SpectrogramFilter::SetOffset(float offset, size_t /*stream*/)
+void SpectrogramFilter::SetOffset(float offset, [[maybe_unused]] size_t stream)
 {
 	m_offset = offset;
 }
@@ -171,25 +171,26 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
-FlowGraphNode::DataLocation SpectrogramFilter::GetInputLocation()
-{
-	return LOC_DONTCARE;
-}
-
 void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SpectrogramFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or invalid");
+		SetData(nullptr, 0);
 		return;
 	}
+
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
 	//Figure out how many FFTs to do
 	//For now, consecutive blocks and not a sliding window
 	size_t inlen = din->size();
-	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
+	size_t fftlen = m_fftLength.GetIntVal();
 	size_t nblocks = floor(inlen * 1.0 / fftlen);
 
 	if( (fftlen != m_cachedFFTLength) || (nblocks != m_cachedFFTNumBlocks) )
@@ -242,7 +243,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	SetData(cap, 0);
 
 	//We also need to adjust the scale by the coherent power gain of the window function
-	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
+	auto window = m_window.GetEnumVal<FFTFilter::WindowFunction>();
 	switch(window)
 	{
 		case FFTFilter::WINDOW_HAMMING:
@@ -308,8 +309,8 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
-	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
-	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
+	float minscale = m_rangeMin.GetFloatVal();
+	float fullscale = m_rangeMax.GetFloatVal();
 	float range = fullscale - minscale;
 
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead

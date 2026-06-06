@@ -66,12 +66,6 @@ string DPhyHSClockRecoveryFilter::GetProtocolName()
 	return "Clock Recovery (D-PHY HS Mode)";
 }
 
-Filter::DataLocation DPhyHSClockRecoveryFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

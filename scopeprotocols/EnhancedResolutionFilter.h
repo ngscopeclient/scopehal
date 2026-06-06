@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,6 +45,8 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual void SetDefaultName() override;
 
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::string GetProtocolName();
 
 	PROTOCOL_DECODER_INITPROC(EnhancedResolutionFilter)
@@ -62,8 +64,8 @@ protected:
 		BITS_3P0
 	};
 
-	std::string m_cutoffFreqName;
-	std::string m_bitsName;
+	FilterParameter& m_cutoffFreq;
+	FilterParameter& m_bits;
 
 	void UpdateCutoff();
 };

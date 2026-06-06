@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,18 +38,17 @@ using namespace std;
 
 USB2PMADecoder::USB2PMADecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
+	, m_speed(m_parameters["Speed"])
 {
 	AddProtocolStream("data");
 	CreateInput("D+");
 	CreateInput("D-");
 
-	m_speedname = "Speed";
-
-	m_parameters[m_speedname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_speedname].AddEnumValue("Low (1.5 Mbps)", SPEED_LOW);
-	m_parameters[m_speedname].AddEnumValue("Full (12 Mbps)", SPEED_FULL);
-	m_parameters[m_speedname].AddEnumValue("High (480 Mbps)", SPEED_HIGH);
-	m_parameters[m_speedname].SetIntVal(SPEED_FULL);
+	m_speed = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_speed.AddEnumValue("Low (1.5 Mbps)", SPEED_LOW);
+	m_speed.AddEnumValue("Full (12 Mbps)", SPEED_FULL);
+	m_speed.AddEnumValue("High (480 Mbps)", SPEED_HIGH);
+	m_speed.SetIntVal(SPEED_FULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +56,7 @@ USB2PMADecoder::USB2PMADecoder(const string& color)
 
 bool USB2PMADecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -77,12 +76,20 @@ string USB2PMADecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void USB2PMADecoder::Refresh()
+void USB2PMADecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("USB2PMADecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -99,7 +106,7 @@ void USB2PMADecoder::Refresh()
 	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Figure out our speed so we know what's going on
-	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
+	auto speed = m_speed.GetEnumVal<Speed>();
 
 	//Set appropriate thresholds for different speeds
 	auto threshold_diff = (speed == SPEED_HIGH) ? 0.15 : 0.2;
@@ -122,7 +129,7 @@ void USB2PMADecoder::Refresh()
 	}
 
 	//Figure out the line state for each input (no clock recovery yet)
-	auto cap = new USB2PMAWaveform;
+	auto cap = SetupEmptyWaveform<USB2PMAWaveform>(din_p, 0);
 	cap->PrepareForCpuAccess();
 	for(size_t i=0; i<len; i++)
 	{
@@ -190,18 +197,10 @@ void USB2PMADecoder::Refresh()
 		cap->m_samples.push_back(type);
 	}
 
-	SetData(cap, 0);
-
-	//Copy our time scales from the input
-	//Use the first trace's timestamp as our start time if they differ
-	cap->m_timescale = din_p->m_timescale;
-	cap->m_startTimestamp = din_p->m_startTimestamp;
-	cap->m_startFemtoseconds = din_p->m_startFemtoseconds;
-	cap->m_triggerPhase = din_p->m_triggerPhase;
 	cap->MarkModifiedFromCpu();
 }
 
-std::string USB2PMAWaveform::GetColor(size_t i)
+string USB2PMAWaveform::GetColor(size_t i)
 {
 	auto sample = m_samples[i];
 	switch(sample.m_type)

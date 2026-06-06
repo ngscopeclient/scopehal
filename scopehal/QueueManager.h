@@ -43,65 +43,10 @@
 #include <vector>
 #include <vulkan/vulkan_raii.hpp>
 
+#include "QueueWrapper.h"
+#include "QueueHandle.h"
+
 class QueueLock;
-
-/**
- * @brief Wrapper around a Vulkan Queue, protected by mutex for thread safety.
- *
- */
-class QueueHandle
-{
-public:
-	QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, std::string name);
-	~QueueHandle();
-
-	/// Append a name to the queue, used for debugging
-	void AddName(std::string name);
-
-	/// Submit the given command buffer on the queue
-	void Submit(vk::raii::CommandBuffer const& cmdBuf);
-	/// Submit the given command buffer on the queue and wait until completion
-	void SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf);
-
-	const std::string& GetName() const
-	{ return m_name; }
-
-	/**
-		@brief Wait for all previous submits to complete
-	 */
-	void WaitIdle()
-	{
-		const std::lock_guard<std::recursive_mutex> lock(m_mutex);
-		_waitFence();
-	}
-
-	bool WaitIdleWithTimeout(uint64_t nanoseconds);
-
-public:
-	//non-copyable
-	QueueHandle(QueueHandle const&) = delete;
-	QueueHandle& operator=(QueueHandle const&) = delete;
-
-protected:
-	/// Waits for previous submit's fence, if any, then resets the fence for reuse.
-	/// Must obtain the lock before calling!
-	void _waitFence();
-
-public:
-	const size_t m_family;
-	const size_t m_index;
-
-protected:
-	friend QueueLock;
-	std::recursive_mutex m_mutex;
-	std::string m_name;
-	std::shared_ptr<vk::raii::Device> m_device;
-	std::unique_ptr<vk::raii::Queue> m_queue;
-	std::unique_ptr<vk::raii::Fence> m_fence;
-
-	bool m_fenceBusy;
-};
-
 
 /**
  * @brief Obtains exclusive access to a Vulkan Queue for the duration of its existence, similar to a std::lock_guard.
@@ -113,12 +58,12 @@ class QueueLock
 {
 public:
 	QueueLock(std::shared_ptr<QueueHandle> handle)
-	: m_lock(handle->m_mutex)
+	: m_lock(handle->GetQueue()->m_mutex)
 	, m_handle(handle)
 	{ handle->_waitFence(); }
 
 	vk::raii::Queue& operator*()
-	{ return *(m_handle->m_queue); }
+	{ return *(m_handle->GetQueue()->GetQueue()); }
 
 public:
 	//non-copyable
@@ -132,29 +77,53 @@ protected:
 
 
 /**
- * @brief Allocates and hands out std::shared_ptr<QueueHandle> instances for thread-safe access to Vulkan Queues.
- *
- * Each QueueHandle represents a single Vulkan Queue. Many shared pointers to a single
- * QueueHandle may exist at a given time, e.g. if the GPU only provides a single queue
- * of the required type.
+ @brief Allocates and hands out std::shared_ptr<QueueHandle> instances for thread-safe access to Vulkan Queues.
+
+ Each QueueWrapper represents a single Vulkan Queue. Many pointers to a single
+ QueueWrapper, each with its own QueueHandle, may exist at a given time, e.g. if the GPU only provides a single queue
+ of the required type.
  */
 class QueueManager
 {
 public:
 	QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device);
 
+	/**
+		@brief List of different queue pools
+	 */
+	enum QueuePoolID
+	{
+		///@brief Queues used for graphics and display
+		QUEUE_POOL_RENDER,
+
+		///@brief Queues used for rasterizing waveforms
+		QUEUE_POOL_RASTERIZE,
+
+		///@brief Queues used for instrument drivers (compute/transfer only)
+		QUEUE_POOL_DRIVER,
+
+		///@brief Queues used for the filter graph (compute/transfer only)
+		QUEUE_POOL_FILTER,
+
+		///@brief Dedicated transfer-only queues
+		QUEUE_POOL_TRANSFER,
+
+		///@brief Queues used for other miscellaneous stuff like the scope deskew wizard
+		QUEUE_POOL_MISC
+	};
+
 	/// Get a handle to a compute queue
-	std::shared_ptr<QueueHandle> GetComputeQueue(std::string name)
+	std::shared_ptr<QueueHandle> GetComputeQueue(const std::string& name)
 	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
 
 	/// Get a handle to a render queue
 	/// @note Currently this requires Graphics and Transfer capabilities to simplify texture transfer code in WaveformArea.
-	std::shared_ptr<QueueHandle> GetRenderQueue(std::string name)
+	std::shared_ptr<QueueHandle> GetRenderQueue(const std::string& name)
 	{ return GetQueueWithFlags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer, name); }
 
 	/// Get a handle to a transfer queue
 	/// @note This currently requires Compute capabilities so we can barrier on compute operations
-	std::shared_ptr<QueueHandle> GetTransferQueue(std::string name)
+	std::shared_ptr<QueueHandle> GetTransferQueue(const std::string& name)
 	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
 
 	/// Get a handle to a queue that has the given flag bits set, allocating the queue if necessary,
@@ -178,11 +147,17 @@ protected:
 		size_t Family;
 		size_t Index;
 		vk::QueueFlags Flags;
-		std::shared_ptr<QueueHandle> Handle;
+		std::shared_ptr<QueueWrapper> Handle;
 	};
 
-	/// All queues available on the device
+	///@brief All queues available on the device
 	std::vector<QueueInfo> m_queues;
+
+	///@brief Queue pools used for allocation
+	std::map<QueuePoolID, std::vector<QueueInfo> > m_pools;
+
+	//Names of pools
+	std::map<QueuePoolID, std::string> m_poolNames;
 };
 
 #endif

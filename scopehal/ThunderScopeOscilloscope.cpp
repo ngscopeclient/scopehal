@@ -154,39 +154,12 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	}
 
 	//Create Vulkan objects for the waveform conversion
-	m_queue = g_vkQueueManager->GetComputeQueue("ThunderScopeOscilloscope.queue");
-	vk::CommandPoolCreateInfo poolInfo(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		m_queue->m_family );
-	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-
-	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
-	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
-		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-
-	if(g_hasDebugUtils)
-	{
-		string poolname = "ThunderScopeOscilloscope.pool";
-		string bufname = "ThunderScopeOscilloscope.cmdbuf";
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandPool,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
-				poolname.c_str()));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
-				bufname.c_str()));
-	}
+	InitVulkanQueue("ThunderScopeOscilloscope");
 
 	m_conversion8BitPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
-
+		"shaders/Convert8BitSamplesQuad.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 	m_conversion16BitPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
 
@@ -382,15 +355,15 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//Read Version No.
 	uint8_t version;
-	if(!m_transport->ReadRawData(sizeof(version), (uint8_t*)&version))
+	if(!m_transport->ReadRawData(sizeof(version), reinterpret_cast<uint8_t*>(&version)))
 		return false;
 
 	//Read the sequence number of the current waveform
-	if(!m_transport->ReadRawData(sizeof(m_lastSeq), (uint8_t*)&m_lastSeq))
+	if(!m_transport->ReadRawData(sizeof(m_lastSeq), reinterpret_cast<uint8_t*>(&m_lastSeq)))
 		return false;
 
 	//Acknowledge receipt of this waveform
-	m_transport->SendRawData(4, (uint8_t*)&m_lastSeq);
+	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
 
 	if(!keep)
 		LogTrace("Dropping waveform %u\n",m_lastSeq);
@@ -401,18 +374,18 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	uint64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
 		return false;
 
 	//Get the de-facto trigger position.
 	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), (uint8_t*)&trigger_fs))
+	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
 		return false;
 
 	{
@@ -426,7 +399,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//Get the de-facto hardware capture rate.
 	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
+	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
 		return false;
 
 	if(keep)
@@ -448,14 +421,12 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	vector<float> scales;
 	vector<float> offsets;
 
-	bool processedWaveformsOnGPU = true;
-
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 
 		//Grab the next free buffer
@@ -475,7 +446,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			auto buf = abuf->GetCpuPointer();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 
 			float scale = config[0];
@@ -485,17 +456,17 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 			offset *= GetChannelAttenuation(chnum);
 
 			bool clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 
-			if(!m_transport->ReadRawData(sizeof(dataType), (uint8_t*)&dataType))
+			if(!m_transport->ReadRawData(sizeof(dataType), reinterpret_cast<uint8_t*>(&dataType)))
 				return false;
 
 			//TODO: stream timestamp from the server
 			uint32_t depth = memdepth * sizeof(int8_t);
 			if(dataType == DATATYPE_I16)
 				depth = memdepth * sizeof(int16_t);
-			if(!m_transport->ReadRawData(depth, (uint8_t*)buf))
+			if(!m_transport->ReadRawData(depth, reinterpret_cast<uint8_t*>(buf)))
 				return false;
 			abuf->MarkModifiedFromCpu();
 
@@ -525,14 +496,13 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 			//Kick off the GPU-side processing of the waveform to run nonblocking while we download the next
 			//Wait for any previous waveform processing to finish first, since we're reusing the command buffer
-			if(!keep)
-			{}
-			else if(g_hasShaderInt8 && g_hasPushDescriptor && (dataType == DATATYPE_I8))
+			//and not using push descriptors
+			if(dataType == DATATYPE_I8)
 			{
 				m_queue->WaitIdle();
+
 				m_cmdBuf->begin({});
 
-				m_conversion8BitPipeline->Bind(*m_cmdBuf);
 				m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
 				m_conversion8BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
@@ -541,8 +511,8 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				args.gain = scales[i];
 				args.offset = -offsets[i];
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-				m_conversion8BitPipeline->DispatchNoRebind(
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*4); //4 samples per thread
+				m_conversion8BitPipeline->Dispatch(
 					*m_cmdBuf, args,
 					min(compute_block_count, 32768u),
 					compute_block_count / 32768 + 1);
@@ -551,12 +521,11 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
-			else if(g_hasShaderInt16 && g_hasPushDescriptor && (dataType == DATATYPE_I16))
+			else /* if(dataType == DATATYPE_I16) */
 			{
 				m_queue->WaitIdle();
 				m_cmdBuf->begin({});
 
-				m_conversion16BitPipeline->Bind(*m_cmdBuf);
 				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
 				m_conversion16BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
@@ -565,8 +534,8 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				args.gain = scales[i];
 				args.offset = -offsets[i];
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-				m_conversion16BitPipeline->DispatchNoRebind(
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
+				m_conversion16BitPipeline->Dispatch(
 					*m_cmdBuf, args,
 					min(compute_block_count, 32768u),
 					compute_block_count / 32768 + 1);
@@ -575,10 +544,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
-
-			//Not available, fall back to CPU side processing
-			else
-				processedWaveformsOnGPU = false;
 		}
 		else
 		{
@@ -588,40 +553,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	if(!keep)
 		return true;
-
-	//Fallback path if GPU doesn't have suitable integer support
-	if(!processedWaveformsOnGPU)
-	{
-		//Process analog captures in parallel
-		#pragma omp parallel for
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-			cap->PrepareForCpuAccess();
-			if(dataType == DATATYPE_I8)
-			{
-				Convert8BitSamples(
-					(float*)&cap->m_samples[0],
-					(int8_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-					scales[i],
-					offsets[i],
-					cap->m_samples.size());
-			}
-			else if(dataType == DATATYPE_I16)
-			{
-				Convert16BitSamples(
-					(float*)&cap->m_samples[0],
-					(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-					scales[i],
-					offsets[i],
-					cap->m_samples.size());
-			}
-			cap->MarkModifiedFromCpu();
-		}
-
-		//If we did CPU side conversion, push the waveforms to our queue now
-		PushPendingWaveformsIfReady();
-	}
 
 	m_receiveClock.Tick();
 	m_diag_receivedWFMHz.SetFloatVal(m_receiveClock.GetAverageHz());
@@ -784,7 +715,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleRatesNonInterleaved()
 	string rates = m_transport->SendCommandQueuedWithReply("ACQ:RATES?");
 
 	auto split = explode(rates, ',');
-	for(auto s : split)
+	for(auto& s : split)
 		ret.push_back(stol(s));
 
 	return ret;
@@ -822,7 +753,7 @@ vector<uint64_t> ThunderScopeOscilloscope::GetSampleDepthsNonInterleaved()
 	string depths = m_transport->SendCommandQueuedWithReply("ACQ:DEPTHS?");
 
 	auto split = explode(depths, ',');
-	for(auto s : split)
+	for(auto& s : split)
 		ret.push_back(stol(s));
 
 	return ret;

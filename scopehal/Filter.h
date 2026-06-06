@@ -209,10 +209,6 @@ public:
 	virtual void AddRef() override;
 	virtual void Release() override;
 
-	///@brief Returns the current reference count
-	size_t GetRefCount()
-	{ return m_refcount; }
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Accessors
 
@@ -234,12 +230,6 @@ public:
 		Most decoders shouldn't have to do anything for this.
 	 */
 	virtual void ClearSweeps();
-
-	[[deprecated]]
-	virtual void Refresh() override;
-
-	//GPU accelerated refresh method
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling
@@ -579,6 +569,19 @@ public:
 
 	/**
 		@brief Gets the base and top voltage of a waveform which may be sparse or uniform
+
+		@param cmdBuf				Vulkan command buffer (must be idle and not already recording)
+		@param queue				Vulkan queue
+		@param minmaxPipeline		Compute pipeline for MinMax shader
+		@param histogramPipeline	Compute pipeline for Histogram shader
+									(optional, requires shaderInt64 and shaderAtomicInt64)
+		@param scratchMin			Scratch buffer for minimum calculation
+		@param scratchMax			Scratch buffer for maximum calculation
+		@param hist					Output buffer for histogram calculation
+		@param swfm					Sparse input waveform (either this or uwfm must be non-null)
+		@param uwfm					Uniform input waveform (either this or uwfm must be non-null)
+		@param base					Output base value
+		@param top					Output top value
 	 */
 	static void GetBaseAndTopVoltage(
 		vk::raii::CommandBuffer& cmdBuf,
@@ -607,7 +610,7 @@ public:
 				base,
 				top);
 		}
-		else
+		else if(uwfm)
 		{
 			GetBaseAndTopVoltage(
 				cmdBuf,
@@ -620,6 +623,12 @@ public:
 				uwfm,
 				base,
 				top);
+		}
+		else
+		{
+			LogError("Filter::GetBaseAndTopVoltage called with both waveforms null\n");
+			base = 0;
+			top = 0;
 		}
 	}
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,12 +37,20 @@
 
 #include <random>
 
+class NoiseFilterConstants
+{
+public:
+	uint32_t size;
+	uint32_t rngSeed;
+	float sigma;
+};
+
 class NoiseFilter : public Filter
 {
 public:
 	NoiseFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -51,14 +59,11 @@ public:
 	PROTOCOL_DECODER_INITPROC(NoiseFilter)
 
 protected:
-#ifdef __x86_64__
-	void CopyWithAwgnAVX2(float* dest, float* src, size_t len, float sigma);
-#endif
-	void CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma);
-
-	std::string m_stdevname;
+	FilterParameter& m_stdev;
 
 	std::mt19937 m_twister;
+
+	ComputePipeline m_computePipeline;
 };
 
 #endif

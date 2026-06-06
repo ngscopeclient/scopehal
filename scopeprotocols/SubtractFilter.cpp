@@ -53,7 +53,7 @@ SubtractFilter::~SubtractFilter()
 
 bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i >= 2)
@@ -81,6 +81,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range range("SubtractFilter::Refresh");
 	#endif
+	ClearErrors();
 
 	//Set units as early as possible so we can spawn in the same plot as our parent signal when creating a filter
 	if(GetInput(0))
@@ -98,7 +99,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		DoRefreshScalarScalar();
 	else if(veca)
 		DoRefreshScalarVector(1, 0);
-	else
+	else /* if vecb */
 		DoRefreshScalarVector(0, 1);
 }
 
@@ -118,7 +119,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or invalid");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -134,7 +136,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
 		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Inconsistent units", "Both inputs must have the same X and Y axis unit");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -167,18 +170,21 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	{
 		scap = SetupSparseOutputWaveform(sdin_p, 0, 0, 0);
 		scap->m_triggerPhase = max(din_p->m_triggerPhase, din_n->m_triggerPhase);
+		scap->Rename("SubtractFilter.data");
 	}
 	else if(udin_p && udin_n)
 	{
 		ucap = SetupEmptyUniformAnalogOutputWaveform(udin_p, 0);
 		ucap->m_triggerPhase = max(din_p->m_triggerPhase, din_n->m_triggerPhase);
 		ucap->Resize(len);
+		ucap->Rename("SubtractFilter.data");
 	}
 
 	//Mixed sparse/uniform not allowed
 	else
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Inconsistent types", "Mixing sparse and uniform inputs is not supported");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -249,6 +255,7 @@ void SubtractFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 	auto din = GetInputWaveform(iVector);
 	if(!din)
 	{
+		AddErrorMessage("Missing input", "Input vector is null or missing");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -303,10 +310,4 @@ void SubtractFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 
 		cap->MarkModifiedFromCpu();
 	}
-}
-
-Filter::DataLocation SubtractFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }

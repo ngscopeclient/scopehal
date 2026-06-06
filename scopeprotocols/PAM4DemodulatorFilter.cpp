@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,23 +37,23 @@ using namespace std;
 
 PAM4DemodulatorFilter::PAM4DemodulatorFilter(const string& color)
 	: Filter(color, CAT_SERIAL)
-	, m_lowerThreshName("Lower Threshold")
-	, m_midThreshName("Middle Threshold")
-	, m_upperThreshName("Upper Threshold")
+	, m_lowerThresh(m_parameters["Lower Threshold"])
+	, m_midThresh(m_parameters["Middle Threshold"])
+	, m_upperThresh(m_parameters["Upper Threshold"])
 {
 	AddDigitalStream("data");
 	AddDigitalStream("clk");
 	CreateInput("data");
 	CreateInput("clk");
 
-	m_parameters[m_lowerThreshName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_lowerThreshName].SetFloatVal(-0.07);
+	m_lowerThresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_lowerThresh.SetFloatVal(-0.07);
 
-	m_parameters[m_midThreshName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_midThreshName].SetFloatVal(0.005);
+	m_midThresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_midThresh.SetFloatVal(0.005);
 
-	m_parameters[m_upperThreshName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_upperThreshName].SetFloatVal(0.09);
+	m_upperThresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_upperThresh.SetFloatVal(0.09);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,7 @@ PAM4DemodulatorFilter::PAM4DemodulatorFilter(const string& color)
 
 bool PAM4DemodulatorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -83,11 +83,19 @@ string PAM4DemodulatorFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PAM4DemodulatorFilter::Refresh()
+void PAM4DemodulatorFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PAM4DemodulatorFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -105,27 +113,21 @@ void PAM4DemodulatorFilter::Refresh()
 	//Get the thresholds
 	float thresholds[3] =
 	{
-		m_parameters[m_lowerThreshName].GetFloatVal(),
-		m_parameters[m_midThreshName].GetFloatVal(),
-		m_parameters[m_upperThreshName].GetFloatVal()
+		m_lowerThresh.GetFloatVal(),
+		m_midThresh.GetFloatVal(),
+		m_upperThresh.GetFloatVal()
 	};
 
 	//Create the captures
-	auto dcap = new SparseDigitalWaveform;
+	auto dcap = SetupEmptyWaveform<SparseDigitalWaveform>(din, 0);
 	dcap->m_timescale = 1;
-	dcap->m_startTimestamp = din->m_startTimestamp;
-	dcap->m_startFemtoseconds = din->m_startFemtoseconds;
 	dcap->m_triggerPhase = 0;
 	dcap->PrepareForCpuAccess();
-	SetData(dcap, 0);
 
-	auto ccap = new SparseDigitalWaveform;
+	auto ccap = SetupEmptyWaveform<SparseDigitalWaveform>(din, 1);
 	ccap->m_timescale = 1;
-	ccap->m_startTimestamp = din->m_startTimestamp;
-	ccap->m_startFemtoseconds = din->m_startFemtoseconds;
 	ccap->m_triggerPhase = 0;
 	ccap->PrepareForCpuAccess();
-	SetData(ccap, 1);
 
 	//Decode the input data, one symbol (two output bits) at a time
 	dcap->Resize(len*2);

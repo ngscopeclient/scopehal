@@ -241,6 +241,7 @@ Oscilloscope::TriggerMode SCPISA::PollTrigger()
 {
 	return m_triggerArmed ? TRIGGER_MODE_TRIGGERED : TRIGGER_MODE_STOP;
 }
+
 void SCPISA::Start()
 {
 	m_triggerArmed = true;
@@ -305,7 +306,7 @@ int64_t SCPISA::GetResolutionBandwidth()
 }
 
 void SCPISA::SetResolutionBandwidth(int64_t rbw)
-{	
+{
 	m_rbw = rbw;
 }
 

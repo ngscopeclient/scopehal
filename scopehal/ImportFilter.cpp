@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -85,7 +85,9 @@ bool ImportFilter::NeedsConfig()
 	return true;
 }
 
-void ImportFilter::Refresh()
+void ImportFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	//everything happens in OnFileNameChanged
 }
@@ -122,6 +124,9 @@ bool ImportFilter::TryNormalizeTimebase(SparseWaveformBase* wfm)
 		interval_min = min(interval_min, dur);
 		interval_max = max(interval_max, dur);
 	}
+	if(interval_count == 0)
+		return false;
+
 	uint64_t avg = interval_sum / interval_count;
 	LogTrace("Min sample interval:     %s\n", xunit.PrettyPrint(interval_min).c_str());
 	LogTrace("Average sample interval: %s\n", xunit.PrettyPrint(avg).c_str());

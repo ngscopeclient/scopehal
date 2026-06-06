@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -308,23 +308,23 @@ bool DSLabsOscilloscope::AcquireData()
 
 	//Read the sequence number of the current waveform
 	uint32_t seqnum;
-	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
+	if(!m_transport->ReadRawData(sizeof(seqnum), reinterpret_cast<uint8_t*>(&seqnum)))
 		return false;
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
 		return false;
 
 	//Get the de-facto trigger position.
 	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), (uint8_t*)&trigger_fs))
+	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
 		return false;
 
 	{
@@ -338,7 +338,7 @@ bool DSLabsOscilloscope::AcquireData()
 
 	//Get the de-facto hardware capture rate.
 	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
+	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
 		return false;
 
 	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
@@ -364,14 +364,14 @@ bool DSLabsOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 
 		// LogDebug("ch%ld: Receive %ld samples\n", chnum, memdepth);
 
-		uint8_t* buf = new uint8_t[memdepth];
+		uint8_t* buf = nullptr;
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
@@ -379,7 +379,7 @@ bool DSLabsOscilloscope::AcquireData()
 			abufs.push_back(buf);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -388,13 +388,16 @@ bool DSLabsOscilloscope::AcquireData()
 			offset *= GetChannelAttenuation(chnum);
 
 			bool clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 
 			//TODO: stream timestamp from the server
-
-			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
+			buf = new uint8_t[memdepth];
+			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), reinterpret_cast<uint8_t*>(buf)))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			//Create our waveform
 			auto cap = new UniformAnalogWaveform;
@@ -416,11 +419,15 @@ bool DSLabsOscilloscope::AcquireData()
 		{
 			int32_t first_sample;
 
-			if(!m_transport->ReadRawData(sizeof(first_sample), (uint8_t*)&first_sample))
+			if(!m_transport->ReadRawData(sizeof(first_sample), reinterpret_cast<uint8_t*>(&first_sample)))
 				return false;
 
-			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), (uint8_t*)buf))
+			buf = new uint8_t[memdepth];
+			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), buf))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			//Create buffers for output waveforms
 			auto cap = new SparseDigitalWaveform;

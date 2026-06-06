@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -155,7 +155,7 @@ protected:
 	int HWDigitalNumber(size_t index)
 	{ return index - m_digitalChannelBase; }
 
-	template <typename T> size_t AcquireHeader(T* cap, std::string chname);
+	template <typename T> size_t AcquireHeader(T* cap, const std::string& chname);
 
 	//config cache
 	std::map<size_t, float> m_channelOffsets;
@@ -165,9 +165,6 @@ protected:
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, int> m_channelBandwidthLimits;
 	std::map<size_t, double> m_channelAttenuations;
-
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 
 	bool m_sampleRateValid;
 	uint64_t m_sampleRate;

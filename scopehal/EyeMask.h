@@ -105,11 +105,11 @@ public:
 	bool Load(const YAML::Node& node);
 
 	///@brief Get the filename of the mask
-	std::string GetFileName() const
+	const std::string& GetFileName() const
 	{ return m_fname; }
 
 	///@brief Get the display name of the eye pattern mask
-	std::string GetMaskName() const
+	const std::string& GetMaskName() const
 	{ return m_maskname; }
 
 	/**

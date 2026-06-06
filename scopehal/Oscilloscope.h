@@ -866,13 +866,18 @@ public:
 	static void ConvertUnsigned8BitSamplesAVX2(float* pout, const uint8_t* pin, float gain, float offset, size_t count);
 #endif
 
-	static void Convert16BitSamples(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesGeneric(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-#ifdef __x86_64__
-	static void Convert16BitSamplesAVX2(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesFMA(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-	static void Convert16BitSamplesAVX512F(float* pout, const int16_t* pin, float gain, float offset, size_t count);
-#endif
+protected:
+
+	///@brief Vulkan queue for GPU waveform processing
+	std::shared_ptr<QueueHandle> m_queue;
+
+	///@brief Vulkan command pool for GPU waveform processing
+	std::unique_ptr<vk::raii::CommandPool> m_pool;
+
+	///@brief Vulkan command buffer for GPU waveform processing
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
+
+	void InitVulkanQueue(const char* debugName);
 
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -897,16 +902,12 @@ protected:
 	std::map<std::string, FilterParameter*> m_diagnosticValues;
 	// Pointers are expected to be to members of this class; not dynamically allocated
 
-	void AddDiagnosticLog(std::string message)
-	{
-		m_diagnosticLogMessages.push_back(message);
-	}
+	void AddDiagnosticLog(const std::string& message)
+	{ m_diagnosticLogMessages.push_back(message); }
 
 public:
 	bool HasPendingDiagnosticLogMessages()
-	{
-		return !m_diagnosticLogMessages.empty();
-	}
+	{ return !m_diagnosticLogMessages.empty(); }
 
 	std::string PopPendingDiagnosticLogMessage()
 	{
@@ -985,10 +986,10 @@ public:
 
 public:
 	typedef std::shared_ptr<Oscilloscope> (*CreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, CreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, CreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<Oscilloscope> CreateOscilloscope(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<Oscilloscope> CreateOscilloscope(const std::string& driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration

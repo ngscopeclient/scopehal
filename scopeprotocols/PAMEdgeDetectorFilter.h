@@ -68,7 +68,6 @@ public:
 	PAMEdgeDetectorFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -91,7 +90,6 @@ protected:
 
 	AcceleratorBuffer<uint32_t> m_edgeIndexesScratch;
 	AcceleratorBuffer<uint8_t> m_edgeStatesScratch;
-	AcceleratorBuffer<uint8_t> m_edgeRisingScratch;
 
 	AcceleratorBuffer<float> m_thresholds;
 	AcceleratorBuffer<float> m_levels;

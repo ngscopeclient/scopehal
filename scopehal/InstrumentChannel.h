@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -87,15 +87,15 @@ public:
 	virtual std::string GetDisplayName();
 
 	///@brief Gets the hardware name of the channel (m_hwname)
-	std::string GetHwname()
+	const std::string& GetHwname() const
 	{ return m_hwname; }
 
 	///@brief Gets the (zero based) index of the channel
-	size_t GetIndex()
+	size_t GetIndex() const
 	{ return m_index; }
 
 	///@brief Gets the instrument this channel is part of (if any)
-	Instrument* GetInstrument()
+	Instrument* GetInstrument() const
 	{ return m_instrument; }
 
 	/**
@@ -264,6 +264,8 @@ public:
 
 	/// returns the start time of a download, if we are DOWNLOAD_IN_PROGRESS; undefined, otherwise
 	virtual double GetDownloadStartTime();
+
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 protected:
 

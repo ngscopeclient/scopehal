@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,19 +37,19 @@ using namespace std;
 
 SquelchFilter::SquelchFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_threshold(m_parameters["Threshold"])
+	, m_holdtime(m_parameters["Hold time"])
 {
 	//Set up channels
 	CreateInput("in");
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "out", Stream::STREAM_TYPE_DIGITAL);
 
-	m_thresholdname = "Threshold";
-	m_parameters[m_thresholdname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_thresholdname].SetFloatVal(0.01);
+	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_threshold.SetFloatVal(0.01);
 
-	m_holdtimename = "Hold time";
-	m_parameters[m_holdtimename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_holdtimename].SetIntVal(1e6);
+	m_holdtime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_holdtime.SetIntVal(1e6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +57,7 @@ SquelchFilter::SquelchFilter(const string& color)
 
 bool SquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 1) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -77,12 +77,20 @@ string SquelchFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SquelchFilter::Refresh()
+void SquelchFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SquelchFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -91,8 +99,8 @@ void SquelchFilter::Refresh()
 
 	size_t len = din->size();
 
-	auto threshold = m_parameters[m_thresholdname].GetFloatVal();
-	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
+	auto threshold = m_threshold.GetFloatVal();
+	auto holdtime_fs = m_holdtime.GetIntVal();
 	size_t holdtime_samples = holdtime_fs / din->m_timescale;
 
 	auto dout = SetupEmptySparseDigitalOutputWaveform(din, 0);

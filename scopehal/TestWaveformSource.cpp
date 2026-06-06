@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,7 +52,12 @@ using namespace std;
  */
 TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
+	, m_forwardInBuf("TestWaveformSource.m_forwardInBuf")
+	, m_forwardOutBuf("TestWaveformSource.m_forwardOutBuf")
+	, m_reverseOutBuf("TestWaveformSource.m_reverseOutBuf")
 	, m_cachedBinSize(0)
+	, m_resampledSparamSines("TestWaveformSource.m_resampledSparamSines")
+	, m_resampledSparamCosines("TestWaveformSource.m_resampledSparamCosines")
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_channelEmulationComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
 	, m_noisySineComputePipeline("shaders/NoisySine.spv", 1, sizeof(NoisySinePushConstants))
@@ -101,6 +106,7 @@ WaveformBase* TestWaveformSource::GenerateStep(
 	auto ret = new UniformAnalogWaveform("Step");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
+	ret->Rename("TestWaveformSource.Step");
 
 	size_t mid = depth/2;
 	for(size_t i=0; i<depth; i++)
@@ -141,18 +147,21 @@ void TestWaveformSource::GenerateNoisySinewave(
 	wfm->m_triggerPhase = 0;
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.NoisySine");
+
+	double cycles_per_sample = static_cast<double>(sampleperiod) / static_cast<double>(period);
+	uint32_t fpfreq = round(0xffffffff * cycles_per_sample);
 
 	//Calculate a bunch of constants
 	const int numThreads = 32768;
 	NoisySinePushConstants push;
-	float samples_per_cycle = period * 1.0 / sampleperiod;
+	push.fpfreq = fpfreq;
 	push.numSamples = depth;
 	push.samplesPerThread = (depth + numThreads) / numThreads;
 	push.rngSeed = m_rng();
 	push.startPhase = startphase;
 	push.scale = amplitude / 2;	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	push.sigma = noise_stdev;
-	push.radiansPerSample = 2 * M_PI / samples_per_cycle;
 
 	//Do the actual waveform generation
 	cmdBuf.begin({});
@@ -194,12 +203,18 @@ void TestWaveformSource::GenerateNoisySinewaveSum(
 	wfm->m_triggerPhase = 0;
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.NoisySineSum");
+
+	double cycles_per_sample1 = static_cast<double>(sampleperiod) / static_cast<double>(period1);
+	double cycles_per_sample2 = static_cast<double>(sampleperiod) / static_cast<double>(period2);
+	uint32_t fpfreq1 = round(0xffffffff * cycles_per_sample1);
+	uint32_t fpfreq2 = round(0xffffffff * cycles_per_sample2);
 
 	//Calculate a bunch of constants
 	const int numThreads = 32768;
 	NoisySineSumPushConstants push;
-	float samples_per_cycle1 = period1 * 1.0 / sampleperiod;
-	float samples_per_cycle2 = period2 * 1.0 / sampleperiod;
+	push.fpfreq1 = fpfreq1;
+	push.fpfreq2 = fpfreq2;
 	push.numSamples = depth;
 	push.samplesPerThread = (depth + numThreads) / numThreads;
 	push.rngSeed = m_rng();
@@ -207,8 +222,6 @@ void TestWaveformSource::GenerateNoisySinewaveSum(
 	push.startPhase2 = startphase2;
 	push.scale = amplitude / 4;	//sin is +/- 1, so need to divide amplitude by 4 to get scaling factor for sum
 	push.sigma = noise_stdev;
-	push.radiansPerSample1 = 2 * M_PI / samples_per_cycle1;
-	push.radiansPerSample2 = 2 * M_PI / samples_per_cycle2;
 
 	//Do the actual waveform generation
 	cmdBuf.begin({});
@@ -247,6 +260,7 @@ void TestWaveformSource::GeneratePRBS31(
 {
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.PRBS31");
 
 	//Generate the PRBS as a square wave. Interpolate zero crossings as needed.
 	uint32_t prbs = rand();
@@ -315,6 +329,7 @@ void TestWaveformSource::Generate8b10b(
 {
 	wfm->m_timescale = sampleperiod;
 	wfm->Resize(depth);
+	wfm->Rename("TestWaveformSource.8B10B");
 
 	const int patternlen = 20;
 	const bool pattern[patternlen] =

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -104,7 +104,7 @@ protected:
 	size_t m_width;
 	size_t m_height;
 
-	std::string m_maxwidth;
+	FilterParameter& m_maxwidth;
 
 	ComputePipeline m_computePipeline;
 };

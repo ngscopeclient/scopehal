@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,13 +43,13 @@ using namespace std;
 
 UARTDecoder::UARTDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
+	, m_baud(m_parameters["Baud rate"])
 {
 	//Set up channels
 	CreateInput("din");
 
-	m_baudname = "Baud rate";
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_baudname].SetIntVal(115200);
+	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_baud.SetIntVal(115200);
 }
 
 UARTDecoder::~UARTDecoder()
@@ -69,7 +69,7 @@ vector<string> UARTDecoder::GetHeaders()
 
 bool UARTDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -85,13 +85,21 @@ string UARTDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void UARTDecoder::Refresh()
+void UARTDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -102,17 +110,14 @@ void UARTDecoder::Refresh()
 	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
 
 	//Get the bit period
-	float bit_period = FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal();
+	float bit_period = FS_PER_SECOND / m_baud.GetFloatVal();
 	int64_t ibitper = bit_period;
 	int64_t scaledbitper = ibitper / din->m_timescale;
 
 	//UART processing
-	auto cap = new ByteWaveform(m_displaycolor);
+	auto cap = SetupEmptyWaveform<ByteWaveform>(din, 0);
+	cap->SetParent(this);
 	cap->PrepareForCpuAccess();
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
 
 	//Time-domain processing to reflect potentially variable sampling rate for RLE captures
 	int64_t next_value = 0;
@@ -203,8 +208,6 @@ void UARTDecoder::Refresh()
 		pack->m_len = ::GetOffsetScaled(sdin, udin, len-1) - pack->m_offset;
 		FinishPacket(pack);
 	}
-
-	SetData(cap, 0);
 }
 
 void UARTDecoder::FinishPacket(Packet* pack)
@@ -228,9 +231,9 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	m_packets.push_back(pack);
 }
 
-std::string ByteWaveform::GetColor(size_t /*i*/)
+string ByteWaveform::GetColor(size_t /*i*/)
 {
-	return m_color;
+	return m_parent->m_displaycolor;
 }
 
 string ByteWaveform::GetText(size_t i)

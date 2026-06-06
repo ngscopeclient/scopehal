@@ -74,7 +74,7 @@ TIEMeasurement::TIEMeasurement(const string& color)
 
 bool TIEMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -93,12 +93,6 @@ bool TIEMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 string TIEMeasurement::GetProtocolName()
 {
 	return "Clock Jitter (TIE)";
-}
-
-Filter::DataLocation TIEMeasurement::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -40,34 +40,34 @@ using namespace std;
 
 FIRFilter::FIRFilter(const string& color)
 	: Filter(color, CAT_MATH, Unit(Unit::UNIT_FS))
-	, m_filterTypeName("Filter Type")
-	, m_filterLengthName("Length")
-	, m_stopbandAttenName("Stopband Attenuation")
-	, m_freqLowName("Frequency Low")
-	, m_freqHighName("Frequency High")
+	, m_filterType(m_parameters["Filter Type"])
+	, m_filterLength(m_parameters["Length"])
+	, m_stopbandAtten(m_parameters["Stopband Attenuation"])
+	, m_freqLow(m_parameters["Frequency Low"])
+	, m_freqHigh(m_parameters["Frequency High"])
 	, m_computePipeline("shaders/FIRFilter.spv", 3, sizeof(FIRFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
-	m_parameters[m_filterTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_filterTypeName].AddEnumValue("Low pass", FILTER_TYPE_LOWPASS);
-	m_parameters[m_filterTypeName].AddEnumValue("High pass", FILTER_TYPE_HIGHPASS);
-	m_parameters[m_filterTypeName].AddEnumValue("Band pass", FILTER_TYPE_BANDPASS);
-	m_parameters[m_filterTypeName].AddEnumValue("Notch", FILTER_TYPE_NOTCH);
-	m_parameters[m_filterTypeName].SetIntVal(FILTER_TYPE_LOWPASS);
+	m_filterType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_filterType.AddEnumValue("Low pass", FILTER_TYPE_LOWPASS);
+	m_filterType.AddEnumValue("High pass", FILTER_TYPE_HIGHPASS);
+	m_filterType.AddEnumValue("Band pass", FILTER_TYPE_BANDPASS);
+	m_filterType.AddEnumValue("Notch", FILTER_TYPE_NOTCH);
+	m_filterType.SetIntVal(FILTER_TYPE_LOWPASS);
 
-	m_parameters[m_filterLengthName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_filterLengthName].SetIntVal(0);
+	m_filterLength = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_filterLength.SetIntVal(0);
 
-	m_parameters[m_stopbandAttenName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
-	m_parameters[m_stopbandAttenName].SetFloatVal(60);
+	m_stopbandAtten = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_stopbandAtten.SetFloatVal(60);
 
-	m_parameters[m_freqLowName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_freqLowName].SetFloatVal(0);
+	m_freqLow = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_freqLow.SetFloatVal(0);
 
-	m_parameters[m_freqHighName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_freqHighName].SetFloatVal(100e6);
+	m_freqHigh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_freqHigh.SetFloatVal(100e6);
 
 	m_coefficients.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_coefficients.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -93,33 +93,33 @@ bool FIRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 void FIRFilter::SetDefaultName()
 {
 	char hwname[256];
-	auto type = static_cast<FIRFilterType>(m_parameters[m_filterTypeName].GetIntVal());
+	auto type = m_filterType.GetEnumVal<FIRFilterType>();
 	switch(type)
 	{
 		case FILTER_TYPE_LOWPASS:
 			snprintf(hwname, sizeof(hwname), "LPF(%s, %s)",
 				GetInputDisplayName(0).c_str(),
-				m_parameters[m_freqHighName].ToString().c_str());
+				m_freqHigh.ToString().c_str());
 			break;
 
 		case FILTER_TYPE_HIGHPASS:
 			snprintf(hwname, sizeof(hwname), "HPF(%s, %s)",
 				GetInputDisplayName(0).c_str(),
-				m_parameters[m_freqLowName].ToString().c_str());
+				m_freqLow.ToString().c_str());
 			break;
 
 		case FILTER_TYPE_BANDPASS:
 			snprintf(hwname, sizeof(hwname), "BPF(%s, %s, %s)",
 				GetInputDisplayName(0).c_str(),
-				m_parameters[m_freqLowName].ToString().c_str(),
-				m_parameters[m_freqHighName].ToString().c_str());
+				m_freqLow.ToString().c_str(),
+				m_freqHigh.ToString().c_str());
 			break;
 
 		case FILTER_TYPE_NOTCH:
 			snprintf(hwname, sizeof(hwname), "Notch(%s, %s, %s)",
 				GetInputDisplayName(0).c_str(),
-				m_parameters[m_freqLowName].ToString().c_str(),
-				m_parameters[m_freqHighName].ToString().c_str());
+				m_freqLow.ToString().c_str(),
+				m_freqHigh.ToString().c_str());
 			break;
 
 	}
@@ -130,12 +130,6 @@ void FIRFilter::SetDefaultName()
 string FIRFilter::GetProtocolName()
 {
 	return "FIR Filter";
-}
-
-Filter::DataLocation FIRFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,9 +163,9 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 
 	//Calculate limits for our filter
 	float nyquist = sample_hz / 2;
-	float flo = m_parameters[m_freqLowName].GetFloatVal();
-	float fhi = m_parameters[m_freqHighName].GetFloatVal();
-	auto type = static_cast<FIRFilterType>(m_parameters[m_filterTypeName].GetIntVal());
+	float flo = m_freqLow.GetFloatVal();
+	float fhi = m_freqHigh.GetFloatVal();
+	auto type = m_filterType.GetEnumVal<FIRFilterType>();
 	if(type == FILTER_TYPE_LOWPASS)
 		flo = 0;
 	else if(type == FILTER_TYPE_HIGHPASS)
@@ -190,8 +184,8 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	fhi = min(fhi, nyquist);
 
 	//Calculate filter order
-	size_t filterlen = m_parameters[m_filterLengthName].GetIntVal();
-	float atten = m_parameters[m_stopbandAttenName].GetFloatVal();
+	size_t filterlen = m_filterLength.GetIntVal();
+	float atten = m_stopbandAtten.GetFloatVal();
 	if(filterlen == 0)
 		filterlen = (atten / 22) * (sample_hz / (fhi - flo) );
 	filterlen |= 1;	//force length to be odd
@@ -236,58 +230,22 @@ void FIRFilter::DoFilterKernel(
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
-	if(g_gpuFilterEnabled)
-	{
-		cmdBuf.begin({});
+	cmdBuf.begin({});
 
-		FIRFilterArgs args;
-		args.end = din->size() - m_coefficients.size();
-		args.filterlen = m_coefficients.size();
+	FIRFilterArgs args;
+	args.end = din->size() - m_coefficients.size();
+	args.filterlen = m_coefficients.size();
 
-		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, m_coefficients, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
-		const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
-		m_computePipeline.Dispatch(cmdBuf, args,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, m_coefficients, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+	const uint32_t compute_block_count = GetComputeBlockCount(args.end, 64);
+	m_computePipeline.Dispatch(cmdBuf, args,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
-		cap->m_samples.MarkModifiedFromGpu();
-	}
-
-	else
-	{
-		din->PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		DoFilterKernelGeneric(din, cap);
-
-		cap->MarkModifiedFromCpu();
-	}
-}
-
-/**
-	@brief Performs a FIR filter (does not assume symmetric)
- */
-void FIRFilter::DoFilterKernelGeneric(
-	UniformAnalogWaveform* din,
-	UniformAnalogWaveform* cap)
-{
-	//Setup
-	size_t len = din->size();
-	size_t filterlen = m_coefficients.size();
-	size_t end = len - filterlen;
-
-	//Do the filter
-	for(size_t i=0; i<end; i++)
-	{
-		float v = 0;
-		for(size_t j=0; j<filterlen; j++)
-			v += din->m_samples[i + j] * m_coefficients[j];
-
-		cap->m_samples[i]	= v;
-	}
+	cap->m_samples.MarkModifiedFromGpu();
 }

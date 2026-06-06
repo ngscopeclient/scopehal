@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -78,12 +78,17 @@ string PulseWidthMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PulseWidthMeasurement::Refresh()
+void PulseWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PulseWidthMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -93,31 +98,36 @@ void PulseWidthMeasurement::Refresh()
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
 	float average_voltage = 0;
 	float max_value;
 	size_t temp = 0;
 
+	//Midpoint is 50% of full scale range
+	//TODO: do base/top instead?
 	if(uadin)
-		average_voltage = GetAvgVoltage(uadin);
+		average_voltage = m_averager.Average(uadin, cmdBuf, queue);
 	else if(sadin)
-		average_voltage = GetAvgVoltage(sadin);
+		average_voltage = m_averager.Average(sadin, cmdBuf, queue);
 
-	//Auto-threshold analog signals at 50% of full scale range
+	//Auto-threshold analog signals
 	if(uadin)
-		FindZeroCrossings(uadin, average_voltage, edges);
+		m_detector.FindZeroCrossings(uadin, average_voltage, cmdBuf, queue);
 	else if(sadin)
-		FindZeroCrossings(sadin, average_voltage, edges);
+		m_detector.FindZeroCrossings(sadin, average_voltage, cmdBuf, queue);
 
 	//Just find edges in digital signals
 	else if(uddin)
-		FindZeroCrossings(uddin, edges);
+		m_detector.FindZeroCrossings(uddin, cmdBuf, queue);
 	else
-		FindZeroCrossings(sddin, edges);
+		m_detector.FindZeroCrossings(sddin, cmdBuf, queue);
+
+	auto& edges = m_detector.GetResults();
+	edges.PrepareForCpuAccess();
 
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
+		AddErrorMessage("Empty input", "Expected two or more level crossings at input");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -128,7 +138,7 @@ void PulseWidthMeasurement::Refresh()
 	cap->PrepareForCpuAccess();
 
 	//Create the output for amplitude waveform for analog inputs only
-	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : NULL;
+	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : nullptr;
 	if(cap1)
 	{
 		cap1->m_timescale = 1;
@@ -138,72 +148,111 @@ void PulseWidthMeasurement::Refresh()
 	size_t elen = edges.size();
 	KahanSummation sum;
 	int64_t nedges = 0;
-	for(size_t i=0; i < (elen - 2); i+= 2)
+
+	//Analog path
+	if(cap1)
 	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+1];
-
-		int64_t delta = end - start;
-
-		//Push pulse width information
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(delta);
-		cap->m_samples.push_back(delta);
-
-		// Find amplitude information for the pulses
 		if(uadin)
 		{
-			int64_t start_index = (start - din->m_triggerPhase) / din->m_timescale;
-			int64_t end_index = (end - din->m_triggerPhase) / din->m_timescale;
-			max_value = average_voltage;
-
-			// Find out the maximum value of the pulse within boundary of the detected pulse
-			for (int64_t j = start_index; j < end_index; j++)
+			for(size_t i=0; i < (elen - 2); i+= 2)
 			{
-				if(uadin->m_samples[j] > max_value)
-					max_value = uadin->m_samples[j];
+				//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+				int64_t start = edges[i];
+				int64_t end = edges[i+1];
+
+				int64_t delta = end - start;
+
+				//Push pulse width information
+				cap->m_offsets.push_back(start);
+				cap->m_durations.push_back(delta);
+				cap->m_samples.push_back(delta);
+
+				// Find amplitude information for the pulses
+				int64_t start_index = (start - din->m_triggerPhase) / din->m_timescale;
+				int64_t end_index = (end - din->m_triggerPhase) / din->m_timescale;
+				max_value = average_voltage;
+
+				// Find out the maximum value of the pulse within boundary of the detected pulse
+				for (int64_t j = start_index; j < end_index; j++)
+				{
+					if(uadin->m_samples[j] > max_value)
+						max_value = uadin->m_samples[j];
+				}
+
+				//Push amplitude information
+				cap1->m_offsets.push_back(start);
+				cap1->m_durations.push_back(delta);
+				cap1->m_samples.push_back(max_value);
+
+				nedges ++;
+				sum += delta;
 			}
-
-			//Push amplitude information
-			cap1->m_offsets.push_back(start);
-			cap1->m_durations.push_back(delta);
-			cap1->m_samples.push_back(max_value);
-
-			nedges ++;
-			sum += delta;
 		}
-		else if (sadin)
+
+		else if(sadin)
 		{
-			int64_t start_offs = (start - din->m_triggerPhase) / din->m_timescale;
-			int64_t end_offs = (end - din->m_triggerPhase) / din->m_timescale;
-			max_value = average_voltage;
-
-			//Parse the waveform to get to a detected pulse
-			for (size_t j = temp; j < sadin->size(); j++)
+			for(size_t i=0; i < (elen - 2); i+= 2)
 			{
-				// Find out maximum value of the pulse within boundary of the detected pulse
-				if ((sadin->m_offsets[j] >= start_offs) && (sadin->m_offsets[j] <= end_offs))
+				//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+				int64_t start = edges[i];
+				int64_t end = edges[i+1];
+
+				int64_t delta = end - start;
+
+				//Push pulse width information
+				cap->m_offsets.push_back(start);
+				cap->m_durations.push_back(delta);
+				cap->m_samples.push_back(delta);
+
+				// Find amplitude information for the pulses
+				int64_t start_offs = (start - din->m_triggerPhase) / din->m_timescale;
+				int64_t end_offs = (end - din->m_triggerPhase) / din->m_timescale;
+				max_value = average_voltage;
+
+				//Parse the waveform to get to a detected pulse
+				for (size_t j = temp; j < sadin->size(); j++)
 				{
-					if(sadin->m_samples[j] > max_value)
-						max_value = sadin->m_samples[j];
+					// Find out maximum value of the pulse within boundary of the detected pulse
+					if ((sadin->m_offsets[j] >= start_offs) && (sadin->m_offsets[j] <= end_offs))
+					{
+						if(sadin->m_samples[j] > max_value)
+							max_value = sadin->m_samples[j];
+					}
+
+					//End of one pulse reached. Record j, so that next time we start from this index for next pulse if any
+					else if (sadin->m_offsets[j] > end_offs)
+					{
+						temp = j;
+						break;
+					}
 				}
 
-				//End of one pulse reached. Record j, so that next time we start from this index for next pulse if any
-				else if (sadin->m_offsets[j] > end_offs)
-				{
-					temp = j;
-					break;
-				}
+				//Push amplitude information
+				cap1->m_offsets.push_back(start);
+				cap1->m_durations.push_back(delta);
+				cap1->m_samples.push_back(max_value);
+
+				nedges ++;
+				sum += delta;
 			}
+		}
+	}
 
-			//Push amplitude information
-			cap1->m_offsets.push_back(start);
-			cap1->m_durations.push_back(delta);
-			cap1->m_samples.push_back(max_value);
+	//Digital path
+	else
+	{
+		for(size_t i=0; i < (elen - 2); i+= 2)
+		{
+			//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+			int64_t start = edges[i];
+			int64_t end = edges[i+1];
 
-			nedges ++;
-			sum += delta;
+			int64_t delta = end - start;
+
+			//Push pulse width information
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(delta);
+			cap->m_samples.push_back(delta);
 		}
 	}
 
@@ -212,7 +261,9 @@ void PulseWidthMeasurement::Refresh()
 
 	m_streams[2].m_value = sum.GetSum() / nedges;
 
-	if(sadin || uadin)
+	//check for cap1 should be redundant as it's only allocated if we have an analog input
+	//but static analysis complains and it's not a critical path so why not check to be safe
+	if( (sadin || uadin) && cap1 )
 	{
 		//Set amplitude output waveform
 		SetData(cap1, 1);

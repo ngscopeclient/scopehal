@@ -72,12 +72,6 @@ string DDR1Decoder::GetProtocolName()
 	return "DDR1 Command Bus";
 }
 
-Filter::DataLocation DDR1Decoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

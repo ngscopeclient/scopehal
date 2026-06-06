@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -77,7 +77,7 @@ class SPIDecoder : public Filter
 public:
 	SPIDecoder(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -86,7 +86,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(SPIDecoder)
 
 protected:
-	std::string m_cpol;
+	FilterParameter& m_cpol;
 };
 
 #endif

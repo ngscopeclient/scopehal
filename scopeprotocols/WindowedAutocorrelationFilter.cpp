@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,18 +38,18 @@ using namespace std;
 
 WindowedAutocorrelationFilter::WindowedAutocorrelationFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_window(m_parameters["Window"])
+	, m_period(m_parameters["Period"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("I");
 	CreateInput("Q");
 
-	m_windowName = "Window";
-	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_windowName].SetFloatVal(400e6);
+	m_window = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_window.SetFloatVal(400e6);
 
-	m_periodName = "Period";
-	m_parameters[m_periodName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_periodName].SetFloatVal(3.6e9);
+	m_period = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_period.SetFloatVal(3.6e9);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +57,7 @@ WindowedAutocorrelationFilter::WindowedAutocorrelationFilter(const string& color
 
 bool WindowedAutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -77,17 +77,25 @@ string WindowedAutocorrelationFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void WindowedAutocorrelationFilter::Refresh()
+void WindowedAutocorrelationFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
-	{
-		SetData(NULL, 0);
-		return;
-	}
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
+	#endif
+	ClearErrors();
 
 	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	if(!din_i || !din_q)
+	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
+		return;
+	}
+
 	din_i->PrepareForCpuAccess();
 	din_q->PrepareForCpuAccess();
 
@@ -95,9 +103,9 @@ void WindowedAutocorrelationFilter::Refresh()
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Convert window and period to samples
-	int window_ps = m_parameters[m_windowName].GetIntVal();
+	auto window_ps = m_window.GetIntVal();
 	size_t window_samples = window_ps / din_i->m_timescale;
-	int period_ps = m_parameters[m_periodName].GetIntVal();
+	auto period_ps = m_period.GetIntVal();
 	size_t period_samples = period_ps / din_i->m_timescale;
 	window_samples = min(window_samples, period_samples);
 
@@ -105,7 +113,8 @@ void WindowedAutocorrelationFilter::Refresh()
 	auto len = min(din_i->m_samples.size(), din_q->m_samples.size());
 	if(len < period_samples)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "The input is shorter than the requested correlation window");
+		SetData(nullptr, 0);
 		return;
 	}
 

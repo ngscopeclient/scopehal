@@ -49,6 +49,10 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 	m_alignment.AddEnumValue("100Base-T1", ALIGN_100BASET1);
 	m_alignment.SetIntVal(ALIGN_NONE);
 
+	//Output buffer is pinned host side
+	m_alignOut.SetCpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+	m_alignOut.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_UNLIKELY);
+
 	if(g_hasShaderInt64)
 	{
 		m_demuxComputePipeline =
@@ -80,12 +84,6 @@ bool IQDemuxFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string IQDemuxFilter::GetProtocolName()
 {
 	return "IQ Demux";
-}
-
-Filter::DataLocation IQDemuxFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,7 +134,6 @@ void IQDemuxFilter::Refresh(
 		m_alignComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
 		m_alignComputePipeline->BindBufferNonblocking(1, m_alignOut, cmdBuf, true);
 		m_alignComputePipeline->Dispatch(cmdBuf, (uint32_t)window, 2);
-		m_alignComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 		m_alignOut.PrepareForCpuAccessNonblocking(cmdBuf);
 
 		cmdBuf.end();
@@ -157,6 +154,8 @@ void IQDemuxFilter::Refresh(
 	size_t outlen = (len - istart) / 2;
 	iout->Resize(outlen);
 	qout->Resize(outlen);
+	iout->Rename("IQDemuxFilter.I");
+	iout->Rename("IQDemuxFilter.Q");
 
 	if(g_hasShaderInt64)
 	{

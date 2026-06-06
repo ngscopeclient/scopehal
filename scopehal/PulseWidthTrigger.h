@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,31 +46,34 @@ public:
 	PulseWidthTrigger(Oscilloscope* scope);
 	virtual ~PulseWidthTrigger();
 
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::string GetTriggerName();
+
 	TRIGGER_INITPROC(PulseWidthTrigger);
 
 	void SetCondition(Condition type)
-	{ m_parameters[m_conditionname].SetIntVal(type); }
+	{ m_condition.SetIntVal(type); }
 
 	Condition GetCondition()
-	{ return (Condition) m_parameters[m_conditionname].GetIntVal(); }
+	{ return m_condition.GetEnumVal<Condition>(); }
 
 	int64_t GetLowerBound()
-	{ return m_parameters[m_lowername].GetIntVal(); }
+	{ return m_lowerLevel.GetIntVal(); }
 
 	void SetLowerBound(int64_t bound)
-	{ m_parameters[m_lowername].SetIntVal(bound); }
+	{ m_lowerLevel.SetIntVal(bound); }
 
 	int64_t GetUpperBound()
-	{ return m_parameters[m_uppername].GetIntVal(); }
+	{ return m_upperPulseLevel.GetIntVal(); }
 
 	void SetUpperBound(int64_t bound)
-	{ m_parameters[m_uppername].SetIntVal(bound); }
+	{ m_upperPulseLevel.SetIntVal(bound); }
 
 protected:
-	std::string m_conditionname;
-	std::string m_lowername;
-	std::string m_uppername;
+	FilterParameter& m_condition;
+	FilterParameter& m_lowerLevel;
+	FilterParameter& m_upperPulseLevel;
 };
 
 #endif

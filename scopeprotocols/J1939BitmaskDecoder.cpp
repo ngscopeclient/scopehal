@@ -82,12 +82,6 @@ string J1939BitmaskDecoder::GetProtocolName()
 	return "J1939 Bitmask";
 }
 
-Filter::DataLocation J1939BitmaskDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

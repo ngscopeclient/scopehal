@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,12 +45,13 @@ using namespace std;
 
 PCIeGen2LogicalDecoder::PCIeGen2LogicalDecoder(const string& color)
 	: Filter(color, CAT_BUS)
-	, m_portCountName("Lane Count")
+	, m_portCount(m_parameters["Lane Count"])
 {
 	AddProtocolStream("data");
-	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_portCountName].SetIntVal(1);
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &PCIeGen2LogicalDecoder::RefreshPorts));
+
+	m_portCount = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_portCount.SetIntVal(1);
+	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &PCIeGen2LogicalDecoder::RefreshPorts));
 
 	RefreshPorts();
 }
@@ -65,11 +66,11 @@ PCIeGen2LogicalDecoder::~PCIeGen2LogicalDecoder()
 
 bool PCIeGen2LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
-	if( (i <= nports) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	size_t nports = m_portCount.GetIntVal();
+	if( (i <= nports) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -86,7 +87,7 @@ string PCIeGen2LogicalDecoder::GetProtocolName()
 void PCIeGen2LogicalDecoder::RefreshPorts()
 {
 	//Create new inputs
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_portCount.GetIntVal();
 	for(size_t i=m_inputs.size(); i<nports; i++)
 		CreateInput(string("Lane") + to_string(i+1));
 
@@ -99,37 +100,52 @@ void PCIeGen2LogicalDecoder::RefreshPorts()
 	m_inputsChangedSignal.emit();
 }
 
-void PCIeGen2LogicalDecoder::Refresh()
+void PCIeGen2LogicalDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PCIeGen2LogicalDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get all of the inputs
-	ssize_t nports = m_parameters[m_portCountName].GetIntVal();
+	ssize_t nports = m_portCount.GetIntVal();
 	vector<IBM8b10bWaveform*> inputs;
 	for(ssize_t i=0; i<nports; i++)
 	{
 		auto wfm = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(i));
+
+		if(!wfm)
+		{
+			AddErrorMessage("Invalid input", "Expected an 8b/10b waveform");
+			SetData(nullptr, 0);
+			return;
+		}
+
 		inputs.push_back(wfm);
 		wfm->PrepareForCpuAccess();
 	}
 
-	if(nports == 0)
+	if( (nports <= 0) || (nports > 32) )
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid configuration", "Expected 1-32 lanes");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Create the capture
 	//Output is time aligned with the input
-	auto cap = new PCIeLogicalWaveform;
 	auto in0 = inputs[0];
+	auto cap = SetupEmptyWaveform<PCIeLogicalWaveform>(in0, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = in0->m_startTimestamp;
-	cap->m_startFemtoseconds = in0->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
@@ -456,7 +472,6 @@ void PCIeGen2LogicalDecoder::Refresh()
 			break;
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 

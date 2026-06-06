@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -376,12 +376,6 @@ protected:
 	///@brief Starting index for spectrum channels
 	size_t m_spectrumChannelBase;
 
-	///@brief True if trigger is armed, false if idle
-	bool m_triggerArmed;
-
-	///@brief True if trigger is single or forced, false if continuous
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PullPulseWidthTrigger();
@@ -500,11 +494,6 @@ protected:
 
 	///@brief Impedance selected for the AFG output
 	FunctionGenerator::OutputImpedance m_afgImpedance;
-
-	//Vulkan peak detection
-	std::shared_ptr<QueueHandle> m_queue;
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 
 public:
 	static std::string GetDriverNameInternal();

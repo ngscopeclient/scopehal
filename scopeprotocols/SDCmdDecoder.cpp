@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,15 +44,15 @@ using namespace std;
 
 SDCmdDecoder::SDCmdDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
-	, m_cardtypename("Card Type")
+	, m_cardtype(m_parameters["Card Type"])
 {
 	CreateInput("CMD");
 	CreateInput("CLK");
 
-	m_parameters[m_cardtypename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_cardtypename].AddEnumValue("SD", SD_GENERIC);
-	m_parameters[m_cardtypename].AddEnumValue("eMMC", SD_EMMC);
-	m_parameters[m_cardtypename].SetIntVal(SD_GENERIC);
+	m_cardtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_cardtype.AddEnumValue("SD", SD_GENERIC);
+	m_cardtype.AddEnumValue("eMMC", SD_EMMC);
+	m_cardtype.SetIntVal(SD_GENERIC);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ string SDCmdDecoder::GetProtocolName()
 
 bool SDCmdDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -77,14 +77,21 @@ bool SDCmdDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SDCmdDecoder::Refresh()
+void SDCmdDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SDCmdDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
-	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -100,11 +107,19 @@ void SDCmdDecoder::Refresh()
 	size_t len = dcmd.size();
 
 	//Create the capture
-	auto cap = new SDCmdWaveform(m_parameters[m_cardtypename]);
-	cap->m_timescale = 1;
+	auto cap = dynamic_cast<SDCmdWaveform*>(GetData(0));
+	if(!cap)
+	{
+		cap = new SDCmdWaveform(m_cardtype);
+		cap->m_timescale = 1;
+		cap->m_triggerPhase = 0;
+		SetData(cap, 0);
+	}
+	else
+		cap->m_revision ++;
+
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
-	SetData(cap, 0);
 
 	enum
 	{

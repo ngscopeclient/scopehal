@@ -45,6 +45,7 @@ using namespace std;
 
 QSGMIIDecoder::QSGMIIDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
+	, m_displayformat(m_parameters["Display Format"])
 {
 	CreateInput("data");
 
@@ -53,9 +54,7 @@ QSGMIIDecoder::QSGMIIDecoder(const string& color)
 	AddProtocolStream("Lane 2");
 	AddProtocolStream("Lane 3");
 
-
-	m_displayformat = "Display Format";
-	m_parameters[m_displayformat] = IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter();
+	m_displayformat = IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter();
 }
 
 QSGMIIDecoder::~QSGMIIDecoder()
@@ -85,11 +84,20 @@ string QSGMIIDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void QSGMIIDecoder::Refresh()
+void QSGMIIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("QSGMIIDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -104,7 +112,7 @@ void QSGMIIDecoder::Refresh()
 	for(size_t i=0; i<4; i++)
 	{
 		auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, i);
-		cap->SetDisplayFormat(m_parameters[m_displayformat].GetIntVal());
+		cap->SetDisplayFormat(m_displayformat.GetIntVal());
 		cap->PrepareForCpuAccess();
 		caps.push_back(cap);
 

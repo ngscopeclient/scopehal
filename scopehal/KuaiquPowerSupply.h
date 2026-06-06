@@ -92,7 +92,7 @@ protected:
 	bool SendWriteValueCommand(Command command, double value);
 	double SendReadValueCommand(Command command);
 	std::string SendSimpleCommand(Command command);
-	std::string SendCommand(Command command, std::string commandString);
+	std::string SendCommand(Command command, const std::string& commandString);
 
 	// PSU state
 	bool m_on = false;
@@ -103,6 +103,9 @@ protected:
 public:
 	static std::string GetDriverNameInternal();
 	POWER_INITPROC(KuaiquPowerSupply);
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

@@ -29,10 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "DownconvertFilter.h"
-#ifdef __x86_64__
-#include <immintrin.h>
-#include "avx_mathfun.h"
-#endif
 
 using namespace std;
 
@@ -80,12 +76,6 @@ string DownconvertFilter::GetProtocolName()
 	return "Downconvert";
 }
 
-Filter::DataLocation DownconvertFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -119,13 +109,17 @@ void DownconvertFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	cap_i->Resize(len);
 	cap_q->Resize(len);
 
-	//Calculate phase velocity
+	//Convert cycles per sample into a fixed-point value so we can use natural uint32 overflow to do the modulus
+	//with no loss of precision
 	double lo_cycles_per_sample = (lo_freq * din->m_timescale) / FS_PER_SECOND;
 	double lo_rad_per_sample = lo_cycles_per_sample * 2 * M_PI;
+	uint32_t fpfreq = round(0xffffffff * lo_cycles_per_sample);
+
+	//Push constants
 	DownconvertConstants cfg;
 	cfg.size = len;
 	cfg.trigger_phase_rad = din->m_triggerPhase * (lo_rad_per_sample / din->m_timescale);
-	cfg.lo_rad_per_sample = lo_rad_per_sample;
+	cfg.fpfreq = fpfreq;
 
 	cmdBuf.begin({});
 

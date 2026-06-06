@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,12 +41,18 @@
 class ByteWaveform : public SparseWaveform<char>
 {
 public:
-	ByteWaveform (const std::string& color) : SparseWaveform<char>(), m_color(color) {};
+	ByteWaveform()
+		: m_parent(nullptr)
+	{}
+
 	virtual std::string GetText(size_t) override;
 	virtual std::string GetColor(size_t) override;
 
+	void SetParent(Filter* parent)
+	{ m_parent = parent; }
+
 private:
-	const std::string& m_color;
+	const Filter* m_parent;
 };
 
 class UARTDecoder : public PacketDecoder
@@ -55,7 +61,7 @@ public:
 	UARTDecoder(const std::string& color);
 	virtual ~UARTDecoder();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -67,7 +73,8 @@ public:
 
 protected:
 	void FinishPacket(Packet* pack);
-	std::string m_baudname;
+
+	FilterParameter& m_baud;
 };
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -121,8 +121,6 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
 	, m_maxBandwidth(10000)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_paginated(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
@@ -145,6 +143,21 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 
 	//Figure out if scope is in low or high bit depth mode so we can download waveforms with the correct format
 	GetADCMode(0);
+
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("SiglentSCPIOscilloscope");
+
+	m_conversion8BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert8BitSamplesQuadOffset.spv", 2, sizeof(ConvertRawSamplesOffsetShaderArgs) );
+	m_conversion16BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert16BitSamplesDualOffset.spv", 2, sizeof(ConvertRawSamplesOffsetShaderArgs) );
+
+	//Create RX buffers for raw ADC samples
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		m_rawWaveformBuffers[i].SetCpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+		m_rawWaveformBuffers[i].SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_UNLIKELY);
+	}
 }
 
 string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
@@ -1778,7 +1791,8 @@ time_t SiglentSCPIOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double
 	return mktime(&tstruc);
 }
 
-vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char* data,
+vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(
+	AcceleratorBuffer<uint8_t>& data,
 	size_t datalen,
 	char* wavedesc,
 	uint32_t num_sequences,
@@ -1821,11 +1835,6 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	else
 		num_samples = datalen;
 	size_t num_per_segment = num_samples / num_sequences;
-	// int16_t* wdata = (int16_t*)&data[0];
-	// int8_t* bdata = (int8_t*)&data[0];
-	const int16_t* wdata = reinterpret_cast<const int16_t*>(data);
-	const int8_t* bdata = reinterpret_cast<const int8_t*>(data);
-
 	float codes_per_div;
 
 	//Codes per div varies with vertical scale on SDS6000A!
@@ -1879,7 +1888,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	for(size_t j = 0; j < num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
-		auto cap = new UniformAnalogWaveform;
+		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(ch)->GetHwname());
 		cap->m_timescale = round(interval);
 
 		cap->m_triggerPhase = h_off_frac;
@@ -1892,29 +1901,57 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
 
 		cap->Resize(num_per_segment);
-		cap->PrepareForCpuAccess();
+		//cap->PrepareForCpuAccess();
 
 		//Convert raw ADC samples to volts
 		if(m_highDefinition)
 		{
-			Convert16BitSamples(
-				cap->m_samples.GetCpuPointer(),
-				wdata + j * num_per_segment,
-				v_gain,
-				v_off,
-				num_per_segment);
+			m_cmdBuf->begin({});
+
+			m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversion16BitPipeline->BindBufferNonblocking(1, data, *m_cmdBuf);
+
+			ConvertRawSamplesOffsetShaderArgs args;
+			args.size = num_per_segment;
+			args.gain = v_gain;
+			args.offset = v_off;
+			args.inputBufferOffset = j*num_per_segment;
+
+			const uint32_t compute_block_count = GetComputeBlockCount(num_per_segment, 64*2); //2 samples per thread
+			m_conversion16BitPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
 		}
 		else
 		{
-			Convert8BitSamples(
-				cap->m_samples.GetCpuPointer(),
-				bdata + j * num_per_segment,
-				v_gain,
-				v_off,
-				num_per_segment);
+			m_cmdBuf->begin({});
+
+			m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversion8BitPipeline->BindBufferNonblocking(1, data, *m_cmdBuf);
+
+			ConvertRawSamplesOffsetShaderArgs args;
+			args.size = num_per_segment;
+			args.gain = v_gain;
+			args.offset = v_off;
+			args.inputBufferOffset = j*num_per_segment;
+
+			const uint32_t compute_block_count = GetComputeBlockCount(num_per_segment, 64*4); //4 samples per thread
+			m_conversion8BitPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
+
+			cap->MarkSamplesModifiedFromGpu();
 		}
 
-		cap->MarkSamplesModifiedFromCpu();
+		cap->MarkModifiedFromGpu();
 		ret.push_back(cap);
 	}
 
@@ -2021,7 +2058,6 @@ vector<SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(c
 bool SiglentSCPIOscilloscope::AcquireData()
 {
 	// Transfer buffers
-	char* analogWaveformData[MAX_ANALOG] {nullptr};
 	size_t analogWaveformDataSize[MAX_ANALOG] {0};
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
 	char* digitalWaveformDataBytes[MAX_DIGITAL] {nullptr};
@@ -2031,7 +2067,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*>> pending_waveforms;
-	double start = GetTime();
 	time_t ttime = 0;
 	double basetime = 0;
 	double h_off_frac = 0;
@@ -2050,7 +2085,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	//Acquire the data (but don't parse it)
 
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
-	start = GetTime();
+	double start = GetTime();
 
 	switch(m_protocolId)
 	{
@@ -2074,11 +2109,23 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
 				if(analogEnabled[i])
-				{	// Allocate buffer
-					analogWaveformData[i] = new char[WAVEFORM_SIZE];
+				{
+					m_rawWaveformBuffers[i].resize(WAVEFORM_SIZE);
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
-					analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE,readBytes,analogWaveformData[i],false, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+					m_rawWaveformBuffers[i].PrepareForCpuAccess();
+					analogWaveformDataSize[i] = ReadWaveformBlock(
+						WAVEFORM_SIZE,
+						readBytes,
+						reinterpret_cast<char*>(m_rawWaveformBuffers[i].GetCpuPointer()),
+						false,
+						[i, this] (float progress)
+						{
+							ChannelsDownloadStatusUpdate(
+								i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress);
+						});
+					m_rawWaveformBuffers[i].MarkModifiedFromCpu();
+
 					// This is the 0x0a0a at the end
 					m_transport->ReadRawData(2, (unsigned char*)tmp);
 				}
@@ -2100,7 +2147,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				std::vector<WaveformBase*> ret;
 				if(m_channelsEnabled[i])
 				{
-					auto cap = new UniformAnalogWaveform;
+					auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 					cap->m_timescale = FS_PER_SECOND / m_sampleRate;
 					// no high res timer on scope ?
 					cap->m_triggerPhase = h_off_frac;
@@ -2109,15 +2156,28 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					cap->m_startFemtoseconds = (start - floor(start)) * FS_PER_SECOND;
 
 					cap->Resize(analogWaveformDataSize[i]);
-					cap->PrepareForCpuAccess();
 
-					Convert8BitSamples(
-						cap->m_samples.GetCpuPointer(),
-						(int8_t*)analogWaveformData[i],
-						m_channelVoltageRanges[i] / (8 * 25),
-						m_channelOffsets[i],
-						analogWaveformDataSize[i]);
-					cap->MarkSamplesModifiedFromCpu();
+					m_cmdBuf->begin({});
+
+					m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+					m_conversion8BitPipeline->BindBufferNonblocking(1, m_rawWaveformBuffers[i], *m_cmdBuf);
+
+					ConvertRawSamplesShaderArgs args;
+					args.size = analogWaveformDataSize[i];
+					args.gain = m_channelVoltageRanges[i] / (8 * 25);
+					args.offset = m_channelOffsets[i];
+
+					const uint32_t compute_block_count = GetComputeBlockCount(args.size, 64*4); //4 samples per thread
+					m_conversion8BitPipeline->Dispatch(
+						*m_cmdBuf, args,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
+
+					m_cmdBuf->end();
+					m_queue->Submit(*m_cmdBuf);
+
+					cap->MarkSamplesModifiedFromGpu();
+
 					ret.push_back(cap);
 				}
 #if (defined(__GNUC__) && !defined(__clang__))
@@ -2211,8 +2271,10 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
 					if(analogEnabled[i])
-					{	// Allocate buffer
-						analogWaveformData[i] = new char[acqBytes];
+					{
+						m_rawWaveformBuffers[i].resize(acqBytes);
+						m_rawWaveformBuffers[i].PrepareForCpuAccess();
+
 						// Run the same loop for paginated and unpagnated mode, if unpaginated we will run it only once
 						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1));
 						for(uint64_t page = 0; page < pages; page++)
@@ -2222,11 +2284,24 @@ bool SiglentSCPIOscilloscope::AcquireData()
 								m_paginated = true;
 								m_transport->SendCommand(":WAVEFORM:START "+ to_string(page*pageSize));
 								m_transport->SendCommand(":WAVEFORM:DATA?");
-								auto progress = [i, this, page, pages] (float fprogress) {
-									float linear_progress = ((float)page + fprogress) / (float)pages; // the last page will go slightly faster, but oh well
-									ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, linear_progress);
+								auto progress = [i, this, page, pages] (float fprogress)
+								{
+									// the last page will go slightly faster, but oh well
+									float linear_progress = ((float)page + fprogress) / (float)pages;
+
+									ChannelsDownloadStatusUpdate(
+										i,
+										InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS,
+										linear_progress);
 								};
-								ReadWaveformBlock(acqBytes-analogWaveformDataSize[i], readBytes, analogWaveformData[i]+analogWaveformDataSize[i], hdWorkaround, progress);
+								ReadWaveformBlock(
+									acqBytes-analogWaveformDataSize[i],
+									readBytes,
+									reinterpret_cast<char*>(m_rawWaveformBuffers[i].GetCpuPointer())
+										+ analogWaveformDataSize[i],
+									hdWorkaround,
+									progress);
+
 								if(readBytes == 0)
 								{
 									LogError("Protocol error, aborting acquisition.");
@@ -2239,12 +2314,24 @@ bool SiglentSCPIOscilloscope::AcquireData()
 							else
 							{	// See if we here prviously paginated
 								if(m_paginated)
-								{	// Previous acquisition was paginated => reset start value
+								{
+									// Previous acquisition was paginated => reset start value
 									m_transport->SendCommand(":WAVEFORM:START 0");
 									m_paginated = false;
 								}
 								m_transport->SendCommand(":WAVEFORM:DATA?");
-								ReadWaveformBlock(acqBytes, readBytes, analogWaveformData[i], hdWorkaround, [i, this] (float progress) { ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, progress); });
+								ReadWaveformBlock(
+									acqBytes,
+									readBytes,
+									reinterpret_cast<char*>(m_rawWaveformBuffers[i].GetCpuPointer()),
+									hdWorkaround,
+									[i, this] (float progress)
+									{
+										ChannelsDownloadStatusUpdate(
+											i,
+											InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS,
+											progress);
+									});
 								if(readBytes == 0)
 								{
 									LogError("Protocol error, aborting acquisition.");
@@ -2277,6 +2364,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 						// Safe-check data size
 						if(analogWaveformDataSize[i] > acqBytes) analogWaveformDataSize[i] = acqBytes;
 						ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_FINISHED, 1.0);
+
+						m_rawWaveformBuffers[i].MarkModifiedFromCpu();
 					}
 				}
 				if(anyDigitalEnabled)
@@ -2375,7 +2464,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				{
 					if(analogEnabled[i])
 					{
-						waveforms[i] = ProcessAnalogWaveform(&analogWaveformData[i][0],
+						waveforms[i] = ProcessAnalogWaveform(
+							m_rawWaveformBuffers[i],
 							analogWaveformDataSize[i],
 							&wavedescs[i][0],
 							num_sequences,
@@ -2453,11 +2543,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	m_pendingWaveformsMutex.unlock();
 
 	//Clean up
-	for(int i = 0; i < MAX_ANALOG; i++)
-	{
-		if(analogWaveformData[i] != nullptr)
-			delete[] analogWaveformData[i];
-	}
 	for(int i = 0; i < MAX_DIGITAL; i++)
 	{
 		if(digitalWaveformDataBytes[i] != nullptr)
@@ -3463,7 +3548,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_sampleRate = rate;
 	m_sampleRateValid = false;
-	
+
 	m_memoryDepthValid = false;
 	// Acq Points and max points will have to be updated too
 	m_acqPointsValid = false;
@@ -4125,7 +4210,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 /**
 	@brief Reads the source of a trigger from the instrument
  */
-void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
+void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, const string& triggerModeName, bool isUart)
 {
 	string reply = Trim(isUart ? converse(":TRIGGER:UART:RXS?") : converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
 	auto chan = GetOscilloscopeChannelByHwName(reply);
@@ -4753,7 +4838,7 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
+void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType)
 {
 	switch(m_protocolId)
 	{
@@ -5057,7 +5142,7 @@ void SiglentSCPIOscilloscope::PushCondition(const string& path, Trigger::Conditi
 	}
 }
 
-void SiglentSCPIOscilloscope::PushFloat(string path, float f)
+void SiglentSCPIOscilloscope::PushFloat(const string& path, float f)
 {
 	sendOnly("%s %1.2E", path.c_str(), f);
 }

@@ -73,6 +73,8 @@ GlitchTrigger::~GlitchTrigger()
 // Accessors
 
 ///@brief Return the constant trigger type name "Glitch"
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string GlitchTrigger::GetTriggerName()
 {
 	return "Glitch";

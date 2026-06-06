@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,10 +48,10 @@ USB2PacketDecoder::USB2PacketDecoder(const string& color)
 
 bool USB2PacketDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<USB2PCSDecoder*>(stream.m_channel) != NULL) )
+	if( (i == 0) && (dynamic_cast<USB2PCSDecoder*>(stream.m_channel) != nullptr) )
 		return true;
 
 	return false;
@@ -84,25 +84,30 @@ vector<string> USB2PacketDecoder::GetHeaders()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void USB2PacketDecoder::Refresh()
+void USB2PacketDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("USB2PacketDecoder::Refresh");
+	#endif
+	ClearErrors();
+
+	auto din = dynamic_cast<USB2PCSWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or null");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = dynamic_cast<USB2PCSWaveform*>(GetInputWaveform(0));
 	din->PrepareForCpuAccess();
 	size_t len = din->m_samples.size();
 
 	//Make the capture and copy our time scales from the input
-	auto cap = new USB2PacketWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<USB2PacketWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 
 	enum
@@ -337,9 +342,6 @@ void USB2PacketDecoder::Refresh()
 		if(sin.m_type == USB2PCSSymbol::TYPE_EOP)
 			state = STATE_IDLE;
 	}
-
-	//Done
-	SetData(cap, 0);
 
 	//Decode packets in the capture
 	FindPackets(cap);

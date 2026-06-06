@@ -62,10 +62,10 @@ PCIeLinkTrainingDecoder::~PCIeLinkTrainingDecoder()
 
 bool PCIeLinkTrainingDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -96,34 +96,39 @@ bool PCIeLinkTrainingDecoder::GetShowDataColumn()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PCIeLinkTrainingDecoder::Refresh()
+void PCIeLinkTrainingDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PCIeLinkTrainingDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
+	if(!din)
+	{
+		AddErrorMessage("Invalid input", "Expected an 8B/10B waveform");
+		SetData(nullptr, 0);
+		return;
+	}
 	din->PrepareForCpuAccess();
 
 	//Create the main capture
 	//Output is time aligned with the input
-	auto cap = new PCIeLinkTrainingWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
+	auto cap = SetupEmptyWaveform<PCIeLinkTrainingWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 
 	//Second output capture for states
-	auto scap = new PCIeLTSSMWaveform;
-	scap->m_timescale = din->m_timescale;
-	scap->m_startTimestamp = din->m_startTimestamp;
-	scap->m_startFemtoseconds = din->m_startFemtoseconds;
-	scap->m_triggerPhase = din->m_triggerPhase;
+	auto scap = SetupEmptyWaveform<PCIeLTSSMWaveform>(din, 1);
 	scap->PrepareForCpuAccess();
 
 	//Find the first comma in our lane and use as a starting point
@@ -568,10 +573,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 	size_t nout = scap->m_offsets.size() - 1;
 	scap->m_durations[nout] = din->m_offsets[nlast] + din->m_durations[nlast] - scap->m_offsets[nout];
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
-
-	SetData(scap, 1);
 	scap->MarkModifiedFromCpu();
 }
 

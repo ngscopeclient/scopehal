@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,36 +49,36 @@ using namespace std;
  */
 CDRTrigger::CDRTrigger(Oscilloscope* scope)
 	: Trigger(scope)
-	, m_bitRateName("Bit Rate")
-	, m_positionName("Trigger Point")
-	, m_lecroyEqName("Equalization")
-	, m_polarityName("Polarity")
+	, m_bitRate(m_parameters["Bit Rate"])
+	, m_position(m_parameters["Trigger Point"])
+	, m_lecroyEq(m_parameters["Equalization"])
+	, m_polarity(m_parameters["Polarity"])
 {
 	CreateInput("in");
 
-	m_parameters[m_bitRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_bitRateName].SetIntVal(1250000000);
+	m_bitRate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_bitRate.SetIntVal(1250000000);
 
-	m_parameters[m_positionName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_positionName].AddEnumValue("Start of pattern", POSITION_START);
-	m_parameters[m_positionName].AddEnumValue("End of pattern", POSITION_END);
-	m_parameters[m_positionName].SetIntVal(POSITION_START);
+	m_position = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_position.AddEnumValue("Start of pattern", POSITION_START);
+	m_position.AddEnumValue("End of pattern", POSITION_END);
+	m_position.SetIntVal(POSITION_START);
 
-	m_parameters[m_polarityName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_polarityName].AddEnumValue("Normal", POLARITY_NORMAL);
-	m_parameters[m_polarityName].AddEnumValue("Inverted", POLARITY_INVERTED);
-	m_parameters[m_polarityName].SetIntVal(POLARITY_NORMAL);
+	m_polarity = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_polarity.AddEnumValue("Normal", POLARITY_NORMAL);
+	m_polarity.AddEnumValue("Inverted", POLARITY_INVERTED);
+	m_polarity.SetIntVal(POLARITY_NORMAL);
 
 	//Equalization (only for LeCroy scopes)
 	//TODO: this is for SDA 8Zi, does the set of parameters change for other scopes?
 	if(dynamic_cast<LeCroyOscilloscope*>(m_scope) != nullptr)
 	{
-		m_parameters[m_lecroyEqName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-		m_parameters[m_lecroyEqName].AddEnumValue("None (0 dB)", LECROY_EQ_NONE);
-		m_parameters[m_lecroyEqName].AddEnumValue("Low (2 dB)", LECROY_EQ_LOW);
-		m_parameters[m_lecroyEqName].AddEnumValue("Medium (5 dB)", LECROY_EQ_MEDIUM);
-		m_parameters[m_lecroyEqName].AddEnumValue("High (9 dB)", LECROY_EQ_HIGH);
-		m_parameters[m_lecroyEqName].SetIntVal(LECROY_EQ_NONE);
+		m_lecroyEq = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_lecroyEq.AddEnumValue("None (0 dB)", LECROY_EQ_NONE);
+		m_lecroyEq.AddEnumValue("Low (2 dB)", LECROY_EQ_LOW);
+		m_lecroyEq.AddEnumValue("Medium (5 dB)", LECROY_EQ_MEDIUM);
+		m_lecroyEq.AddEnumValue("High (9 dB)", LECROY_EQ_HIGH);
+		m_lecroyEq.SetIntVal(LECROY_EQ_NONE);
 	}
 }
 

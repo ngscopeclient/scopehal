@@ -38,9 +38,9 @@
 class DownconvertConstants
 {
 public:
+	uint32_t fpfreq;
 	uint32_t size;
 	float trigger_phase_rad;
-	float lo_rad_per_sample;
 };
 
 /**
@@ -52,7 +52,6 @@ public:
 	DownconvertFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 

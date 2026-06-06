@@ -49,7 +49,6 @@ public:
 	EnvelopeFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	virtual void ClearSweeps() override;
 

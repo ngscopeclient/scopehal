@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,13 +38,13 @@ using namespace std;
 TrendFilter::TrendFilter(const string& color)
 	: PausableFilter(color, CAT_MATH)
 	, m_tlast(0)
-	, m_depthname("Buffer length")
+	, m_depth(m_parameters["Buffer length"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_depthname].SetIntVal(10000);
+	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_depth.SetIntVal(10000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +52,7 @@ TrendFilter::TrendFilter(const string& color)
 
 bool TrendFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -86,14 +86,24 @@ void TrendFilter::ClearSweeps()
 	SetData(nullptr, 0);
 }
 
-void TrendFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
+void TrendFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TrendFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!ShouldRefresh())
 		return;
 
 	auto din = GetInput(0);
 	if(!din)
+	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		return;
+	}
 
 	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
 
@@ -103,7 +113,7 @@ void TrendFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<Q
 	if(wfm)
 	{
 		//Remove old samples
-		size_t nmax = m_parameters[m_depthname].GetIntVal();
+		size_t nmax = m_depth.GetIntVal();
 		while(wfm->m_samples.size() > nmax)
 		{
 			wfm->m_samples.pop_front();

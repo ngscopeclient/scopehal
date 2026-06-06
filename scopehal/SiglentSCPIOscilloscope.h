@@ -281,17 +281,17 @@ protected:
 	void PullSlewRateTrigger();
 	void PullUartTrigger();
 	void PullWindowTrigger();
-	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
+	void PullTriggerSource(Trigger* trig, const std::string& triggerModeName, bool isUart);
 
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushDropoutTrigger(DropoutTrigger* trig);
-	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType);
 	void PushGlitchTrigger(GlitchTrigger* trig);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
@@ -312,7 +312,8 @@ protected:
 
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 
-	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
+	std::vector<WaveformBase*> ProcessAnalogWaveform(
+		AcceleratorBuffer<uint8_t>& data,
 		size_t datalen,
 		char* wavedesc,
 		uint32_t num_sequences,
@@ -320,7 +321,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	std::vector<SparseDigitalWaveform*> ProcessDigitalWaveform(const char* data,
 		size_t datalen,
 		char* wavedesc,
@@ -329,7 +330,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
@@ -364,8 +365,6 @@ protected:
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 	bool m_triggerForced;
 
 	// Pagination state
@@ -414,8 +413,20 @@ protected:
 	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
 
+	///@brief Buffers for raw waveform data before conversion to float32
+	std::map<int, AcceleratorBuffer<uint8_t> > m_rawWaveformBuffers;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion8BitPipeline;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
+
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

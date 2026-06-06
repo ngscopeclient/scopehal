@@ -27,34 +27,83 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#version 430
-#pragma shader_stage(compute)
-#extension GL_EXT_shader_16bit_storage : require
+/**
+	@file
+	@author Lain Agan
+	@brief Vulkan queue management
+ */
 
-layout(std430, binding=0) restrict writeonly buffer buf_pout
+#ifndef QueueHandle_h
+#define QueueHandle_h
+
+#include <map>
+#include <memory>
+#include <mutex>
+#include <tuple>
+#include <vector>
+#include <vulkan/vulkan_raii.hpp>
+
+#include "QueueWrapper.h"
+
+/**
+	@brief Wrapper around a Vulkan Queue object
+
+	Many QueueHandle's can point to a single QueueWrapper and are thread safe, but a single QueueHandle cannot be
+	used from more than one thread simultaneously.
+
+	TODO: how does this play with g_vkTransferQueue? for now keep a lock on the fence for that use case
+ */
+class QueueHandle
 {
-	float pout[];
+public:
+
+	QueueHandle(std::shared_ptr<QueueWrapper>& queue, const std::string& name);
+	~QueueHandle();
+
+	/// Submit the given command buffer on the queue
+	void Submit(vk::raii::CommandBuffer const& cmdBuf);
+
+	/// Submit the given command buffer on the queue and wait until completion
+	void SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf);
+
+	const std::string GetName() const
+	{ return m_queue->GetName(); }
+
+	/**
+		@brief Wait for all previous submits to complete
+	 */
+	void WaitIdle()
+	{
+		const std::lock_guard<std::recursive_mutex> lock(m_queue->GetMutex());
+		_waitFence();
+	}
+
+	bool WaitIdleWithTimeout(uint64_t nanoseconds);
+
+	std::shared_ptr<QueueWrapper> GetQueue()
+	{ return m_queue; }
+
+public:
+	//non-copyable
+	QueueHandle(QueueHandle const&) = delete;
+	QueueHandle& operator=(QueueHandle const&) = delete;
+
+protected:
+	/// Waits for previous submit's fence, if any, then resets the fence for reuse.
+	/// Must obtain the lock before calling!
+	void _waitFence();
+
+protected:
+	friend QueueLock;
+	std::shared_ptr<QueueWrapper> m_queue;
+	std::unique_ptr<vk::raii::Fence> m_fence;
+	bool m_fenceBusy;
+
+	std::string m_fenceName;
+
+	///@brief The mutex controlling access to the fence
+	std::recursive_mutex m_fenceMutex;
 };
 
-layout(std430, binding=1) restrict readonly buffer buf_pin
-{
-	int16_t pin[];
-};
 
-layout(std430, push_constant) uniform constants
-{
-	uint size;
-	float gain;
-	float offset;
-};
-
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
-
-void main()
-{
-	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	if(nthread >= size)
-		return;
-
-	pout[nthread] = gain*float(int(pin[nthread])) - offset;
-}
+#endif

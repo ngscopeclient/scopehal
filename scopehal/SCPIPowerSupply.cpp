@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,7 +48,7 @@ SCPIPowerSupply::~SCPIPowerSupply()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPIPowerSupply::DoAddDriverClass(string name, PowerCreateProcType proc)
+void SCPIPowerSupply::DoAddDriverClass(const string& name, PowerCreateProcType proc)
 {
 	m_powercreateprocs[name] = proc;
 }
@@ -59,7 +59,7 @@ void SCPIPowerSupply::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPIPowerSupply> SCPIPowerSupply::CreatePowerSupply(string driver, SCPITransport* transport)
+shared_ptr<SCPIPowerSupply> SCPIPowerSupply::CreatePowerSupply(const string& driver, SCPITransport* transport)
 {
 	if(m_powercreateprocs.find(driver) != m_powercreateprocs.end())
 		return m_powercreateprocs[driver](transport);

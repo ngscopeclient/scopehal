@@ -232,6 +232,8 @@ set(SCOPEHAL_SOURCES
 	PipelineCacheManager.cpp
 	VulkanFFTPlan.cpp
 	QueueManager.cpp
+	QueueHandle.cpp
+	QueueWrapper.cpp
 	)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

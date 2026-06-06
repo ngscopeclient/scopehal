@@ -291,7 +291,6 @@ void ACRMSMeasurement::DoRefreshUniform(
 	{
 		cap->PrepareForCpuAccess();
 		edges.PrepareForCpuAccess();
-		temp = 0;
 		for(size_t i = 0; i < (elen - 2); i += 2)
 		{
 			//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -327,10 +326,4 @@ void ACRMSMeasurement::DoRefreshUniform(
 	}
 
 	SetData(cap, 0);
-}
-
-Filter::DataLocation ACRMSMeasurement::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }

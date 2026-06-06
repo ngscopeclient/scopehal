@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -190,6 +190,8 @@ void PcapngExportFilter::Export()
  */
 void PcapngExportFilter::ExportEthernet(EthernetWaveform* wfm)
 {
+	wfm->PrepareForCpuAccess();
+
 	vector<uint8_t> bytes;
 	int64_t offset = 0;
 	for(size_t i=0; i<wfm->m_samples.size(); i++)

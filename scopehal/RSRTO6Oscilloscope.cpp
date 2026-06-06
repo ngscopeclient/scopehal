@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,8 +52,6 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 	, m_hasAFG(false)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
 	, m_sampleDepthValid(false)
 	, m_triggerOffsetValid(false)
@@ -64,12 +62,9 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 		LogFatal("rs.rto6 driver only appropriate for RTO6");
 	}
 
-	SCPISocketTransport* sockettransport = NULL;
-
-	if (!(sockettransport = dynamic_cast<SCPISocketTransport*>(transport)))
-	{
+	//TODO: better error handling here this shouldn't abort
+	if(dynamic_cast<SCPISocketTransport*>(transport) == nullptr)
 		LogFatal("rs.rto6 driver requires 'lan' transport");
-	}
 
 	// RTO6 always has four analog channels
 	m_analogChannelCount = 4;
@@ -136,7 +131,7 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 		opts.push_back(substr);
 	}
 
-	for (auto app : opts)
+	for (auto& app : opts)
 	{
 		if (app == "B1")
 		{
@@ -706,7 +701,7 @@ Oscilloscope::TriggerMode RSRTO6Oscilloscope::PollTrigger()
 	// return m_triggerArmed ? TRIGGER_MODE_TRIGGERED : TRIGGER_MODE_STOP;
 }
 
-template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, string chname)
+template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, const string& chname)
 {
 	//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
 	string reply = m_transport->SendCommandImmediateWithReply(chname + ":DATA:HEAD?; *WAI");
@@ -797,7 +792,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 		// Request a reasonably-sized buffer as this may cause RAM allocation in recv(2)
 		const size_t block_size = 50e6;
 
-		unsigned char* dest_buf = (unsigned char*)cap->m_samples.GetCpuPointer();
+		auto dest_buf = reinterpret_cast<unsigned char*>(cap->m_samples.GetCpuPointer());
 
 		LogDebug(" - Begin transfer of %zu bytes\n", length);
 

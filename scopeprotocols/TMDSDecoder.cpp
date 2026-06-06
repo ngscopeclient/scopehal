@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,14 +43,14 @@ using namespace std;
 
 TMDSDecoder::TMDSDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
+	, m_lane(m_parameters["Lane number"])
 {
 	AddProtocolStream("data");
 	CreateInput("data");
 	CreateInput("clk");
 
-	m_lanename = "Lane number";
-	m_parameters[m_lanename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_lanename].SetIntVal(0);
+	m_lane = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_lane.SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +58,7 @@ TMDSDecoder::TMDSDecoder(const string& color)
 
 bool TMDSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -75,11 +75,20 @@ string TMDSDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TMDSDecoder::Refresh()
+void TMDSDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TMDSDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -90,10 +99,8 @@ void TMDSDecoder::Refresh()
 	clkin->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new TMDSWaveform;
+	auto cap = SetupEmptyWaveform<TMDSWaveform>(din, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
 	//Record the value of the data stream at each clock edge
@@ -148,7 +155,7 @@ void TMDSDecoder::Refresh()
 		}
 	}
 
-	int lane = m_parameters[m_lanename].GetIntVal();
+	int lane = m_lane.GetIntVal();
 
 	//HDMI Video guard band (HDMI 1.4 spec 5.2.2.1)
 	static const bool video_guard[3][10] =
@@ -247,7 +254,6 @@ void TMDSDecoder::Refresh()
 		last_symbol_type = TYPE_DATA;
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 

@@ -54,13 +54,21 @@ public:
 	uint8_t		masterMode;
 };
 
+class BaseT1DecodeConstants
+{
+public:
+	uint32_t	npackets;
+	uint32_t	maxPacketBytes;
+	uint32_t	inputLength;
+	uint32_t	masterMode;
+};
+
 class Ethernet100BaseT1Decoder : public EthernetProtocolDecoder
 {
 public:
 	Ethernet100BaseT1Decoder(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 
@@ -87,6 +95,7 @@ protected:
 
 	std::shared_ptr<ComputePipeline> m_pam3DecodeComputePipeline;
 	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
+	std::shared_ptr<ComputePipeline> m_decodeComputePipeline;
 };
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -66,7 +66,7 @@ SWDDecoder::SWDDecoder(const string& color) : Filter(color, CAT_BUS)
 
 bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if((i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -85,12 +85,20 @@ string SWDDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SWDDecoder::Refresh()
+void SWDDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SWDDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -101,11 +109,9 @@ void SWDDecoder::Refresh()
 	data->PrepareForCpuAccess();
 
 	//Create the capture
-	auto cap = new SWDWaveform;
+	auto cap = SetupEmptyWaveform<SWDWaveform>(clk, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	//Sample SWDIO on SWCLK edges
 	SparseDigitalWaveform samples;
@@ -188,8 +194,8 @@ void SWDDecoder::Refresh()
 					cap->m_durations.push_back(stateLen);
 					tstart = off + dur;
 					i += c_magic_seqlen - 1;
-					dur = samples.m_durations[i];
-					off = samples.m_offsets[i] - dur / 2;
+					//dur = samples.m_durations[i];
+					//off = samples.m_offsets[i] - dur / 2;
 
 					switch(current_word)
 					{
@@ -435,7 +441,6 @@ void SWDDecoder::Refresh()
 
 		last_dur = dur;
 	}
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }

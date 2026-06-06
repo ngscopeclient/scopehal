@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,8 +49,6 @@ using namespace std;
 RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 	int nchans = 0;
 
@@ -162,7 +160,7 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	LogDebug("Installed options:\n");
 	if(options.empty())
 		LogDebug("* None\n");
-	for(auto sopt : options)
+	for(auto& sopt : options)
 	{
 		LogDebug(" * %s ",sopt.c_str());
 		if(opt == "B243")
@@ -385,7 +383,7 @@ void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "PROB%zd:SET:ATT:MAN ", m_channels[i]->GetIndex()+1);
+	snprintf(cmd, sizeof(cmd), "PROB%zu:SET:ATT:MAN ", m_channels[i]->GetIndex()+1);
 	PushFloat(cmd, atten);
 }
 
@@ -538,15 +536,13 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		int64_t fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
 		//LogDebug("%ld fs/sample\n", fs_per_sample);
 
-		float* temp_buf = new float[length];
-
 		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
-		auto cap = new UniformAnalogWaveform;
+		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+		cap->m_startTimestamp = floor(t);
+		cap->m_startFemtoseconds = (t - cap->m_startTimestamp) * FS_PER_SECOND;
 
 		//Ask for the data
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DATA?");
@@ -562,7 +558,9 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Super easy, it comes across the wire in IEEE754 already!
 		cap->Resize(length);
 		cap->PrepareForCpuAccess();
-		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)cap->m_samples.GetCpuPointer());
+		m_transport->ReadRawData(
+			length*sizeof(float),
+			reinterpret_cast<unsigned char*>(cap->m_samples.GetCpuPointer()));
 		cap->MarkSamplesModifiedFromCpu();
 
 		//Discard trailing newline
@@ -570,9 +568,6 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);
-
-		//Clean up
-		delete[] temp_buf;
 	}
 	if (!any_data)
 	{
@@ -841,10 +836,10 @@ void RohdeSchwarzOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 
 	// They use CH1, CH2 and so on here :-(
 
-	snprintf(tmp, sizeof(tmp), "TRIG:A:SOUR CH%zd", trig->GetInput(0).m_channel->GetIndex()+1);
+	snprintf(tmp, sizeof(tmp), "TRIG:A:SOUR CH%zu", trig->GetInput(0).m_channel->GetIndex()+1);
 	m_transport->SendCommand(tmp);
 
-	snprintf(tmp, sizeof(tmp), "TRIG:A:LEV%zd %f", trig->GetInput(0).m_channel->GetIndex()+1, trig->GetLevel());
+	snprintf(tmp, sizeof(tmp), "TRIG:A:LEV%zu %f", trig->GetInput(0).m_channel->GetIndex()+1, trig->GetLevel());
 	m_transport->SendCommand(tmp);
 
 	string slope_str;
@@ -870,7 +865,7 @@ void RohdeSchwarzOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	@brief Sends float, assumes transport is already mutexed
  */
 
-void RohdeSchwarzOscilloscope::PushFloat(string path, float f)
+void RohdeSchwarzOscilloscope::PushFloat(const string& path, float f)
 {
 	m_transport->SendCommand(path + " " + to_string_sci(f));
 }

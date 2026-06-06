@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,7 +49,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(ScalarPulseDelayFilter)
 
 protected:
-	std::string m_interval;
+	FilterParameter& m_interval;
 
 	double m_lastUpdate;
 	bool m_active;

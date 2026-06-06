@@ -144,15 +144,6 @@ protected:
 	///@brief Index of next buffer from m_analogRawWaveformBuffers to use
 	unsigned int m_nextWaveformWriteBuffer;
 
-	///@brief Vulkan queue used for sample conversion
-	std::shared_ptr<QueueHandle> m_queue;
-
-	///@brief Command pool from which m_cmdBuf was allocated
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-
-	///@brief Command buffer for sample conversion
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
-
 	///@brief Compute pipeline for converting raw ADC codes to float32 samples
 	std::unique_ptr<ComputePipeline> m_conversion8BitPipeline;
 

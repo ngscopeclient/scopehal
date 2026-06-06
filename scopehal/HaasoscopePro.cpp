@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -126,36 +126,10 @@ HaasoscopePro::HaasoscopePro(SCPITransport* transport)
 	}
 
 	//Create Vulkan objects for the waveform conversion
-	m_queue = g_vkQueueManager->GetComputeQueue("HaasoscopePro.queue");
-	vk::CommandPoolCreateInfo poolInfo(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		m_queue->m_family );
-	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-
-	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
-	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
-		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-
-	if(g_hasDebugUtils)
-	{
-		string poolname = "HaasoscopePro.pool";
-		string bufname = "HaasoscopePro.cmdbuf";
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandPool,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
-				poolname.c_str()));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
-				bufname.c_str()));
-	}
+	InitVulkanQueue("HaasoscopePro");
 
 	m_conversionPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
 	m_clippingBuffer.resize(1);
 
@@ -304,24 +278,24 @@ bool HaasoscopePro::AcquireData()
 
 	//Read the sequence number of the current waveform
 	uint32_t seqnum;
-	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
+	if(!m_transport->ReadRawData(sizeof(seqnum), reinterpret_cast<uint8_t*>(&seqnum)))
 		return false;
 	LogTrace("HaasoscopePro got seqnum %d \n",seqnum); // Note: run ngscopeclient with --debug to see these
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	uint64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
 		return false;
 
 	//Get the de-facto trigger position.
 	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), (uint8_t*)&trigger_fs))
+	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
 		return false;
 
 	{
@@ -335,7 +309,7 @@ bool HaasoscopePro::AcquireData()
 
 	//Get the de-facto hardware capture rate.
 	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
+	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
 		return false;
 	LogTrace("HaasoscopePro got wfms_s %f \n",wfms_s);
 	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
@@ -357,9 +331,9 @@ bool HaasoscopePro::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
 			return false;
 		LogTrace("HaasoscopePro got memdepth %" PRIu64 " \n", memdepth);
 
@@ -374,7 +348,7 @@ bool HaasoscopePro::AcquireData()
 			auto buf = abuf->GetCpuPointer();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -385,13 +359,13 @@ bool HaasoscopePro::AcquireData()
 			offset *= GetChannelAttenuation(chnum);
 
 			uint8_t clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
 				return false;
 			LogTrace("HaasoscopePro got clipping %d \n", clipping);
 
 			//FIXME: stream timestamp from the server
 
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(buf)))
 				return false;
 			LogTrace("HaasoscopePro got data bytes... %d %d %d ...\n", buf[0],buf[1],buf[2]);
 			abuf->MarkModifiedFromCpu();
@@ -419,9 +393,9 @@ bool HaasoscopePro::AcquireData()
 	}
 
 	//Prefer GPU path
-	if(g_hasShaderInt16 && g_hasPushDescriptor)
+	if(g_hasPushDescriptor)
 	{
-		LogTrace("HaasoscopePro doing GPU path \n");
+		LogTrace("HaasoscopePro doing push descriptor path \n");
 		m_cmdBuf->begin({});
 		m_conversionPipeline->Bind(*m_cmdBuf);
 		for(size_t i=0; i<awfms.size(); i++)
@@ -436,7 +410,7 @@ bool HaasoscopePro::AcquireData()
 			args.gain = scales[i];
 			args.offset = -offsets[i];
 
-			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2);
 			m_conversionPipeline->DispatchNoRebind(
 				*m_cmdBuf, args,
 				min(compute_block_count, 32768u),
@@ -448,22 +422,33 @@ bool HaasoscopePro::AcquireData()
 		m_queue->SubmitAndBlock(*m_cmdBuf);
 	}
 
-	//Fallback path if GPU doesn't have suitable integer support
+	//Fallback path if no push descriptor: multiple separate submits
 	else
 	{
-		LogTrace("HaasoscopePro doing GPU path \n");
-		#pragma omp parallel for  //Process analog captures in parallel
+		LogTrace("HaasoscopePro doing non-push descriptor path \n");
 		for(size_t i=0; i<awfms.size(); i++)
 		{
+			m_cmdBuf->begin({});
+
 			auto cap = awfms[i];
-			cap->PrepareForCpuAccess();
-			Convert16BitSamples(
-				(float*)&cap->m_samples[0],
-				(int16_t*)m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				offsets[i],
-				cap->m_samples.size());
-			cap->MarkModifiedFromCpu();
+
+			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scales[i];
+			args.offset = -offsets[i];
+
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2);
+			m_conversionPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+			cap->MarkModifiedFromGpu();
+
+			m_cmdBuf->end();
+			m_queue->SubmitAndBlock(*m_cmdBuf);
 		}
 	}
 

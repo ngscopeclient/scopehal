@@ -100,9 +100,6 @@ protected:
 
 	std::string GetChannelColor(size_t i);
 
-	bool m_triggerArmed = false;
-	bool m_triggerOneShot = false;
-
 	int64_t m_sampleDepth = 0;
 	size_t m_maxDeviceSampleDepth = 0;
 	int64_t m_rbw = 0;
@@ -119,6 +116,9 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

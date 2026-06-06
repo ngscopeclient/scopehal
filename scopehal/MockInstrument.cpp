@@ -52,13 +52,14 @@ MockInstrument::MockInstrument(const string& name,
 	const std::string& driver,
 	const std::string& args)
 	: SCPIInstrument(nullptr, false)
-	, m_name(name)
-	, m_vendor(vendor)
-	, m_serial(serial)
 	, m_transportName(transport)
 	, m_driver(driver)
 	, m_args(args)
 {
+	m_model = name;
+	m_vendor = vendor;
+	m_serial = serial;
+
 	// Use a null transport
 	m_transport = new SCPINullTransport(args);
 
@@ -108,7 +109,7 @@ void MockInstrument::SetTransportConnectionString(const string& args)
 
 string MockInstrument::GetName() const
 {
-	return m_name;
+	return m_model;
 }
 
 string MockInstrument::GetVendor() const
@@ -121,10 +122,11 @@ string MockInstrument::GetSerial() const
 	return m_serial;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+//This is called by Instrument::m_serializers and is not virtual
+//cppcheck-suppress duplInheritedMember
 void MockInstrument::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
 {
 	node["transport"] = GetTransportName();

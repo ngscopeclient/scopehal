@@ -70,12 +70,6 @@ string MultiplyFilter::GetProtocolName()
 	return "Multiply";
 }
 
-Filter::DataLocation MultiplyFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -134,6 +128,9 @@ void MultiplyFilter::RefreshScalarVector(
 	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
 
+	//Copy units
+	SetXAxisUnits(GetInput(iVector).GetXAxisUnits());
+
 	//Push constants
 	MultiplyByConstantConstants cfg;
 	cfg.size = len;
@@ -176,6 +173,9 @@ void MultiplyFilter::RefreshScalarVector(
 void MultiplyFilter::RefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
+	//Copy units
+	SetXAxisUnits(GetInput(0).GetXAxisUnits());
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

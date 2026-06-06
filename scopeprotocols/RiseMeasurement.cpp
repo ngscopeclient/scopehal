@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,18 +37,27 @@ using namespace std;
 
 RiseMeasurement::RiseMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_start(m_parameters["Start Fraction"])
+	, m_end(m_parameters["End Fraction"])
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("din");
 
-	m_startname = "Start Fraction";
-	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
-	m_parameters[m_startname].SetFloatVal(0.2);
+	m_start = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
+	m_start.SetFloatVal(0.2);
 
-	m_endname = "End Fraction";
-	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
-	m_parameters[m_endname].SetFloatVal(0.8);
+	m_end = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
+	m_end.SetFloatVal(0.8);
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +65,7 @@ RiseMeasurement::RiseMeasurement(const string& color)
 
 bool RiseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -73,8 +82,8 @@ void RiseMeasurement::SetDefaultName()
 	char hwname[256];
 	snprintf(hwname, sizeof(hwname), "Rise(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
-		m_parameters[m_startname].ToString().c_str(),
-		m_parameters[m_endname].ToString().c_str()
+		m_start.ToString().c_str(),
+		m_end.ToString().c_str()
 		);
 	m_hwname = hwname;
 	m_displayname = m_hwname;
@@ -88,12 +97,20 @@ string RiseMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void RiseMeasurement::Refresh()
+void RiseMeasurement::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("RiseMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		m_streams[1].m_value = 0;
 		return;
 	}
@@ -106,13 +123,25 @@ void RiseMeasurement::Refresh()
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Get the base/top (we use these for calculating percentages)
-	float base = GetBaseVoltage(sdin, udin);
-	float top = GetTopVoltage(sdin, udin);
+	float base;
+	float top;
+	Filter::GetBaseAndTopVoltage(
+		cmdBuf,
+		queue,
+		m_minmaxPipeline,
+		m_histogramPipeline,
+		m_minbuf,
+		m_maxbuf,
+		m_histogramBuf,
+		sdin,
+		udin,
+		base,
+		top);
 
 	//Find the actual levels we use for our time gate
 	float delta = top - base;
-	float vstart = base + m_parameters[m_startname].GetFloatVal()*delta;
-	float vend = base + m_parameters[m_endname].GetFloatVal()*delta;
+	float vstart = base + m_start.GetFloatVal()*delta;
+	float vend = base + m_end.GetFloatVal()*delta;
 
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
@@ -120,13 +149,14 @@ void RiseMeasurement::Refresh()
 	cap->PrepareForCpuAccess();
 
 	float last = 1e20;
-	double tedge = 0;
+	int64_t tedgeInt = 0;
+	float tedgeFrac = 0;
 
 	int state = 0;
 	int64_t tlast = 0;
 
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
-	double sum = 0;
+	KahanSummation sum;
 	int64_t num = 0;
 	for(size_t i=0; i < len; i++)
 	{
@@ -138,7 +168,8 @@ void RiseMeasurement::Refresh()
 		{
 			if( (cur > vstart) && (last <= vstart) )
 			{
-				tedge = tnow - din->m_timescale + InterpolateTime(sdin, udin, i-1, vstart)*din->m_timescale;
+				tedgeInt = tnow - din->m_timescale;
+				tedgeFrac = InterpolateTime(sdin, udin, i-1, vstart)*din->m_timescale;
 				state = 1;
 			}
 		}
@@ -148,10 +179,12 @@ void RiseMeasurement::Refresh()
 		{
 			if( (cur > vend) && (last <= vend) )
 			{
-				double dt = InterpolateTime(sdin, udin, i-1, vend)*din->m_timescale + tnow - din->m_timescale - tedge;
+				int64_t dtInt = (tnow - din->m_timescale) - tedgeInt;
+				float dtFrac = InterpolateTime(sdin, udin, i-1, vend)*din->m_timescale - tedgeFrac;
+				float dt = dtInt + dtFrac;
 
 				cap->m_offsets.push_back(tlast);
-				cap->m_durations.push_back(tnow-tlast);
+				cap->m_durations.push_back(tnow - tlast);
 				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
@@ -168,5 +201,5 @@ void RiseMeasurement::Refresh()
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 
-	m_streams[1].m_value = sum / num;
+	m_streams[1].m_value = sum.GetSum() / num;
 }

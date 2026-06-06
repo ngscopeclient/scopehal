@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,31 +37,31 @@ using namespace std;
 
 ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_start("Begin")
-	, m_end("End")
-	, m_interval("Step interval")
-	, m_nsteps("Step count")
-	, m_unit("Unit")
+	, m_start(m_parameters["Begin"])
+	, m_end(m_parameters["End"])
+	, m_interval(m_parameters["Step interval"])
+	, m_nsteps(m_parameters["Step count"])
+	, m_unit(m_parameters["Unit"])
 	, m_lastUpdate(GetTime())
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_COUNTS), "updated", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	m_parameters[m_start] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_start].SetFloatVal(0);
+	m_start = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_start.SetFloatVal(0);
 
-	m_parameters[m_end] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_end].SetFloatVal(1);
+	m_end = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_end.SetFloatVal(1);
 
-	m_parameters[m_interval] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_interval].SetIntVal(FS_PER_SECOND);
+	m_interval = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_interval.SetIntVal(FS_PER_SECOND);
 
-	m_parameters[m_nsteps] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_nsteps].SetIntVal(10);
+	m_nsteps = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_nsteps.SetIntVal(10);
 
-	m_parameters[m_unit] = FilterParameter::UnitSelector();
-	m_parameters[m_unit].SetIntVal(Unit::UNIT_VOLTS);
-	m_parameters[m_unit].signal_changed().connect(sigc::mem_fun(*this, &ScalarStairstepFilter::OnUnitChanged));
+	m_unit = FilterParameter::UnitSelector();
+	m_unit.SetIntVal(Unit::UNIT_VOLTS);
+	m_unit.signal_changed().connect(sigc::mem_fun(*this, &ScalarStairstepFilter::OnUnitChanged));
 
 	SetData(nullptr, 0);
 }
@@ -70,7 +70,7 @@ ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ScalarStairstepFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool ScalarStairstepFilter::ValidateChannel([[maybe_unused]] size_t i, [[maybe_unused]] StreamDescriptor stream)
 {
 	//no inputs
 	return false;
@@ -98,7 +98,7 @@ bool ScalarStairstepFilter::PerformAction(const string& id)
 		//Trigger an update immediately and set our output
 		m_lastUpdate = GetTime();
 		m_streams[1].m_value = 1;
-		m_streams[0].m_value = m_parameters[m_start].GetFloatVal();
+		m_streams[0].m_value = m_start.GetFloatVal();
 	}
 
 	return true;
@@ -109,20 +109,20 @@ bool ScalarStairstepFilter::PerformAction(const string& id)
 
 void ScalarStairstepFilter::OnUnitChanged()
 {
-	auto unit = static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal());
+	auto unit = m_unit.GetEnumVal<Unit::UnitType>();
 
 	//Don't touch anything if our unit is already the same
-	if(m_parameters[m_start].GetUnit() == unit)
+	if(m_start.GetUnit() == unit)
 		return;
 
-	auto oldstart = m_parameters[m_start].GetFloatVal();
-	auto oldend = m_parameters[m_end].GetFloatVal();
+	auto oldstart = m_start.GetFloatVal();
+	auto oldend = m_end.GetFloatVal();
 
-	m_parameters[m_start] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
-	m_parameters[m_start].SetFloatVal(oldstart);
+	m_start = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+	m_start.SetFloatVal(oldstart);
 
-	m_parameters[m_end] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
-	m_parameters[m_end].SetFloatVal(oldend);
+	m_end = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+	m_end.SetFloatVal(oldend);
 }
 
 void ScalarStairstepFilter::LoadParameters(const YAML::Node& node, IDTable& table)
@@ -133,13 +133,20 @@ void ScalarStairstepFilter::LoadParameters(const YAML::Node& node, IDTable& tabl
 	Filter::LoadParameters(node, table);
 }
 
-void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void ScalarStairstepFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	SetYAxisUnits(static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal()), 0);
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ScalarStairstepFilter::Refresh");
+	#endif
+	ClearErrors();
+
+	SetYAxisUnits(m_unit.GetEnumVal<Unit::UnitType>(), 0);
 
 	//See how long it's been since our last update and set update flag accordingly
 	double now = GetTime();
-	double dt = m_parameters[m_interval].GetFloatVal()*SECONDS_PER_FS;
+	double dt = m_interval.GetFloatVal()*SECONDS_PER_FS;
 	double timeOfNextUpdate = m_lastUpdate + dt;
 	if(timeOfNextUpdate > now)
 	{
@@ -158,10 +165,10 @@ void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_
 	else
 		m_lastUpdate = timeOfNextUpdate;
 
-	float start = m_parameters[m_start].GetFloatVal();
-	float end = m_parameters[m_end].GetFloatVal();
+	float start = m_start.GetFloatVal();
+	float end = m_end.GetFloatVal();
 	float delta = end - start;
-	float stepsize = delta / m_parameters[m_nsteps].GetIntVal();
+	float stepsize = delta / m_nsteps.GetIntVal();
 
 	//Clip out of range values
 	if((end > start) && ( (m_streams[0].m_value > end) || (m_streams[0].m_value < start) ) )

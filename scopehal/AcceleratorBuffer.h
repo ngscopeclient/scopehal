@@ -47,6 +47,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef __GNUC__
+#include <cxxabi.h>
+#endif
+
 #include <type_traits>
 
 extern uint32_t g_vkPinnedMemoryType;
@@ -239,6 +243,86 @@ std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const Accelerato
 { return a.GetIndex() - b.GetIndex(); }
 
 /**
+	@brief Base class for AcceleratorBuffer storing common metadata used by all derived types
+ */
+class AcceleratorBufferBase
+{
+public:
+
+	AcceleratorBufferBase(const std::string& name = "")
+		: m_capacity(0)
+		, m_size(0)
+		, m_name(name)
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_objectListMutex);
+		m_objectList.emplace(this);
+	}
+
+	virtual ~AcceleratorBufferBase()
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_objectListMutex);
+		m_objectList.erase(this);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sizes of buffers
+
+	///@brief Size of the allocated memory space (may be larger than m_size)
+	size_t m_capacity;
+
+	///@brief Size of the memory actually being used
+	size_t m_size;
+
+protected:
+
+	///@brief Friendly name of the buffer (for debug tools)
+	std::string m_name;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// General accessors
+public:
+
+	///@brief Returns the actual size of the container (may be smaller than what was allocated)
+	size_t size() const
+	{ return m_size; }
+
+	///@brief Returns the allocated size of the container
+	size_t capacity() const
+	{ return m_capacity; }
+
+	///@brief Returns the debug name of the buffer, if any
+	const std::string& GetName() const
+	{ return m_name; }
+
+	///@brief Gets the underlying C++ object type
+	virtual std::string GetType() const =0;
+
+	///@brief Gets the size of each entry in the container
+	virtual size_t GetElementSize() const =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Object enumeration
+
+protected:
+
+	///@brief Mutex controlling access to m_objectList
+	static std::recursive_mutex m_objectListMutex;
+
+	///@brief Set of all existing AcceleratorBufferBase objects
+	static std::set<AcceleratorBufferBase*> m_objectList;
+
+public:
+
+	///@brief Get the mutex for m_objectList
+	static std::recursive_mutex& GetMutex()
+	{ return m_objectListMutex; }
+
+	///@brief Get the set of all objects. You must hold a lock on m_objectListMutex while working with it.
+	static const std::set<AcceleratorBufferBase*>& GetObjects()
+	{ return m_objectList; }
+};
+
+/**
 	@brief A buffer of memory which may be used by GPU acceleration
 
 	At any given point in time the buffer may exist as a single copy on the CPU, a single copy on the GPU, or
@@ -255,8 +339,53 @@ std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const Accelerato
 	non-trivially-copyable types as a convenience for working with waveforms on the CPU.
  */
 template<class T>
-class AcceleratorBuffer
+class AcceleratorBuffer : public AcceleratorBufferBase
 {
+public:
+
+	virtual std::string GetType() const
+	{
+		//Get the data type
+		auto& etype = typeid(T);
+
+		//Check common stdint data types and return them rather than the underlying C type
+		if(etype == typeid(int64_t))
+			return "int64_t";
+		else if(etype == typeid(uint64_t))
+			return "uint64_t";
+		else if(etype == typeid(int32_t))
+			return "int32_t";
+		else if(etype == typeid(uint32_t))
+			return "uint32_t";
+		else if(etype == typeid(int16_t))
+			return "int16_t";
+		else if(etype == typeid(uint16_t))
+			return "uint16_t";
+		else if(etype == typeid(int8_t))
+			return "int8_t";
+		else if(etype == typeid(uint8_t))
+			return "uint8_t";
+
+		else
+		{
+			//separate path here needed since GCC returns mangled name
+			#ifdef __GNUC__
+				int status;
+				auto pname = etype.name();
+				auto tmp = abi::__cxa_demangle(pname, nullptr, nullptr, &status);
+
+				std::string ret = std::string(tmp);
+				free(tmp);
+				return ret;
+			#else
+				return std::string(etype.name());
+			#endif
+		}
+	}
+
+	virtual size_t GetElementSize() const
+	{ return sizeof(T); }
+
 protected:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -385,18 +514,6 @@ protected:
 #endif
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Iteration
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Sizes of buffers
-
-	///@brief Size of the allocated memory space (may be larger than m_size)
-	size_t m_capacity;
-
-	///@brief Size of the memory actually being used
-	size_t m_size;
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Hint configuration
 public:
 	enum UsageHint
@@ -422,7 +539,8 @@ public:
 	 */
 	__attribute__((noinline))
 	AcceleratorBuffer(const std::string& name = "")
-		: m_cpuMemoryType(MEM_TYPE_NULL)
+		: AcceleratorBufferBase(name)
+		, m_cpuMemoryType(MEM_TYPE_NULL)
 		, m_gpuMemoryType(MEM_TYPE_NULL)
 		, m_cpuPtr(nullptr)
 		, m_gpuPhysMem(nullptr)
@@ -432,11 +550,8 @@ public:
 		#ifndef _WIN32
 		, m_tempFileHandle(0)
 		#endif
-		, m_capacity(0)
-		, m_size(0)
 		, m_cpuAccessHint(HINT_LIKELY)	//default access hint: CPU-side pinned memory
 		, m_gpuAccessHint(HINT_UNLIKELY)
-		, m_name(name)
 	{
 		//non-trivially-copyable types can't be copied to GPU except on unified memory platforms
 		if(!std::is_trivially_copyable<T>::value && !g_vulkanDeviceHasUnifiedMemory)
@@ -451,7 +566,7 @@ public:
 		ClearTransferFlags();
 	}
 
-	~AcceleratorBuffer()
+	virtual ~AcceleratorBuffer()
 	{
 		FreeCpuBuffer(true);
 		FreeGpuBuffer(true);
@@ -460,18 +575,6 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// General accessors
 public:
-
-	/**
-		@brief Returns the actual size of the container (may be smaller than what was allocated)
-	 */
-	size_t size() const
-	{ return m_size; }
-
-	/**
-		@brief Returns the allocated size of the container
-	 */
-	size_t capacity() const
-	{ return m_capacity; }
 
 	/**
 		@brief Returns the total reserved CPU memory, in bytes
@@ -618,10 +721,16 @@ public:
 	 __attribute__((noinline))
 	 void CopyFrom(const std::vector<T>& rhs)
 	 {
-		 PrepareForCpuAccess();
-		 resize(rhs.size());
-		 memcpy(m_cpuPtr, &rhs[0], m_size * sizeof(T));
-		 MarkModifiedFromCpu();
+		assert(std::is_trivially_copyable<T>::value);
+
+		PrepareForCpuAccess();
+		resize(rhs.size());
+
+		//This function should never be used if T isn't trivially copyable but cppcheck doesn't realize that
+		//cppcheck-suppress memsetClass
+		memcpy(m_cpuPtr, &rhs[0], m_size * sizeof(T));
+
+		MarkModifiedFromCpu();
 	 }
 
 	/**
@@ -648,8 +757,12 @@ public:
 			}
 
 			//Trivially copyable types can be done more efficiently in a block
+			//cppcheck doesn't realize this path is unreachable so suppress it
 			else
+			{
+				//cppcheck-suppress memsetClass
 				memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+			}
 		}
 		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
 
@@ -701,8 +814,12 @@ public:
 			}
 
 			//Trivially copyable types can be done more efficiently in a block
+			//cppcheck doesn't realize this path is unreachable so suppress it
 			else
+			{
+				//cppcheck-suppress memsetClass
 				memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+			}
 		}
 		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
 
@@ -710,6 +827,17 @@ public:
 		if(rhs.HasGpuBuffer() && !rhs.m_gpuPhysMemIsStale)
 		{
 			AcceleratorBufferPerformanceCounters::LogDeviceDeviceCopyNonBlocking();
+
+			//Add a barrier
+			cmdBuf.pipelineBarrier(
+				vk::PipelineStageFlagBits::eComputeShader,
+				vk::PipelineStageFlagBits::eTransfer,
+				{},
+				vk::MemoryBarrier(
+					vk::AccessFlagBits::eShaderWrite,
+					vk::AccessFlagBits::eTransferRead),
+				{},
+				{});
 
 			//Make the transfer request
 			vk::BufferCopy region(0, 0, m_size * sizeof(T));
@@ -738,14 +866,14 @@ protected:
 		ClearTransferFlags();
 
 		/*
-			If we are a bool[] or similar one-byte type, we are likely going to be accessed from the GPU via a uint32
-			descriptor for at least some shaders (such as rendering).
+			If we are a bool[], uint16_t[], or similar small type, we are likely going to be accessed from the GPU via
+			a uint32 descriptor for at least some shaders (such as rendering).
 
 			Round our actual allocated size to the next multiple of 4 bytes. The padding values are unimportant as the
 			bytes are never written, and the data read from the high bytes in the uint32 is discarded by the GPU.
 			We just need to ensure the memory is allocated so the 32-bit read is legal to perform.
 		 */
-		if( (sizeof(T) == 1) && (m_gpuAccessHint != HINT_NEVER) )
+		if( (sizeof(T) < 4) && (m_gpuAccessHint != HINT_NEVER) )
 		{
 			if(size & 3)
 				size = (size | 3) + 1;
@@ -788,12 +916,13 @@ protected:
 
 					//Trivially copyable types can be done more efficiently in a block
 					//gcc warns about this even though we only call this code if the type is trivially copyable,
-					//so disable the warning.
+					//so disable the warning. Ditto for cppcheck.
 					else
 					{
 						#pragma GCC diagnostic push
 						#pragma GCC diagnostic ignored "-Wclass-memaccess"
 
+						//cppcheck-suppress memsetClass
 						memcpy(m_cpuPtr, pOld, m_size * sizeof(T));
 
 						#pragma GCC diagnostic pop
@@ -929,11 +1058,20 @@ protected:
 	//PrepareForCpuAccess() *must* be called prior to calling any of these methods.
 public:
 
+	//Reject static analysis error here
+	//Compile time sanitizer checks don't understand Vulkan allocations and think the buffer is always 0 bytes
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Warray-bounds"
+
+	///@brief Index the CPU side buffer
 	const T& operator[](size_t i) const
 	{ return m_cpuPtr[i]; }
 
+	///@brief Index the CPU side buffer
 	T& operator[](size_t i)
 	{ return m_cpuPtr[i]; }
+
+	#pragma GCC diagnostic pop
 
 	/**
 		@brief Adds a new element to the end of the container, allocating space if needed
@@ -986,8 +1124,12 @@ public:
 		}
 
 		//Trivially copyable types can be done more efficiently in a block
+		//cppcheck doesn't realize this path is unreachable so suppress it
 		else
+		{
+			//cppcheck-suppress memsetClass
 			memmove(m_cpuPtr+1, m_cpuPtr, sizeof(T) * (cursize));
+		}
 
 		//Insert the new first element
 		m_cpuPtr[0] = value;
@@ -1022,7 +1164,11 @@ public:
 
 		//Trivially copyable types can be done more efficiently in a block
 		else
+		{
+			//this path is unreachable if not trivially copyable, but cppcheck complains about it anyway
+			//cppcheck-suppress memsetClass
 			memmove(m_cpuPtr, m_cpuPtr+1, sizeof(T) * (m_size-1));
+		}
 
 		resize(m_size - 1);
 
@@ -1265,7 +1411,7 @@ public:
 		}
 
 		//Make sure the GPU-side buffer is up to date
-		if(m_gpuPhysMemIsStale && !outputOnly)
+		if(HasGpuBuffer() && m_gpuPhysMemIsStale && !outputOnly)
 			CopyToGpuNonblocking(cmdBuf);
 		else
 			AcceleratorBufferPerformanceCounters::LogHostDeviceCopySkipped();
@@ -1289,6 +1435,15 @@ protected:
 
 		//Make the transfer request
 		g_vkTransferCommandBuffer->begin({});
+		g_vkTransferCommandBuffer->pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eShaderWrite,
+				vk::AccessFlagBits::eTransferRead),
+			{},
+			{});
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		g_vkTransferCommandBuffer->copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
 
@@ -1317,6 +1472,16 @@ protected:
 
 		//Make the transfer request
 		g_vkTransferCommandBuffer->begin({});
+
+		g_vkTransferCommandBuffer->pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eShaderWrite,
+				vk::AccessFlagBits::eTransferRead),
+			{},
+			{});
 
 		vk::BufferCopy startregion(0, 0, sizeof(T));
 		size_t endOffset = (m_size - 1) * sizeof(T);
@@ -1445,7 +1610,6 @@ public:
 			{});
 	}
 
-
 protected:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1453,6 +1617,9 @@ protected:
 
 	/**
 		@brief Free the CPU-side buffer and underlying physical memory
+
+		@param dataLossOK		True if we do not intend to use the contents of this buffer again
+								(and thus it's OK to remove the only copy of the data)
 	 */
 	void FreeCpuBuffer(bool dataLossOK = false)
 	{
@@ -1486,6 +1653,7 @@ protected:
 	}
 
 public:
+
 	/**
 		@brief Free the GPU-side buffer and underlying physical memory
 
@@ -1791,9 +1959,6 @@ protected:
 
 protected:
 
-	///@brief Friendly name of the buffer (for debug tools)
-	std::string m_name;
-
 	/**
 		@brief Pushes our friendly name to the underlying Vulkan objects
 	 */
@@ -1858,8 +2023,12 @@ public:
 
 		@param name	Name of the buffer
 	 */
-	void SetName(std::string name)
+	void SetName(const std::string& name)
 	{
+		//Early out if name hasn't actually changed
+		if(m_name == name)
+			return;
+
 		m_name = name;
 		if(g_hasDebugUtils)
 		{
@@ -1868,6 +2037,24 @@ public:
 			if(m_cpuBuffer != nullptr)
 				UpdateCpuNames();
 		}
+	}
+
+	/**
+		@brief Dump the raw contents of the buffer to a file for debugging
+	 */
+	__attribute__((noinline))
+	void DebugDumpToFile(const std::string& fname)
+	{
+		FILE* fp = fopen(fname.c_str(), "wb");
+		if(!fp)
+			LogFatal("failed to open debug dump %s\n", fname.c_str());
+
+		PrepareForCpuAccess();
+
+		//Actually write the data (only the valid part of the buffer for now... TODO extra tail stuff?)
+		fwrite(GetCpuPointer(), size(), sizeof(T), fp);
+
+		fclose(fp);
 	}
 
 public:

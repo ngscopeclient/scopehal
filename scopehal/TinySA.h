@@ -84,7 +84,7 @@ protected:
 		TINY_SA_ULTRA
 	};
 
-	size_t ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length);
+	size_t ConverseBinary(const std::string& commandString, std::vector<uint8_t> &data, size_t length);
 	int64_t ConverseRbwValue(bool sendValue = false, int64_t value = 0);
 
 	std::string GetChannelColor(size_t i);
@@ -102,13 +102,11 @@ protected:
 	// dbm offset to apply on values received from the device (model depedant)
 	int64_t m_modelDbmOffset;
 
-	//Vulkan peak detection
-	std::shared_ptr<QueueHandle> m_queue;
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
-
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

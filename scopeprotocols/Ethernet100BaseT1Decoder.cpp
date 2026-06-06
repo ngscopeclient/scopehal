@@ -77,6 +77,9 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 		{
 			m_descrambleComputePipeline =
 				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Descrambler.spv", 4, sizeof(BaseT1DescrambleConstants));
+
+			m_decodeComputePipeline =
+				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Decoder.spv", 9, sizeof(BaseT1DecodeConstants));
 		}
 	}
 }
@@ -103,12 +106,6 @@ bool Ethernet100BaseT1Decoder::ValidateChannel(size_t i, StreamDescriptor stream
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-Filter::DataLocation Ethernet100BaseT1Decoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
 
 void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
@@ -164,6 +161,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	auto cap = SetupEmptyWaveform<EthernetWaveform>(din_i, 0);
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
+	cap->Rename("Ethernet100BaseT1Decoder.data");
 
 	vector<uint8_t> bytes;
 	vector<uint64_t> starts;
@@ -202,13 +200,21 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 		const uint32_t compute_block_count = GetComputeBlockCount(ilen, 64);
 
+		#ifdef HAVE_NVTX
+			nvtx3::scoped_range nrange2("PAM3 decode");
+		#endif
+
 		cmdBuf.begin({});
 
 			m_pam3DecodeComputePipeline->Bind(cmdBuf);
 
 			//Copy I channel timestamps to CPU since we still need those for software decoding for now
-			din_i->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
-			din_i->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+			//If we have int64 support, we can do the whole decode on the GPU and skip this copy
+			if(!g_hasShaderInt64)
+			{
+				din_i->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+				din_i->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+			}
 
 			//Decode I channel
 			m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
@@ -230,9 +236,12 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				compute_block_count / 32768 + 1);
 			m_pointsQ.MarkModifiedFromGpu();
 
-			//Copy points to CPU
-			m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
-			m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
+			//Copy points to CPU if needed for software decoding
+			if(!g_hasShaderInt64)
+			{
+				m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
+				m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
+			}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
@@ -286,244 +295,159 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		//A minimum sized Ethernet frame is 64 bytes (512 bits) or 171 triplets long plus start/stop symbols etc
 		uint32_t	maxFramesInCapture = din_i->size() / 171;
 
+		ScratchBuffer_uint32_t tmp_vstarts(ScratchBufferManager::U32_GPU_WAVEFORM);
+		ScratchBuffer_int64_t tmp_vscramblers(ScratchBufferManager::I64_GPU_WAVEFORM);
+
 		BaseT1DescrambleConstants cfg;
 		cfg.len = ilen;
 		cfg.samplesPerThread = GetComputeBlockCount(ilen, nthreads);
 		cfg.maxOutputPerThread = GetComputeBlockCount(maxFramesInCapture, nthreads) + 1;
 		cfg.masterMode = masterMode;
 
-		//Allocate scratch space
-		ScratchBuffer_uint32_t tmp_vstarts(ScratchBufferManager::U32_GPU_WAVEFORM);
-		ScratchBuffer_int64_t tmp_vscramblers(ScratchBufferManager::I64_GPU_WAVEFORM);
-		tmp_vstarts->resize(cfg.maxOutputPerThread * nthreads);
-		tmp_vscramblers->resize(cfg.maxOutputPerThread * nthreads);
-
-		//Run the shader
-		m_descrambleComputePipeline->BindBufferNonblocking(0, m_pointsI, cmdBuf);
-		m_descrambleComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf);
-		m_descrambleComputePipeline->BindBufferNonblocking(2, *tmp_vstarts, cmdBuf, true);
-		m_descrambleComputePipeline->BindBufferNonblocking(3, *tmp_vscramblers, cmdBuf, true);
-
-		m_descrambleComputePipeline->Dispatch(
-			cmdBuf,
-			cfg,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
-
-		tmp_vstarts->MarkModifiedFromGpu();
-		tmp_vscramblers->MarkModifiedFromGpu();
-
-		//Grab the output
-		tmp_vstarts->PrepareForCpuAccessNonblocking(cmdBuf);
-		tmp_vscramblers->PrepareForCpuAccessNonblocking(cmdBuf);
-
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-
-		//CPU side coalescing
-		auto pstart = tmp_vstarts->GetCpuPointer();
-		auto pscramble = tmp_vscramblers->GetCpuPointer();
-		vector< pair<uint32_t, int64_t> > packets;
-		for(size_t i=0; i<nthreads; i++)
 		{
-			uint32_t outbase = i * cfg.maxOutputPerThread;
+			#ifdef HAVE_NVTX
+				nvtx3::scoped_range nrange2("Descramble");
+			#endif
 
-			LogIndenter li;
-			size_t numEntries = pstart[outbase];
-			if(numEntries != 0)
-			{
-				for(size_t j=0; j<numEntries; j++)
-				{
-					packets.push_back(pair<uint32_t, int64_t>(
-						pstart[outbase + j + 1],
-						pscramble[outbase + j + 1]));
-				}
-			}
+			//Allocate scratch space
+			tmp_vstarts->resize(cfg.maxOutputPerThread * nthreads);
+			tmp_vscramblers->resize(cfg.maxOutputPerThread * nthreads);
+
+			//Run the shader
+			m_descrambleComputePipeline->BindBufferNonblocking(0, m_pointsI, cmdBuf);
+			m_descrambleComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf);
+			m_descrambleComputePipeline->BindBufferNonblocking(2, *tmp_vstarts, cmdBuf, true);
+			m_descrambleComputePipeline->BindBufferNonblocking(3, *tmp_vscramblers, cmdBuf, true);
+
+			m_descrambleComputePipeline->Dispatch(
+				cmdBuf,
+				cfg,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			tmp_vstarts->MarkModifiedFromGpu();
+			tmp_vscramblers->MarkModifiedFromGpu();
+
+			//Grab the output
+			tmp_vstarts->PrepareForCpuAccessNonblocking(cmdBuf);
+			tmp_vscramblers->PrepareForCpuAccessNonblocking(cmdBuf);
+
+			cmdBuf.end();
+			queue->SubmitAndBlock(cmdBuf);
 		}
 
-		//Decode each packet that the GPU found
-		for(auto pinfo : packets)
+		ScratchBuffer_uint32_t packetStarts(ScratchBufferManager::U32_GPU_WAVEFORM);	//TODO U32_GPU_SMALL
+		ScratchBuffer_int64_t packetScramblers(ScratchBufferManager::I64_GPU_SMALL);
 		{
-			scrambler = pinfo.second;
-			size_t i = pinfo.first;
-			int64_t tnow = din_i->m_offsets[i];
-			int64_t tlen = din_i->m_durations[i];
+			#ifdef HAVE_NVTX
+				nvtx3::scoped_range nrange2("Merge");
+			#endif
 
-			//Add the fake preamble byte
-			bytestart = din_i->m_offsets[i-2];
-			bytes.push_back(0x55);
-			starts.push_back(bytestart);
-			bytestart = tnow + (tlen * 2 / 3);
-			ends.push_back(bytestart);
-
-			//We're now 1 bit into the first preamble byte, which is always a 1
-			nbits = 1;
-			curNib = 1;
-
-			prevNib = 0;
-			phaseLow = true;
-			state = STATE_PACKET;
-			scramblerLocked = true;
-
-			i++;
-
-			//Decode just this one packet
-			for(; (i<ilen) && (state != STATE_IDLE); i++)
+			//CPU side coalescing (TODO move this to GPU)
+			auto pstart = tmp_vstarts->GetCpuPointer();
+			auto pscramble = tmp_vscramblers->GetCpuPointer();
+			packetStarts->clear();
+			packetScramblers->clear();
+			for(size_t i=0; i<nthreads; i++)
 			{
-				tnow = din_i->m_offsets[i];
-				tlen = din_i->m_durations[i];
+				uint32_t outbase = i * cfg.maxOutputPerThread;
 
-				int ci = m_pointsI[i];
-				int cq = m_pointsQ[i];
-
-				//Advance the scrambler for each constellation point
-				auto b32 = (scrambler >> 32) & 1;
-				auto b19 = (scrambler >> 19) & 1;
-				auto b12 = (scrambler >> 12) & 1;
-				if(masterMode)
-					scrambler = (scrambler << 1) | ( b32 ^ b12 );
-				else
-					scrambler = (scrambler << 1) | ( b32 ^ b19 );
-
-				//Extract scrambler bits we care about for the data bits
-				auto b16 = (scrambler >> 16) & 1;
-				bool b8 = (scrambler >> 8) & 1;
-				bool b6 = (scrambler >> 6) & 1;
-				bool b3 = (scrambler >> 3) & 1;
-				bool b0 = (scrambler & 1);
-
-				switch(state)
+				LogIndenter li;
+				size_t numEntries = pstart[outbase];
+				if(numEntries != 0)
 				{
-					case STATE_PACKET:
-
-						//Look for ESD
-						//96.3.3.3.5
-						if( (ci == 0) && (cq == 0) )
-							state = STATE_ESD_1;
-
-						//No, it's a data symbol
-						else if(scramblerLocked)
-						{
-							//Decode to a sequence of 3 scrambled data bits
-							uint8_t sd = 0;
-							switch(ci)
-							{
-								//-1 -> 3'b000, 0 = 3'b001, 1 = 3'b010
-								case -1:
-									sd = cq + 1;
-									break;
-
-								//Q=0 is disallowed here
-								case 0:
-									if(cq == -1)
-										sd = 3;
-									else //if(cq == 1)
-										sd = 4;
-									break;
-
-								//-1 -> 3'b101, 0 -> 3'b110, 1 -> 3'b111
-								case 1:
-									sd = cq + 6;
-
-								default:
-									break;
-							}
-
-							/*
-								Descramble sd per 40.3.1.4.2
-
-								Sy0 = scr0
-								sy1 = scr3 ^ 8
-								sy2 = scr6 ^ 16
-								sy3 = scr9 ^ 14 ^ 19 ^ 24
-
-								sx0 = scr4 ^ scr6
-								sx1 = scr7 ^ 9 ^ 12 ^ 14
-								sx2 = scr10 ^ 12 ^ 20 ^ 22
-								sx3 = scr13 ^ 15 ^ 18 ^ 20 ^ 23 ^ 25 ^ 28 ^ 30
-
-								scrambler for 7:4 is sx
-								scrambler for 3:0 is sy
-							 */
-							bool sy0 = b0;
-							bool sy1 = b3 ^ b8;
-							bool sy2 = b6 ^ b16;
-							sd ^= (sy2 << 2) ^ (sy1 << 1) ^ sy0;
-
-							//Add the 3 descrambled bits into the current nibble
-							curNib |= (sd << nbits);
-							nbits += 3;
-
-							//At this point we should have 3, 4, 5, or 6 bits in the current nibble-in-progress.
-							//If we have at least a whole nibble, process it
-							if(nbits >= 4)
-							{
-								uint8_t nib = curNib & 0xf;
-
-								curNib >>= 4;
-								nbits -= 4;
-
-								//Combine nibbles into bytes
-								if(!phaseLow)
-								{
-									uint8_t bval = (nib << 4) | prevNib;
-
-									//Add the byte
-									bytes.push_back(bval);
-									starts.push_back(bytestart);
-
-									//Byte end time depends on how many bits from this symbol weren't consumed
-									bytestart = tnow + (tlen * (2 - nbits) / 3);
-
-									ends.push_back(bytestart);
-								}
-
-								prevNib = nib;
-								phaseLow = !phaseLow;
-							}
-						}
-
-						break;
-
-					case STATE_ESD_1:
-
-						//Look for ESD, bail if malformed
-						if( (ci == 0) && (cq == 0) )
-							state = STATE_ESD_2;
-						else
-							state = STATE_IDLE;
-
-						break;
-
-					case STATE_ESD_2:
-
-						//Good ESD, decode what we got
-						if( (ci == 1) && (cq == 1) )
-							BytesToFrames(bytes, starts, ends, cap);
-
-						//ESD with error
-						//TODO: how to handle this? for now decode it anyway
-						else if( (ci == -1) && (cq == -1) )
-						{
-							if(scramblerLocked)
-								BytesToFrames(bytes, starts, ends, cap);
-						}
-
-						//invalid, don't try to decode
-						else
-						{}
-
-						//Either way, clear frame data and move on
-						bytes.clear();
-						starts.clear();
-						ends.clear();
-						state = STATE_IDLE;
-						break;
-
-					default:
-						break;
+					for(size_t j=0; j<numEntries; j++)
+					{
+						packetStarts->push_back(pstart[outbase + j + 1]);
+						packetScramblers->push_back(pscramble[outbase + j + 1]);
+					}
 				}
 			}
+			packetStarts->MarkModifiedFromCpu();
+			packetScramblers->MarkModifiedFromCpu();
+		}
+
+		ScratchBuffer_uint8_t gpuBytes(ScratchBufferManager::U8_GPU_WAVEFORM);	//should be GPU_SMALL
+		ScratchBuffer_int64_t gpuStarts(ScratchBufferManager::I64_GPU_SMALL);
+		ScratchBuffer_int64_t gpuEnds(ScratchBufferManager::I64_GPU_SMALL);
+
+		size_t maxPacketBytes = 2048;
+		size_t npackets = packetStarts->size();
+		LogTrace("GPU found %zu packets\n", npackets);
+
+		//skip this if no packets identified
+		if(npackets)
+		{
+			#ifdef HAVE_NVTX
+				nvtx3::scoped_range nrange2("Decode");
+			#endif
+
+			//Next shader: make the full list of bytes in each packet
+			//Buffer format to start: each thread gets a 2048 entry buffer of (bytes, starts, ends)
+			//Make them consecutive, so we can decode in a batch
+			size_t bufsize = maxPacketBytes * npackets;
+			gpuStarts->resize(bufsize);
+			gpuEnds->resize(bufsize);
+			gpuBytes->resize(bufsize);
+
+			cmdBuf.begin({});
+			BaseT1DecodeConstants dcfg;
+			dcfg.npackets = npackets;
+			dcfg.maxPacketBytes = maxPacketBytes;
+			dcfg.inputLength = ilen;
+			dcfg.masterMode = masterMode;
+
+			m_decodeComputePipeline->BindBufferNonblocking(0, m_pointsI, cmdBuf);
+			m_decodeComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf);
+			m_decodeComputePipeline->BindBufferNonblocking(2, *packetStarts, cmdBuf);
+			m_decodeComputePipeline->BindBufferNonblocking(3, *packetScramblers, cmdBuf);
+			m_decodeComputePipeline->BindBufferNonblocking(4, *gpuBytes, cmdBuf, true);
+			m_decodeComputePipeline->BindBufferNonblocking(5, *gpuStarts, cmdBuf, true);
+			m_decodeComputePipeline->BindBufferNonblocking(6, *gpuEnds, cmdBuf, true);
+			m_decodeComputePipeline->BindBufferNonblocking(7, din_i->m_offsets, cmdBuf);
+			m_decodeComputePipeline->BindBufferNonblocking(8, din_i->m_durations, cmdBuf);
+
+			auto decodeBlockCount = GetComputeBlockCount(npackets, 32);
+			m_decodeComputePipeline->Dispatch(
+				cmdBuf,
+				dcfg,
+				min(decodeBlockCount, 32768u),
+				decodeBlockCount / 32768 + 1);
+
+			gpuStarts->MarkModifiedFromGpu();
+			gpuEnds->MarkModifiedFromGpu();
+			gpuBytes->MarkModifiedFromGpu();
+
+			gpuStarts->PrepareForCpuAccessNonblocking(cmdBuf);
+			gpuEnds->PrepareForCpuAccessNonblocking(cmdBuf);
+			gpuBytes->PrepareForCpuAccessNonblocking(cmdBuf);
+
+			cmdBuf.end();
+			queue->SubmitAndBlock(cmdBuf);
+		}
+
+		#ifdef HAVE_NVTX
+			nvtx3::scoped_range nrange2("Final decode");
+		#endif
+
+		//Pull the data off the GPU and do final CPU-side decoding
+		//TODO: this can be made more efficient if we omit copying and make BytesToFrames work on the block as-is
+		for(size_t j=0; j<npackets; j++)
+		{
+			uint32_t base = j*maxPacketBytes;
+			uint32_t length = (*gpuStarts)[base];
+			if(length == 0)
+				continue;
+
+			bytes.resize(length);
+			starts.resize(length);
+			ends.resize(length);
+
+			memcpy(&bytes[0], gpuBytes->GetCpuPointer() + base + 1, length * sizeof(uint8_t));
+			memcpy(&starts[0], gpuStarts->GetCpuPointer() + base + 1, length * sizeof(int64_t));
+			memcpy(&ends[0], gpuEnds->GetCpuPointer() + base + 1, length * sizeof(int64_t));
+
+			BytesToFrames(bytes, starts, ends, cap);
 		}
 	}
 
@@ -793,6 +717,15 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 				case STATE_ESD_1:
 
+					//at end of packet reset scrambler state if we're not locked
+					if(!scramblerLocked)
+					{
+						lastScramblerError = 0;
+						scramblerErrors = 0;
+						idlesMatched = 0;
+						totalErrorsReported = 0;
+					}
+
 					//Look for ESD, bail if malformed
 					if( (ci == 0) && (cq == 0) )
 						state = STATE_ESD_2;
@@ -828,6 +761,9 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			}
 		}
 	}
+
+	//Calculate color for each protocol event and cache it so we don't have to do a ton of string manipulation later
+	cap->PreCacheColors();
 
 	cap->MarkModifiedFromCpu();
 }

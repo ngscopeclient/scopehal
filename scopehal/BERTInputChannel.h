@@ -214,7 +214,7 @@ public:
 	{ m_bert.lock()->SetDataRate(GetIndex(), rate); }
 
 	///@brief Gets the path of the mask file for pass/fail testing (if any)
-	std::string GetMaskFile()
+	const std::string& GetMaskFile()
 	{ return m_maskFile; }
 
 	/**

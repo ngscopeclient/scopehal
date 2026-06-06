@@ -294,37 +294,10 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	}
 
 	//Create Vulkan objects for the waveform conversion
-	m_queue = g_vkQueueManager->GetComputeQueue("PicoOscilloscope.queue");
-	vk::CommandPoolCreateInfo poolInfo(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		m_queue->m_family );
-
-	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-
-	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
-	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
-		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-
-	if(g_hasDebugUtils)
-	{
-		string poolname = "PicoOscilloscope.pool";
-		string bufname = "PicoOscilloscope.cmdbuf";
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandPool,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
-				poolname.c_str()));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
-				bufname.c_str()));
-	}
+	InitVulkanQueue("PicoOscilloscope");
 
 	m_conversionPipeline = make_unique<ComputePipeline>(
-			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+			"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 }
 
 /**
@@ -381,7 +354,7 @@ void PicoOscilloscope::IdentifyHardware()
 			m_picoHasAwg = true;
 			m_picoHasBwlimiter = false;
 			m_awgBufferSize = 8192;
-			if(m_model[4] == 'B')
+			if((m_model.size() > 4) && (m_model[4] == 'B'))
 				m_awgBufferSize = 32768;
 
 			if(m_model.find("MSO") != string::npos)
@@ -844,14 +817,14 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 	#pragma pack(pop)
 
 	//Read global waveform settings (independent of each channel)
-	if(!m_transport->ReadRawData(sizeof(wfmhdrs), (uint8_t*)&wfmhdrs))
+	if(!m_transport->ReadRawData(sizeof(wfmhdrs), reinterpret_cast<uint8_t*>(&wfmhdrs)))
 		return false;
 	uint16_t numChannels = wfmhdrs.numChannels;
 	int64_t fs_per_sample = wfmhdrs.fs_per_sample;
 
 	//Acknowledge receipt of this waveform
 	m_lastSeq = wfmhdrs.sequence;
-	m_transport->SendRawData(4, (uint8_t*)&m_lastSeq);
+	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
 
 	//Acquire data for each channel
 	size_t chnum;
@@ -864,13 +837,12 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 	vector<UniformAnalogWaveform*> awfms;
 	lock_guard<recursive_mutex> wipLock(m_wipWaveformMutex);
 
-	bool processedWaveformsOnGPU = false;
 	for(size_t i=0; i<numChannels; i++)
 	{
 		size_t tmp[2];
 
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(tmp), (uint8_t*)&tmp))
+		if(!m_transport->ReadRawData(sizeof(tmp), reinterpret_cast<uint8_t*>(&tmp)))
 			return false;
 		chnum = tmp[0];
 		memdepth = tmp[1];
@@ -888,7 +860,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			abuf->PrepareForCpuAccess();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -909,7 +881,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
-			cap->m_startTimestamp = time(NULL);
+			cap->m_startTimestamp = time(nullptr);
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
 
@@ -919,57 +891,43 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 
 			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
 
-			if(g_hasShaderInt16)
-			{
-				m_queue->WaitIdle();
-				m_cmdBuf->begin({});
+			m_queue->WaitIdle();
+			m_cmdBuf->begin({});
 
-				m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversionPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
+			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversionPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
-				ConvertRawSamplesShaderArgs args;
-				args.size = cap->size();
-				args.gain = scale;
-				args.offset = -offset;
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scale;
+			args.offset = -offset;
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64);
-				m_conversionPipeline->Dispatch(
-					*m_cmdBuf, args,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
+			const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2);
+			m_conversionPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
 
-				cap->MarkModifiedFromGpu();
+			cap->MarkModifiedFromGpu();
 
-				m_cmdBuf->end();
-				m_queue->Submit(*m_cmdBuf);
-
-				processedWaveformsOnGPU = true;
-			}
-			else
-			{
-				cap->PrepareForCpuAccess();
-				Convert16BitSamples(
-					cap->m_samples.GetCpuPointer(),
-					abuf->GetCpuPointer(),
-					scale,
-					-offset,
-					cap->size());
-
-				cap->MarkSamplesModifiedFromCpu();
-			}
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
 		}
 
 		//Digital pod
 		else
 		{
-			int16_t* buf = new int16_t[memdepth];
-
 			float trigphase;
-			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
+			if(!m_transport->ReadRawData(sizeof(trigphase), reinterpret_cast<uint8_t*>(&trigphase)))
 				return false;
 			trigphase = -trigphase * fs_per_sample;
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
+
+			int16_t* buf = new int16_t[memdepth];
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(buf)))
+			{
+				delete[] buf;
 				return false;
+			}
 
 			if(!keep)
 				continue;
@@ -979,6 +937,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 			{
 				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
 						 chnum);
+				delete[] buf;
 				return false;
 			}
 
@@ -1054,10 +1013,6 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 
 	if(!keep)
 		return true;
-
-	//If we did CPU side conversion, push the waveforms to our queue now
-	if(!processedWaveformsOnGPU)
-		PushPendingWaveformsIfReady();
 
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)

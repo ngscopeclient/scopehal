@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,7 +64,7 @@ TouchstoneParser::~TouchstoneParser()
 
 	@return	True on success, false on failure
  */
-bool TouchstoneParser::Load(string fname, SParameters& params)
+bool TouchstoneParser::Load(const string& fname, SParameters& params)
 {
 	params.Clear();
 
@@ -91,17 +91,35 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	}
 	params.Allocate(nports);
 
-	//Read entire file into working buffer
+	//Get length
 	fseek(fp, 0, SEEK_END);
 	size_t len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
-	char* buf = new char[len];
+	if(len == 0)
+	{
+		LogError("S-parameter file %s is empty\n", fname.c_str());
+		fclose(fp);
+		return false;
+	}
+
+	//Overflow check
+	size_t sizeWithNull = len + 1;
+	if(sizeWithNull == 0)
+	{
+		LogError("S-parameter file %s has invalid size\n", fname.c_str());
+		fclose(fp);
+		return "";
+	}
+
+	//Read entire file into working buffer
+	char* buf = new char[sizeWithNull];
 	if(len != fread(buf, 1, len, fp))
 	{
 		delete[] buf;
 		fclose(fp);
 		return false;
 	}
+	buf[len] = '\0';
 	fclose(fp);
 
 	//Main parsing loop
@@ -261,7 +279,7 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& f)
 {
 	//eat spaces
-	while(isspace(buf[i]) && (i < len) )
+	while((i < len) && isspace(buf[i]) )
 		i++;
 	if(i >= len)
 		return false;
@@ -270,7 +288,7 @@ bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& 
 	f = atof(buf + i);
 
 	//eat digits
-	while(!isspace(buf[i]) && (i < len) )
+	while((i < len) && !isspace(buf[i]) )
 		i++;
 	return true;
 

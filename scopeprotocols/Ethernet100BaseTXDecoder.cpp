@@ -139,12 +139,6 @@ bool Ethernet100BaseTXDecoder::ValidateChannel(size_t i, StreamDescriptor stream
 	return false;
 }
 
-Filter::DataLocation Ethernet100BaseTXDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -187,7 +181,7 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 			vk::CommandPoolCreateInfo poolInfo(
 				vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-				m_transferQueue->m_family );
+				m_transferQueue->GetQueue()->m_family );
 			m_cmdPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 			vk::CommandBufferAllocateInfo bufinfo(**m_cmdPool, vk::CommandBufferLevel::ePrimary, 1);
@@ -446,6 +440,8 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		m_4b5bSamples.PrepareForCpuAccessNonblocking(cmdBuf);
 		m_4b5bTimestamps.PrepareForCpuAccessNonblocking(cmdBuf);
 
+		//TODO: after deserialization, search for J/K and find frame starts??
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
@@ -603,6 +599,9 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			first = !first;
 		}
 	}
+
+	//Calculate color for each protocol event and cache it so we don't have to do a ton of string manipulation later
+	cap->PreCacheColors();
 
 	cap->MarkModifiedFromCpu();
 }

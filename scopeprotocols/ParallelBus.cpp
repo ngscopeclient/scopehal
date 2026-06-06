@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,6 +37,7 @@ using namespace std;
 
 ParallelBus::ParallelBus(const string& color)
 	: Filter(color, CAT_BUS)
+	, m_width(m_parameters["Width"])
 {
 	AddStream( Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_DIGITAL_BUS);
 
@@ -48,9 +49,8 @@ ParallelBus::ParallelBus(const string& color)
 		CreateInput(tmp);
 	}
 
-	m_widthname = "Width";
-	m_parameters[m_widthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_widthname].SetIntVal(0);
+	m_width = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_width.SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +58,7 @@ ParallelBus::ParallelBus(const string& color)
 
 bool ParallelBus::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 16) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -78,19 +78,27 @@ string ParallelBus::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ParallelBus::Refresh()
+void ParallelBus::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ParallelBus::Refresh");
+	#endif
+	ClearErrors();
+
 	//Figure out how wide our input is
-	int width = m_parameters[m_widthname].GetIntVal();
+	int width = m_width.GetIntVal();
 
 	//Make sure we have an input for each channel in use
 	vector<SparseDigitalWaveform*> inputs;
 	for(int i=0; i<width; i++)
 	{
 		auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(i));
-		if(din == NULL)
+		if(din == nullptr)
 		{
-			SetData(NULL, 0);
+			AddErrorMessage("Missing input", "One or more inputs are unconnected");
+			SetData(nullptr, 0);
 			return;
 		}
 		din->PrepareForCpuAccess();
@@ -98,7 +106,8 @@ void ParallelBus::Refresh()
 	}
 	if(inputs.empty())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "No inputs provided");
+		SetData(nullptr, 0);
 		return;
 	}
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,34 +37,34 @@ using namespace std;
 
 StepGeneratorFilter::StepGeneratorFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_lowname("Beginning Level")
-	, m_highname("Ending Level")
-	, m_ratename("Sample Rate")
-	, m_depthname("Memory Depth")
-	, m_steptimename("Step Position")
+	, m_low(m_parameters["Beginning Level"])
+	, m_high(m_parameters["Ending Level"])
+	, m_rate(m_parameters["Sample Rate"])
+	, m_depth(m_parameters["Memory Depth"])
+	, m_steptime(m_parameters["Step Position"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
-	m_parameters[m_lowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_lowname].SetFloatVal(0);
+	m_low = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_low.SetFloatVal(0);
 
-	m_parameters[m_highname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_highname].SetFloatVal(1);
+	m_high = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_high.SetFloatVal(1);
 
-	m_parameters[m_ratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_ratename].SetIntVal(500 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));
+	m_rate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_rate.SetIntVal(500 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));
 
-	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_depthname].SetIntVal(100 * 1000);
+	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_depth.SetIntVal(100 * 1000);
 
-	m_parameters[m_steptimename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_steptimename].SetIntVal(50 * 1000);
+	m_steptime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_steptime.SetIntVal(50 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool StepGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool StepGeneratorFilter::ValidateChannel([[maybe_unused]] size_t i, [[maybe_unused]] StreamDescriptor stream)
 {
 	//no inputs
 	return false;
@@ -81,24 +81,27 @@ string StepGeneratorFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void StepGeneratorFilter::Refresh()
+void StepGeneratorFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	int64_t samplerate = m_parameters[m_ratename].GetIntVal();
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("StepGeneratorFilter::Refresh");
+	#endif
+	ClearErrors();
+
+	int64_t samplerate = m_rate.GetIntVal();
 	size_t samplePeriod = FS_PER_SECOND / samplerate;
-	size_t depth = m_parameters[m_depthname].GetIntVal();
-	size_t mid = m_parameters[m_steptimename].GetIntVal();
-	float vstart = m_parameters[m_lowname].GetFloatVal();
-	float vend = m_parameters[m_highname].GetFloatVal();
+	size_t depth = m_depth.GetIntVal();
+	size_t mid = m_steptime.GetIntVal();
+	float vstart = m_low.GetFloatVal();
+	float vend = m_high.GetFloatVal();
 
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
-	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
-	if(!cap)
-	{
-		cap = new UniformAnalogWaveform;
-		SetData(cap, 0);
-	}
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(nullptr, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = samplePeriod;
 	cap->m_triggerPhase = 0;

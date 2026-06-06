@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,15 +40,15 @@ using namespace std;
 
 ThermalDiodeFilter::ThermalDiodeFilter(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
-	, m_diodeType("Diode type")
+	, m_diodeType(m_parameters["Diode type"])
 {
 	AddStream(Unit(Unit::UNIT_CELSIUS), "temp", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("VTEMP");
 
-	m_parameters[m_diodeType] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_diodeType].AddEnumValue("LTC3374", DIODE_LTC3374);
-	m_parameters[m_diodeType].AddEnumValue("LTC3374A", DIODE_LTC3374A);
-	m_parameters[m_diodeType].SetIntVal(DIODE_LTC3374A);
+	m_diodeType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_diodeType.AddEnumValue("LTC3374", DIODE_LTC3374);
+	m_diodeType.AddEnumValue("LTC3374A", DIODE_LTC3374A);
+	m_diodeType.SetIntVal(DIODE_LTC3374A);
 }
 
 ThermalDiodeFilter::~ThermalDiodeFilter()
@@ -60,7 +60,7 @@ ThermalDiodeFilter::~ThermalDiodeFilter()
 
 bool ThermalDiodeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i >= 1)
@@ -82,13 +82,20 @@ string ThermalDiodeFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ThermalDiodeFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void ThermalDiodeFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ThermalDiodeFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	SetData(nullptr, 0);
 
 	float offset = 0;
 	float gain = 1;
-	switch(m_parameters[m_diodeType].GetIntVal())
+	switch(m_diodeType.GetEnumVal<DiodeType_t>())
 	{
 		case DIODE_LTC3374:
 			offset = 19e-3;

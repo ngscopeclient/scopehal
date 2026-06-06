@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -129,6 +129,8 @@ LeCroyFWPOscilloscope::~LeCroyFWPOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Object creation / enumeration
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string LeCroyFWPOscilloscope::GetDriverNameInternal()
 {
 	return "lecroy_fwp";
@@ -206,12 +208,11 @@ bool LeCroyFWPOscilloscope::AcquireData()
 	//For now, hard code four channels as we don't have this part synced yet
 	//No need to lock transport mutex as this is a dedicated socket
 	WaveformHeader headers[4];
-	vector<int16_t> data[4];
 	map<int, WaveformBase* > pending_waveforms;
 	for(int i=0; i<4; i++)
 	{
 		//Grab the waveform header
-		if(!m_socket.RecvLooped((uint8_t*)&headers[i], sizeof(WaveformHeader)))
+		if(!m_socket.RecvLooped(reinterpret_cast<uint8_t*>(&headers[i]), sizeof(WaveformHeader)))
 			return false;
 	}
 
@@ -220,9 +221,15 @@ bool LeCroyFWPOscilloscope::AcquireData()
 		if(headers[i].numSamples > 0)
 		{
 			//Grab the data
-			data[i].resize(headers[i].numSamples);
-			if(!m_socket.RecvLooped((uint8_t*)&data[i][0], headers[i].numSamples * sizeof(int16_t)))
+			m_rawWaveformBuffers[i].resize(headers[i].numSamples);
+			m_rawWaveformBuffers[i].PrepareForCpuAccess();
+			if(!m_socket.RecvLooped(
+				reinterpret_cast<uint8_t*>(m_rawWaveformBuffers[i].GetCpuPointer()),
+				headers[i].numSamples * sizeof(int16_t)))
+			{
 				return false;
+			}
+			m_rawWaveformBuffers[i].MarkModifiedFromCpu();
 		}
 	}
 
@@ -261,13 +268,28 @@ bool LeCroyFWPOscilloscope::AcquireData()
 
 			//Crunch the data
 			wfm->Resize(headers[i].numSamples);
-			Convert16BitSamples(
-				wfm->m_samples.GetCpuPointer(),
-				&data[i][0],
-				headers[i].verticalGain,
-				headers[i].verticalOffset,
-				headers[i].numSamples);
-			wfm->MarkSamplesModifiedFromCpu();
+
+			m_cmdBuf->begin({});
+
+			m_conversion16BitPipeline->BindBufferNonblocking(0, wfm->m_samples, *m_cmdBuf, true);
+			m_conversion16BitPipeline->BindBufferNonblocking(1, m_rawWaveformBuffers[i], *m_cmdBuf);
+
+			ConvertRawSamplesOffsetShaderArgs args;
+			args.size = headers[i].numSamples;
+			args.gain = headers[i].verticalGain;
+			args.offset = headers[i].verticalOffset;
+			args.inputBufferOffset = 0;
+
+			const uint32_t compute_block_count = GetComputeBlockCount(headers[i].numSamples, 64*2); //2 samples per thread
+			m_conversion16BitPipeline->Dispatch(
+				*m_cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+
+			m_cmdBuf->end();
+			m_queue->Submit(*m_cmdBuf);
+
+			wfm->MarkSamplesModifiedFromGpu();
 
 			pending_waveforms[i] = wfm;
 		}

@@ -52,15 +52,11 @@ EthernetSGMIIDecoder::EthernetSGMIIDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string EthernetSGMIIDecoder::GetProtocolName()
 {
 	return "Ethernet - SGMII";
-}
-
-Filter::DataLocation EthernetSGMIIDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

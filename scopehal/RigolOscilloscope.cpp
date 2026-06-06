@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,12 +46,14 @@ using namespace std;
 RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
 	, m_triggerWasLive(false)
-	, m_triggerOneShot(false)
 	, m_liveMode(false)
+	, m_has_125M_sample_depth(false)
+	, m_has_200M_sample_depth(false)
 	, m_highDefinition(false)
 {
+	int nchans = -1;
+
 	//Last digit of the model number is the number of channels
 	if(1 == sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
 	{
@@ -144,7 +146,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n"));
 			if (reply == "1")
 				m_maxMdepth = 500*1000*1000;
-			
+
 			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW2T4\n"));
 			if (reply == "1")
 				m_bandwidth = 400;
@@ -164,7 +166,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU\n"));
 			if (reply == "1")
 				m_maxMdepth = 100*1000*1000;
-			
+
 			reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BW7T10\n"));
 			if (reply == "1")
 				m_bandwidth = 100;
@@ -184,6 +186,48 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			m_lowSrate = true;
 		}
 	}
+	else if(1 == sscanf(m_model.c_str(), "MHO%d", &m_modelNumber) && (m_modelNumber < 1000))
+	{	// Model numbers are :
+		// MHO98 (1GHz); MHO984 (800MHz); MHO954 (500MHz); MHO934 (350MHz)
+		m_protocol = DHO;
+		// Those are 12 bits (HD) models => default to high definition mode
+		// This can be overriden by driver 8bits setting
+		m_highDefinition = true;
+
+		switch (m_modelNumber)
+		{
+		case 98:  m_bandwidth = 1000; nchans = 4; break;
+		case 984: m_bandwidth = 800; break;
+		case 954: m_bandwidth = 500; break;
+		case 934: m_bandwidth = 350; break;
+		default: LogError("unknown MHO9xx\n");
+		}
+
+		m_opt200M = false;	  // does not exist in 800/900 series
+		m_lowSrate = false;
+		m_maxSrate  = 4*1000*1000*1000U;
+
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? RLU-05\n"));
+		m_maxMdepth = reply == "1" ? 500*1000*1000 : 100*1000*1000;
+
+		// we must support these, even if we didn't want to set them
+		// in the UI, because they could already be selected on the
+		// scope
+		m_has_125M_sample_depth = true;
+		m_has_200M_sample_depth = true;
+
+		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU03T05\n"));
+		if (reply == "1")
+			m_bandwidth = 500;
+
+		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU03T08\n"));
+		if (reply == "1")
+			m_bandwidth = 800;
+
+		reply = Trim(m_transport->SendCommandQueuedWithReply(":SYST:OPT:STAT? BWU05T08\n"));
+		if (reply == "1")
+			m_bandwidth = 800;
+	}
 	else
 	{
 		LogError("Bad model number\n");
@@ -191,7 +235,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	}
 
 	// Maybe fix this in a similar manner to bandwidth
-	int nchans = m_modelNumber % 10;
+	if (nchans == -1)
+		nchans = m_modelNumber % 10;
 
 	if((m_protocol != MSO5) && (m_protocol != DHO))
 		m_bandwidth = m_modelNumber % 1000 - nchans;
@@ -255,6 +300,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 
 	//make sure all setup commands finish before we proceed
 	m_transport->FlushCommandQueue();
+
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("RigolOscilloscope");
 }
 
 RigolOscilloscope::~RigolOscilloscope()
@@ -604,7 +652,9 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 				break;
 			case 350:
 			case 400:
+			case 500:
 			case 800:
+			case 1000:
 				if((limit_mhz <= 20) & (limit_mhz != 0))
 					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BWL 20M");
 				else if((limit_mhz <= 100) & (limit_mhz != 0))
@@ -833,7 +883,7 @@ bool RigolOscilloscope::AcquireData()
 				&yorigin,
 				&yreference);
 			if(sec_per_sample == 0)
-			{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform 
+			{	// Sometimes the scope might return a null value for xincrement => ignore waveform to prenvent an Arithmetic exception in WaveformArea::RasterizeAnalogOrDigitalWaveform
 				LogWarning("Got null sec_per_sample value from the scope, ignoring this waveform.\n");
 				continue;
 			}
@@ -958,12 +1008,12 @@ bool RigolOscilloscope::AcquireData()
 				float v;
 				if(m_highDefinition)
 				{
- 					v = (((static_cast<float>(temp_buf_int16[j]))) - ydelta) * yincrement;	
+ 					v = (((static_cast<float>(temp_buf_int16[j]))) - ydelta) * yincrement;
 					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf_int16[j], ydelta, yincrement);
 				}
 				else
 				{
- 					v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;	
+ 					v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
 					//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
 				}
 				if(m_protocol == DS_OLD)
@@ -1263,6 +1313,8 @@ static std::vector<uint64_t> dhoSampleDepths {
 		25*1000*1000,
 		50*1000*1000,
 		100*1000*1000,
+		125*1000*1000,
+		200*1000*1000,
 		250*1000*1000,
 		500*1000*1000,
 	}
@@ -1288,6 +1340,12 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 		uint64_t maxMemDepth = m_maxMdepth / GetEnabledChannelCount();
 		for (auto curMemDepth : dhoSampleDepths)
 		{
+			// these exist on MHO9x only
+			if(curMemDepth == 125*1000*1000 && !m_has_125M_sample_depth)
+				continue;
+			if(curMemDepth == 200*1000*1000 && !m_has_200M_sample_depth)
+				continue;
+
 			if(curMemDepth<=maxMemDepth)
 			{
 				ret.push_back(curMemDepth);
@@ -1499,7 +1557,7 @@ int64_t RigolOscilloscope::GetTriggerOffset()
 
 	m_triggerOffsetValid = true;
 
-	return m_triggerOffset;	
+	return m_triggerOffset;
 }
 
 bool RigolOscilloscope::IsInterleaving()

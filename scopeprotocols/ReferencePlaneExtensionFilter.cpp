@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,7 +45,7 @@ using namespace std;
 ReferencePlaneExtensionFilter::ReferencePlaneExtensionFilter(const string& color)
 	: SParameterFilter(color, CAT_RF)
 {
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &ReferencePlaneExtensionFilter::OnPortCountChanged));
+	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &ReferencePlaneExtensionFilter::OnPortCountChanged));
 	OnPortCountChanged();
 }
 
@@ -69,7 +69,7 @@ string ReferencePlaneExtensionFilter::GetProtocolName()
  */
 void ReferencePlaneExtensionFilter::OnPortCountChanged()
 {
-	size_t nports_cur = m_parameters[m_portCountName].GetIntVal();
+	size_t nports_cur = m_portCount.GetIntVal();
 	size_t nports_old = m_portParamNames.size();
 
 	//Delete old parameters
@@ -93,16 +93,24 @@ void ReferencePlaneExtensionFilter::OnPortCountChanged()
 	m_parametersChangedSignal.emit();
 }
 
-void ReferencePlaneExtensionFilter::Refresh()
+void ReferencePlaneExtensionFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("ReferencePlaneExtensionFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	size_t nports = m_portCount.GetIntVal();
 	for(size_t to=0; to<nports; to++)
 	{
 		for(size_t from=0; from<nports; from++)
@@ -117,11 +125,17 @@ void ReferencePlaneExtensionFilter::Refresh()
 				auto mag_out = SetupSparseOutputWaveform(smag_in, imag, 0, 0);
 				mag_out->m_samples.CopyFrom(smag_in->m_samples);
 			}
-			else
+			else if(umag_in)
 			{
 				auto mag_out = SetupEmptyUniformAnalogOutputWaveform(umag_in, imag);
 				mag_out->Resize(umag_in->size());
 				mag_out->m_samples.CopyFrom(umag_in->m_samples);
+			}
+			else
+			{
+				AddErrorMessage("Invalid input", "Expected sparse or uniform analog");
+				SetData(nullptr, 0);
+				return;
 			}
 
 			//Copy magnitude gain/offset

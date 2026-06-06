@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,11 +37,20 @@ using namespace std;
 
 TopMeasurement::TopMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +58,7 @@ TopMeasurement::TopMeasurement(const string& color)
 
 bool TopMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -68,12 +77,17 @@ string TopMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TopMeasurement::Refresh()
+void TopMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TopMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "Input signal is null or not connected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -85,14 +99,47 @@ void TopMeasurement::Refresh()
 	size_t len = din->size();
 
 	//Make a histogram of the waveform
-	float min = GetMinVoltage(sdin, udin);
-	float max = GetMaxVoltage(sdin, udin);
+	float vmin = 0;
+	float vmax = 0;
+
+	//Make a histogram of the waveform
 	size_t nbins = 64;
-	vector<size_t> hist = MakeHistogram(sdin, udin, min, max, nbins);
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		if(sdin)
+		{
+			GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, sdin, vmin, vmax);
+			MakeHistogram(cmdBuf, queue, *m_histogramPipeline, sdin, m_histogramBuf, vmin, vmax, nbins);
+		}
+		else
+		{
+			GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, udin, vmin, vmax);
+			MakeHistogram(cmdBuf, queue, *m_histogramPipeline, udin, m_histogramBuf, vmin, vmax, nbins);
+		}
+	}
+
+	//CPU fallback
+	else
+	{
+		PrepareForCpuAccess(sdin, udin);
+		m_histogramBuf.PrepareForCpuAccess();
+
+		if(sdin)
+			GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, sdin, vmin, vmax);
+		else
+			GetMinMaxVoltage(cmdBuf, queue, m_minmaxPipeline, m_minbuf, m_maxbuf, udin, vmin, vmax);
+
+		auto hist = MakeHistogram(sdin, udin, vmin, vmax, nbins);
+		for(size_t i=0; i<nbins; i++)
+			m_histogramBuf[i] = hist[i];
+
+		m_histogramBuf.MarkModifiedFromCpu();
+	}
+	m_histogramBuf.PrepareForCpuAccess();
 
 	//Set temporary midpoint and range
-	float range = (max - min);
-	float midpoint = range/2 + min;
+	float range = (vmax - vmin);
+	float midpoint = range/2 + vmin;
 
 	//Find the highest peak in the last quarter of the histogram
 	//This is the peak for the entire waveform
@@ -100,26 +147,26 @@ void TopMeasurement::Refresh()
 	size_t idx = 0;
 	for(size_t i=(nbins*3/4); i<nbins; i++)
 	{
-		if(hist[i] > binval)
+		if(m_histogramBuf[i] > binval)
 		{
-			binval = hist[i];
+			binval = m_histogramBuf[i];
 			idx = i;
 		}
 	}
 	float fbin = (idx + 0.5f)/nbins;
-	float global_top = fbin*range + min;
+	float global_top = fbin*range + vmin;
 
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
 
-	float last = min;
+	float last = vmin;
 	int64_t tedge = 0;
-	float sum = 0;
 	int64_t count = 0;
 	float delta = range * 0.1;
 
+	KahanSummation workingSum;
 	for(size_t i=0; i < len; i++)
 	{
 		//Wait for a rising edge
@@ -133,7 +180,11 @@ void TopMeasurement::Refresh()
 			{
 				cap->m_offsets.push_back(tedge);
 				cap->m_durations.push_back(tnow - tedge);
-				cap->m_samples.push_back(sum / count);
+				cap->m_samples.push_back(workingSum.GetSum() / count);
+
+				//Clear out
+				workingSum.Reset();
+				count = 0;
 			}
 			tedge = tnow;
 		}
@@ -143,19 +194,17 @@ void TopMeasurement::Refresh()
 		if(fabs(cur - global_top) < delta)
 		{
 			count ++;
-			sum += cur;
+			workingSum += cur;
 		}
 
 		last = cur;
 	}
 
-	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
 
 	//Compute average
-	double finalsum = 0;
+	KahanSummation finalsum;
 	for(auto f : cap->m_samples)
 		finalsum += f;
-	m_streams[1].m_value = finalsum / cap->m_samples.size();
+	m_streams[1].m_value = finalsum.GetSum() / cap->m_samples.size();
 }

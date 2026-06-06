@@ -52,9 +52,7 @@ using namespace std;
 DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport, false)
 	, SCPIInstrument(transport, false)
-	, m_extTrigger(NULL)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
+	, m_extTrigger(nullptr)
 {
 	for(int i=0; i<4; i++)
 	{
@@ -105,36 +103,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_channels[3]->SetDisplayName("8B10B");
 
 	//Create Vulkan objects for the waveform conversion
-	for(int i=0; i<4; i++)
-	{
-		m_queue[i] = g_vkQueueManager->GetComputeQueue(string("DemoOscilloscope.queue") + to_string(i));
-
-		vk::CommandPoolCreateInfo poolInfo(
-			vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			m_queue[i]->m_family );
-		m_pool[i] = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-
-		vk::CommandBufferAllocateInfo bufinfo(**m_pool[i], vk::CommandBufferLevel::ePrimary, 1);
-		m_cmdBuf[i] = make_unique<vk::raii::CommandBuffer>(
-			std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-
-		if(g_hasDebugUtils)
-		{
-			string bufname = string("DemoOscilloscope.cmdbuf") + to_string(i);
-			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-				vk::DebugUtilsObjectNameInfoEXT(
-					vk::ObjectType::eCommandBuffer,
-					reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf[i])),
-					bufname.c_str()));
-
-			string poolname = string("DemoOscilloscope.pool") + to_string(i);
-			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-				vk::DebugUtilsObjectNameInfoEXT(
-					vk::ObjectType::eCommandPool,
-					reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool[i])),
-					poolname.c_str()));
-		}
-	}
+	InitVulkanQueue("DemoOscilloscope");
 }
 
 DemoOscilloscope::~DemoOscilloscope()
@@ -482,6 +451,11 @@ bool DemoOscilloscope::IsADCModeConfigurable()
 	return true;
 }
 
+bool DemoOscilloscope::IsADCModePerChannel()
+{
+	return true;
+}
+
 vector<Oscilloscope::AnalogBank> DemoOscilloscope::GetAnalogBanks()
 {
 	vector<AnalogBank> ret;
@@ -553,7 +527,7 @@ bool DemoOscilloscope::AcquireData()
 					auto wfm = AllocateAnalogWaveform("NoisySine");
 					waveforms[i] = wfm;
 					m_source[i]->GenerateNoisySinewave(
-						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+						*m_cmdBuf, m_queue, wfm, 0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
 				}
 				break;
 
@@ -562,7 +536,7 @@ bool DemoOscilloscope::AcquireData()
 					auto wfm = AllocateAnalogWaveform("NoisySineSum");
 					waveforms[i] = wfm;
 					m_source[i]->GenerateNoisySinewaveSum(
-						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
+						*m_cmdBuf, m_queue, wfm, 0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
 				}
 				break;
 
@@ -571,7 +545,7 @@ bool DemoOscilloscope::AcquireData()
 					auto wfm = AllocateAnalogWaveform("PRBS31");
 					waveforms[i] = wfm;
 					m_source[i]->GeneratePRBS31(
-						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
+						*m_cmdBuf, m_queue, wfm, 0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
 				}
 				break;
 
@@ -580,7 +554,7 @@ bool DemoOscilloscope::AcquireData()
 					auto wfm = AllocateAnalogWaveform("8B10B");
 					waveforms[i] = wfm;
 					m_source[i]->Generate8b10b(
-						*m_cmdBuf[i], m_queue[i], wfm, 0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
+						*m_cmdBuf, m_queue, wfm, 0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
 				}
 				break;
 
@@ -593,9 +567,7 @@ bool DemoOscilloscope::AcquireData()
 
 	SequenceSet s;
 	for(int i=0; i<4; i++)
-	{
 		s[GetOscilloscopeChannel(i)] = waveforms[i];
-	}
 
 	//Timestamp the waveform(s)
 	double now = GetTime();

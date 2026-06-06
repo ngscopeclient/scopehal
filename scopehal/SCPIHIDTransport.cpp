@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -165,19 +165,22 @@ bool SCPIHIDTransport::IsCommandBatchingSupported()
 	return false;
 }
 
-std::vector<TransportEndpoint> SCPIHIDTransport::EnumTransportEndpoints()
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
+vector<TransportEndpoint> SCPIHIDTransport::EnumTransportEndpoints()
 {
-	std::vector<TransportEndpoint> result;
+	vector<TransportEndpoint> result;
 	auto devices = HID::EnumerateDevices();
 	char buffer[512];
-	std::set<string> paths;
+	set<string> paths;
 
-	for(auto device : devices)
+	for(auto& device : devices)
 	{
 		snprintf(buffer, sizeof(buffer), "%x:%x:%s",device.vendorId,device.productId,device.serialNumber.c_str());
 		string path = string(buffer);
 		if(paths.find(path) == paths.end())
-		{	// Ignore duplicates
+		{
+			//Ignore duplicates
 			TransportEndpoint endpoint;
 			endpoint.path = path;
 			endpoint.description = device.description;

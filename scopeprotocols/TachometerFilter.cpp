@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,15 +37,15 @@ using namespace std;
 
 TachometerFilter::TachometerFilter(const string& color)
 	: Filter(color, CAT_MISC)
+	, m_ticks(m_parameters["Pulses per revolution"])
 {
 	AddStream(Unit(Unit::UNIT_RPM), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
 
-	m_ticksname = "Pulses per revolution";
-	m_parameters[m_ticksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_ticksname].SetIntVal(1);
+	m_ticks = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_ticks.SetIntVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +53,7 @@ TachometerFilter::TachometerFilter(const string& color)
 
 bool TachometerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -73,29 +73,46 @@ string TachometerFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TachometerFilter::Refresh()
+void TachometerFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("TachometerFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
+
 	auto din = GetInputWaveform(0);
 	din->PrepareForCpuAccess();
 
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
-	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = GetAvgVoltage(sdin, udin);
-
 	//Timestamps of the edges
-	vector<int64_t> edges;
-	FindZeroCrossings(sdin, udin, midpoint, edges);
+	if(sdin)
+		m_edgedet.FindZeroCrossings(sdin, m_averager.Average(sdin, cmdBuf, queue), cmdBuf, queue);
+	else if(udin)
+		m_edgedet.FindZeroCrossings(udin, m_averager.Average(udin, cmdBuf, queue), cmdBuf, queue);
+	else
+	{
+		AddErrorMessage("Invalid input", "Expected a sparse or uniform analog waveform");
+		SetData(nullptr, 0);
+		return;
+	}
+	auto& edges = m_edgedet.GetResults();
+	edges.PrepareForCpuAccess();
+
 	if(edges.size() < 2)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Input too short", "Need at least two edges in the waveform");
 		return;
 	}
 
@@ -104,7 +121,7 @@ void TachometerFilter::Refresh()
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
 
-	int64_t pulses_per_rev = m_parameters[m_ticksname].GetIntVal();
+	int64_t pulses_per_rev = m_ticks.GetIntVal();
 	float pulses_to_rpm = 60.0f / pulses_per_rev;
 
 	size_t elen = edges.size();
@@ -122,8 +139,6 @@ void TachometerFilter::Refresh()
 		cap->m_durations.push_back(delta);
 		cap->m_samples.push_back(rpm);
 	}
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }

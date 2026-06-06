@@ -54,6 +54,9 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 {
 	//Set a very long socket timeout because initial connection creation takes forever
 	auto socktrans = dynamic_cast<SCPISocketTransport*>(transport);
+	if(!socktrans)
+		LogFatal("MultiLaneBERT requires a SCPISocketTransport\n");
+
 	unsigned int timeoutSec = 30;
 	unsigned int timeoutUs = timeoutSec * 1000 * 1000;
 	if(socktrans)
@@ -645,7 +648,7 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 	auto data = explode(reply, ',');
 	vector<float> values;
 	float tmp;
-	for(auto num : data)
+	for(auto& num : data)
 	{
 		sscanf(num.c_str(), "%f", &tmp);
 		values.push_back(tmp);
@@ -742,7 +745,7 @@ void MultiLaneBERT::MeasureEye(size_t i)
 	auto data = explode(reply, ',');
 	vector<float> values;
 	float tmp;
-	for(auto num : data)
+	for(auto& num : data)
 	{
 		sscanf(num.c_str(), "%f", &tmp);
 		values.push_back(tmp);

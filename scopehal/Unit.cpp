@@ -739,6 +739,77 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 }
 
 /**
+	@brief Prints a value with SI scaling factors in a format suitable for tabular display
+
+	@param value				The value
+	@param digits				Number of significant digits to display
+ */
+string Unit::PrettyPrintTabular(double value, int leftdigits, int rightdigits) const
+{
+	// Special handling for overload value
+	if(value >= std::numeric_limits<double>::max())
+		return UNIT_OVERLOAD_LABEL;
+
+	SetPrintingLocale();
+
+	//Figure out scaling, prefix, and suffix
+	double scaleFactor;
+	string prefix;
+	string numprefix;
+	string suffix;
+	GetSIScalingFactor(value, scaleFactor, prefix);
+	GetUnitSuffix(m_type, value, scaleFactor, prefix, numprefix, suffix);
+
+	double value_rescaled = value * scaleFactor;
+
+	bool space_after_number = true;
+	switch(m_type)
+	{
+		case Unit::UNIT_UI:
+		case Unit::UNIT_HEXNUM:
+		case Unit::UNIT_COUNTS:
+			space_after_number = false;
+			break;
+
+		default:
+			break;
+	}
+
+	char tmp[128];
+	switch(m_type)
+	{
+		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
+			snprintf(tmp, sizeof(tmp), "%.2e", pow(10, value));
+			//snprintf(tmp, sizeof(tmp), "1e%.2f", value);
+			break;
+
+		case UNIT_RATIO_SCI:
+			snprintf(tmp, sizeof(tmp), "%.2e", value);
+			break;
+
+		//NOTE: only works for 32 bit values or smaller
+		case UNIT_HEXNUM:
+			snprintf(tmp, sizeof(tmp), "%x", static_cast<uint32_t>(value));
+			break;
+
+		default:
+			{
+				const char* space = " ";
+				if(!space_after_number)
+					space = "";
+
+				string format = string("%") + to_string(leftdigits) + "." + to_string(rightdigits) + "f%s%s%s";
+				snprintf(tmp, sizeof(tmp), format.c_str(), value_rescaled, space, prefix.c_str(), suffix.c_str());
+			}
+			break;
+	}
+
+	SetDefaultLocale();
+	return numprefix + string(tmp);
+}
+
+
+/**
 	@brief Prints a value with SI scaling factors
 
 	@param value				The value

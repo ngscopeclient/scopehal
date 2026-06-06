@@ -231,8 +231,8 @@ protected:
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
-	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
+	void PushFloat(const std::string& path, float f);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType);
 	void PushLineTrigger(LineTrigger* trig);
 	void PushRiseTimeTrigger(RSRTB2kRiseTimeTrigger* trig);
 	void PushRuntTrigger(RSRTB2kRuntTrigger* trig);
@@ -280,8 +280,6 @@ protected:
 	//Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 	bool m_triggerForced;
 
 	//Cached configuration

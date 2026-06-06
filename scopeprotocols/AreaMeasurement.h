@@ -61,8 +61,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(AreaMeasurement)
 
 protected:
-	std::string m_measurement_typename;
-	std::string m_area_typename;
+	FilterParameter& m_measurementType;
+	FilterParameter& m_areaType;
 };
 
 #endif

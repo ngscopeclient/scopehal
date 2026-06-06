@@ -38,7 +38,7 @@
 class ToneGeneratorConstants
 {
 public:
-	double		radians_per_sample;
+	uint32_t	fpfreq;
 	uint32_t	depth;
 	float		bias;
 	float		scale;
@@ -51,7 +51,6 @@ public:
 	ToneGeneratorFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 
 	static std::string GetProtocolName();
 

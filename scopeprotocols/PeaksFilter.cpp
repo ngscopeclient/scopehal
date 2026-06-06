@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,7 +48,7 @@ PeaksFilter::PeaksFilter(const string& color)
 
 bool PeaksFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i >= 1)
@@ -73,20 +73,26 @@ string PeaksFilter::GetProtocolName()
 
 void PeaksFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PeaksFilter::Refresh");
+	#endif
+	ClearErrors();
+
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
+	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
+		return;
+	}
+
 	//Output units track the input
 	if(GetInput(0))
 	{
 		SetXAxisUnits(GetInput(0).GetXAxisUnits());
 		SetYAxisUnits(GetInput(0).GetYAxisUnits(), 0);
 
-		m_parameters[m_peakwindowname].SetUnit(GetInput(0).GetXAxisUnits());
-	}
-
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
-	{
-		SetData(nullptr, 0);
-		return;
+		m_peakwindow.SetUnit(GetInput(0).GetXAxisUnits());
 	}
 
 	auto din = GetInputWaveform(0);

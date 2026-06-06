@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,17 +37,17 @@ using namespace std;
 
 UartClockRecoveryFilter::UartClockRecoveryFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
+	, m_baud(m_parameters["Baud rate"])
+	, m_thresh(m_parameters["Threshold"])
 {
 	AddDigitalStream("data");
 	CreateInput("din");
 
-	m_baudname = "Baud rate";
-	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_baudname].SetIntVal(115200);	//115.2 Kbps by default
+	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_baud.SetIntVal(115200);	//115.2 Kbps by default
 
-	m_threshname = "Threshold";
-	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_threshname].SetFloatVal(0);
+	m_thresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_thresh.SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +55,7 @@ UartClockRecoveryFilter::UartClockRecoveryFilter(const string& color)
 
 bool UartClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -75,12 +75,20 @@ string UartClockRecoveryFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void UartClockRecoveryFilter::Refresh()
+void UartClockRecoveryFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("UartClockRecoveryFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -88,7 +96,7 @@ void UartClockRecoveryFilter::Refresh()
 	auto din = GetInputWaveform(0);
 
 	//Look up the nominal baud rate and convert to time
-	int64_t baud = m_parameters[m_baudname].GetIntVal();
+	int64_t baud = m_baud.GetIntVal();
 	int64_t fs = static_cast<int64_t>(FS_PER_SECOND / baud);
 
 	//Create the output waveform and copy our timescales
@@ -101,7 +109,7 @@ void UartClockRecoveryFilter::Refresh()
 	vector<int64_t> edges;
 
 	//Find times of the zero crossings
-	const float threshold = m_parameters[m_threshname].GetFloatVal();
+	const float threshold = m_thresh.GetFloatVal();
 	FindZeroCrossingsBase(din, threshold, edges);
 
 	//Actual DLL logic

@@ -87,17 +87,21 @@ void RGBLEDDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("RGBLEDDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
-	LogTrace("Refresh\n");
-	LogIndenter li;
-
-	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
+
+	LogTrace("Refresh\n");
+	LogIndenter li;
 
 	//Get the input data
 	auto din = GetInputWaveform(0);
@@ -106,18 +110,16 @@ void RGBLEDDecoder::Refresh(
 	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
 
 	//Create the capture
-	auto cap = new RGBLEDWaveform;
+	auto cap = SetupEmptyWaveform<RGBLEDWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_scale = m_displayscale.GetFloatVal();
-	SetData(cap, 0);
 
 	VideoScanlinePacket* pack = nullptr;
 
 	//Measure widths of all edges in the incoming signal
 	//Add a dummy edge at beginning and end
+	//(these extra edges make it not trivial to switch to LevelCrossingDetector so skipping that for now)
 	vector<int64_t> edges;
 	edges.push_back(din->m_triggerPhase);
 	if(sdin)

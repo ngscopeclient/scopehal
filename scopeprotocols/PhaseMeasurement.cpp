@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,8 +38,9 @@ using namespace std;
 
 PhaseMeasurement::PhaseMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
-	, m_freqModeName("Frequency Mode")
-	, m_freqName("Center Frequency")
+	, m_freqMode(m_parameters["Frequency Mode"])
+	, m_freq(m_parameters["Center Frequency"])
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_DEGREES), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
@@ -47,13 +48,21 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 	//Set up channels
 	CreateInput("din");
 
-	m_parameters[m_freqName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_freqName].SetIntVal(100e6);
+	m_freq = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_freq.SetIntVal(100e6);
 
-	m_parameters[m_freqModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_freqModeName].AddEnumValue("Auto", MODE_AUTO);
-	m_parameters[m_freqModeName].AddEnumValue("Manual", MODE_MANUAL);
-	m_parameters[m_freqModeName].SetIntVal(MODE_AUTO);
+	m_freqMode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_freqMode.AddEnumValue("Auto", MODE_AUTO);
+	m_freqMode.AddEnumValue("Manual", MODE_MANUAL);
+	m_freqMode.SetIntVal(MODE_AUTO);
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +70,7 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 
 bool PhaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if(i > 0)
@@ -84,11 +93,16 @@ string PhaseMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PhaseMeasurement::Refresh()
+void PhaseMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PhaseMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -99,23 +113,40 @@ void PhaseMeasurement::Refresh()
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
-	float vmax = GetTopVoltage(sdin, udin);
-	float vmin = GetBaseVoltage(sdin, udin);
+	//Find midpoint
+	float vmin;
+	float vmax;
+	Filter::GetBaseAndTopVoltage(
+		cmdBuf,
+		queue,
+		m_minmaxPipeline,
+		m_histogramPipeline,
+		m_minbuf,
+		m_maxbuf,
+		m_histogramBuf,
+		sdin,
+		udin,
+		vmin,
+		vmax);
+
+	//Find edges
 	float vavg = (vmax + vmin) / 2;
-	vector<int64_t> edges;
 	if(sdin)
-		FindRisingEdges(sdin, vavg, edges);
+		m_detector.FindZeroCrossings(sdin, vavg, cmdBuf, queue);
 	else
-		FindRisingEdges(udin, vavg, edges);
+		m_detector.FindZeroCrossings(udin, vavg, cmdBuf, queue);
+	auto& edges = m_detector.GetResults();
+	edges.PrepareForCpuAccess();
 	size_t edgelen = edges.size();
 
 	//Auto: use median of interval between pairs of rising edges
 	int64_t period = 0;
-	if(m_parameters[m_freqModeName].GetIntVal() == MODE_AUTO)
+	if(m_freqMode.GetIntVal() == MODE_AUTO)
 	{
 		if(edgelen < 2)
 		{
-			SetData(NULL, 0);
+			AddErrorMessage("No edges", "Need at least two level crossings in the input");
+			SetData(nullptr, 0);
 			return;
 		}
 		vector<int64_t> durations;
@@ -127,7 +158,7 @@ void PhaseMeasurement::Refresh()
 
 	//Manual: use user-selected frequency
 	else
-		period = FS_PER_SECOND / m_parameters[m_freqName].GetIntVal();
+		period = round(FS_PER_SECOND / m_freq.GetIntVal());
 
 	//Create the output
 	size_t outlen = edgelen/2;
@@ -146,7 +177,7 @@ void PhaseMeasurement::Refresh()
 	{
 		//Calculate normalized phase of the LO
 		int64_t tnow = edges[i*2];
-		float theta = fmodf(tnow, period) / period;
+		float theta = static_cast<float>(tnow % period) / period;
 		theta = (theta - 0.5) * 2 * M_PI;
 		float finalPhase = -(360 * theta / M_PI);
 

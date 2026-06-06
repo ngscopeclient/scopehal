@@ -44,10 +44,10 @@ public:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPIMultimeter> (*MeterCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, MeterCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, MeterCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPIMultimeter> CreateMultimeter(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIMultimeter> CreateMultimeter(const std::string& driver, SCPITransport* transport);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage

@@ -102,7 +102,7 @@ void main()
 		//EVM calculation
 		if(nConstellationPoints > 0)
 		{
-			//Find the closest simulation point by brute force
+			//Find the closest constellation point by brute force
 			//TODO: can we be more efficient?
 			float minvec = 1e10;
 			for(uint j=0; j<nConstellationPoints; j++)

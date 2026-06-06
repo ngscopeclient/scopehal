@@ -55,7 +55,7 @@ SCPITransport::~SCPITransport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPITransport::DoAddTransportClass(string name, CreateProcType proc, EnumEndpointsProcType eproc)
+void SCPITransport::DoAddTransportClass(const string& name, CreateProcType proc, EnumEndpointsProcType eproc)
 {
 	m_createprocs[name] = proc;
 	m_enumEndpointsProcs[name] = eproc;
@@ -194,7 +194,7 @@ bool SCPITransport::FlushCommandQueue()
 		LogTrace("%zu commands being flushed\n", tmp.size());
 
 	lock_guard<recursive_mutex> lock(m_netMutex);
-	for(auto str : tmp)
+	for(auto& str : tmp)
 	{
 		if(m_rateLimitingEnabled)
 			RateLimitingWait();
@@ -208,7 +208,7 @@ bool SCPITransport::FlushCommandQueue()
 
 	This is an atomic operation requiring no mutexing at the caller side.
  */
-string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon)
+string SCPITransport::SendCommandQueuedWithReply(const string& cmd, bool endOnSemicolon)
 {
 	FlushCommandQueue();
 	return SendCommandImmediateWithReply(cmd, endOnSemicolon);
@@ -219,7 +219,7 @@ string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon
 
 	This is an atomic operation requiring no mutexing at the caller side.
  */
-string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemicolon)
+string SCPITransport::SendCommandImmediateWithReply(const string& cmd, bool endOnSemicolon)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 
@@ -234,7 +234,7 @@ string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemico
 /**
 	@brief Sends a command (jumping ahead of the queue) which does not require a response.
  */
-void SCPITransport::SendCommandImmediate(string cmd)
+void SCPITransport::SendCommandImmediate(const string& cmd)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 
@@ -247,7 +247,7 @@ void SCPITransport::SendCommandImmediate(string cmd)
 /**
 	@brief Sends a command (jumping ahead of the queue) which reads a binary block response
  */
-void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len)
+void* SCPITransport::SendCommandImmediateWithRawBlockReply(const string& cmd, size_t& len)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 
@@ -299,7 +299,7 @@ string to_string(SCPITransportType transportType)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Static functions
 
-vector<TransportEndpoint> SCPITransport::EnumEndpoints(string transport)
+vector<TransportEndpoint> SCPITransport::EnumEndpoints(const string& transport)
 {
 	if(m_enumEndpointsProcs.find(transport) != m_enumEndpointsProcs.end())
 		return m_enumEndpointsProcs[transport]();

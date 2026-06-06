@@ -110,6 +110,7 @@ public:
 	virtual bool CanInterleave() override;
 
 	virtual bool IsADCModeConfigurable() override;
+	virtual bool IsADCModePerChannel() override;
 	virtual std::vector<std::string> GetADCModeNames(size_t channel) override;
 	virtual size_t GetADCMode(size_t channel) override;
 	virtual void SetADCMode(size_t channel, size_t mode) override;
@@ -158,12 +159,6 @@ protected:
 		CHANNEL_MODE_NOISE_LPF
 	};
 
-	///@brief True if trigger is armed
-	bool m_triggerArmed;
-
-	///@brief True if most recent trigger arm was a single-shot trigger
-	bool m_triggerOneShot;
-
 	///@brief Current frequency within the sweep for channel 2
 	float m_sweepFreq;
 
@@ -181,22 +176,14 @@ protected:
 
 	/**
 		@brief Signal sources for each channel
-
-		Must be separate to enable parallel waveform synthesis
 	 */
 	TestWaveformSource* m_source[4];
 
-	///@brief Vulkan queue for ISI channel
-	std::shared_ptr<QueueHandle> m_queue[4];
-
-	///@brief Vulkan command pool for ISI channel
-	std::unique_ptr<vk::raii::CommandPool> m_pool[4];
-
-	///@brief Vulkan command buffer for ISI channel
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf[4];
-
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {

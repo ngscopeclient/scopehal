@@ -83,6 +83,7 @@ public:
 		, m_triggerPhase(rhs.m_triggerPhase)
 		, m_flags(rhs.m_flags)
 		, m_revision(rhs.m_revision)
+		, m_cachedColorRevision(0)
 	{}
 
 	//empty virtual destructor in case any derived classes need one

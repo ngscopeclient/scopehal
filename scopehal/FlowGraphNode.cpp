@@ -80,49 +80,6 @@ void FlowGraphNode::DetachInputs()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accelerated waveform processing
-
-/**
-	@brief Evaluates a filter graph node.
-
-	This version does not support using Vulkan acceleration and should be considered deprecated. It will be
-	removed in the indefinite future once all filters have been converted to the new API.
- */
-void FlowGraphNode::Refresh()
-{
-}
-
-/**
-	@brief Evaluates a filter graph node, using GPU acceleration if possible
-
-	The default implementation calls the legacy non-accelerated Refresh() method.
- */
-void FlowGraphNode::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
-{
-	#pragma GCC diagnostic push
-	#pragma GCC diagnostic ignored "-Wdeprecated"
-
-	//This is the deprecated legacy method signature, but we don't want to warn on this call to it
-	Refresh();
-
-	#pragma GCC diagnostic pop
-}
-
-/**
-	@brief Gets the desired location of the nodes's input data
-
-	The default implementation returns CPU.
-
-	@return		LOC_CPU: if the filter assumes input waveforms are readable from the CPU
-				LOC_GPU: if the filter assumes input waveforms are readable from the GPU
-				LOC_DONTCARE: if the filter manages its own input memory, or can work with either CPU or GPU input
- */
-FlowGraphNode::DataLocation FlowGraphNode::GetInputLocation()
-{
-	return LOC_CPU;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
 FilterParameter& FlowGraphNode::GetParameter(string s)
@@ -409,7 +366,7 @@ void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
 
 		SetInput(
 			it.first.as<string>(),
-			StreamDescriptor(table.Lookup<OscilloscopeChannel*>(index), stream),
+			StreamDescriptor(table.Lookup<OscilloscopeChannel>(index), stream),
 			true
 			);
 	}

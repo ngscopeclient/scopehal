@@ -56,16 +56,17 @@ WaterfallWaveform::~WaterfallWaveform()
 
 Waterfall::Waterfall(const string& color)
 	: Filter(color, CAT_RF)
+	, m_offsetHz(0)
 	, m_width(1)
 	, m_height(1)
-	, m_maxwidth("Max width")
+	, m_maxwidth(m_parameters["Max width"])
 	, m_computePipeline("shaders/WaterfallFilter.spv", 3, sizeof(WaterfallFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_WATERFALL);
 	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
 
-	m_parameters[m_maxwidth] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_maxwidth].SetIntVal(131072);
+	m_maxwidth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_maxwidth.SetIntVal(131072);
 
 	//Set up channels
 	CreateInput("Spectrum");
@@ -76,7 +77,7 @@ Waterfall::Waterfall(const string& color)
 
 bool Waterfall::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) &&
@@ -118,9 +119,16 @@ void Waterfall::ClearSweeps()
 
 void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("Waterfall::Refresh");
+	#endif
+	ClearErrors();
+
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -129,11 +137,10 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
 
 	//Get the input data
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	size_t inlen = din->size();
 
 	//Figure out how wide we want the input capture to be
-	size_t maxwidth = m_parameters[m_maxwidth].GetIntVal();
+	size_t maxwidth = m_maxwidth.GetIntVal();
 	size_t capwidth = min(maxwidth, inlen);
 
 	//Reallocate if input size changed, or we don't have an input capture at all

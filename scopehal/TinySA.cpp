@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -114,34 +114,8 @@ TinySA::TinySA(SCPITransport* transport)
 	SetChannelVoltageRange(0,0,130);
 	SetChannelOffset(0,0,50);
 
-	//Create Vulkan objects for peak detection
-	m_queue = g_vkQueueManager->GetComputeQueue("TinySA.queue");
-	vk::CommandPoolCreateInfo poolInfo(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		m_queue->m_family );
-	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-
-	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
-	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
-		std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-
-	if(g_hasDebugUtils)
-	{
-		string poolname = "TinySA.pool";
-		string bufname = "TinySA.cmdbuf";
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandPool,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandPool>(**m_pool)),
-				poolname.c_str()));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
-				bufname.c_str()));
-	}
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("TinySA");
 }
 
 TinySA::~TinySA()
@@ -156,7 +130,7 @@ TinySA::~TinySA()
    @param length the length of binary data expected from the device
    @return size_t the number of bytes actually read from the device
  */
-size_t TinySA::ConverseBinary(const std::string commandString, std::vector<uint8_t> &data, size_t length)
+size_t TinySA::ConverseBinary(const string& commandString, vector<uint8_t>& data, size_t length)
 {
 	string header;
 	bool inHeader = true;

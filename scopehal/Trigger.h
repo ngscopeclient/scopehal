@@ -48,6 +48,8 @@ public:
 	Trigger(Oscilloscope* scope);
 	virtual ~Trigger();
 
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+
 	///@brief Get the trigger level
 	float GetLevel()
 	{ return m_level.GetFloatVal(); }

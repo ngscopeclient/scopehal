@@ -49,10 +49,10 @@ public:
 	// Dynamic creation
 public:
 	typedef std::shared_ptr<SCPIBERT> (*BERTCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, BERTCreateProcType proc);
+	static void DoAddDriverClass(const std::string& name, BERTCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static std::shared_ptr<SCPIBERT> CreateBERT(std::string driver, SCPITransport* transport);
+	static std::shared_ptr<SCPIBERT> CreateBERT(const std::string& driver, SCPITransport* transport);
 
 protected:
 	//Class enumeration

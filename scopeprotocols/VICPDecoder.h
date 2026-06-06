@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,8 +62,9 @@ public:
 	 , m_data(data)
 	{}
 
-	VICPSymbol(FieldType type, std::string str)
+	VICPSymbol(FieldType type, const std::string& str)
 	 : m_type(type)
+	 , m_data(0)
 	 , m_str(str)
 	{}
 
@@ -87,7 +88,7 @@ public:
 	VICPDecoder(const std::string& color);
 	virtual ~VICPDecoder();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	std::vector<std::string> GetHeaders() override;
 

@@ -29,7 +29,13 @@
 
 #version 430
 #pragma shader_stage(compute)
-#extension GL_EXT_shader_8bit_storage : require
+
+/**
+	@brief Signed int8 to float32 conversion
+
+	This shader is a drop-in replacement for Convert8BitSamples except requires 1/4 as many threads to be launched,
+	and does not need GL_EXT_shader_8bit_storage
+ */
 
 layout(std430, binding=0) restrict writeonly buffer buf_pout
 {
@@ -38,7 +44,7 @@ layout(std430, binding=0) restrict writeonly buffer buf_pout
 
 layout(std430, binding=1) restrict readonly buffer buf_pin
 {
-	int8_t pin[];
+	uint pin[];
 };
 
 layout(std430, push_constant) uniform constants
@@ -46,15 +52,47 @@ layout(std430, push_constant) uniform constants
 	uint size;
 	float gain;
 	float offset;
+	uint inputBufferOffset;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
+	//Rest of shader assumes inputBufferOffset is a multiple of 2
+	//If it's not, patch it to avoid problems
+	//(is this a reasonable assumption? do segmented captures ever have non multiple of 2 size?)
+	uint realBufferOffset = inputBufferOffset - (inputBufferOffset % 2);
+
 	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	if(nthread >= size)
+	uint outbase = nthread * 2;
+	uint base = (nthread * 2) + realBufferOffset;
+
+	//Don't go off the end of the input
+	if(base >= size)
 		return;
 
-	pout[nthread] = gain*float(int(pin[nthread])) - offset;
+	//Fetch the input sample
+	uint block = pin[nthread + realBufferOffset/2];
+
+	//Four samples per thread
+	for(uint i=0; i<2; i++)
+	{
+		//Make sure we don't go off the end
+		uint j = i + base;
+		if(j >= size)
+			return;
+
+		//Fetch the sample and sign extend
+		uint sampleIn = (block >> (16*i)) & 0xffff;
+		int signExtended = int(sampleIn);
+		if( (sampleIn & 0x8000) == 0x8000)
+		{
+			sampleIn = (~sampleIn + 1) & 0xffff;
+			signExtended = -int(sampleIn);
+		}
+
+		//Do the actual conversion
+		pout[outbase + i] = gain * float(int(signExtended)) - offset;
+	}
 }

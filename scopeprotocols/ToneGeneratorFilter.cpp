@@ -99,12 +99,6 @@ void ToneGeneratorFilter::OnUnitChanged()
 	m_bias.SetUnit(unit);
 }
 
-Filter::DataLocation ToneGeneratorFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -133,15 +127,17 @@ void ToneGeneratorFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 	cap->m_startFemtoseconds = fs;
 	cap->Resize(depth);
 
-	double samples_per_cycle = samplerate * 1.0 / freq;
-	double radians_per_sample = 2 * M_PI / samples_per_cycle;
-
 	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	float scale = amplitude / 2;
 
-	//Push onstants
+	//Convert cycles per sample into a fixed-point value so we can use natural uint32 overflow to do the modulus
+	//with no loss of precision
+	double cycles_per_sample = freq * 1.0 / samplerate;
+	uint32_t fpfreq = round(0xffffffff * cycles_per_sample);
+
+	//Push constants
 	ToneGeneratorConstants cfg;
-	cfg.radians_per_sample = radians_per_sample;
+	cfg.fpfreq = fpfreq;
 	cfg.depth = depth;
 	cfg.bias = bias;
 	cfg.scale = scale;

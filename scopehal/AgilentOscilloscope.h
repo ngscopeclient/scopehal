@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -165,28 +165,22 @@ protected:
 	///@brief Acquisition sample rate
 	uint64_t m_sampleRate;
 
-	///@brief True if trigger is armed, false if idle
-	bool m_triggerArmed;
-
-	///@brief True if trigger is one-shot (single or forced), false if idle
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 	void PullNthEdgeBurstTrigger();
 	void PullPulseWidthTrigger();
 
-	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
-	void GetTriggerSlope(NthEdgeBurstTrigger* trig, std::string reply);
-	Trigger::Condition GetCondition(std::string reply);
+	void GetTriggerSlope(EdgeTrigger* trig, const std::string& reply);
+	void GetTriggerSlope(NthEdgeBurstTrigger* trig, const std::string& reply);
+	Trigger::Condition GetCondition(const std::string& reply);
 	void GetProbeType(size_t i);
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
-	void PushCondition(std::string path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
-	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
-	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
+	void PushCondition(const std::string& path, Trigger::Condition cond);
+	void PushFloat(const std::string& path, float f);
+	void PushSlope(const std::string& path, EdgeTrigger::EdgeType slope);
+	void PushSlope(const std::string& path, NthEdgeBurstTrigger::EdgeType slope);
 
 private:
 
@@ -208,12 +202,12 @@ private:
 		double yreference;
 	};
 
-	void ConfigureWaveform(std::string channel);
+	void ConfigureWaveform(const std::string& channel);
 	bool IsAnalogChannel(size_t i);
 	size_t GetDigitalPodIndex(size_t i);
 	std::string GetDigitalPodName(size_t i);
-	std::vector<uint8_t> GetWaveformData(std::string channel);
-	WaveformPreamble GetWaveformPreamble(std::string channel);
+	std::vector<uint8_t> GetWaveformData(const std::string& channel);
+	WaveformPreamble GetWaveformPreamble(const std::string& channel);
 	void ProcessDigitalWaveforms(
 		std::map<int, std::vector<WaveformBase*>> &pending_waveforms,
 		std::vector<uint8_t> &data, WaveformPreamble &preamble,

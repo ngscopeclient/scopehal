@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,8 +54,6 @@ using namespace std;
 AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport, true, 30000000) //Some models (DSOX2024A at least) take ~10 seconds to respond after network connection
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
 	std::string model_number = m_model;
@@ -147,10 +145,8 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	LogDebug("Installed options:\n");
 	if(options.empty())
 		LogDebug("* None\n");
-	for(auto opt : options)
-	{
+	for(auto& opt : options)
 		LogDebug("* %s\n", opt.c_str());
-	}
 
 	// If the MSO option is enabled, add digital channels
 	if (options.find("MSO") != options.end())
@@ -176,6 +172,12 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			chan->SetDefaultDisplayName();
 		}
 	}
+
+	//Clear config cache
+	m_sampleRateValid = false;
+	m_sampleRate = 0;
+	m_sampleDepthValid = false;
+	m_sampleDepth = 0;
 }
 
 AgilentOscilloscope::~AgilentOscilloscope()
@@ -187,7 +189,7 @@ AgilentOscilloscope::~AgilentOscilloscope()
 
 	@param channel	The channel to configure
  */
-void AgilentOscilloscope::ConfigureWaveform(string channel)
+void AgilentOscilloscope::ConfigureWaveform(const string& channel)
 {
 	//Select the channel to apply settings to
 	//NOTE: this also enables the channel
@@ -238,7 +240,7 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_sampleDepthValid = false;
 
 	delete m_trigger;
-	m_trigger = NULL;
+	m_trigger = nullptr;
 }
 
 /**
@@ -607,7 +609,7 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 
 	@return			Raw waveform data
  */
-vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
+vector<uint8_t> AgilentOscilloscope::GetWaveformData(const string& channel)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":WAV:SOUR " + channel);
@@ -639,7 +641,7 @@ vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 
 	@return			Preamble data
  */
-AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
+AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(const string& channel)
 {
 	WaveformPreamble ret;
 	string reply;
@@ -857,7 +859,11 @@ void AgilentOscilloscope::Stop()
 
 void AgilentOscilloscope::ForceTrigger()
 {
-	LogError("AgilentOscilloscope::ForceTrigger not implemented\n");
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(":SING");
+	m_transport->SendCommand(":TRIG:FORC");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 bool AgilentOscilloscope::IsTriggerArmed()
@@ -1220,7 +1226,7 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 	@param trig		Trigger to configure
 	@param reply	Response from the instrument
  */
-void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, const string& reply)
 {
 	if (reply == "POS")
 		trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -1240,7 +1246,7 @@ void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 	@param trig		Trigger to configure
 	@param reply	Response from the instrument
  */
-void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string reply)
+void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, const string& reply)
 {
 	if (reply == "POS")
 		trig->SetSlope(NthEdgeBurstTrigger::EDGE_RISING);
@@ -1255,15 +1261,15 @@ void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string repl
 
 	@param reply	Response from the instrument
  */
-Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
+Trigger::Condition AgilentOscilloscope::GetCondition(const string& reply)
 {
-	reply = Trim(reply);
+	auto sreply = Trim(reply);
 
-	if(reply == "LESS")
+	if(sreply == "LESS")
 		return Trigger::CONDITION_LESS;
-	else if(reply == "GRE")
+	else if(sreply == "GRE")
 		return Trigger::CONDITION_GREATER;
-	else if(reply == "RANG")
+	else if(sreply == "RANG")
 		return Trigger::CONDITION_BETWEEN;
 
 	//unknown
@@ -1391,7 +1397,7 @@ void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 	@param path		SCPI path of the parameter to set
 	@param cond		Trigger condition
  */
-void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
+void AgilentOscilloscope::PushCondition(const string& path, Trigger::Condition cond)
 {
 	string cond_str;
 	switch(cond)
@@ -1417,7 +1423,7 @@ void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
 	@param path		SCPI path of the parameter to set
 	@param f		The value to send
  */
-void AgilentOscilloscope::PushFloat(string path, float f)
+void AgilentOscilloscope::PushFloat(const string& path, float f)
 {
 	m_transport->SendCommand(path + " " + to_string_sci(f));
 }
@@ -1428,7 +1434,7 @@ void AgilentOscilloscope::PushFloat(string path, float f)
 	@param path		SCPI path of the parameter to set
 	@param slope	The desired slope
  */
-void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
+void AgilentOscilloscope::PushSlope(const string& path, EdgeTrigger::EdgeType slope)
 {
 	string slope_str;
 	switch(slope)
@@ -1457,7 +1463,7 @@ void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
 	@param path		SCPI path of the parameter to set
 	@param slope	The desired slope
  */
-void AgilentOscilloscope::PushSlope(string path, NthEdgeBurstTrigger::EdgeType slope)
+void AgilentOscilloscope::PushSlope(const string& path, NthEdgeBurstTrigger::EdgeType slope)
 {
 	string slope_str;
 	switch(slope)

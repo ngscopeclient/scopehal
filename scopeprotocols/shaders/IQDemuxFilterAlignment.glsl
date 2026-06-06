@@ -78,7 +78,7 @@ void main()
 	{
 		uint total = 0;
 		for(int i=0; i<LOCAL_SIZE; i++)
-			total += zerosFound[total];
+			total += zerosFound[i];
 
 		zeroSymbols[gl_WorkGroupID.x] = total;
 	}

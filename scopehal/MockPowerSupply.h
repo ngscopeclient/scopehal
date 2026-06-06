@@ -82,6 +82,8 @@ public:
 	void SetMasterPowerEnable(bool enable) override;
 
 	// Serialization
+	//This is intentionally not virtual since it's called by Instrument::m_preloaders
+	//cppcheck-suppress duplInheritedMember
 	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 
 	// SCPI

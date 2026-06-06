@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -130,12 +130,6 @@ public:
 	virtual void SetIntegrationTime(int64_t t) override;
 
 protected:
-
-	///@brief Indicates trigger is armed
-	bool m_triggerArmed;
-
-	///@brief Indicates most recent trigger arm was a one-shot rather than continuous trigger
-	bool m_triggerOneShot;
 
 	///@brief Wavelength (in picometers) at each spectral bin
 	std::vector<float> m_wavelengths;

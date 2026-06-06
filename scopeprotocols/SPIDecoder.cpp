@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,17 +44,17 @@ using namespace std;
 
 SPIDecoder::SPIDecoder(const string& color)
 	: Filter(color, CAT_BUS)
-	, m_cpol("Clock Polarity")
+	, m_cpol(m_parameters["Clock Polarity"])
 {
 	AddProtocolStream("data");
 	CreateInput("clk");
 	CreateInput("cs#");
 	CreateInput("data");
 
-	m_parameters[m_cpol] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_cpol].AddEnumValue("Idle low", 0);
-	m_parameters[m_cpol].AddEnumValue("Idle high", 1);
-	m_parameters[m_cpol].SetIntVal(0);
+	m_cpol = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_cpol.AddEnumValue("Idle low", 0);
+	m_cpol.AddEnumValue("Idle high", 1);
+	m_cpol.SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,7 @@ SPIDecoder::SPIDecoder(const string& color)
 
 bool SPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 3) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -79,12 +79,20 @@ string SPIDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SPIDecoder::Refresh()
+void SPIDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SPIDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -105,10 +113,8 @@ void SPIDecoder::Refresh()
 	auto udata = dynamic_cast<UniformDigitalWaveform*>(data);
 
 	//Create the capture
-	auto cap = new SPIWaveform;
+	auto cap = SetupEmptyWaveform<SPIWaveform>(clk, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
@@ -141,7 +147,7 @@ void SPIDecoder::Refresh()
 	size_t datalen = data->size();
 
 	//Get SPI clock polarity
-	auto cpol = m_parameters[m_cpol].GetIntVal();
+	auto cpol = m_cpol.GetIntVal();
 
 	bool active_clk;
 	if(cpol == 0)
@@ -272,12 +278,10 @@ void SPIDecoder::Refresh()
 		AdvanceToTimestampScaled(sdata, udata, idata, datalen, timestamp);
 	}
 
-	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
 }
 
-std::string SPIWaveform::GetColor(size_t i)
+string SPIWaveform::GetColor(size_t i)
 {
 	const SPISymbol& s = m_samples[i];
 	switch(s.m_stype)

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,7 @@ class SawtoothGeneratorFilter : public Filter
 public:
 	SawtoothGeneratorFilter(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -56,17 +56,17 @@ public:
 	};
 
 	RampType GetRampType()
-	{ return static_cast<RampType>(m_parameters[m_rampname].GetIntVal()); }
+	{ return m_ramp.GetEnumVal<RampType>(); }
 
 protected:
-	std::string m_ratename;
-	std::string m_freqname;
-	std::string m_biasname;
-	std::string m_amplitudename;
-	std::string m_depthname;
-	std::string m_phasename;
-	std::string m_unitname;
-	std::string m_rampname;
+	FilterParameter& m_rate;
+	FilterParameter& m_freq;
+	FilterParameter& m_bias;
+	FilterParameter& m_amplitude;
+	FilterParameter& m_depth;
+	FilterParameter& m_phase;
+	FilterParameter& m_unit;
+	FilterParameter& m_ramp;
 
 	void OnUnitChanged();
 };

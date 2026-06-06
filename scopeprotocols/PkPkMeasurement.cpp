@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,11 +37,20 @@ using namespace std;
 
 PkPkMeasurement::PkPkMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_minmaxPipeline("shaders/MinMax.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "minmax", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
+
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		m_histogramPipeline =
+			make_shared<ComputePipeline>("shaders/Histogram.spv", 2, sizeof(HistogramConstants));
+
+		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +58,7 @@ PkPkMeasurement::PkPkMeasurement(const string& color)
 
 bool PkPkMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -69,12 +78,17 @@ string PkPkMeasurement::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PkPkMeasurement::Refresh()
+void PkPkMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PkPkMeasurement::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -91,8 +105,20 @@ void PkPkMeasurement::Refresh()
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
 
 	//Figure out the nominal midpoint of the waveform
-	float top = GetTopVoltage(sdin, udin);
-	float base = GetBaseVoltage(sdin, udin);
+	float base;
+	float top;
+	Filter::GetBaseAndTopVoltage(
+		cmdBuf,
+		queue,
+		m_minmaxPipeline,
+		m_histogramPipeline,
+		m_minbuf,
+		m_maxbuf,
+		m_histogramBuf,
+		sdin,
+		udin,
+		base,
+		top);
 	float midpoint = (top+base)/2;
 
 	//Create the output

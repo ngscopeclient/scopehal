@@ -65,19 +65,17 @@ public:
 	virtual std::string GetSerial() const override;
 
 	// Serialization
+
+	//This is called by Instrument::m_serializers and is not virtual
+	//cppcheck-suppress duplInheritedMember
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+
 	void ClearWarnings(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
 
 	// SCPI
 	virtual void BackgroundProcessing() override {}
 
 protected:
-
-	//standard *IDN? fields
-	std::string m_name;
-	std::string m_vendor;
-	std::string m_serial;
-	std::string m_fwVersion;
 
 	//Simulated transport information
 	std::string m_transportName;

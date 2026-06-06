@@ -105,11 +105,19 @@ void CSVImportFilter::OnFileNameChanged()
 		return;
 	}
 	fseek(fp, 0, SEEK_END);
-	size_t flen = ftell(fp);
+	off_t flen = ftello(fp);
+	if(flen < 0)
+	{
+		AddErrorMessage("Bad file", string("Failed to seek file ") + fname);
+		fclose(fp);
+		return;
+	}
 	fseek(fp, 0, SEEK_SET);
 	char* buf = new char[flen+1];
-	if(flen != fread(buf, 1, flen, fp))
+	if(flen != static_cast<off_t>(fread(buf, 1, flen, fp)))
 	{
+		fclose(fp);
+		delete[] buf;
 		AddErrorMessage("Bad file", string("Failed to read contents of file ") + fname);
 		return;
 	}
@@ -333,12 +341,16 @@ void CSVImportFilter::OnFileNameChanged()
 			AddErrorMessage("Malformed file",
 				string("Line ") + to_string(nrow) + " contains " + to_string(ncol) + " fields, but file started with " +
 				to_string(ncols) + " fields");
+			delete[] buf;
 			return;
 		}
 	}
 
 	if(ncols == 0)
+	{
+		delete[] buf;
 		return;
+	}
 	size_t nrows = min(vcolumns[0].size(), timestamps.size());
 
 	//Assign default names to channels if there's no header row or not enough names

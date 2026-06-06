@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -93,7 +93,7 @@ public:
 	PCIeGen2LogicalDecoder(const std::string& color);
 	virtual ~PCIeGen2LogicalDecoder();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -106,7 +106,7 @@ protected:
 
 	void RefreshPorts();
 
-	std::string m_portCountName;
+	FilterParameter& m_portCount;
 };
 
 #endif

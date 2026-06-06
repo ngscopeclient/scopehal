@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,12 +35,14 @@
 #ifndef PhaseMeasurement_h
 #define PhaseMeasurement_h
 
+#include "../scopehal/LevelCrossingDetector.h"
+
 class PhaseMeasurement : public Filter
 {
 public:
 	PhaseMeasurement(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -55,8 +57,20 @@ public:
 	};
 
 protected:
-	std::string m_freqModeName;
-	std::string m_freqName;
+	FilterParameter& m_freqMode;
+	FilterParameter& m_freq;
+
+	//Minmax calculation
+	ComputePipeline m_minmaxPipeline;
+	AcceleratorBuffer<float> m_minbuf;
+	AcceleratorBuffer<float> m_maxbuf;
+
+	//Histogram calculation
+	std::shared_ptr<ComputePipeline> m_histogramPipeline;
+	AcceleratorBuffer<uint64_t> m_histogramBuf;
+
+	//Level crossing search
+	LevelCrossingDetector m_detector;
 };
 
 #endif

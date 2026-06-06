@@ -202,6 +202,8 @@ void ComplexImportFilter::Reload()
 
 		case FORMAT_FLOAT32:
 			{
+				//This is intentional and assumes IEEE754 little endian as the native platform floating point format
+				//cppcheck-suppress invalidPointerCast
 				auto wfm = reinterpret_cast<float*>(buf);
 				for(size_t i=0; i<nsamples; i++)
 				{
@@ -213,6 +215,8 @@ void ComplexImportFilter::Reload()
 
 		case FORMAT_FLOAT64:
 			{
+				//This is intentional and assumes IEEE754 little endian as the native platform floating point format
+				//cppcheck-suppress invalidPointerCast
 				auto wfm = reinterpret_cast<double*>(buf);
 				for(size_t i=0; i<nsamples; i++)
 				{

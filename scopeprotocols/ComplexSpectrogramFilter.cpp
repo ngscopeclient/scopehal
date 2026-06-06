@@ -90,15 +90,11 @@ bool ComplexSpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string ComplexSpectrogramFilter::GetProtocolName()
 {
 	return "Complex Spectrogram";
-}
-
-Filter::DataLocation ComplexSpectrogramFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +153,7 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	//Figure out how many FFTs to do
 	//For now, consecutive blocks and not an overlapping window
 	size_t inlen = min(din_i->size(), din_q->size());
-	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
+	size_t fftlen = m_fftLength.GetIntVal();
 	size_t nblocks = floor(inlen * 1.0 / fftlen);
 
 	if( (fftlen != m_cachedFFTLength) || (nblocks != m_cachedFFTNumBlocks) )
@@ -214,7 +210,7 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	SetData(cap, 0);
 
 	//We also need to adjust the scale by the coherent power gain of the window function
-	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
+	auto window = m_window.GetEnumVal<FFTFilter::WindowFunction>();
 	switch(window)
 	{
 		case FFTFilter::WINDOW_HAMMING:
@@ -280,8 +276,8 @@ void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
-	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
-	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
+	float minscale = m_rangeMin.GetFloatVal();
+	float fullscale = m_rangeMax.GetFloatVal();
 	float range = fullscale - minscale;
 
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead

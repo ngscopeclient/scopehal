@@ -53,12 +53,6 @@ string Ethernet10BaseTDecoder::GetProtocolName()
 	return "Ethernet - 10baseT";
 }
 
-Filter::DataLocation Ethernet10BaseTDecoder::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

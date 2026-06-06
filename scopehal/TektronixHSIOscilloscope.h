@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,24 +47,26 @@
 class TektronixHSIOscilloscope : public TektronixOscilloscope
 {
 public:
-	   TektronixHSIOscilloscope(SCPITransport* transport);
-	   virtual ~TektronixHSIOscilloscope();
+	TektronixHSIOscilloscope(SCPITransport* transport);
+	virtual ~TektronixHSIOscilloscope();
 
-	   //not copyable or assignable
-	   TektronixHSIOscilloscope(const TektronixHSIOscilloscope& rhs) =delete;
-	   TektronixHSIOscilloscope& operator=(const TektronixHSIOscilloscope& rhs) =delete;
-
-public:
-
-	   virtual Oscilloscope::TriggerMode PollTrigger() override;
-	   virtual bool AcquireData() override;
-	   virtual void Start() override;
-	   virtual void StartSingleTrigger() override;
-	   virtual void Stop() override;
+	//not copyable or assignable
+	TektronixHSIOscilloscope(const TektronixHSIOscilloscope& rhs) =delete;
+	TektronixHSIOscilloscope& operator=(const TektronixHSIOscilloscope& rhs) =delete;
 
 public:
 
-	   static std::string GetDriverNameInternal();
-	   OSCILLOSCOPE_INITPROC(TektronixHSIOscilloscope);
+	virtual Oscilloscope::TriggerMode PollTrigger() override;
+	virtual bool AcquireData() override;
+	virtual void Start() override;
+	virtual void StartSingleTrigger() override;
+	virtual void Stop() override;
+
+public:
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::string GetDriverNameInternal();
+
+	OSCILLOSCOPE_INITPROC(TektronixHSIOscilloscope);
 };
 #endif

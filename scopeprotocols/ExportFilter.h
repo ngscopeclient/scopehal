@@ -48,6 +48,10 @@ public:
 	ExportFilter(const std::string& color);
 	virtual ~ExportFilter();
 
+	//not copyable or assignable
+	ExportFilter(const ExportFilter& rhs) =delete;
+	ExportFilter& operator=(const ExportFilter& rhs) =delete;
+
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	virtual std::vector<std::string> EnumActions() override;

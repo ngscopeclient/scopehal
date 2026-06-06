@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -112,12 +112,9 @@ protected:
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, double> m_channelAttenuations;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 
 public:
 	static std::string GetDriverNameInternal();

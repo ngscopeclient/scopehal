@@ -43,7 +43,6 @@ public:
 	std::vector<std::string> GetHeaders() override;
 	virtual void SetDefaultName() override;
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual DataLocation GetInputLocation() override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetProtocolName();
@@ -51,8 +50,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(CandumpImportFilter)
 
 protected:
-	std::string m_fpname;
-	std::string m_datarate;
+	FilterParameter& m_filePath;
+	FilterParameter& m_datarate;
 
 	void OnFileNameChanged();
 };

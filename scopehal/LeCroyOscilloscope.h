@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -195,6 +195,7 @@ public:
 		MODEL_MDA_800,
 
 		MODEL_SDA_3K,
+		MODEL_SDA_6K,
 
 		MODEL_SDA_7ZI,
 		MODEL_SDA_7ZI_A,
@@ -298,7 +299,7 @@ protected:
 	void PushGlitchTrigger(GlitchTrigger* trig);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
@@ -321,7 +322,7 @@ protected:
 		bool& any_enabled);
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	std::vector<WaveformBase*> ProcessAnalogWaveform(
-		const char* data,
+		AcceleratorBuffer<uint8_t>& data,
 		size_t datalen,
 		std::string& wavedesc,
 		uint32_t num_sequences,
@@ -354,14 +355,8 @@ protected:
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
-	///@brief True if we have sent an arm command to the scope (may not have executed  yet)
-	bool m_triggerArmed;
-
 	///@brief True if the scope has reported it is in fact in the arm state
 	bool m_triggerReallyArmed;
-
-	///@brief True if current trigger is a single-shot and should not re-arm
-	bool m_triggerOneShot;
 
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
@@ -398,6 +393,15 @@ protected:
 
 	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion8BitPipeline;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
+
+	///@brief Buffers for raw waveform data before conversion to float32
+	std::map<int, AcceleratorBuffer<uint8_t> > m_rawWaveformBuffers;
 
 public:
 	static std::string GetDriverNameInternal();

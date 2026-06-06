@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,17 +37,17 @@ using namespace std;
 
 PhaseNonlinearityFilter::PhaseNonlinearityFilter(const string& color)
 	: Filter(color, CAT_RF)
-	, m_refLowName("Ref Freq Low")
-	, m_refHighName("Ref Freq High")
+	, m_refLow(m_parameters["Ref Freq Low"])
+	, m_refHigh(m_parameters["Ref Freq High"])
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("Phase");
 
-	m_parameters[m_refLowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_refLowName].SetIntVal(1e9);
+	m_refLow = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_refLow.SetIntVal(1e9);
 
-	m_parameters[m_refHighName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_refHighName].SetIntVal(2e9);
+	m_refHigh = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_refHigh.SetIntVal(2e9);
 
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 }
@@ -57,7 +57,7 @@ PhaseNonlinearityFilter::PhaseNonlinearityFilter(const string& color)
 
 bool PhaseNonlinearityFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
 		return false;
@@ -78,12 +78,20 @@ string PhaseNonlinearityFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PhaseNonlinearityFilter::Refresh()
+void PhaseNonlinearityFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PhaseNonlinearityFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -93,14 +101,15 @@ void PhaseNonlinearityFilter::Refresh()
 	din->PrepareForCpuAccess();
 
 	m_xAxisUnit = GetInput(0).GetXAxisUnits();
-	m_parameters[m_refLowName].SetUnit(m_xAxisUnit);
-	m_parameters[m_refHighName].SetUnit(m_xAxisUnit);
+	m_refLow.SetUnit(m_xAxisUnit);
+	m_refHigh.SetUnit(m_xAxisUnit);
 
 	//We need meaningful data
 	size_t len = din->size();
 	if(len == 0)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing data", "Input waveform is empty");
+		SetData(nullptr, 0);
 		return;
 	}
 	else
@@ -120,8 +129,8 @@ void PhaseNonlinearityFilter::Refresh()
 	float phase = initialPhase;
 	float phaseLow = 0;
 	float phaseHigh = 0;
-	int64_t freqLow = m_parameters[m_refLowName].GetIntVal();
-	int64_t freqHigh = m_parameters[m_refHighName].GetIntVal();
+	int64_t freqLow = m_refLow.GetIntVal();
+	int64_t freqHigh = m_refHigh.GetIntVal();
 	bool foundFreqLow = false;
 	for(size_t i=0; i<len; i++)
 	{

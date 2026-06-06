@@ -651,11 +651,12 @@ void WFMImportFilter::OnFileNameChanged()
 		if(numRealSamples != fread(rawdata, sizeof(int16_t), numRealSamples, fp))
 		{
 			LogError("Fail to read waveform data\n");
+			fclose(fp);
 			delete[] rawdata;
 			return;
 		}
 
-		//Convert (TODO vectorize)
+		//Convert (TODO GPU)
 		for(size_t i=0; i<numRealSamples; i++)
 			wfm->m_samples[i] = (rawdata[i] * yscale) + yoff;
 
@@ -669,11 +670,12 @@ void WFMImportFilter::OnFileNameChanged()
 		if(numRealSamples != fread(rawdata, sizeof(int8_t), numRealSamples, fp))
 		{
 			LogError("Fail to read waveform data\n");
+			fclose(fp);
 			delete[] rawdata;
 			return;
 		}
 
-		//Convert (TODO vectorize)
+		//Convert (TODO GPU)
 		for(size_t i=0; i<numRealSamples; i++)
 			wfm->m_samples[i] = (rawdata[i] * yscale) + yoff;
 

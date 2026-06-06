@@ -114,12 +114,6 @@ void AverageFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHan
 	}
 }
 
-Filter::DataLocation AverageFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-
 string AverageFilter::GetProtocolName()
 {
 	return "Average";

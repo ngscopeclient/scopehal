@@ -69,8 +69,6 @@ MagnovaOscilloscope::MagnovaOscilloscope(SCPITransport* transport)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_maxBandwidth(10000)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
@@ -137,7 +135,7 @@ bool MagnovaOscilloscope::sendWithAck(const char* fmt, ...)
 
 	// Lock on transport at this level since magnova sometimes returns an \n before the actual reply
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
-	ret = m_transport->SendCommandQueuedWithReply(result.c_str(), false);
+	ret = m_transport->SendCommandQueuedWithReply(result, false);
 	if(ret.length() == 0)
 		ret = m_transport->ReadReply(); // Sometimes the Magnova returns en empty string and then the actual reply
 	return (ret == "1");
@@ -153,7 +151,8 @@ void MagnovaOscilloscope::protocolError(bool flush, const char* fmt, va_list ap)
     char opString[128];
     vsnprintf(opString, sizeof(opString), fmt, ap);
     LogError("Protocol error%s: %s.\n", flush ? ", flushing read stream" : "", opString);
-    if(flush) m_transport->ReadReply();
+    if(flush)
+		m_transport->ReadReply();
 }
 
 void MagnovaOscilloscope::protocolError(const char* fmt, ...)
@@ -368,7 +367,9 @@ string MagnovaOscilloscope::GetDriverNameInternal()
 	return "magnova";
 }
 
-std::vector<SCPIInstrumentModel> MagnovaOscilloscope::GetDriverSupportedModels()
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
+vector<SCPIInstrumentModel> MagnovaOscilloscope::GetDriverSupportedModels()
 {
 	return {
 	{"Magnova", {
@@ -887,7 +888,7 @@ Oscilloscope::TriggerMode MagnovaOscilloscope::PollTrigger()
 
 std::optional<MagnovaOscilloscope::Metadata> MagnovaOscilloscope::parseMetadata(
     const std::vector<uint8_t>& data) {
-    
+
     try {
         Metadata metadata;
 
@@ -1081,7 +1082,7 @@ bool MagnovaOscilloscope::IsReducedSampleRate()
 	// ADC sample rate 1.0 GSa/s if
 	// - Channel 3 and/or 4 are active
 	// - The number of analog channels plus digital probes is 3 or more and time scale is > 20 ns/div.
-	
+
 	unsigned int activeChannels = GetActiveChannelsCount();
 	if(IsChannelEnabled(2) || IsChannelEnabled(3))
 	{	// Reduced if channel 3 or 4 is active
@@ -1122,9 +1123,9 @@ double MagnovaOscilloscope::GetCaptureScreenDivisions(MemoryDepthMode memoryMode
 		if(srate > ((captureMode == CAPTURE_MODE_EXTENDED) ? 1000000 : 0))
 		{
 			string stringSrate = to_string(srate);
-			for (char c : stringSrate) 
+			for (char c : stringSrate)
 			{
-				if (c == '1' || c == '5') 
+				if (c == '1' || c == '5')
 				{
 					return ((captureMode == CAPTURE_MODE_EXTENDED) ? 40 : 20);
 				}
@@ -1166,7 +1167,7 @@ uint64_t MagnovaOscilloscope::GetMaxAutoMemoryDepth(uint64_t original)
 		return original;
 	}
 	unsigned int activeChannels = GetActiveChannelsCount();
-	uint64_t max; 
+	uint64_t max;
 	if(activeChannels <= 1)
 	{
 		max = 300*1000*1000;
@@ -1513,7 +1514,7 @@ bool MagnovaOscilloscope::AcquireData()
 	// Notify about download operation start
 	ChannelsDownloadStarted();
 
-	
+
 	{	// Lock transport from now during all acquisition phase
 		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 		start = GetTime();
@@ -1634,7 +1635,7 @@ bool MagnovaOscilloscope::AcquireData()
 		digitalWaveformDataBytes[i] = {};
 	}
 
-	
+
 	{	//Now that we have all of the pending waveforms, save them in sets across all channels
 		lock_guard<mutex> lock(m_pendingWaveformsMutex);
 		for(size_t i = 0; i < num_sequences; i++)
@@ -1813,7 +1814,7 @@ vector<uint64_t> MagnovaOscilloscope::GetSampleRatesNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_MAGNOVA_BMO:
-			// Call GetSampleDepth to update Memody Depth Mode 
+			// Call GetSampleDepth to update Memody Depth Mode
 			GetSampleDepth();
 			if(m_memoryDepthMode == MEMORY_DEPTH_AUTO_MAX)
 			{	// In auto modes reduce possible values to the one that match sample depth / coarse time scale
@@ -2009,7 +2010,7 @@ uint64_t MagnovaOscilloscope::GetSampleDepth()
 		case MEMORY_DEPTH_AUTO_FAST:
 			{
 			// Get Sample depth based on srate and timebase
-			// Auto (Max): Memory length = recording time * sample rate. If the maximum memory is exceeded, the sample rate is halved until the memory length is <= maximum. 
+			// Auto (Max): Memory length = recording time * sample rate. If the maximum memory is exceeded, the sample rate is halved until the memory length is <= maximum.
 			// Auto (Fast): Memory length = recording time * sample rate. If over 20 Mpts/CH, the sample rate is halved until the memory length is <= 20 Mpts.
 			double scale = GetTimebaseScale();
 			depth = llround(scale * GetCaptureScreenDivisions(mode,GetCaptureMode(),0) * GetSampleRate());
@@ -2399,7 +2400,7 @@ void MagnovaOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level
 void MagnovaOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
 	string bank = GetDigitalChannelBankName(channel);
-	
+
 	sendWithAck(":DIG:THRESHOLD%s %1.2E", bank.c_str(), level);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
@@ -2499,7 +2500,7 @@ void MagnovaOscilloscope::PushCondition(const string& path, Trigger::Condition c
 	}
 }
 
-void MagnovaOscilloscope::PushFloat(string path, float f)
+void MagnovaOscilloscope::PushFloat(const string& path, float f)
 {
 	sendOnly("%s %1.5E", path.c_str(), f);
 }
@@ -2565,11 +2566,11 @@ void MagnovaOscilloscope::PullTrigger()
 /**
 	@brief Reads the source of a trigger from the instrument
  */
-void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName, bool isUart)
+void MagnovaOscilloscope::PullTriggerSource(Trigger* trig, const string& triggerModeName, bool isUart)
 {
 	string reply;
 	if(!isUart)
-	{	
+	{
 		reply = converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str());
 	}
 	else
@@ -2742,7 +2743,7 @@ void MagnovaOscilloscope::PullEdgeTrigger()
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void MagnovaOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
+void MagnovaOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType)
 {
 	switch(trig->GetType())
 	{
@@ -3067,7 +3068,7 @@ void MagnovaOscilloscope::PushUartTrigger(UartTrigger* trig)
 	else
 		sendOnly(":TRIGGER:UART:STOP 1.5");*/
 
-	//Pattern 
+	//Pattern
 	int dataLength = 1;
 	trig->SetRadix(SerialTrigger::RADIX_ASCII);
 	// No public access to unformated Pattern 1 and 2 => use GetParameter() instread since we want the unformated string value
@@ -3235,7 +3236,7 @@ void MagnovaOscilloscope::PullNthEdgeBurstTrigger()
 	//Slope
 	GetTriggerSlope(bt,converse(":TRIGger:NEDGe:SLOPe?"));
 
-	//Idle time 
+	//Idle time
 	bt->SetIdleTime(llround(stod(converse(":TRIGger:NEDGe:IDLE?"))*FS_PER_SECOND));
 
 	//Edge number
@@ -3361,7 +3362,7 @@ float MagnovaOscilloscope::GetFunctionChannelDutyCycle(int chan)
 	}
 
 	string type = GetFunctionChannelShape(chan) == SHAPE_SQUARE ? "SQU" : "PULS";
-	
+
 	string duty = converse(":FGEN:WAV:%s:DUTY ?",type.c_str());
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);

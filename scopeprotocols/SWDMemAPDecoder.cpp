@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,10 +47,10 @@ SWDMemAPDecoder::SWDMemAPDecoder(const string& color)
 
 bool SWDMemAPDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<SWDDecoder*>(stream.m_channel) != NULL) )
+	if( (i == 0) && (dynamic_cast<SWDDecoder*>(stream.m_channel) != nullptr) )
 		return true;
 
 	return false;
@@ -76,29 +76,35 @@ string SWDMemAPDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SWDMemAPDecoder::Refresh()
+void SWDMemAPDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SWDMemAPDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	auto din = dynamic_cast<SWDWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Invalid input", "Expected a SWD waveform");
+		SetData(nullptr, 0);
 		return;
 	}
 	din->PrepareForCpuAccess();
 
 	//Set up output
-	auto cap = new SWDMemAPWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<SWDMemAPWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
 
 	//Main decode loop
@@ -336,8 +342,6 @@ void SWDMemAPDecoder::Refresh()
 
 	if(pack)
 		delete pack;
-
-	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
 }

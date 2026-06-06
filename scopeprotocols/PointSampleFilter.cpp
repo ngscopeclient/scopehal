@@ -35,49 +35,59 @@ using namespace std;
 
 PointSampleFilter::PointSampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_off(m_parameters["Sample Point"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "sample", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("in");
 
-	m_offname = "Sample Point";
-	m_parameters[m_offname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_offname].SetIntVal(0);
+	m_off = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_off.SetIntVal(0);
 }
 
 PointSampleFilter::~PointSampleFilter()
 {
 }
 
-void PointSampleFilter::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+void PointSampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	auto din = GetInput(0);
 	if(!din)
+	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
 		return;
+	}
+
 	auto data = din.GetData();
 	if(!data)
 	{
 		m_streams[0].m_value = std::numeric_limits<float>::quiet_NaN();
+		AddErrorMessage("Missing data", "Input is null");
 		return;
 	}
 
+	//Grab the input to the CPU
+	//TODO: only grab a single sample of interest
+	cmdBuf.begin({});
+		data->PrepareForCpuAccessNonblocking(cmdBuf);
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
 	//Copy units to output streams
 	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
-	m_parameters[m_offname].SetUnit(din.GetXAxisUnits());
+	m_off.SetUnit(din.GetXAxisUnits());
 
 	//Sample the input
-	auto off = m_parameters[m_offname].GetIntVal();
+	auto off = m_off.GetIntVal();
 	optional<float> sample = GetValueAtTime(data, off, false);
 	if(!sample)
 		m_streams[0].m_value = std::numeric_limits<float>::quiet_NaN();
 	else
 		m_streams[0].m_value = sample.value();
-}
-
-Filter::DataLocation PointSampleFilter::GetInputLocation()
-{
-	return LOC_CPU;
 }
 
 string PointSampleFilter::GetProtocolName()

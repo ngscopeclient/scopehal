@@ -58,6 +58,7 @@ add_compute_shaders(
 		EnvelopeFilter.glsl
 		Ethernet100BaseT1_PAM3Decoder.glsl
 		Ethernet100BaseT1_Descrambler.glsl
+		Ethernet100BaseT1_Decoder.glsl
 		Ethernet100BaseTX_4b5bDecode.glsl
 		Ethernet100BaseTX_Descrambler.glsl
 		Ethernet100BaseTX_FindSSD.glsl
@@ -72,6 +73,7 @@ add_compute_shaders(
 		FIRFilter.glsl
 		FrequencyMeasurement.glsl
 		InvertFilter.glsl
+		InvertFilterDigital.glsl
 		IQDemuxFilter.glsl
 		IQDemuxFilterAlignment.glsl
 		Magnitude.glsl
@@ -79,6 +81,7 @@ add_compute_shaders(
 		MovingAverageFilter_Uniform.glsl
 		MultiplyByConstant.glsl
 		MultiplyVectorVector.glsl
+		NoiseFilter.glsl
 		PAMEdgeDetector_InitialMerge.glsl
 		PAMEdgeDetector_LevelCrossings.glsl
 		PAMEdgeDetector_MergeCrossings.glsl

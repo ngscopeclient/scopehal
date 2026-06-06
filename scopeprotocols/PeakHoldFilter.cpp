@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,7 +49,7 @@ PeakHoldFilter::PeakHoldFilter(const string& color)
 
 bool PeakHoldFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
@@ -68,7 +68,7 @@ string PeakHoldFilter::GetProtocolName()
 
 void PeakHoldFilter::ClearSweeps()
 {
-	SetData(NULL, 0);
+	SetData(nullptr, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,10 +76,16 @@ void PeakHoldFilter::ClearSweeps()
 
 void PeakHoldFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("PeakHoldFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -99,7 +105,7 @@ void PeakHoldFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	if(sdin)
 	{
 		auto cap = dynamic_cast<SparseAnalogWaveform*>(GetData(0));
-		if(cap == NULL)
+		if(cap == nullptr)
 		{
 			cap = new SparseAnalogWaveform;
 			cap->Resize(len);
@@ -141,7 +147,7 @@ void PeakHoldFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	else
 	{
 		auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
-		if(cap == NULL)
+		if(cap == nullptr)
 		{
 			cap = new UniformAnalogWaveform;
 			cap->Resize(len);

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -87,7 +87,7 @@ public:
 	// TX pattern generator configuration
 
 	static std::string GetPatternName(Pattern pat);
-	static Pattern GetPatternOfName(std::string name);
+	static Pattern GetPatternOfName(const std::string& name);
 
 	/**
 		@brief Gets the currently selected transmit pattern for a channel

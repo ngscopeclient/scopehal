@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,7 +48,7 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	PROTOCOL_DECODER_INITPROC(SParameterDeEmbedFilter)
 
@@ -61,7 +61,7 @@ protected:
 		SIDE_RIGHT
 	};
 
-	std::string m_knownSide;
+	FilterParameter& m_knownSide;
 };
 
 #endif

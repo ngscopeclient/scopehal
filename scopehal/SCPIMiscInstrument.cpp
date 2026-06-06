@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,7 +48,7 @@ SCPIMiscInstrument::~SCPIMiscInstrument()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPIMiscInstrument::DoAddDriverClass(string name, MiscCreateProcType proc)
+void SCPIMiscInstrument::DoAddDriverClass(const string& name, MiscCreateProcType proc)
 {
 	m_misccreateprocs[name] = proc;
 }
@@ -59,7 +59,7 @@ void SCPIMiscInstrument::EnumDrivers(vector<string>& names)
 		names.push_back(it->first);
 }
 
-shared_ptr<SCPIMiscInstrument> SCPIMiscInstrument::CreateInstrument(string driver, SCPITransport* transport)
+shared_ptr<SCPIMiscInstrument> SCPIMiscInstrument::CreateInstrument(const string& driver, SCPITransport* transport)
 {
 	if(m_misccreateprocs.find(driver) != m_misccreateprocs.end())
 		return m_misccreateprocs[driver](transport);

@@ -65,6 +65,7 @@ float blackman(float x, float width)
 UpsampleFilter::UpsampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
 	, m_factor(m_parameters["Upsample factor"])
+	, m_filter("UpsampleFilter.m_filter")
 	, m_computePipeline("shaders/UpsampleFilter.spv", 3, sizeof(UpsampleFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
@@ -153,73 +154,32 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	//Create the output and configure it
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_timescale = din->m_timescale / upsample_factor;
+	cap->Rename("UpsampleFilter.data");
 	size_t len = din->size();
 	size_t imax = len - window;
 	size_t outlen = imax*upsample_factor;
 	cap->Resize(outlen);
 
-	if(g_gpuFilterEnabled)
-	{
-		cmdBuf.begin({});
+	cmdBuf.begin({});
 
-		//Update our descriptor sets with current buffers
-		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, m_filter, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+	//Update our descriptor sets with current buffers
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, m_filter, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
-		UpsampleFilterArgs args;
-		args.imax = imax;
-		args.upsample_factor = upsample_factor;
-		args.kernel = kernel;
+	UpsampleFilterArgs args;
+	args.imax = imax;
+	args.upsample_factor = upsample_factor;
+	args.kernel = kernel;
 
-		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-		m_computePipeline.Dispatch(cmdBuf, args,
-			upsample_factor,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+	m_computePipeline.Dispatch(cmdBuf, args,
+		upsample_factor,
+		min(compute_block_count, 32768u),
+		compute_block_count / 32768 + 1);
 
-		//Done, submit to the queue and wait
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-		cap->MarkModifiedFromGpu();
-	}
-
-	else
-	{
-		din->PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		//Logically, we upsample by inserting zeroes, then convolve with the sinc filter.
-		//Optimization: don't actually waste time multiplying by zero
-		#pragma omp parallel for
-		for(size_t i=0; i < imax; i++)
-		{
-			size_t offset = i * upsample_factor;
-			for(size_t j=0; j<upsample_factor; j++)
-			{
-				size_t start = 0;
-				size_t sstart = 0;
-				if(j > 0)
-				{
-					sstart = 1;
-					start = upsample_factor - j;
-				}
-
-				float f = 0;
-				for(size_t k = start; k<kernel; k += upsample_factor, sstart ++)
-					f += m_filter[k] * din->m_samples[i + sstart];
-
-				cap->m_samples[offset + j] = f;
-			}
-		}
-
-		cap->MarkModifiedFromCpu();
-	}
+	//Done, submit to the queue and wait
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+	cap->MarkModifiedFromGpu();
 }
-
-Filter::DataLocation UpsampleFilter::GetInputLocation()
-{
-	//We explicitly manage our input memory and don't care where it is when Refresh() is called
-	return LOC_DONTCARE;
-}
-

@@ -270,17 +270,17 @@ protected:
 	void PullWindowTrigger();
 	void PullGlitchTrigger();
 	void PullNthEdgeBurstTrigger();
-	void PullTriggerSource(Trigger* trig, std::string triggerModeName, bool isUart);
+	void PullTriggerSource(Trigger* trig, const std::string& triggerModeName, bool isUart);
 
 	void GetTriggerSlope(Trigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushDropoutTrigger(DropoutTrigger* trig);
-	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& trigType);
 	void PushGlitchTrigger(GlitchTrigger* trig);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
+	void PushFloat(const std::string& path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
@@ -324,7 +324,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	std::vector<SparseDigitalWaveform*> ProcessDigitalWaveform(
 		const std::vector<uint8_t>& data,
 		size_t datalen,
@@ -333,7 +333,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	
+
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
@@ -357,8 +357,6 @@ protected:
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
 	bool m_triggerForced;
 
 	//Cached configuration
@@ -493,6 +491,9 @@ private:
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(MagnovaOscilloscope)
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels();
 };
 #endif

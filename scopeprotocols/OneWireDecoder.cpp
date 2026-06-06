@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -57,7 +57,7 @@ OneWireDecoder::~OneWireDecoder()
 
 bool OneWireDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -73,11 +73,20 @@ string OneWireDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void OneWireDecoder::Refresh()
+void OneWireDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -88,12 +97,8 @@ void OneWireDecoder::Refresh()
 	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
 	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
 
-	auto cap = new OneWireWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyWaveform<OneWireWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	//Get timestamps and durations of all low-going pulses
 	vector<int64_t> starts;
@@ -275,7 +280,7 @@ void OneWireDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-std::string OneWireWaveform::GetColor(size_t i)
+string OneWireWaveform::GetColor(size_t i)
 {
 	const OneWireSymbol& s = m_samples[i];
 

@@ -101,7 +101,7 @@ protected:
 		MSO5,	 //MSO5000 series
 		DS,
 		DS_OLD,
-		DHO,	//DHO800, DHO900, DHO1000 and DHO4000 series
+		DHO,	//DHO800, DHO900, DHO1000, DHO4000, MHO98 series
 	};
 
 	OscilloscopeChannel* m_extTrigChannel;
@@ -123,9 +123,7 @@ protected:
 	int64_t m_triggerOffset;
 	bool m_triggerOffsetValid;
 
-	bool m_triggerArmed;
 	bool m_triggerWasLive;
-	bool m_triggerOneShot;
 
 	bool m_liveMode;
 
@@ -136,6 +134,8 @@ protected:
 	uint64_t m_maxSrate;  /* Maximum Sample rate for DHO models */
 	bool m_lowSrate;	  /* True for DHO low sample rate models (DHO800/900) */
 	protocol_version m_protocol;
+	bool m_has_125M_sample_depth;
+	bool m_has_200M_sample_depth;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
@@ -147,6 +147,9 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
 		return {
@@ -166,6 +169,10 @@ public:
 			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
 			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
 		}},
+		{"Rigol MHO900", {
+			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
+		}},
 		{"Rigol DS1100D/E", {
 			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
 			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
@@ -180,6 +187,7 @@ public:
 		}},
 		};
 	}
+
 	OSCILLOSCOPE_INITPROC(RigolOscilloscope)
 };
 

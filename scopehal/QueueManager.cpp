@@ -33,125 +33,11 @@
 	@brief Vulkan queue management
  */
 
-#include <vulkan/vulkan_raii.hpp>
-
 #include "log.h"
 #include "QueueManager.h"
 
 using namespace std;
-
-
 extern bool g_hasDebugUtils;
-
-
-QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family, size_t index, string name)
-	: m_family(family)
-	, m_index(index)
-	, m_mutex()
-	, m_name()
-	, m_device(device)
-	, m_queue(make_unique<vk::raii::Queue>(*device, family, index))
-	, m_fence(make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo()))
-	, m_fenceBusy(false)
-{
-	AddName(name);
-
-	if(g_hasDebugUtils)
-	{
-		m_device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eFence,
-				reinterpret_cast<uint64_t>(static_cast<VkFence>(**m_fence)),
-				m_name.c_str()));
-	}
-}
-
-QueueHandle::~QueueHandle()
-{
-	const lock_guard<recursive_mutex> lock(m_mutex);
-	m_fence = nullptr;
-	m_queue = nullptr;
-	m_device = nullptr;
-}
-
-void QueueHandle::AddName(string name)
-{
-	const lock_guard<recursive_mutex> lock(m_mutex);
-
-	if(m_name.size() != 0)
-		m_name += ";";
-	m_name += name;
-
-	if(g_hasDebugUtils)
-	{
-		m_device->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
-				reinterpret_cast<uint64_t>(static_cast<VkQueue>(**m_queue)),
-				m_name.c_str()));
-	}
-}
-
-void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
-{
-	const lock_guard<recursive_mutex> lock(m_mutex);
-
-	_waitFence();
-
-	m_fenceBusy = true;
-
-	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->submit(info, **m_fence);
-}
-
-void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
-{
-	const lock_guard<recursive_mutex> lock(m_mutex);
-
-	_waitFence();
-
-	m_fenceBusy = true;
-
-	vk::SubmitInfo info({}, {}, *cmdBuf);
-	m_queue->submit(info, **m_fence);
-	_waitFence();
-}
-
-/**
-	@brief Wait for previous submits to complete, but only up to a timeout
-
-	@return true if now idle, false if timeout
- */
-bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
-{
-	//Not busy? Return immediately
-	if(!m_fenceBusy)
-		return true;
-
-	//Wait exactly once for the submit, time out if not finished
-	if(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, nanoseconds))
-		return false;
-
-	//If we get here, the most recent wait was the one that finished
-	m_fenceBusy = false;
-	m_device->resetFences(**m_fence);
-	return true;
-}
-
-void QueueHandle::_waitFence()
-{
-	//Not busy? Return immediately
-	if(!m_fenceBusy)
-		return;
-
-	//Wait for any previous submit to finish
-	while(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
-	{}
-
-	m_fenceBusy = false;
-	m_device->resetFences(**m_fence);
-}
-
 
 QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device)
 : m_phys(phys)
@@ -161,8 +47,19 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 {
 	auto families = phys->getQueueFamilyProperties();
 	for(size_t family=0; family<families.size(); family++)
+	{
 		for(size_t idx=0; idx<families[family].queueCount; idx++)
-			m_queues.push_back(QueueInfo{family, idx, families[family].queueFlags, nullptr});
+		{
+			m_queues.push_back(
+				QueueInfo
+				{
+					family,
+					idx,
+					families[family].queueFlags,
+					make_shared<QueueWrapper>(device, family, idx)
+				});
+		}
+	}
 	//Sort the queues in ascending order of feature flag count
 	//FIXME-CXX20 Use std::popcount() for sorting when we move to C++20
 	static_assert(sizeof(vk::QueueFlags::MaskType) == sizeof(uint32_t));
@@ -184,11 +81,71 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 	LogIndenter li;
 	for(QueueInfo const& qi : m_queues)
 		LogDebug("Family=%zu Index=%zu Flags=%08x\n", qi.Family, qi.Index, (uint32_t)qi.Flags);
+
+	//Names for pools
+	m_poolNames[QUEUE_POOL_RENDER] = "Render";
+	m_poolNames[QUEUE_POOL_RASTERIZE] = "Rasterize";
+	m_poolNames[QUEUE_POOL_DRIVER] = "Driver";
+	m_poolNames[QUEUE_POOL_FILTER] = "Filter";
+	m_poolNames[QUEUE_POOL_TRANSFER] = "Transfer";
+	m_poolNames[QUEUE_POOL_MISC] = "Misc";
+
+	/*
+		Figure out how many queues we have that are *eligible* to be in each pool
+		(have the minimum number of feature flags set to use it).
+
+		This does not guarantee that the queue will actually be placed in the pool.
+	 */
+	std::map<QueuePoolID, std::vector<QueueInfo> > eligiblePools;
+	auto renderFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer;
+	auto computeFlags = vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
+	auto transferFlags = vk::QueueFlagBits::eTransfer;
+	for(auto& q : m_queues)
+	{
+		//Render pool needs graphics, compute, transfer
+		if( (q.Flags & renderFlags) == renderFlags)
+			eligiblePools[QUEUE_POOL_RENDER].push_back(q);
+
+		//Transfer pool just needs transfer
+		if( (q.Flags & transferFlags) == transferFlags)
+			eligiblePools[QUEUE_POOL_TRANSFER].push_back(q);
+
+		//All other pools need compute + transfer
+		if( (q.Flags & computeFlags) == computeFlags)
+		{
+			eligiblePools[QUEUE_POOL_RASTERIZE].push_back(q);
+			eligiblePools[QUEUE_POOL_DRIVER].push_back(q);
+			eligiblePools[QUEUE_POOL_FILTER].push_back(q);
+			eligiblePools[QUEUE_POOL_MISC].push_back(q);
+		}
+	}
+
+	//Print out the list of eligible queues for each pool
+	LogTrace("Eligible queues:\n");
+	for(auto it : m_poolNames)
+	{
+		LogIndenter li2;
+		auto& queues = eligiblePools[it.first];
+		LogTrace("%s:\n", it.second.c_str());
+		for(auto& q : queues)
+		{
+			LogIndenter li3;
+			LogTrace("Family=%zu Index=%zu Flags=%08x\n", q.Family, q.Index, (uint32_t)q.Flags);
+		}
+	}
+
+	//Initialize the queue pools
+
+	//This follows a few basic strategies:
+	//If we have only one queue: it goes in every pool
+	//If we are on an NVIDIA platform and have a lot of queues
 }
 
 shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, std::string name)
 {
 	const lock_guard<mutex> lock(m_mutex);
+
+	//TODO: smart allocation from queue pools to create less contention
 
 	//This will choose the first queue with matching flags that is not yet used.
 	//If all queues with matching flags are used, the queue with the fewest
@@ -203,12 +160,12 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 			continue;
 
 		//If handle is unallocated, use it right away
-		if(m_queues[i].Handle.use_count() == 0)
+		if(m_queues[i].Handle.use_count() <= 1)
 		{
-			LogDebug("QueueManager creating family=%zu index=%zu name=%s\n", m_queues[i].Family, m_queues[i].Index, name.c_str());
-			m_queues[i].Handle = make_shared<QueueHandle>(
-				m_device, m_queues[i].Family, m_queues[i].Index, name);
-			return m_queues[i].Handle;
+			LogTrace("Creating family=%zu index=%zu name=%s\n",
+				m_queues[i].Family, m_queues[i].Index, name.c_str());
+
+			return make_shared<QueueHandle>(m_queues[i].Handle, name);
 		}
 
 		//Otherwise find the queue with the fewest existing handles
@@ -221,9 +178,11 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	if(chosenIdx < 0)
 		LogFatal("Failed to locate a vulkan queue satisfying the flags 0x%x", (unsigned int)flags);
 
-	LogTrace("QueueManager reusing handle idx=%zu name=%s for name=%s\n",
-		chosenIdx, m_queues[chosenIdx].Handle->GetName().c_str(), name.c_str());
-	m_queues[chosenIdx].Handle->AddName(name);
+	LogTrace("Reusing handle idx=%zu name=%s rc=%ld for name=%s\n",
+		chosenIdx,
+		m_queues[chosenIdx].Handle->GetName().c_str(),
+		m_queues[chosenIdx].Handle.use_count(),
+		name.c_str());
 
-	return m_queues[chosenIdx].Handle;
+	return make_shared<QueueHandle>(m_queues[chosenIdx].Handle, name);
 }

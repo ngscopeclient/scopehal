@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,18 +35,29 @@
 #ifndef RMSMeasurement_h
 #define RMSMeasurement_h
 
+#include "../scopehal/Averager.h"
+#include "../scopehal/LevelCrossingDetector.h"
+
 class RMSMeasurement : public Filter
 {
 public:
 	RMSMeasurement(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(RMSMeasurement)
+
+protected:
+
+	//GPU midpoint detection
+	Averager m_averager;
+
+	//Level crossing search
+	LevelCrossingDetector m_detector;
 };
 
 #endif

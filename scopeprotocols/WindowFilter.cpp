@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,17 +39,17 @@ size_t GetIndexNearestAfterTimestamp(WaveformBase* wfm, int64_t time_fs);
 
 WindowFilter::WindowFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_startTimeName("Start Time")
-	, m_durationName("Duration")
+	, m_startTime(m_parameters["Start Time"])
+	, m_duration(m_parameters["Duration"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
-	m_parameters[m_startTimeName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_startTimeName].SetIntVal(0);
+	m_startTime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_startTime.SetIntVal(0);
 
-	m_parameters[m_durationName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_durationName].SetFloatVal(FS_PER_SECOND / 10);
+	m_duration = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_duration.SetFloatVal(FS_PER_SECOND / 10);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +57,7 @@ WindowFilter::WindowFilter(const string& color)
 
 bool WindowFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i == 0) && (stream.GetXAxisUnits() == Unit(Unit::UNIT_FS)) )
@@ -91,19 +91,28 @@ void DoCopy(T* w_in, T* w_out, size_t start_sample, size_t end_sample)
 	w_out->MarkModifiedFromCpu();
 }
 
-void WindowFilter::Refresh()
+void WindowFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
-	//Make sure we've got valid inputs
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("WindowFilter::Refresh");
+	#endif
+	ClearErrors();
+
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		SetData(nullptr, 0);
 		return;
 	}
 
 	auto in = GetInputWaveform(0);
+	in->PrepareForCpuAccess();
 
-	int64_t start_time = m_parameters[m_startTimeName].GetIntVal();
-	int64_t end_time = start_time + m_parameters[m_durationName].GetIntVal();
+	int64_t start_time = m_startTime.GetIntVal();
+	int64_t end_time = start_time + m_duration.GetIntVal();
 
 	bool dontcare;
 	size_t start_sample = GetIndexNearestAtOrBeforeTimestamp(in, start_time, dontcare);
@@ -117,27 +126,27 @@ void WindowFilter::Refresh()
 
 	if(auto uaw = dynamic_cast<UniformAnalogWaveform*>(in))
 	{
-		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG; // TODO: I think this races with WaveformArea::MapAllBuffers
+		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
 		DoCopy(uaw, SetupEmptyUniformAnalogOutputWaveform(uaw, 0), start_sample, end_sample);
 	}
 	else if (auto saw = dynamic_cast<SparseAnalogWaveform*>(in))
 	{
-		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG; // TODO: I think this races with WaveformArea::MapAllBuffers
+		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
 		DoCopy(saw, SetupSparseOutputWaveform(saw, 0, start_sample, saw->size() - end_sample), start_sample, end_sample);
 	}
 	else if(auto udw = dynamic_cast<UniformDigitalWaveform*>(in))
 	{
-		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL; // TODO: I think this races with WaveformArea::MapAllBuffers
+		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL;
 		DoCopy(udw, SetupEmptyUniformDigitalOutputWaveform(udw, 0), start_sample, end_sample);
 	}
 	else if (auto sdw = dynamic_cast<SparseDigitalWaveform*>(in))
 	{
-		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL; // TODO: I think this races with WaveformArea::MapAllBuffers
+		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL;
 		DoCopy(sdw, SetupSparseDigitalOutputWaveform(sdw, 0, start_sample, sdw->size() - end_sample), start_sample, end_sample);
 	}
 	else
 	{
-		LogError("Unknown waveform type in WindowFilter");
+		AddErrorMessage("Unrecognized data type", "Don't know what to do with this type");
 		return;
 	}
 }

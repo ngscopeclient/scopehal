@@ -71,10 +71,10 @@ public:
 		after some kind of fixed timeout?
 	 */
 	void SendCommandQueued(const std::string& cmd);
-	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true);
-	void SendCommandImmediate(std::string cmd);
-	std::string SendCommandImmediateWithReply(std::string cmd, bool endOnSemicolon = true);
-	void* SendCommandImmediateWithRawBlockReply(std::string cmd, size_t& len);
+	std::string SendCommandQueuedWithReply(const std::string& cmd, bool endOnSemicolon = true);
+	void SendCommandImmediate(const std::string& cmd);
+	std::string SendCommandImmediateWithReply(const std::string& cmd, bool endOnSemicolon = true);
+	void* SendCommandImmediateWithRawBlockReply(const std::string& cmd, size_t& len);
 	bool FlushCommandQueue();
 
 	//Manual mutex locking for ReadRawData() etc
@@ -131,12 +131,12 @@ public:
 public:
 	typedef SCPITransport* (*CreateProcType)(const std::string& args);
 	typedef std::vector<TransportEndpoint> (*EnumEndpointsProcType)();
-	static void DoAddTransportClass(std::string name, CreateProcType proc, EnumEndpointsProcType eproc);
+	static void DoAddTransportClass(const std::string& name, CreateProcType proc, EnumEndpointsProcType eproc);
 
 	static void EnumTransports(std::vector<std::string>& names);
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);
 
-	static std::vector<TransportEndpoint> EnumEndpoints(std::string transport);
+	static std::vector<TransportEndpoint> EnumEndpoints(const std::string& transport);
 	static std::vector<TransportEndpoint> EnumTransportEndpoints();
 
 protected:

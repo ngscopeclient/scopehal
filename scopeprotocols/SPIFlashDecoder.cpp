@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,25 +38,25 @@ using namespace std;
 
 SPIFlashDecoder::SPIFlashDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
+	, m_type(m_parameters["Flash Type"])
+	, m_outfile(m_parameters["Dump File"])
 {
 	CreateInput("spi_in");
 	CreateInput("spi_out");
 	CreateInput("qspi");
 
-	m_typename = "Flash Type";
-	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_typename].AddEnumValue("Generic (3-byte address)", FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
-	m_parameters[m_typename].AddEnumValue("Generic (4-byte address)", FLASH_TYPE_GENERIC_4BYTE_ADDRESS);
-	m_parameters[m_typename].AddEnumValue("Winbond W25N", FLASH_TYPE_WINBOND_W25N);
-	m_parameters[m_typename].SetIntVal(FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
+	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_type.AddEnumValue("Generic (3-byte address)", FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
+	m_type.AddEnumValue("Generic (4-byte address)", FLASH_TYPE_GENERIC_4BYTE_ADDRESS);
+	m_type.AddEnumValue("Winbond W25N", FLASH_TYPE_WINBOND_W25N);
+	m_type.SetIntVal(FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
 
-	m_outfile = "Dump File";
-	m_parameters[m_outfile] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_outfile].m_fileFilterMask = "*.bin";
-	m_parameters[m_outfile].m_fileFilterName = "Binary files (*.bin)";
-	m_parameters[m_outfile].m_fileIsOutput = true;
+	m_outfile = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
+	m_outfile.m_fileFilterMask = "*.bin";
+	m_outfile.m_fileFilterName = "Binary files (*.bin)";
+	m_outfile.m_fileIsOutput = true;
 
-	m_fpOut = NULL;
+	m_fpOut = nullptr;
 }
 
 SPIFlashDecoder::~SPIFlashDecoder()
@@ -64,7 +64,7 @@ SPIFlashDecoder::~SPIFlashDecoder()
 	if(m_fpOut)
 	{
 		fclose(m_fpOut);
-		m_fpOut = NULL;
+		m_fpOut = nullptr;
 	}
 }
 
@@ -74,13 +74,13 @@ SPIFlashDecoder::~SPIFlashDecoder()
 bool SPIFlashDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	//Allow null for the QSPI input, since some flashes run in x1 mode
-	if((i == 2) && (stream.m_channel == NULL) )
+	if((i == 2) && (stream.m_channel == nullptr) )
 		return true;
 
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i < 3) && (dynamic_cast<SPIWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i < 3) && (dynamic_cast<SPIWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
 		return true;
 
 	return false;
@@ -107,14 +107,21 @@ vector<string> SPIFlashDecoder::GetHeaders()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SPIFlashDecoder::Refresh()
+void SPIFlashDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue
+	)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("SPIFlashDecoder::Refresh");
+	#endif
+	ClearErrors();
 	ClearPackets();
 
-	FlashType flashtype = (FlashType)m_parameters[m_typename].GetIntVal();
+	auto flashtype = m_type.GetEnumVal<FlashType>();
 
 	//Open dump file, if applicable
-	auto fname = m_parameters[m_outfile].GetFileName();
+	auto fname = m_outfile.GetFileName();
 	if(m_cachedfname != fname)
 	{
 		m_cachedfname = fname;
@@ -124,19 +131,15 @@ void SPIFlashDecoder::Refresh()
 	}
 
 	//Input/output x1 inputs are required
-	if( (m_inputs[0].m_channel == NULL) || (m_inputs[1].m_channel == NULL) )
-	{
-		SetData(NULL, 0);
-		return;
-	}
 	auto din = dynamic_cast<SPIWaveform*>(GetInputWaveform(0));
 	auto dout = dynamic_cast<SPIWaveform*>(GetInputWaveform(1));
-	SPIWaveform* dquad = NULL;
-	if(m_inputs[2].m_channel != NULL)
+	SPIWaveform* dquad = nullptr;
+	if(m_inputs[2].m_channel != nullptr)
 		dquad = dynamic_cast<SPIWaveform*>(GetInputWaveform(2));
 	if(!din || !dout)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing input", "SPI input and output connections are required");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -153,13 +156,8 @@ void SPIFlashDecoder::Refresh()
 		quadlen = dquad->m_samples.size();
 
 	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
-	auto cap = new SPIFlashWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
+	auto cap = SetupEmptyWaveform<SPIFlashWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
-	SetData(cap, 0);
 
 	//Number of address bytes used (for generic flash only, not W25N)
 	int num_address_bytes = 3;
@@ -189,7 +187,7 @@ void SPIFlashDecoder::Refresh()
 	int64_t addr_start;
 	SPIFlashSymbol::FlashType data_type = SPIFlashSymbol::TYPE_DATA;
 	SPIFlashSymbol::FlashType addr_type = SPIFlashSymbol::TYPE_ADDRESS;
-	Packet* pack = NULL;
+	Packet* pack = nullptr;
 	for(size_t iin = 0; iin+1 < len; iin ++)
 	{
 		//Figure out what the incoming packet is
@@ -1030,7 +1028,7 @@ void SPIFlashDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-std::string SPIFlashWaveform::GetColor(size_t i)
+string SPIFlashWaveform::GetColor(size_t i)
 {
 	const SPIFlashSymbol& s = m_samples[i];
 

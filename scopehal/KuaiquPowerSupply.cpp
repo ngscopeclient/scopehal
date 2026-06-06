@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -137,7 +137,7 @@ double KuaiquPowerSupply::SendReadValueCommand(Command command)
 	}
 }
 
-std::string KuaiquPowerSupply::SendSimpleCommand(Command command)
+string KuaiquPowerSupply::SendSimpleCommand(Command command)
 {
 	std::string commandString;
 	switch (command)
@@ -162,7 +162,7 @@ std::string KuaiquPowerSupply::SendSimpleCommand(Command command)
 	return SendCommand(command,commandString);
 }
 
-std::string KuaiquPowerSupply::SendCommand(Command command, std::string commandString)
+string KuaiquPowerSupply::SendCommand(Command command, const string& commandString)
 {
 	std::string result = "";
 	bool needReply = (command != COMMAND_ON && command != COMMAND_OFF);

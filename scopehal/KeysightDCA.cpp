@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,8 +41,6 @@ using namespace std;
 KeysightDCA::KeysightDCA(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 {
 
 	// Color the channels based on Agilent's standard color sequence (yellow-green-violet-pink)
@@ -92,14 +90,14 @@ KeysightDCA::~KeysightDCA()
 {
 }
 
-void KeysightDCA::ConfigureWaveform(string channel)
+void KeysightDCA::ConfigureWaveform(const string& channel)
 {
 	//Configure transport format to raw 8-bit int
 	m_transport->SendCommand(":WAV:SOUR " + channel);
 	m_transport->SendCommand(":WAV:FORM BYTE");
 }
 
-void KeysightDCA::AddTriggerSource(string hw_name, string display_name)
+void KeysightDCA::AddTriggerSource(const string& hw_name, const string& display_name)
 {
 	auto channel = new OscilloscopeChannel(
 		this,
@@ -165,7 +163,7 @@ bool KeysightDCA::IsAnalogChannel(size_t i)
 	return GetOscilloscopeChannel(i)->GetType(0) == Stream::STREAM_TYPE_ANALOG;
 }
 
-bool KeysightDCA::IsChannelPresent(string name)
+bool KeysightDCA::IsChannelPresent(const string& name)
 {
 	// Check whether the channel exists (depends on what modules are installed).
 	// Unfortunately there doesn't seem to be a way to query whether a channel exists,
@@ -177,7 +175,7 @@ bool KeysightDCA::IsChannelPresent(string name)
 	return GetLastError() != ERROR_HARDWARE_MISSING;
 }
 
-bool KeysightDCA::IsModulePresent(string name)
+bool KeysightDCA::IsModulePresent(const string& name)
 {
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -431,7 +429,7 @@ Oscilloscope::TriggerMode KeysightDCA::PollTrigger()
 	}
 }
 
-vector<int8_t> KeysightDCA::GetWaveformData(string channel)
+vector<int8_t> KeysightDCA::GetWaveformData(const string& channel)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":WAV:SOUR " + channel);
@@ -456,7 +454,7 @@ vector<int8_t> KeysightDCA::GetWaveformData(string channel)
 	return buf;
 }
 
-KeysightDCA::WaveformPreamble KeysightDCA::GetWaveformPreamble(string channel)
+KeysightDCA::WaveformPreamble KeysightDCA::GetWaveformPreamble(const string& channel)
 {
 	WaveformPreamble ret;
 
@@ -760,7 +758,7 @@ void KeysightDCA::PullEdgeTrigger()
 /**
 	@brief Processes the slope for an edge or edge-derived trigger
  */
-void KeysightDCA::GetTriggerSlope(DCAEdgeTrigger* trig, string reply)
+void KeysightDCA::GetTriggerSlope(DCAEdgeTrigger* trig, const string& reply)
 {
 	if (reply == "POS")
 		trig->SetType(DCAEdgeTrigger::EDGE_RISING);
@@ -800,12 +798,12 @@ void KeysightDCA::PushEdgeTrigger(DCAEdgeTrigger* trig)
 	PushSlope("TRIG:SLOPE", trig->GetType());
 }
 
-void KeysightDCA::PushFloat(string path, float f)
+void KeysightDCA::PushFloat(const string& path, float f)
 {
 	m_transport->SendCommand(path + " " + to_string_sci(f));
 }
 
-void KeysightDCA::PushSlope(string path, DCAEdgeTrigger::EdgeType slope)
+void KeysightDCA::PushSlope(const string& path, DCAEdgeTrigger::EdgeType slope)
 {
 	string slope_str;
 	switch(slope)

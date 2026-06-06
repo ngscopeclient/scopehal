@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,25 +39,28 @@ using namespace std;
 // Construction / destruction
 
 PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
-	: EdgeTrigger(scope), m_conditionname("Condition"), m_lowername("Lower Bound"), m_uppername("Upper Bound")
+	: EdgeTrigger(scope)
+	, m_condition(m_parameters["Condition"])
+	, m_lowerLevel(m_parameters["Lower Bound"])
+	, m_upperPulseLevel(m_parameters["Upper Bound"])
 {
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_lowerLevel = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_upperPulseLevel = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+	m_condition = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_condition.AddEnumValue("Less than", CONDITION_LESS);
+	m_condition.AddEnumValue("Greater than", CONDITION_GREATER);
+	m_condition.AddEnumValue("Between", CONDITION_BETWEEN);
 
 	//Some modes are only supported by certain vendors
 	if((dynamic_cast<LeCroyOscilloscope*>(scope) != NULL) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL))
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+		m_condition.AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
 	{
-		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
-		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+		m_condition.AddEnumValue("Equal", CONDITION_EQUAL);
+		m_condition.AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
+		m_condition.AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 	}
 }
 
@@ -68,6 +71,8 @@ PulseWidthTrigger::~PulseWidthTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+//This is intentionally not virtual since it's a static method used by enumeration
+//cppcheck-suppress duplInheritedMember
 string PulseWidthTrigger::GetTriggerName()
 {
 	return "Pulse Width";
