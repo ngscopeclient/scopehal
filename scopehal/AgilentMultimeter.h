@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,54 +29,69 @@
 
 /**
 	@file
-	@author Alyssa Milburn
-	@brief Declaration of SCPIUARTTransport
-	@ingroup transports
+	@author Tim Pattinson
+	@brief Agilent 34401A multimeter driver
  */
-
-#ifndef SCPIUARTTransport_h
-#define SCPIUARTTransport_h
-
-#include "../xptools/UART.h"
+#ifndef AgilentMultimeter_h
+#define AgilentMultimeter_h
 
 /**
-	@brief Abstraction of a transport layer for moving SCPI data between endpoints
-	@ingroup transports
+	@brief Driver for Agilent 34401A
  */
-class SCPIUARTTransport : public SCPITransport
+
+ class AgilentMultimeter
+    : public virtual SCPIMultimeter
 {
+
 public:
-	SCPIUARTTransport(const std::string& args);
-	virtual ~SCPIUARTTransport();
+    AgilentMultimeter(SCPITransport* transport);
+    virtual ~AgilentMultimeter();
 
-	virtual std::string GetConnectionString() override;
+    virtual unsigned int GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	virtual bool SendCommand(const std::string& cmd) override;
-	virtual std::string ReadReply(bool endOnSemicolon = true, std::function<void(float)> progress = nullptr) override;
-	virtual size_t ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> progress = nullptr) override;
-	virtual void SendRawData(size_t len, const unsigned char* buf) override;
+	virtual unsigned int GetMeasurementTypes() override;
+	virtual unsigned int GetSecondaryMeasurementTypes() override;
 
-	virtual bool IsCommandBatchingSupported() override;
-	virtual bool IsConnected() override;
+	//Channel info
+	virtual int GetCurrentMeterChannel() override;
+	virtual void SetCurrentMeterChannel(int chan) override;
 
-	virtual bool SetTimeouts(unsigned int txUs, unsigned int rxUs) override;
+	//Meter operating mode
+	virtual MeasurementTypes GetMeterMode() override;
+	virtual MeasurementTypes GetSecondaryMeterMode() override;
+	virtual void SetMeterMode(MeasurementTypes type) override;
+	virtual void SetSecondaryMeterMode(MeasurementTypes type) override;
 
-	//This is intentionally not virtual since it's a static method used by enumeration
-	//cppcheck-suppress duplInheritedMember
-	static std::string GetTransportName();
+	//Control
+	virtual void SetMeterAutoRange(bool enable) override;
+	virtual bool GetMeterAutoRange() override;
+	virtual void StartMeter() override;
+	virtual void StopMeter() override;
 
-	//This is intentionally not virtual since it's a static method used by enumeration
-	//cppcheck-suppress duplInheritedMember
-	static std::vector<TransportEndpoint> EnumTransportEndpoints();
+	virtual int GetMeterDigits() override;
 
-	TRANSPORT_INITPROC(SCPIUARTTransport)
+	//Get readings
+	virtual double GetMeterValue() override;
+	virtual double GetSecondaryMeterValue() override;
 
 protected:
-	UART m_uart;
+	MeasurementTypes m_mode;
+	bool m_modeValid;
 
-	std::string m_devfile;
-	unsigned int m_baudrate;
-	bool m_dtrEnable;
+public:
+    static std::string GetDriverNameInternal();
+    static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+    {
+        return {
+    #ifdef _WIN32
+        {"Agilent 34401A", {{ SCPITransportType::TRANSPORT_UART, "COM<x>" }}}
+    #else
+        {"Agilent 34401A", {{ SCPITransportType::TRANSPORT_UART, "/dev/ttyUSB<x>" }}}
+    #endif
+        };
+    }
+    METER_INITPROC(AgilentMultimeter)
 };
 
 #endif
