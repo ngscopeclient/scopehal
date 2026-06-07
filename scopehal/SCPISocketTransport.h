@@ -81,7 +81,7 @@ public:
 		@param txUs		Send timeout, in microseconds
 		@param rxUs		Receive timeout, in microseconds
 	 */
-	bool SetTimeouts(unsigned int txUs, unsigned int rxUs)
+	bool SetTimeouts(unsigned int txUs, unsigned int rxUs) override
 	{
 		bool success = m_socket.SetTxTimeout(txUs);
 		success = success & m_socket.SetRxTimeout(rxUs);
