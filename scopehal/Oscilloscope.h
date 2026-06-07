@@ -331,6 +331,15 @@ public:
 	virtual float GetChannelOffset(size_t i, size_t stream) =0;
 
 	/**
+		@brief Checks if the channel supports high rate offset changes, or if the GUI should rate-limit
+
+		The default implementation returns false;
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool IsHighRateOffsetCapable(size_t i);
+
+	/**
 		@brief Sets the offset for a given channel
 
 		@param i			Zero-based index of channel

@@ -370,3 +370,20 @@ double OscilloscopeChannel::GetDownloadStartTime()
 {
 	return m_downloadStartTime;
 }
+
+/**
+	@brief Check if this channel is able to handle high rate (e.g. every mouse movement) offset changes
+
+	@return True if yes (instrument is fast or driver rate-limits), false if GUI should rate limit
+ */
+bool OscilloscopeChannel::IsHighRateOffsetCapable()
+{
+	auto scope = GetScope();
+
+	//No scope, we must be a filter or something so always high rate capable
+	if(!scope)
+		return true;
+
+	//We have a scope, ask it
+	return scope->IsHighRateOffsetCapable(m_index);
+}

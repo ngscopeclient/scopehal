@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -78,7 +78,7 @@ inline bool StreamDescriptor::operator<(const StreamDescriptor& rhs) const
 
 inline uint8_t StreamDescriptor::GetFlags() const
 {
-	if(m_channel == NULL)
+	if(m_channel == nullptr)
 		return 0;
 	else
 		return m_channel->GetStreamFlags(m_stream);
@@ -87,7 +87,7 @@ inline uint8_t StreamDescriptor::GetFlags() const
 inline float StreamDescriptor::GetVoltageRange()
 {
 	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
-	if(schan == NULL)
+	if(schan == nullptr)
 		return 1;
 	else
 		return schan->GetVoltageRange(m_stream);
@@ -96,10 +96,19 @@ inline float StreamDescriptor::GetVoltageRange()
 inline float StreamDescriptor::GetOffset()
 {
 	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
-	if(schan == NULL)
+	if(schan == nullptr)
 		return 0;
 	else
 		return schan->GetOffset(m_stream);
+}
+
+inline bool StreamDescriptor::IsHighRateOffsetCapable()
+{
+	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
+	if(schan == nullptr)
+		return true;
+	else
+		return schan->IsHighRateOffsetCapable();
 }
 
 inline void StreamDescriptor::SetVoltageRange(float v)

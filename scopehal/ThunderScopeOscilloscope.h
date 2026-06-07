@@ -73,6 +73,7 @@ public:
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
 	virtual void EnableChannel(size_t i) override;
+	virtual bool IsHighRateOffsetCapable(size_t i) override;
 
 	//Triggering
 	virtual void BackgroundProcessing() override;

@@ -298,6 +298,11 @@ void DemoOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float
 	m_channelVoltageRange[i] = range;
 }
 
+bool DemoOscilloscope::IsHighRateOffsetCapable([[maybe_unused]] size_t i)
+{
+	return true;
+}
+
 OscilloscopeChannel* DemoOscilloscope::GetExternalTrigger()
 {
 	return m_extTrigger;

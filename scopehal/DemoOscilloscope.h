@@ -82,6 +82,7 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual float GetChannelOffset(size_t i, size_t stream) override;
 	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual bool IsHighRateOffsetCapable(size_t i) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger() override;

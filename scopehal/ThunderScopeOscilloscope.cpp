@@ -296,10 +296,15 @@ vector<unsigned int> ThunderScopeOscilloscope::GetChannelBandwidthLimiters([[may
 	return ret;
 }
 
+bool ThunderScopeOscilloscope::IsHighRateOffsetCapable([[maybe_unused]] size_t i)
+{
+	return true;
+}
+
 OscilloscopeChannel* ThunderScopeOscilloscope::GetExternalTrigger()
 {
 	//FIXME
-	return NULL;
+	return nullptr;
 }
 
 void ThunderScopeOscilloscope::BackgroundProcessing()

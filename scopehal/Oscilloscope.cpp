@@ -991,6 +991,11 @@ bool Oscilloscope::HasTimebaseControls()
 	return true;
 }
 
+bool Oscilloscope::IsHighRateOffsetCapable([[maybe_unused]] size_t i)
+{
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers for converting raw 8-bit ADC samples to fp32 waveforms
 
