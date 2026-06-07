@@ -315,7 +315,7 @@ vector<TransportEndpoint> SCPITransport::EnumTransportEndpoints()
 }
 
 
-/** 
+/**
 	@brief Base implementation does nothing
 */
 bool SCPITransport::SetTimeouts([[maybe_unused]] unsigned int txUs, [[maybe_unused]]unsigned int rxUs){

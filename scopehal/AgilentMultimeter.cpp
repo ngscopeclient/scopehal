@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,7 +60,6 @@ AgilentMultimeter::AgilentMultimeter(SCPITransport* transport)
 	, SCPIInstrument(transport)
 	, m_modeValid(false)
 {
-
 	//Create our single channel
 	m_channels.push_back(new MultimeterChannel(this, "VIN", "#ffff00", 0));
 
@@ -72,13 +71,12 @@ AgilentMultimeter::AgilentMultimeter(SCPITransport* transport)
 
 	// Reset
 	//m_transport->SendCommandQueuedWithReply("*RST");
-	
+
 	// Clear errors
 	m_transport->SendCommandQueuedWithReply("*CLS");
 
 	//prefetch operating mode
 	GetMeterMode();
-
 }
 
 AgilentMultimeter::~AgilentMultimeter()
@@ -126,10 +124,8 @@ int AgilentMultimeter::GetMeterDigits()
 	return 7;
 }
 
-
 bool AgilentMultimeter::GetMeterAutoRange()
 {
-
 	string s_autoRangeReply;
 	auto mode = GetMeterMode(); // should be cached
 
@@ -163,17 +159,16 @@ bool AgilentMultimeter::GetMeterAutoRange()
 		default:
 			LogError("Unknown meter mode \n");
 	}
-	
-	if(Trim(s_autoRangeReply) == "1"){
+
+	if(Trim(s_autoRangeReply) == "1")
 		return true;
-	}else if(Trim(s_autoRangeReply) == "0"){
+	else if(Trim(s_autoRangeReply) == "0")
 		return false;
-	}else{
+	else
+	{
 		LogError("Unexpected reply for auto range %s\n",s_autoRangeReply.c_str());
 		return false;
 	}
-
-
 }
 
 void AgilentMultimeter::SetMeterAutoRange(bool enable)
@@ -217,7 +212,7 @@ void AgilentMultimeter::SetMeterAutoRange(bool enable)
 			LogError("Unknown meter mode \n");
 			break;
 	}
-	
+
 
 }
 
@@ -239,7 +234,7 @@ double AgilentMultimeter::GetMeterValue()
 		LogTrace("sent READ?\n");
 		value = Trim(m_transport->SendCommandQueuedWithReply("READ?"));
 		LogTrace("reply for READ? %s\n",value.c_str());
-		
+
 		if(value.empty())
 		{
 			LogWarning("Failed to read value: got '%s'\n",value.c_str());
@@ -273,16 +268,16 @@ void AgilentMultimeter::SetCurrentMeterChannel([[maybe_unused] ]int chan)
 
 Multimeter::MeasurementTypes AgilentMultimeter::GetMeterMode()
 {
-	if(m_modeValid){
+	if(m_modeValid)
 		return m_mode;
-	}
 
 	LogTrace("sent FUNC?\n");
 	auto s_modeReply = TrimQuotes(Trim(m_transport->SendCommandQueuedWithReply("FUNC?")));
 	LogTrace("reply for FUNC? %s\n",s_modeReply.c_str());
 
 	// Split with the space to get a string with the mode
-	if(!s_modeReply.empty()){
+	if(!s_modeReply.empty())
+	{
 		if(s_modeReply == "VOLT:AC")
 			m_mode = AC_RMS_AMPLITUDE;
 		else if(s_modeReply == "VOLT")
@@ -306,17 +301,16 @@ Multimeter::MeasurementTypes AgilentMultimeter::GetMeterMode()
 			m_mode = NONE;
 		}
 
-	}else{
+	}
+	else
+	{
 		// bad SCPI reply or no SCPI reply
 		LogWarning("Bad SCPI reply getting mode = '%s'\n", s_modeReply.c_str());
 		m_mode = NONE;
 	}
-	
+
 	m_modeValid = true;
 	return m_mode;
-
-	
-	
 }
 
 Multimeter::MeasurementTypes AgilentMultimeter::GetSecondaryMeterMode()
@@ -334,7 +328,7 @@ void AgilentMultimeter::SetMeterMode(Multimeter::MeasurementTypes type)
 			//m_transport->SendCommandImmediate("CONF:VOLT:DC");
 			//s_Reply = m_transport->SendCommandQueuedWithReply("CONF:VOLT:DC;*OPC?");
 			//LogTrace("OPC reply: %s",s_Reply.c_str());
-			
+
 			m_transport->SendCommandQueuedWithReply("CONF:VOLT:DC;*OPC?");
 			// Sending *OPC? afterwards lets this block the SCPI bus so the meter can do its setup, rather than sending the next
 			// command right away.
@@ -373,9 +367,9 @@ void AgilentMultimeter::SetMeterMode(Multimeter::MeasurementTypes type)
 			LogWarning("Unexpected multimeter mode = '%d'", type);
 			return;
 	}
+
 	//LogTrace("Probably set mode\n");
 	m_mode = type;
-
 }
 
 void AgilentMultimeter::SetSecondaryMeterMode(Multimeter::MeasurementTypes type)
