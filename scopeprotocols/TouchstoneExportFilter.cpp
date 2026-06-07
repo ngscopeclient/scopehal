@@ -215,14 +215,13 @@ void TouchstoneExportFilter::OnPortCountChanged()
 		for(size_t from=0; from < portCount; from++)
 		{
 			auto base = to*portCount + from;
-			m_signalNames[base*2 + 0] = string("S") + to_string(to+1) + to_string(from+1) + "_mag";
-			m_signalNames[base*2 + 1] = string("S") + to_string(to+1) + to_string(from+1) + "_ang";
+			m_inputs[base*2 + 0]->m_name = string("S") + to_string(to+1) + to_string(from+1) + "_mag";
+			m_inputs[base*2 + 1]->m_name = string("S") + to_string(to+1) + to_string(from+1) + "_ang";
 		}
 	}
 
 	//Remove extra ports, if any
 	m_inputs.resize(sizeNew);
-	m_signalNames.resize(sizeNew);
 
 	//Inputs changed
 	signal_inputsChanged().emit();

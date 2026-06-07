@@ -85,14 +85,14 @@ void VectorPhaseFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		for(int i=0; i<2; i++)
 		{
 			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
 			else
 			{
 				auto w = GetInputWaveform(i);
 				if(!w)
-					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
 				else if(!dynamic_cast<UniformAnalogWaveform*>(w))
-					AddErrorMessage("Invalid input", string("Expected uniform analog waveform at input ") + m_signalNames[i] );
+					AddErrorMessage("Invalid input", string("Expected uniform analog waveform at input ") + m_inputs[i]->m_name );
 			}
 		}
 

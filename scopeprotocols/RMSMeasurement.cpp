@@ -94,8 +94,8 @@ void RMSMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 
 	//Copy input unit to output
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 1);
 	auto length = din->size();
 
 	//Calculate the global RMS value

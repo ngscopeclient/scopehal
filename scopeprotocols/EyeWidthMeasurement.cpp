@@ -123,7 +123,7 @@ void EyeWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 	}
 
 	//Figure out how many volts per eye bin and round everything to nearest eye bin
-	float vrange = m_inputs[0].GetVoltageRange();
+	float vrange = m_inputs[0]->GetVoltageRange();
 	float volts_per_row = vrange / din->GetHeight();
 	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;
 

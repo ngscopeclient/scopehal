@@ -211,8 +211,8 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	CalculateFilterCoefficients(flo / nyquist, fhi / nyquist, atten, type);
 
 	//Set up output
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 	size_t radius = (filterlen - 1) / 2;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->Resize(din->size() - filterlen);

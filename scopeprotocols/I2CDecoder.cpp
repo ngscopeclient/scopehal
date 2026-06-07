@@ -298,9 +298,9 @@ void I2CDecoder::Refresh(
 		for(int i=0; i<2; i++)
 		{
 			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
 			else if(!GetInputWaveform(i))
-				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
 		}
 
 		SetData(nullptr, 0);

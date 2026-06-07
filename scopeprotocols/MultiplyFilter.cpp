@@ -86,7 +86,7 @@ void MultiplyFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 
 	//Update units
 	if(m_inputs[0] && m_inputs[1])
-		SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
+		SetYAxisUnits(m_inputs[0]->GetYAxisUnits() * m_inputs[1]->GetYAxisUnits(), 0);
 
 	if(veca && vecb)
 		RefreshVectorVector(cmdBuf, queue);
@@ -175,7 +175,7 @@ void MultiplyFilter::RefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, shared
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
 
 	//Copy units
-	SetXAxisUnits(GetInput(0).GetXAxisUnits());
+	SetXAxisUnits(m_inputs[0]->GetXAxisUnits());
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

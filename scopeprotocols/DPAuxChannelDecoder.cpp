@@ -47,7 +47,7 @@ DPAuxChannelDecoder::DPAuxChannelDecoder(const string& color)
 	CreateInput("aux");
 
 	//Rename default output stream since we have several
-	m_signalNames[0] = "dpaux";
+	m_streams[0].m_name = "dpaux";
 
 	//Add a second output stream (in addition to the usual DP one) for I2C
 	AddProtocolStream("i2c");

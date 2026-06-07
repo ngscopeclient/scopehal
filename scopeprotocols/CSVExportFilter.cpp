@@ -257,7 +257,6 @@ void CSVExportFilter::OnColumnCountChanged()
 
 	//Remove extra ports, if any
 	m_inputs.resize(sizeNew);
-	m_signalNames.resize(sizeNew);
 
 	//Inputs changed
 	signal_inputsChanged().emit();

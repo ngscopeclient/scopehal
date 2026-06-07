@@ -129,12 +129,12 @@ Filter* Filter::CreateFilter(const string& protocol, const string& color)
  */
 bool Filter::VerifyInputOK(size_t i, bool allowEmpty)
 {
-	auto p = m_inputs[i];
+	auto p = m_inputs[i]->m_sourceStream;
 
 	if(p.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
 		return true;
 
-	if(p.m_channel == NULL)
+	if(p.m_channel == nullptr)
 		return false;
 	auto data = p.GetData();
 	if(data == NULL)
@@ -170,10 +170,12 @@ bool Filter::VerifyAllInputsOKAndUniformAnalog()
 {
 	for(auto p : m_inputs)
 	{
-		if(p.m_channel == nullptr)
+		auto q = p->m_sourceStream;
+		
+		if(q.m_channel == nullptr)
 			return false;
 
-		auto data = p.m_channel->GetData(p.m_stream);
+		auto data = q.m_channel->GetData(q.m_stream);
 		if(data == nullptr)
 			return false;
 		if(data->size() == 0)
@@ -194,10 +196,12 @@ bool Filter::VerifyAllInputsOKAndSparseAnalog()
 {
 	for(auto p : m_inputs)
 	{
-		if(p.m_channel == nullptr)
+		auto q = p->m_sourceStream;
+		
+		if(q.m_channel == nullptr)
 			return false;
 
-		auto data = p.m_channel->GetData(p.m_stream);
+		auto data = q.m_channel->GetData(q.m_stream);
 		if(data == nullptr)
 			return false;
 		if(data->size() == 0)
@@ -218,10 +222,12 @@ bool Filter::VerifyAllInputsOKAndSparseDigital()
 {
 	for(auto p : m_inputs)
 	{
-		if(p.m_channel == nullptr)
+		auto q = p->m_sourceStream;
+		
+		if(q.m_channel == nullptr)
 			return false;
 
-		auto data = p.m_channel->GetData(p.m_stream);
+		auto data = q.m_channel->GetData(q.m_stream);
 		if(data == nullptr)
 			return false;
 		if(data->size() == 0)
@@ -242,10 +248,12 @@ bool Filter::VerifyAllInputsOKAndSparseOrUniformDigital()
 {
 	for(auto p : m_inputs)
 	{
-		if(p.m_channel == nullptr)
+		auto q = p->m_sourceStream;
+		
+		if(q.m_channel == nullptr)
 			return false;
 
-		auto data = p.m_channel->GetData(p.m_stream);
+		auto data = q.m_channel->GetData(q.m_stream);
 		if(data == nullptr)
 			return false;
 		if(data->size() == 0)

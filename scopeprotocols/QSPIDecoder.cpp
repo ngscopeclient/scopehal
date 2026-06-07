@@ -47,7 +47,6 @@ QSPIDecoder::QSPIDecoder(const string& color)
 {
 	//Remove the x1 SPI inputs
 	m_inputs.clear();
-	m_signalNames.clear();
 
 	CreateInput("clk");
 	CreateInput("cs#");

@@ -119,10 +119,10 @@ void MemoryFilter::Update()
 	auto sin = GetInput(0);
 
 	//Copy units even if no data
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
 	SetVoltageRange(sin.GetVoltageRange(), 0);
 	SetOffset(sin.GetOffset(), 0);
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	auto data = sin.GetData();
 	auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);

@@ -112,7 +112,6 @@ void SParameterFilter::RefreshPorts()
 	for(size_t i=nin; i<m_inputs.size(); i++)
 		SetInput(i, nullptr, true);
 	m_inputs.resize(nin);
-	m_signalNames.resize(nin);
 
 	m_inputsChangedSignal.emit();
 }

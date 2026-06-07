@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,10 +50,10 @@
  */
 inline WaveformBase* FlowGraphNode::GetInputWaveform(size_t i)
 {
-	auto chan = m_inputs[i].m_channel;
+	auto chan = m_inputs[i]->m_sourceStream.m_channel;
 	if(chan == nullptr)
 		return nullptr;
-	return chan->GetData(m_inputs[i].m_stream);
+	return chan->GetData(m_inputs[i]->m_sourceStream.m_stream);
 }
 
 /**
@@ -64,6 +64,14 @@ inline Stream::StreamType StreamDescriptor::GetType()
 	if(m_channel == nullptr)
 		return Stream::STREAM_TYPE_ANALOG;
 	return m_channel->GetType(m_stream);
+}
+
+/**
+	@brief Get the number of input ports
+ */
+inline size_t FlowGraphNode::GetInputCount()
+{
+	return m_inputs.size();
 }
 
 #endif

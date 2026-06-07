@@ -44,7 +44,6 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 	, m_lowerThresholdI(m_parameters["Threshold I-"])
 	, m_lowerThresholdQ(m_parameters["Threshold Q-"])
 {
-	m_signalNames.clear();
 	m_inputs.clear();
 
 	CreateInput("i");
@@ -126,11 +125,11 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		for(int i=0; i<2; i++)
 		{
 			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
 			else if(!GetInputWaveform(i))
-				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
 			else
-				AddErrorMessage("Invalid inputs", string("Expected sparse analog waveform at input ") + m_signalNames[i] );
+				AddErrorMessage("Invalid inputs", string("Expected sparse analog waveform at input ") + m_inputs[i]->m_name );
 		}
 
 		SetData(nullptr, 0);

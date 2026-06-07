@@ -41,7 +41,6 @@ EthernetRGMIIDecoder::EthernetRGMIIDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
-	m_signalNames.clear();
 	m_inputs.clear();
 
 	//Add inputs. Make data be the first, because we normally want the overlay shown there.

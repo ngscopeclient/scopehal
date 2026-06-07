@@ -112,8 +112,8 @@ void ExponentialMovingAverageFilter::Refresh(
 	size_t len = din->size();
 
 	//Set up units
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	//See if we already had valid output data
 	auto cap = GetData(0);

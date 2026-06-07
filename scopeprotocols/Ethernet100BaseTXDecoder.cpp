@@ -79,7 +79,6 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	, m_findSSDOutput("Ethernet100BaseTXDecoder.m_findSSDOutput")
 	, m_lfsrTable("Ethernet100BaseTXDecoder.m_lfsrTable")
 {
-	m_signalNames.clear();
 	m_inputs.clear();
 
 	CreateInput("sampledData");

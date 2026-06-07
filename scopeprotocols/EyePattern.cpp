@@ -158,7 +158,7 @@ string EyePattern::GetProtocolName()
 float EyePattern::GetVoltageRange(size_t /*stream*/)
 {
 	if(m_parameters[m_vmodeName].GetIntVal() == RANGE_AUTO)
-		return m_inputs[0].GetVoltageRange();
+		return m_inputs[0]->GetVoltageRange();
 	else
 		return m_parameters[m_rangeName].GetFloatVal();
 }

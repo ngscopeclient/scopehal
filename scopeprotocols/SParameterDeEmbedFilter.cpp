@@ -50,7 +50,6 @@ SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 	SetupStreams();
 
 	//Create our input ports
-	m_signalNames.clear();
 	m_inputs.clear();
 	for(size_t to = 0; to < 2; to++)
 	{

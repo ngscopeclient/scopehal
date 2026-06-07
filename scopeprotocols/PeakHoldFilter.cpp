@@ -90,8 +90,8 @@ void PeakHoldFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	}
 
 	//Copy units
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	auto din = GetInputWaveform(0);
 

@@ -112,8 +112,8 @@ void ACRMSMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 
 	//Copy input unit to output
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 1);
 
 	if(uadin)
 		DoRefreshUniform(uadin, cmdBuf, queue);

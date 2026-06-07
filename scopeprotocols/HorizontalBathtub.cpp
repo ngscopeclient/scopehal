@@ -95,7 +95,7 @@ void HorizontalBathtub::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	float threshold = m_parameters[m_voltageName].GetFloatVal();
 
 	//Find the eye bin for this height
-	float yscale = din->GetHeight() / m_inputs[0].GetVoltageRange();
+	float yscale = din->GetHeight() / m_inputs[0]->GetVoltageRange();
 	float ymid = din->GetHeight()/2;
 	float center = din->GetCenterVoltage();
 

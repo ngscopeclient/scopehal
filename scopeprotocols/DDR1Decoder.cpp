@@ -58,7 +58,7 @@ DDR1Decoder::DDR1Decoder(const string& color)
 
 bool DDR1Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -89,9 +89,9 @@ void DDR1Decoder::Refresh(
 		for(int i=0; i<6; i++)
 		{
 			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
 			else if(!GetInputWaveform(i))
-				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
 		}
 
 		SetData(nullptr, 0);

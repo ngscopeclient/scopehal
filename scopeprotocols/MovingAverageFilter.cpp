@@ -111,8 +111,8 @@ void MovingAverageFilter::Refresh(
 		return;
 	}
 
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	size_t off = depth/2;
 	size_t nsamples = len - 2*off;

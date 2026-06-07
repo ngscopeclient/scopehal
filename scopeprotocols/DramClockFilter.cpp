@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -108,9 +108,9 @@ void DramClockFilter::Refresh(
 		for(int i=0; i<3; i++)
 		{
 			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
 			else if(!GetInputWaveform(i))
-				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
 		}
 
 		SetData(nullptr, 0);

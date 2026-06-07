@@ -64,7 +64,6 @@ CTLEFilter::CTLEFilter(const string& color)
 	m_cachedPole2Freq = 1;
 
 	//delete s-param inputs
-	m_signalNames.resize(1);
 	m_inputs.resize(1);
 }
 

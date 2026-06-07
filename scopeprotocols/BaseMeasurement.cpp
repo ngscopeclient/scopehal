@@ -119,8 +119,8 @@ void BaseMeasurement::Refresh(
 	size_t len = in->size();
 
 	//Copy input unit to output
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 1);
 
 	//Make a histogram of the waveform
 	float vmin;

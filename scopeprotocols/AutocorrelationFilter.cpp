@@ -91,7 +91,7 @@ void AutocorrelationFilter::Refresh(
 	auto len = din->size();
 
 	//Copy the units
-	SetYAxisUnits(m_inputs[0].m_channel->GetYAxisUnits(0), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	//Sanity check range
 	size_t range = m_maxDelta.GetIntVal();

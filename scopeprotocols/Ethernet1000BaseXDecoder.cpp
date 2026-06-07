@@ -42,7 +42,6 @@ Ethernet1000BaseXDecoder::Ethernet1000BaseXDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
-	m_signalNames.clear();
 	m_inputs.clear();
 
 	//Add inputs. We take a single 8b10b coded stream

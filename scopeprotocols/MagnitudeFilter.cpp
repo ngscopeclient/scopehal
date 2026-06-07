@@ -91,12 +91,12 @@ void MagnitudeFilter::Refresh(
 		for(int i=0; i<2; i++)
 		{
 			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_signalNames[i] );
+				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
 			else
 			{
 				auto w = GetInputWaveform(i);
 				if(!w)
-					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_signalNames[i] );
+					AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
 			}
 		}
 		return;
@@ -119,7 +119,7 @@ void MagnitudeFilter::Refresh(
 	uint32_t len = min(a->size(), b->size());
 
 	//Copy Y axis units from input
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	cmdBuf.begin({});
 

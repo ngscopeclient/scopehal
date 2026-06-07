@@ -100,7 +100,7 @@ void WindowedAutocorrelationFilter::Refresh(
 	din_q->PrepareForCpuAccess();
 
 	//Copy the units
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	//Convert window and period to samples
 	auto window_ps = m_window.GetIntVal();

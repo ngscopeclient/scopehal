@@ -128,7 +128,7 @@ string ConstellationFilter::GetProtocolName()
 
 float ConstellationFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].GetVoltageRange();
+	return m_inputs[0]->GetVoltageRange();
 }
 
 float ConstellationFilter::GetOffset(size_t /*stream*/)

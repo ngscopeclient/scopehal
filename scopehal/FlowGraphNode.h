@@ -39,6 +39,7 @@
 class OscilloscopeChannel;
 class WaveformBase;
 class StreamDescriptor;
+class InputDescriptor;
 
 #include "FilterParameter.h"
 #include "Waveform.h"
@@ -169,21 +170,21 @@ protected:
 	SparseDigitalBusWaveform* GetSparseDigitalBusInputWaveform(size_t i)
 	{ return dynamic_cast<SparseDigitalBusWaveform*>(GetInputWaveform(i)); }
 
-	void CreateInput(const std::string& name);
+	virtual void CreateInput(const std::string& name);
 
 	std::string GetInputDisplayName(size_t i);
 
 protected:
-	///Names of signals we take as input
-	std::vector<std::string> m_signalNames;
 
-	///@brief The channel (if any) connected to each of our inputs
-	std::vector<StreamDescriptor> m_inputs;
+	/**
+		@brief Input ports
+	 */
+	std::vector< std::shared_ptr<InputDescriptor> > m_inputs;
 
 	/**
 		@brief The nodes (if any) that each of our streams drives
 
-		m_sinks[i] is the set of sinks for stream i
+		m_sinks[i] is the set of sinks for output stream i
 	 */
 	std::vector< std::set<FlowGraphNode*> > m_sinks;
 

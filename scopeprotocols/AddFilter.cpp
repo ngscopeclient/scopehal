@@ -103,10 +103,10 @@ void AddFilter::DoRefreshScalarScalar()
 	SetData(nullptr, 0);
 
 	//Set up units and complain if they're inconsistent
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
-		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	if( (m_xAxisUnit != m_inputs[1]->GetXAxisUnits()) ||
+		(m_inputs[0]->GetYAxisUnits() != m_inputs[1]->GetYAxisUnits()) )
 	{
 		AddErrorMessage("Inconsistent units", "The inputs have different X or Y axis units");
 		SetData(nullptr, 0);
@@ -137,10 +137,10 @@ void AddFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 	auto len = din->size();
 
 	//Set up units and complain if they're inconsistent
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
-		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	if( (m_xAxisUnit != m_inputs[1]->GetXAxisUnits()) ||
+		(m_inputs[0]->GetYAxisUnits() != m_inputs[1]->GetYAxisUnits()) )
 	{
 		AddErrorMessage("Inconsistent units", "The inputs have different X or Y axis units");
 		SetData(nullptr, 0);
@@ -204,10 +204,10 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Set up units and complain if they're inconsistent
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
-		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	if( (m_xAxisUnit != m_inputs[1]->GetXAxisUnits()) ||
+		(m_inputs[0]->GetYAxisUnits() != m_inputs[1]->GetYAxisUnits()) )
 	{
 		AddErrorMessage("Inconsistent units", "The inputs have different X or Y axis units");
 		SetData(nullptr, 0);

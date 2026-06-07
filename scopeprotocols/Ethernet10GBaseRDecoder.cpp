@@ -42,7 +42,6 @@ Ethernet10GBaseRDecoder::Ethernet10GBaseRDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
-	m_signalNames.clear();
 	m_inputs.clear();
 
 	//Add inputs. We take a single 64b66b coded stream

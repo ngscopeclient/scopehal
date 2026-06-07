@@ -133,9 +133,7 @@ void SPIFlashDecoder::Refresh(
 	//Input/output x1 inputs are required
 	auto din = dynamic_cast<SPIWaveform*>(GetInputWaveform(0));
 	auto dout = dynamic_cast<SPIWaveform*>(GetInputWaveform(1));
-	SPIWaveform* dquad = nullptr;
-	if(m_inputs[2].m_channel != nullptr)
-		dquad = dynamic_cast<SPIWaveform*>(GetInputWaveform(2));
+	auto dquad = dynamic_cast<SPIWaveform*>(GetInputWaveform(2));
 	if(!din || !dout)
 	{
 		AddErrorMessage("Missing input", "SPI input and output connections are required");

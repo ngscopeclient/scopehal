@@ -101,8 +101,8 @@ void PkPkMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Copy Y axis units from input
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 1);
 
 	//Figure out the nominal midpoint of the waveform
 	float base;

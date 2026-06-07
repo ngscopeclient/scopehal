@@ -41,7 +41,6 @@ ComplexSpectrogramFilter::ComplexSpectrogramFilter(const string& color)
 	: SpectrogramFilter(color)
 {
 	//remove base class ports
-	m_signalNames.clear();
 	m_inputs.clear();
 
 	//Set up channels

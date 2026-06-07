@@ -95,7 +95,6 @@ void PCIeGen2LogicalDecoder::RefreshPorts()
 	for(size_t i=nports; i<m_inputs.size(); i++)
 		SetInput(i, NULL, true);
 	m_inputs.resize(nports);
-	m_signalNames.resize(nports);
 
 	m_inputsChangedSignal.emit();
 }

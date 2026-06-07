@@ -112,8 +112,8 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		SetData(nullptr, 0);
 		return;
 	}
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	//Set up output
 	int64_t tap_delay = round(FS_PER_SECOND / m_dataRate.GetFloatVal());

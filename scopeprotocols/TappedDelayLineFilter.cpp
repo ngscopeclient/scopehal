@@ -131,8 +131,8 @@ void TappedDelayLineFilter::Refresh(
 		SetData(nullptr, 0);
 		return;
 	}
-	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+	m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+	SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 
 	din->PrepareForCpuAccess();
 

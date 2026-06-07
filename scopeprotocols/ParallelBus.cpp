@@ -138,13 +138,13 @@ void ParallelBus::Refresh(
 	//Set all unused channels to NULL
 	for(size_t i=width; i < 16; i++)
 	{
-		auto chan = m_inputs[i].m_channel;
+		auto chan = m_inputs[i]->m_sourceStream.m_channel;
 		if(chan)
 		{
 			auto schan = dynamic_cast<OscilloscopeChannel*>(chan);
 			if(schan)
 				schan->Release();
-			m_inputs[i].m_channel = nullptr;
+			m_inputs[i]->m_sourceStream.m_channel = nullptr;
 		}
 	}
 

@@ -57,7 +57,7 @@ FlowGraphNode::~FlowGraphNode()
 	//Release any inputs we currently have refs to
 	for(auto c : m_inputs)
 	{
-		auto schan = dynamic_cast<OscilloscopeChannel*>(c.m_channel);
+		auto schan = dynamic_cast<OscilloscopeChannel*>(c->m_sourceStream.m_channel);
 		if(schan)
 			schan->Release();
 	}
@@ -73,7 +73,7 @@ void FlowGraphNode::DetachInputs()
 {
 	for(auto& c : m_inputs)
 	{
-		c.m_channel = nullptr;
+		c->m_sourceStream.m_channel = nullptr;
 
 		//TODO: disconnect us from their sinks
 	}
@@ -90,15 +90,10 @@ FilterParameter& FlowGraphNode::GetParameter(string s)
 	return m_parameters[s];
 }
 
-size_t FlowGraphNode::GetInputCount()
-{
-	return m_signalNames.size();
-}
-
 string FlowGraphNode::GetInputName(size_t i)
 {
-	if(i < m_signalNames.size())
-		return m_signalNames[i];
+	if(i < m_inputs.size())
+		return m_inputs[i]->m_name;
 	else
 	{
 		LogError("Invalid channel index %zu in FlowGraphNode::GetInputName()\n", i);
@@ -127,75 +122,76 @@ void FlowGraphNode::OnInputChanged([[maybe_unused]] size_t i)
  */
 void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 {
-	if(i < m_signalNames.size())
+	if(i >= m_inputs.size())
 	{
-		//Calling SetInput with the current input is a legal no-op
-		if(stream == m_inputs[i])
-			return;
+		LogError("Invalid channel index %zu in FlowGraphNode::SetInput()\n", i);
+		return;
+	}
+	
+	auto pin = m_inputs[i];
+	
+	//Calling SetInput with the current input is a legal no-op
+	if(stream == pin->m_sourceStream)
+		return;
 
-		if(stream.m_channel == nullptr)	//NULL is always legal
-		{
-			//Remove us from the old input's sink list
-			if(m_inputs[i].m_channel)
-				m_inputs[i].m_channel->m_sinks[m_inputs[i].m_stream].erase(this);
-
-			//Deref whatever was there (if anything).
-			auto oldchan = dynamic_cast<OscilloscopeChannel*>(m_inputs[i].m_channel);
-			if(oldchan)
-				oldchan->Release();
-
-			//Make the new connection
-			m_inputs[i] = StreamDescriptor(nullptr, 0);
-
-			//Notify the derived class in case it wants to do anything
-			OnInputChanged(i);
-			return;
-		}
-
-		//If not forcing, make sure the input is legal
-		if(!force)
-		{
-			if(!ValidateChannel(i, stream))
-			{
-				//If validation fails, set the input to null
-				LogError("Invalid channel for input %zu of node\n", i);
-				SetInput(i, StreamDescriptor(nullptr, 0), false);
-				return;
-			}
-		}
-
-		/*
-			It's critical to ref the new input *before* dereffing the current one (#432).
-
-			Consider a 3-node filter chain A -> B -> C, A and B offscreen.
-			If we set C's input to A's output, B now has no loads and will get GC'd.
-			... but now A has no loads!
-
-			This causes A to get GC'd right before we hook up C's input to it, and Bad Things(tm) happen.
-		 */
-		auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
-		if(schan)
-			schan->AddRef();
-
+	if(stream.m_channel == nullptr)	//NULL is always legal
+	{
 		//Remove us from the old input's sink list
-		if(m_inputs[i].m_channel)
-			m_inputs[i].m_channel->m_sinks[m_inputs[i].m_stream].erase(this);
+		if(pin->m_sourceStream.m_channel)
+			pin->m_sourceStream.m_channel->m_sinks[pin->m_sourceStream.m_stream].erase(this);
 
 		//Deref whatever was there (if anything).
-		auto oldchan = dynamic_cast<OscilloscopeChannel*>(m_inputs[i].m_channel);
+		auto oldchan = dynamic_cast<OscilloscopeChannel*>(pin->m_sourceStream.m_channel);
 		if(oldchan)
 			oldchan->Release();
 
-		//All good, we can save the new input
-		m_inputs[i] = stream;
+		//Make the new connection
+		pin->m_sourceStream = StreamDescriptor(nullptr, 0);
 
 		//Notify the derived class in case it wants to do anything
 		OnInputChanged(i);
+		return;
 	}
-	else
+
+	//If not forcing, make sure the input is legal
+	if(!force)
 	{
-		LogError("Invalid channel index %zu in FlowGraphNode::SetInput()\n", i);
+		if(!ValidateChannel(i, stream))
+		{
+			//If validation fails, set the input to null
+			LogError("Invalid channel for input %zu of node\n", i);
+			SetInput(i, StreamDescriptor(nullptr, 0), false);
+			return;
+		}
 	}
+
+	/*
+		It's critical to ref the new input *before* dereffing the current one (#432).
+
+		Consider a 3-node filter chain A -> B -> C, A and B offscreen.
+		If we set C's input to A's output, B now has no loads and will get GC'd.
+		... but now A has no loads!
+
+		This causes A to get GC'd right before we hook up C's input to it, and Bad Things(tm) happen.
+	 */
+	auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
+	if(schan)
+		schan->AddRef();
+
+	//Remove us from the old input's sink list
+	if(pin->m_sourceStream.m_channel)
+		pin->m_sourceStream.m_channel->m_sinks[pin->m_sourceStream.m_stream].erase(this);
+
+	//Deref whatever was there (if anything).
+	auto oldchan = dynamic_cast<OscilloscopeChannel*>(pin->m_sourceStream.m_channel);
+	if(oldchan)
+		oldchan->Release();
+
+	//All good, we can save the new input
+	pin->m_sourceStream = stream;
+
+	//Notify the derived class in case it wants to do anything
+	OnInputChanged(i);
 }
 
 /**
@@ -209,9 +205,9 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 void FlowGraphNode::SetInput(const string& name, StreamDescriptor stream, bool force)
 {
 	//Find the channel
-	for(size_t i=0; i<m_signalNames.size(); i++)
+	for(size_t i=0; i<m_inputs.size(); i++)
 	{
-		if(m_signalNames[i] == name)
+		if(m_inputs[i]->m_name == name)
 		{
 			SetInput(i, stream, force);
 			return;
@@ -227,12 +223,12 @@ void FlowGraphNode::SetInput(const string& name, StreamDescriptor stream, bool f
  */
 StreamDescriptor FlowGraphNode::GetInput(size_t i)
 {
-	if(i < m_signalNames.size())
-		return m_inputs[i];
+	if(i < m_inputs.size())
+		return m_inputs[i]->m_sourceStream;
 	else
 	{
 		LogError("Invalid channel index %zu in FlowGraphNode::GetInput()\n", i);
-		return StreamDescriptor(NULL, 0);
+		return StreamDescriptor(nullptr, 0);
 	}
 }
 
@@ -243,8 +239,8 @@ StreamDescriptor FlowGraphNode::GetInput(size_t i)
  */
 string FlowGraphNode::GetInputDisplayName(size_t i)
 {
-	auto in = m_inputs[i];
-	if(in.m_channel == NULL)
+	auto in = m_inputs[i]->m_sourceStream;
+	if(in.m_channel == nullptr)
 		return "NULL";
 	else if(in.m_channel->GetStreamCount() > 1)
 		return in.m_channel->GetDisplayName() + "." + in.m_channel->GetStreamName(in.m_stream);
@@ -257,8 +253,7 @@ string FlowGraphNode::GetInputDisplayName(size_t i)
  */
 void FlowGraphNode::CreateInput(const string& name)
 {
-	m_signalNames.push_back(name);
-	m_inputs.push_back(StreamDescriptor(NULL, 0));
+	m_inputs.push_back(make_shared<InputDescriptor>(name, StreamDescriptor(nullptr, 0)));
 }
 
 bool FlowGraphNode::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
@@ -278,7 +273,7 @@ bool FlowGraphNode::IsDownstreamOf(set<FlowGraphNode*> nodes)
 {
 	for(size_t i=0; i<m_inputs.size(); i++)
 	{
-		auto chan = m_inputs[i].m_channel;
+		auto chan = m_inputs[i]->m_sourceStream.m_channel;
 		if(!chan)
 			continue;
 		if(nodes.find(chan) != nodes.end())
@@ -301,13 +296,13 @@ YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 	YAML::Node inputs;
 	for(size_t i=0; i<m_inputs.size(); i++)
 	{
-		auto desc = m_inputs[i];
+		auto desc = m_inputs[i]->m_sourceStream;
 		string value;
 		if(desc.m_channel == nullptr)
 			value = "0";
 		else
 			value = to_string(table.emplace(desc.m_channel)) + "/" + to_string(desc.m_stream);
-		inputs[m_signalNames[i]] = value;
+		inputs[m_inputs[i]->m_name] = value;
 	}
 	node["inputs"] = inputs;
 

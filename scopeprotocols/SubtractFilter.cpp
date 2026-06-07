@@ -86,8 +86,8 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	//Set units as early as possible so we can spawn in the same plot as our parent signal when creating a filter
 	if(GetInput(0))
 	{
-		m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-		SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+		m_xAxisUnit = m_inputs[0]->GetXAxisUnits();
+		SetYAxisUnits(m_inputs[0]->GetYAxisUnits(), 0);
 	}
 
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
@@ -133,8 +133,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Set up units and complain if they're inconsistent
-	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
-		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
+	if( (m_xAxisUnit != m_inputs[1]->GetXAxisUnits()) ||
+		(m_inputs[0]->GetYAxisUnits() != m_inputs[1]->GetYAxisUnits()) )
 	{
 		AddErrorMessage("Inconsistent units", "Both inputs must have the same X and Y axis unit");
 		SetData(nullptr, 0);

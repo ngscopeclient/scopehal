@@ -139,7 +139,7 @@ void EyeHeightMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	end_bin = min(end_bin, din->GetWidth());
 
 	//Approximate center of the eye opening
-	float vrange = m_inputs[0].GetVoltageRange();
+	float vrange = m_inputs[0]->GetVoltageRange();
 	size_t height = din->GetHeight();
 	float volts_per_row = vrange / height;
 	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;

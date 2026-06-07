@@ -165,8 +165,8 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	args.width = m_width;
 	args.height = m_height;
 	args.inlen = inlen;
-	args.vrange = m_inputs[0].GetVoltageRange(); //db from min to max scale
-	args.vfs = args.vrange/2 - m_inputs[0].GetOffset();
+	args.vrange = m_inputs[0]->GetVoltageRange(); //db from min to max scale
+	args.vfs = args.vrange/2 - m_inputs[0]->m_sourceStream.GetOffset();
 
 	//TODO: is this OK or are we going to lose too much precision doing this?
 	args.timescaleRatio = cap->m_timescale * 1.0 / din->m_timescale;
