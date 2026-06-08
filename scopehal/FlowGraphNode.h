@@ -173,6 +173,14 @@ protected:
 
 	std::string GetInputDisplayName(size_t i);
 
+public:
+	//Sink management (used for special stuff that doesn't call SetInput directly)
+	void AddSink(size_t stream, FlowGraphNode* node)
+	{ m_sinks[stream].emplace(node); }
+
+	void RemoveSink(size_t stream, FlowGraphNode* node)
+	{ m_sinks[stream].erase(node); }
+
 protected:
 
 	/**
