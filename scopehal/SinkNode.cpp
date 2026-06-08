@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,10 +29,25 @@
 
 #include "scopehal.h"
 
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
 SinkNode::SinkNode()
 {
 }
 
 SinkNode::~SinkNode()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Dummy refresh function since most sinks don't do actual compute
+
+void SinkNode::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+
 }
