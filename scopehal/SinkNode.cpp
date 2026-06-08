@@ -51,3 +51,15 @@ void SinkNode::Refresh(
 {
 
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers for dynamic port count
+
+/**
+	@brief Regenerate the list of inputs so that each port has a unique, monotonic name
+ */
+void SinkNode::RefreshInputNames()
+{
+	for(size_t i=0; i<m_inputs.size(); i++)
+		m_inputs[i]->m_name = string("in") + to_string(i);
+}

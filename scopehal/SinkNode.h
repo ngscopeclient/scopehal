@@ -48,6 +48,9 @@ public:
 	virtual ~SinkNode();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+
+protected:
+	void RefreshInputNames();
 };
 
 #endif
