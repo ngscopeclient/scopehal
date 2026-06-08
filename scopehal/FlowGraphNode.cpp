@@ -127,9 +127,9 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 		LogError("Invalid channel index %zu in FlowGraphNode::SetInput()\n", i);
 		return;
 	}
-	
+
 	auto pin = m_inputs[i];
-	
+
 	//Calling SetInput with the current input is a legal no-op
 	if(stream == pin->m_sourceStream)
 		return;
@@ -189,6 +189,9 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 
 	//All good, we can save the new input
 	pin->m_sourceStream = stream;
+
+	//We are now a sink of the source
+	stream.m_channel->m_sinks[stream.m_stream].emplace(this);
 
 	//Notify the derived class in case it wants to do anything
 	OnInputChanged(i);
