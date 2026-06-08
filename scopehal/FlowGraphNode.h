@@ -181,6 +181,9 @@ public:
 	void RemoveSink(size_t stream, FlowGraphNode* node)
 	{ m_sinks[stream].erase(node); }
 
+	const std::set<FlowGraphNode*>& GetSinks(size_t stream)
+	{ return m_sinks[stream]; }
+
 protected:
 
 	/**

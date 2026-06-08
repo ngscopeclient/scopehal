@@ -153,4 +153,9 @@ inline void StreamDescriptor::RemoveSink(FlowGraphNode* node)
 		m_channel->RemoveSink(m_stream, node);
 }
 
+inline const std::set<FlowGraphNode*>& StreamDescriptor::GetSinks()
+{
+	return m_channel->GetSinks(m_stream);
+}
+
 #endif

@@ -64,6 +64,7 @@ public:
 
 	void AddSink(FlowGraphNode* node);
 	void RemoveSink(FlowGraphNode* node);
+	const std::set<FlowGraphNode*>& GetSinks();
 
 	std::string GetName() const;
 
