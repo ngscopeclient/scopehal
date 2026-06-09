@@ -51,6 +51,10 @@ public:
 
 protected:
 	void RefreshInputNames();
+	virtual void RemoveStream(size_t i);
+	void ClearEmptyInputs();
+	size_t GetStreamPosition(StreamDescriptor desc);
+	void MoveStream(StreamDescriptor desc, size_t newPosition);
 };
 
 #endif
