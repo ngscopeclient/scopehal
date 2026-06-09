@@ -45,6 +45,30 @@ class InputDescriptor;
 #include "Waveform.h"
 #include "Stream.h"
 #include "SerializableObject.h"
+#include "log.h"
+
+
+/**
+	@brief A Message to the user from a node in the signal flow graph
+	@ingroup core
+
+	A basic message containing a severity and content
+**/
+class FlowGraphNodeMessage
+{
+public:
+	FlowGraphNodeMessage(Severity severity, const std::string& title, const std::string& msg)
+	: m_severity(severity), m_title(title), m_message(msg) {}
+	Severity GetSeverity() const { return m_severity; }
+	const std::string& GetTitle() const {return m_title; }
+	const std::string& GetMessage() const {return m_message; }
+private:
+	Severity m_severity;
+	///@brief Short name to be shown in tooltips etc.
+	std::string m_title;
+	///@brief Elaborate explanation of the message
+	std::string m_message;
+};
 
 /**
 	@brief Abstract base class for a node in the signal flow graph.
@@ -127,17 +151,15 @@ public:
 	// Error detection and reporting
 public:
 
-	///@brief Checks if this graph node reported any errors the last time it was refreshed
-	bool HasErrors()
-	{ return !m_errorTitle.empty(); }
+	///@brief Checks if this graph has any messages
+	bool HasMessages() const
+	{ return not m_messages.empty(); }
 
-	///@brief Returns the error log from this filter block, if any
-	const std::string& GetErrorLog()
-	{ return m_errorLog; }
+	///@brief Walking through any messages
+	const std::vector<FlowGraphNodeMessage>& GetMessages() const
+	{ return m_messages; }
 
-	///@brief Returns the error message title from this filter block, if any
-	const std::string& GetErrorTitle()
-	{ return m_errorTitle; }
+	const FlowGraphNodeMessage* GetMostSevereMessage() const;
 
 	//Input handling helpers
 protected:
@@ -211,16 +233,29 @@ public:
 
 protected:
 
-	///@brief Remove any error messages left over from the last graph refresh
-	void ClearErrors()
+	///@brief Remove any messages left over from the last graph refresh
+	void ClearMessages()
 	{
-		m_errorTitle = "";
-		m_errorLog = "";
+		m_messages.clear();
 	}
+
+	__attribute_deprecated__
+	void ClearErrors()
+	{ ClearMessages(); }
+
+	///@brief Attach a new message to the node
+	void AddMessage(const FlowGraphNodeMessage& msg)
+	{ m_messages.push_back(msg); }
+
+	///@brief Attach a new message to the node
+	void AddMessage(Severity severity, const std::string& title, const std::string& message)
+	{ AddMessage(FlowGraphNodeMessage(severity, title, message)); }
 
 	///@brief Add a new error message
 	void AddErrorMessage(const std::string& err)
-	{ m_errorLog += std::string("• ") + err + "\n"; }
+	{
+		AddErrorMessage("Unknown", std::string("• ") + err);
+	}
 
 	/**
 		@brief Add a new error message with a title
@@ -228,10 +263,7 @@ protected:
 		The title replaces any previous title, if set
 	 */
 	void AddErrorMessage(const std::string& title, const std::string& err)
-	{
-		m_errorTitle = title;
-		AddErrorMessage(err);
-	}
+	{ AddMessage(Severity::ERROR, title, err); }
 
 	///@brief Signal emitted when the set of parameters changes
 	sigc::signal<void()> m_parametersChangedSignal;
@@ -239,11 +271,8 @@ protected:
 	///@brief Signal emitted when the set of inputs changes
 	sigc::signal<void()> m_inputsChangedSignal;
 
-	///@brief Title / summary of error messages from the most recent filter refresh
-	std::string m_errorTitle;
-
-	///@brief Log of error messages from the most recent filter refresh
-	std::string m_errorLog;
+	//@brief All the messages the Node accumulates
+	std::vector<FlowGraphNodeMessage> m_messages;
 };
 
 #endif

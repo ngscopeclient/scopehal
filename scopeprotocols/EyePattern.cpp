@@ -457,8 +457,8 @@ void EyePattern::Refresh(
 				break;
 
 			default:
-				m_errorTitle = "Unimplemented modulation order";
-				AddErrorMessage(string("Don't know how to find midpoints for ") +
+				AddErrorMessage("Unimplemented modulation order",
+					string("Don't know how to find midpoints for ") +
 					to_string(cap->m_numLevels) + " level eye");
 				break;
 		}
