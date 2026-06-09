@@ -81,7 +81,7 @@ void SinkNode::ClearEmptyInputs()
 }
 
 /**
-	@brief Remove a stream connected to one of our inputs
+	@brief Remove a stream connected to one of our inputs but DOES NOT free the reference
  */
 void SinkNode::RemoveStream(size_t i)
 {
