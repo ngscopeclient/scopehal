@@ -43,13 +43,13 @@ using namespace std;
 
 EthernetClause73AutonegotiationDecoder::EthernetClause73AutonegotiationDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
-	, m_displayformat("Display Format")
+	, m_displayformat(m_parameters["Display Format"])
 {
 	AddProtocolStream("data");
 	CreateInput("data");
 	CreateInput("clk");
 
-	m_parameters[m_displayformat] = MakeDisplayFormatParameter();
+	m_displayformat = MakeDisplayFormatParameter();
 }
 
 FilterParameter EthernetClause73AutonegotiationDecoder::MakeDisplayFormatParameter()
@@ -67,7 +67,7 @@ FilterParameter EthernetClause73AutonegotiationDecoder::MakeDisplayFormatParamet
 
 bool EthernetClause73AutonegotiationDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
@@ -86,14 +86,14 @@ string EthernetClause73AutonegotiationDecoder::GetProtocolName()
 
 static size_t CountConsecutiveBits(SparseDigitalWaveform &data, size_t start_idx)
 {
-	if(start_idx >= data.m_samples.size()) {
+	if(start_idx >= data.m_samples.size())
 		return 0;
-	}
 
 	auto bit_val = data.m_samples[start_idx];
 	size_t count = 1;
 
-	for(size_t i = start_idx + 1; i < data.m_samples.size(); i++) {
+	for(size_t i = start_idx + 1; i < data.m_samples.size(); i++)
+	{
 		if(data.m_samples[i] == bit_val)
 			count++;
 		else
@@ -108,24 +108,31 @@ static vector<char> DecodeAutonegPage(SparseDigitalWaveform &data, size_t start_
 	vector<char> decoded;
 	size_t i = start_idx;
 
-	while(i + 1 < data.m_samples.size()) {
+	while(i + 1 < data.m_samples.size())
+	{
 		int bit1 = data.m_samples[i];
 		int bit2 = data.m_samples[i + 1];
 
-		if(bit1 == bit2) {
+		if(bit1 == bit2)
+		{
 			// Same bits - could be 0 or termination
 			size_t count = CountConsecutiveBits(data, i);
 
-			if(count > 2) {
+			if(count > 2)
+			{
 				// Termination
 				end_idx = i;
 				return decoded;
-			} else {
+			}
+			else
+			{
 				// Exactly 2 same bits = 0
 				decoded.push_back(0);
 				i += 2;
 			}
-		} else {
+		}
+		else
+		{
 			// Different bits (01 or 10) = 1
 			decoded.push_back(1);
 			i += 2;
@@ -145,14 +152,18 @@ static bool ParseCodePage(const vector<char>& bits, Clause73CodePage& page)
 	// D[4:0] Selector Field
 	page.selector_field = 0;
 	for(int i = 0; i < 5; i++)
+	{
 		if(bits[i])
 			page.selector_field |= (1UL << i);
+	}
 
 	// D[9:5] Echoed Nonce
 	page.echoed_nonce = 0;
 	for(int i = 5; i < 10; i++)
+	{
 		if(bits[i])
 			page.echoed_nonce |= (1UL << (i - 5));
+	}
 
 	page.c2_reserved = bits[10];
 	page.c1_pause = bits[11];
@@ -166,20 +177,26 @@ static bool ParseCodePage(const vector<char>& bits, Clause73CodePage& page)
 	// D[20:16] Transmitted Nonce
 	page.transmitted_nonce = 0;
 	for(int i = 16; i < 21; i++)
+	{
 		if(bits[i])
 			page.transmitted_nonce |= (1UL << (i - 16));
+	}
 
 	// D[43:21] Technology Ability
 	page.technology_ability = 0;
 	for(int i = 21; i < 44; i++)
+	{
 		if(bits[i])
 			page.technology_ability |= (1UL << (i - 21));
+	}
 
 	// D[47:44] FEC capability
 	page.fec = 0;
 	for(int i = 44; i < 48; i++)
+	{
 		if(bits[i])
 			page.fec |= (1UL << (i - 44));
+	}
 
 	// D[48] Code
 	page.code = bits[48];
@@ -196,51 +213,58 @@ static vector<StartSequence> FindAllAutonegStarts(SparseDigitalWaveform &data)
 {
 	vector<StartSequence> starts;
 
-	if (data.m_samples.size() < 8) {
+	if (data.m_samples.size() < 8)
 		return starts;
-	}
 
 	uint8_t val = 0;
-	for(auto bit = 0; bit < 7; bit++) {
+	for(auto bit = 0; bit < 7; bit++)
+	{
 		val <<= 1;
 		val |= data.m_samples[bit] ? 1 : 0;
 	}
 
-	for(size_t i = 7; i <= data.m_samples.size(); ++i) {
+	for(size_t i = 7; i <= data.m_samples.size(); ++i)
+	{
 		val <<= 1;
 		val |= data.m_samples[i] ? 1 : 0;
 
 		// Check for 00001111 or 11110000
-		if ( (val == 0xF0) || (val == 0x0F) ) {
+		if ( (val == 0xF0) || (val == 0x0F) )
 			starts.push_back({i + 1});
-		}
 	}
 
 	return starts;
 }
 
 template <std::size_t X>
-static std::string FormatBitsX(std::uint64_t val)
+static string FormatBitsX(std::uint64_t val)
 {
     static_assert(X > 0, "X must be > 0");
     static_assert(X <= 64, "X must be <= 64 for uint64_t");
 
-    std::array<char, X + 1> buf{}; // +1 for null terminator
+    array<char, X + 1> buf{}; // +1 for null terminator
 
-    for (std::size_t i = 0; i < X; ++i) {
+    for (std::size_t i = 0; i < X; ++i)
+    {
         buf[X - 1 - i] = (val & (1UL << i)) ? '1' : '0';
     }
     buf[X] = '\0';
 
-    return std::string(buf.data());
+    return string(buf.data());
 }
 
-void EthernetClause73AutonegotiationDecoder::Refresh()
+void EthernetClause73AutonegotiationDecoder::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	LogTrace("EthernetClause73AutonegotiationDecoder::Refresh\n");
-	LogIndenter li;
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EthernetClause73AutonegotiationDecoder::Refresh");
+	#endif
 
-	if(!VerifyAllInputsOK()) {
+	ClearErrors();
+	if(!VerifyAllInputsOK())
+	{
+		AddErrorMessage("Missing inputs", "Invalid input");
 		SetData(nullptr, 0);
 		return;
 	}
@@ -252,8 +276,15 @@ void EthernetClause73AutonegotiationDecoder::Refresh()
 	clkin->PrepareForCpuAccess();
 
 	// Create the capture
-	auto cap = new Clause73Waveform(m_parameters[m_displayformat]);
-	cap->m_timescale = 1;
+	auto cap = dynamic_cast<Clause73Waveform*>(GetData(0));
+	if(!cap)
+	{
+		cap = new Clause73Waveform(m_displayformat);
+		SetData(cap, 0);
+		cap->m_timescale = 1;
+		cap->m_revision ++;
+	}
+
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
@@ -264,7 +295,8 @@ void EthernetClause73AutonegotiationDecoder::Refresh()
 	data.PrepareForCpuAccess();
 
 	// Check if we have enough data
-	if(data.m_samples.size() < 8) {
+	if(data.m_samples.size() < 8)
+	{
 		SetData(nullptr, 0);
 		return;
 	}
@@ -272,7 +304,8 @@ void EthernetClause73AutonegotiationDecoder::Refresh()
 	// Find all autonegotiation starts
 	vector<StartSequence> start_sequences = FindAllAutonegStarts(data);
 
-	if(start_sequences.empty()) {
+	if(start_sequences.empty())
+	{
 		SetData(nullptr, 0);
 		return;
 	}
@@ -280,7 +313,8 @@ void EthernetClause73AutonegotiationDecoder::Refresh()
 	LogTrace("Found %zu autonegotiation sequences\n", start_sequences.size());
 
 	// Process each sequence
-	for(size_t seq_idx = 0; seq_idx < start_sequences.size(); seq_idx++) {
+	for(size_t seq_idx = 0; seq_idx < start_sequences.size(); seq_idx++)
+	{
 		size_t start_idx = start_sequences[seq_idx].start_idx;
 
 		// Decode the page
@@ -288,20 +322,26 @@ void EthernetClause73AutonegotiationDecoder::Refresh()
 		vector<char> decoded_bits = DecodeAutonegPage(data, start_idx, end_idx);
 
 		// Only process if we have exactly 49 bits (valid Clause 73 page)
-		if(decoded_bits.size() == 49) {
+		if(decoded_bits.size() == 49)
+		{
 			Clause73CodePage page;
-			if(ParseCodePage(decoded_bits, page)) {
+			if(ParseCodePage(decoded_bits, page))
+			{
 
 				// Map the bit position to a timestamp
 				size_t preamble_start = start_idx - 8;
-				if(preamble_start < data.m_samples.size()) {
+				if(preamble_start < data.m_samples.size())
+				{
 					int64_t offset = data.m_offsets[preamble_start];
 					int64_t duration = 1; // Default duration
 
 					// Try to get duration from the end index if available
-					if(end_idx < data.m_offsets.size() && end_idx > preamble_start) {
+					if(end_idx < data.m_offsets.size() && end_idx > preamble_start)
+					{
 						duration = data.m_offsets[end_idx] - data.m_offsets[preamble_start];
-					} else if(start_idx + 1 < data.m_durations.size()) {
+					}
+					else if(start_idx + 1 < data.m_durations.size())
+					{
 						duration = data.m_durations[start_idx] * 49; // Approximate
 					}
 
@@ -313,7 +353,6 @@ void EthernetClause73AutonegotiationDecoder::Refresh()
 		}
 	}
 
-	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 

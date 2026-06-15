@@ -70,7 +70,7 @@ class EthernetClause73AutonegotiationDecoder : public Filter
 public:
 	EthernetClause73AutonegotiationDecoder(const std::string& color);
 
-	virtual void Refresh() override;
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -87,7 +87,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(EthernetClause73AutonegotiationDecoder)
 
 protected:
-	std::string m_displayformat;
+	FilterParameter& m_displayformat;
 };
 
 #endif
