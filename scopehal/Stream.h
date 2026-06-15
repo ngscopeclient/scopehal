@@ -47,7 +47,6 @@
 class Stream
 {
 public:
-	Stream();
 
 	/**
 		@brief General data type stored in a stream
@@ -80,13 +79,22 @@ public:
 		STREAM_TYPE_UNDEFINED
 	};
 
+	Stream()
+		: m_yAxisUnit(Unit::UNIT_VOLTS)
+		, m_name("stream")
+		, m_waveform(nullptr)
+		, m_value(0)
+		, m_stype(Stream::STREAM_TYPE_ANALOG)
+		, m_flags(0)
+	{}
+
 	Stream(Unit yunit, std::string name, StreamType type, uint8_t flags = 0)
-	: m_yAxisUnit(yunit)
-	, m_name(name)
-	, m_waveform(nullptr)
-	, m_value(0)
-	, m_stype(type)
-	, m_flags(flags)
+		: m_yAxisUnit(yunit)
+		, m_name(name)
+		, m_waveform(nullptr)
+		, m_value(0)
+		, m_stype(type)
+		, m_flags(flags)
 	{}
 
 	///Unit of measurement for our vertical axis
