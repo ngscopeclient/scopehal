@@ -142,6 +142,8 @@ void TDRFilter::Refresh(
 	cap->Resize(len);
 	cap->PrepareForCpuAccess();
 
+	din->PrepareForCpuAccess();
+
 	float pulseScale = 1.0 / pulseAmplitude;
 	for(size_t i=0; i<len; i++)
 	{
