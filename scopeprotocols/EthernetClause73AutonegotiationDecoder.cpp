@@ -46,8 +46,7 @@ EthernetClause73AutonegotiationDecoder::EthernetClause73AutonegotiationDecoder(c
 	, m_displayformat(m_parameters["Display Format"])
 {
 	AddProtocolStream("data");
-	CreateInput("data");
-	CreateInput("clk");
+	CreateInput("sampleData");
 
 	m_displayformat = MakeDisplayFormatParameter();
 }
@@ -70,7 +69,7 @@ bool EthernetClause73AutonegotiationDecoder::ValidateChannel(size_t i, StreamDes
 	if(stream.m_channel == nullptr)
 		return false;
 
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+	if( (i < 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -262,18 +261,22 @@ void EthernetClause73AutonegotiationDecoder::Refresh(
 	#endif
 
 	ClearErrors();
-	if(!VerifyAllInputsOK())
+
+	// Get the input data
+	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		AddErrorMessage("Missing inputs", "Invalid input");
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		else
+			AddErrorMessage("Invalid inputs", "Expected a sparse digital waveform");
+
 		SetData(nullptr, 0);
 		return;
 	}
-
-	// Get the input data
-	auto din = GetInputWaveform(0);
-	auto clkin = GetInputWaveform(1);
 	din->PrepareForCpuAccess();
-	clkin->PrepareForCpuAccess();
 
 	// Create the capture
 	auto cap = dynamic_cast<Clause73Waveform*>(GetData(0));
@@ -289,23 +292,20 @@ void EthernetClause73AutonegotiationDecoder::Refresh(
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
-	// Record the value of the data stream at each clock edge
-	SparseDigitalWaveform data;
-	SampleOnAnyEdgesBase(din, clkin, data);
-	data.PrepareForCpuAccess();
-
 	// Check if we have enough data
-	if(data.m_samples.size() < 8)
+	if(din->m_samples.size() < 8)
 	{
+		AddErrorMessage("Input too short", "Need at least 8 bits of data to decode");
 		SetData(nullptr, 0);
 		return;
 	}
 
 	// Find all autonegotiation starts
-	vector<StartSequence> start_sequences = FindAllAutonegStarts(data);
+	vector<StartSequence> start_sequences = FindAllAutonegStarts(*din);
 
 	if(start_sequences.empty())
 	{
+		//not an error, this is a legal no-op
 		SetData(nullptr, 0);
 		return;
 	}
@@ -319,7 +319,7 @@ void EthernetClause73AutonegotiationDecoder::Refresh(
 
 		// Decode the page
 		size_t end_idx;
-		vector<char> decoded_bits = DecodeAutonegPage(data, start_idx, end_idx);
+		vector<char> decoded_bits = DecodeAutonegPage(*din, start_idx, end_idx);
 
 		// Only process if we have exactly 49 bits (valid Clause 73 page)
 		if(decoded_bits.size() == 49)
@@ -330,19 +330,19 @@ void EthernetClause73AutonegotiationDecoder::Refresh(
 
 				// Map the bit position to a timestamp
 				size_t preamble_start = start_idx - 8;
-				if(preamble_start < data.m_samples.size())
+				if(preamble_start < din->m_samples.size())
 				{
-					int64_t offset = data.m_offsets[preamble_start];
+					int64_t offset = din->m_offsets[preamble_start];
 					int64_t duration = 1; // Default duration
 
 					// Try to get duration from the end index if available
-					if(end_idx < data.m_offsets.size() && end_idx > preamble_start)
+					if(end_idx < din->m_offsets.size() && end_idx > preamble_start)
 					{
-						duration = data.m_offsets[end_idx] - data.m_offsets[preamble_start];
+						duration = din->m_offsets[end_idx] - din->m_offsets[preamble_start];
 					}
-					else if(start_idx + 1 < data.m_durations.size())
+					else if(start_idx + 1 < din->m_durations.size())
 					{
-						duration = data.m_durations[start_idx] * 49; // Approximate
+						duration = din->m_durations[start_idx] * 49; // Approximate
 					}
 
 					cap->m_offsets.push_back(offset);
