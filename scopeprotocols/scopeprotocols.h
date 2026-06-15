@@ -99,6 +99,7 @@
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetAutonegotiationPageDecoder.h"
 #include "EthernetBaseXAutonegotiationDecoder.h"
+#include "EthernetClause73AutonegotiationDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "EthernetRGMIIDecoder.h"
 #include "EthernetRMIIDecoder.h"
