@@ -114,7 +114,7 @@ protected:
 	unsigned int m_analogChannelCount;
 
 	///@brief Number of digital channels supported
-	unsigned int m_digitalChannelCount;
+	unsigned int m_digitalChannelCount = 0;
 
 	///@brief Index of the first digital channel (if any)
 	unsigned int m_digitalChannelBase;
