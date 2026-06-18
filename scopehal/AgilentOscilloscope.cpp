@@ -172,6 +172,8 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			chan->SetDefaultDisplayName();
 		}
 	}
+	else
+		m_digitalChannelCount = 0;
 
 	//Clear config cache
 	m_sampleRateValid = false;
