@@ -171,7 +171,7 @@ bool Filter::VerifyAllInputsOKAndUniformAnalog()
 	for(auto p : m_inputs)
 	{
 		auto q = p->m_sourceStream;
-		
+
 		if(q.m_channel == nullptr)
 			return false;
 
@@ -197,7 +197,7 @@ bool Filter::VerifyAllInputsOKAndSparseAnalog()
 	for(auto p : m_inputs)
 	{
 		auto q = p->m_sourceStream;
-		
+
 		if(q.m_channel == nullptr)
 			return false;
 
@@ -223,7 +223,7 @@ bool Filter::VerifyAllInputsOKAndSparseDigital()
 	for(auto p : m_inputs)
 	{
 		auto q = p->m_sourceStream;
-		
+
 		if(q.m_channel == nullptr)
 			return false;
 
@@ -249,7 +249,7 @@ bool Filter::VerifyAllInputsOKAndSparseOrUniformDigital()
 	for(auto p : m_inputs)
 	{
 		auto q = p->m_sourceStream;
-		
+
 		if(q.m_channel == nullptr)
 			return false;
 
@@ -1549,6 +1549,10 @@ float Filter::GetVoltageRange(size_t stream)
 
 void Filter::SetVoltageRange(float range, size_t stream)
 {
+	//can happen with filters that have dynamic port counts during loading
+	if(stream >= m_ranges.size())
+		m_ranges.resize(stream + 1);
+
 	m_ranges[stream] = range;
 }
 
@@ -1567,5 +1571,9 @@ float Filter::GetOffset(size_t stream)
 
 void Filter::SetOffset(float offset, size_t stream)
 {
+	//can happen with filters that have dynamic port counts during loading
+	if(stream >= m_offsets.size())
+		m_offsets.resize(stream + 1);
+
 	m_offsets[stream] = offset;
 }

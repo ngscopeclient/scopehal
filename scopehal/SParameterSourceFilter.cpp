@@ -60,6 +60,8 @@ void SParameterSourceFilter::SetupStreams()
 	auto nstreams = nports * nports * 2;
 	m_streams.resize(nstreams);
 	m_sinks.resize(nstreams);
+	m_ranges.resize(0);
+	m_offsets.resize(0);
 
 	for(size_t to=0; to < nports; to++)
 	{
