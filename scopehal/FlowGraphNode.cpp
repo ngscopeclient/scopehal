@@ -236,6 +236,20 @@ StreamDescriptor FlowGraphNode::GetInput(size_t i)
 }
 
 /**
+	@brief Get the constraints on one of our inputs
+ */
+shared_ptr<InputConstraint> FlowGraphNode::GetInputConstraints(size_t i)
+{
+	if(i < m_inputs.size())
+		return m_inputs[i]->m_constraints;
+	else
+	{
+		LogError("Invalid channel index %zu in FlowGraphNode::GetInputConstraints()\n", i);
+		return nullptr;
+	}
+}
+
+/**
 	@brief Gets the display name for one of our inputs.
 
 	This includes the stream name iff the input comes from a multi-stream source.
@@ -259,9 +273,22 @@ void FlowGraphNode::CreateInput(const string& name)
 	m_inputs.push_back(make_shared<InputDescriptor>(name, StreamDescriptor(nullptr, 0)));
 }
 
-bool FlowGraphNode::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+/**
+	@brief Check if a stream is allowed to be connected to the given input
+ */
+bool FlowGraphNode::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	return true;
+	//Immediately reject anything out of bounds
+	if(i >= m_inputs.size())
+		return false;
+
+	//If we do not have a constraint, default-accept
+	auto constraints = m_inputs[i]->m_constraints;
+	if(!constraints)
+		return true;
+
+	//If we do, ask the constraint
+	return constraints->Check(stream);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

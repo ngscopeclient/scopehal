@@ -30,114 +30,87 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of StreamDescriptor
+	@brief Declaration of InputConstraint
+	@ingroup core
+ */
+#ifndef InputConstraint_h
+#define InputConstraint_h
+
+/**
+	@brief Base class for constraints on inputs
 
 	@ingroup core
  */
-#ifndef StreamDescriptor_h
-#define StreamDescriptor_h
-
-class InstrumentChannel;
-class InputConstraint;
-
-/**
-	@brief Descriptor for a single stream coming off a channel
- */
-class StreamDescriptor
+class InputConstraint
 {
 public:
-	StreamDescriptor()
-	: m_channel(NULL)
-	, m_stream(0)
-	{}
+	InputConstraint(FlowGraphNode* sink);
+	virtual ~InputConstraint();
 
-	StreamDescriptor(InstrumentChannel* channel, size_t stream = 0)
-		: m_channel(channel)
-		, m_stream(stream)
-	{}
+	///@brief Checks if the given input satisfies the constraint
+	virtual bool Check(StreamDescriptor source) =0;
 
-	///@return True if this is an invalid stream (index greater than the highest allowed value)
-	bool IsOutOfRange()
-	{ return (m_stream >= m_channel->GetStreamCount()); }
+	///@brief Convert this constraint to a string
+	virtual std::string ToString() =0;
 
-	operator bool() const
-	{ return (m_channel != NULL); }
-
-	void AddSink(FlowGraphNode* node);
-	void RemoveSink(FlowGraphNode* node);
-	const std::set<FlowGraphNode*>& GetSinks();
-
-	std::string GetName() const;
-
-	InstrumentChannel* m_channel;
-	size_t m_stream;
-
-	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
-	//See StreamDescriptor_inlines.h for implementations
-	Unit GetXAxisUnits();
-	Unit GetYAxisUnits();
-	WaveformBase* GetData() const;
-	bool operator==(const StreamDescriptor& rhs) const;
-	bool operator!=(const StreamDescriptor& rhs) const;
-	bool operator<(const StreamDescriptor& rhs) const;
-	uint8_t GetFlags() const;
-	float GetVoltageRange();
-	float GetOffset();
-	bool IsHighRateOffsetCapable();
-	void SetVoltageRange(float v);
-	void SetOffset(float v);
-	Stream::StreamType GetType();
-	float GetScalarValue();
-	bool IsInverted();
+protected:
+	FlowGraphNode* m_sink;
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
-	@brief Base class for filter graph inputs
+	@brief A set of constraints, all of which must be satisfied for the group to match
+
 	@ingroup core
-
-	An individual node may override CreateInput() to create derived-class objects with additional metadata.
  */
-class InputDescriptor
+class InputConstraintAND : public InputConstraint
 {
 public:
-	InputDescriptor(const std::string& name = "", const StreamDescriptor source = nullptr)
-		: m_name(name)
-		, m_sourceStream(source)
+	InputConstraintAND(FlowGraphNode* sink)
+	: InputConstraint(sink)
 	{}
 
-	virtual ~InputDescriptor()
-	{}
+	//Match if all children are satisfied
+	virtual bool Check(StreamDescriptor source) override
+	{
+		for(auto p : m_constraints)
+		{
+			if(!p->Check(source))
+				return false;
+		}
+		return true;
+	}
 
-	//not copyable or assignable
-	InputDescriptor(const InputDescriptor& rhs) =delete;
-	InputDescriptor& operator=(const InputDescriptor& rhs) =delete;
+	virtual std::string ToString() override
+	{ return "FIXME"; }
 
-	//Porting helpers and trivial accessors
-	Unit GetYAxisUnits()
-	{ return m_sourceStream.GetYAxisUnits(); }
-
-	Unit GetXAxisUnits()
-	{ return m_sourceStream.GetXAxisUnits(); }
-
-	WaveformBase* GetData() const
-	{ return m_sourceStream.GetData(); }
-
-	float GetVoltageRange()
-	{ return m_sourceStream.GetVoltageRange(); }
-
-	/**
-		@brief Name of the input port displayed in the graph editor
-
-		Must be unique within a given node
-	 */
-	std::string m_name;
-
-	///@brief The stream, if any, connected to this input port
-	StreamDescriptor m_sourceStream;
-
-	///@brief Constraints that apply to this input
-	std::shared_ptr<InputConstraint> m_constraints;
+protected:
+	std::vector< std::shared_ptr<InputConstraint> > m_constraints;
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+	@brief Match if the input is of the correct stream type
+
+	@ingroup core
+ */
+class InputConstraintStreamType : public InputConstraint
+{
+public:
+	InputConstraintStreamType(FlowGraphNode* sink, Stream::StreamType stype)
+		: InputConstraint(sink)
+		, m_type(stype)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{ return (m_type == source.GetType() ); }
+
+	virtual std::string ToString() override;
+
+protected:
+	Stream::StreamType m_type;
+};
 
 #endif

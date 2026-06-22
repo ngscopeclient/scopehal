@@ -27,117 +27,77 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of StreamDescriptor
+#include "scopehal.h"
 
-	@ingroup core
- */
-#ifndef StreamDescriptor_h
-#define StreamDescriptor_h
+using namespace std;
 
-class InstrumentChannel;
-class InputConstraint;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-/**
-	@brief Descriptor for a single stream coming off a channel
- */
-class StreamDescriptor
+InputConstraint::InputConstraint(FlowGraphNode* sink)
+	: m_sink(sink)
 {
-public:
-	StreamDescriptor()
-	: m_channel(NULL)
-	, m_stream(0)
-	{}
+}
 
-	StreamDescriptor(InstrumentChannel* channel, size_t stream = 0)
-		: m_channel(channel)
-		, m_stream(stream)
-	{}
-
-	///@return True if this is an invalid stream (index greater than the highest allowed value)
-	bool IsOutOfRange()
-	{ return (m_stream >= m_channel->GetStreamCount()); }
-
-	operator bool() const
-	{ return (m_channel != NULL); }
-
-	void AddSink(FlowGraphNode* node);
-	void RemoveSink(FlowGraphNode* node);
-	const std::set<FlowGraphNode*>& GetSinks();
-
-	std::string GetName() const;
-
-	InstrumentChannel* m_channel;
-	size_t m_stream;
-
-	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
-	//See StreamDescriptor_inlines.h for implementations
-	Unit GetXAxisUnits();
-	Unit GetYAxisUnits();
-	WaveformBase* GetData() const;
-	bool operator==(const StreamDescriptor& rhs) const;
-	bool operator!=(const StreamDescriptor& rhs) const;
-	bool operator<(const StreamDescriptor& rhs) const;
-	uint8_t GetFlags() const;
-	float GetVoltageRange();
-	float GetOffset();
-	bool IsHighRateOffsetCapable();
-	void SetVoltageRange(float v);
-	void SetOffset(float v);
-	Stream::StreamType GetType();
-	float GetScalarValue();
-	bool IsInverted();
-};
-
-/**
-	@brief Base class for filter graph inputs
-	@ingroup core
-
-	An individual node may override CreateInput() to create derived-class objects with additional metadata.
- */
-class InputDescriptor
+InputConstraint::~InputConstraint()
 {
-public:
-	InputDescriptor(const std::string& name = "", const StreamDescriptor source = nullptr)
-		: m_name(name)
-		, m_sourceStream(source)
-	{}
 
-	virtual ~InputDescriptor()
-	{}
+}
 
-	//not copyable or assignable
-	InputDescriptor(const InputDescriptor& rhs) =delete;
-	InputDescriptor& operator=(const InputDescriptor& rhs) =delete;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// InputConstraintStreamType
 
-	//Porting helpers and trivial accessors
-	Unit GetYAxisUnits()
-	{ return m_sourceStream.GetYAxisUnits(); }
+string InputConstraintStreamType::ToString()
+{
+	string ret = "Stream type is ";
 
-	Unit GetXAxisUnits()
-	{ return m_sourceStream.GetXAxisUnits(); }
+	switch(m_type)
+	{
+		case Stream::STREAM_TYPE_ANALOG:
+			ret += "analog waveform";
+			break;
 
-	WaveformBase* GetData() const
-	{ return m_sourceStream.GetData(); }
+		case Stream::STREAM_TYPE_DIGITAL:
+			ret += "digital waveform";
+			break;
 
-	float GetVoltageRange()
-	{ return m_sourceStream.GetVoltageRange(); }
+		case Stream::STREAM_TYPE_DIGITAL_BUS:
+			ret += "digital bus";
+			break;
 
-	/**
-		@brief Name of the input port displayed in the graph editor
+		case Stream::STREAM_TYPE_EYE:
+			ret += "eye pattern";
+			break;
 
-		Must be unique within a given node
-	 */
-	std::string m_name;
+		case Stream::STREAM_TYPE_SPECTROGRAM:
+			ret += "spectrogram";
+			break;
 
-	///@brief The stream, if any, connected to this input port
-	StreamDescriptor m_sourceStream;
+		case Stream::STREAM_TYPE_WATERFALL:
+			ret += "waterfall";
+			break;
 
-	///@brief Constraints that apply to this input
-	std::shared_ptr<InputConstraint> m_constraints;
-};
+		case Stream::STREAM_TYPE_CONSTELLATION:
+			ret += "constellation";
+			break;
 
+		case Stream::STREAM_TYPE_TRIGGER:
+			ret += "trigger";
+			break;
 
-#endif
+		case Stream::STREAM_TYPE_PROTOCOL:
+			ret += "protocol";
+			break;
+
+		case Stream::STREAM_TYPE_ANALOG_SCALAR:
+			ret += "analog scalar";
+			break;
+
+		case Stream::STREAM_TYPE_UNDEFINED:
+		default:
+			ret += "undefined";
+			break;
+	}
+
+	return ret;
+}

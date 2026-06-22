@@ -146,6 +146,7 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "Instrument.h"
 #include "StreamDescriptor.h"
 #include "StreamGroupDescriptor.h"
+#include "InputConstraint.h"
 
 #include "OscilloscopeChannel.h"
 #include "StreamDescriptor_inlines.h"
