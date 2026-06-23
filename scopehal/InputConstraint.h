@@ -205,6 +205,50 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
+	@brief Match if the input filter is of the correct class type
+
+	@ingroup core
+ */
+template<class T>
+class InputConstraintBlockType : public InputConstraint
+{
+public:
+	InputConstraintBlockType(FlowGraphNode* sink)
+		: InputConstraint(sink)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{
+		//Input must be non-null
+		auto chan = source.m_channel;
+		if(!chan)
+			return false;
+
+		//Make sure it matches what we expect
+		return ( typeid(*chan) == typeid(T) );
+	}
+
+	virtual std::string ToString() override
+	{
+		std::string stype;
+
+		//separate path here needed since GCC returns mangled name
+		#ifdef __GNUC__
+			int status;
+			auto tmp = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
+			stype = std::string(tmp);
+			free(tmp);
+		#else
+			stype = typeid(T).name();
+		#endif
+
+		return std::string("Source block type is ") + stype;
+	}
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
 	@brief Match if the input is one of a list of stream types
 
 	@ingroup core
