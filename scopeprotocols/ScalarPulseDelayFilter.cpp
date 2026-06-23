@@ -42,24 +42,12 @@ ScalarPulseDelayFilter::ScalarPulseDelayFilter(const string& color)
 	, m_active(false)
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "pulseout", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput("pulsein");
+	CreateInput<InputConstraintStreamType>("pulsein", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	m_interval = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_interval.SetFloatVal(FS_PER_SECOND / 2);
 
 	SetData(nullptr, 0);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ScalarPulseDelayFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

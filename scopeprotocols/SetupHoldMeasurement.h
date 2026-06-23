@@ -48,8 +48,6 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(SetupHoldMeasurement)
 
 protected:

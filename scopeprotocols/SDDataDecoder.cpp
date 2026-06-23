@@ -45,12 +45,12 @@ using namespace std;
 SDDataDecoder::SDDataDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
 {
-	CreateInput("clk");
-	CreateInput("dat3");
-	CreateInput("dat2");
-	CreateInput("dat1");
-	CreateInput("dat0");
-	CreateInput("cmdbus");
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dat3", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dat2", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dat1", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dat0", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintWaveformType<SDCmdWaveform> >("cmdbus");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,20 +59,6 @@ SDDataDecoder::SDDataDecoder(const string& color)
 string SDDataDecoder::GetProtocolName()
 {
 	return "SD Card Data Bus";
-}
-
-bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 5) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	if( (i == 5) && (dynamic_cast<SDCmdDecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

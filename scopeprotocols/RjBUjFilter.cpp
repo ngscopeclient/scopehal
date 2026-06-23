@@ -42,28 +42,10 @@ RjBUjFilter::RjBUjFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
-	CreateInput("TIE");
-	CreateInput("Threshold");
-	CreateInput("Clock");
-	CreateInput("DDJ");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool RjBUjFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i <= 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-	if( (i == 3) && (dynamic_cast<DDJMeasurement*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamType>("TIE", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("Threshold", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("Clock", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintBlockType<DDJMeasurement> >("DDJ");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

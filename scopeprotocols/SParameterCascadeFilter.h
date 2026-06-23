@@ -41,8 +41,6 @@ public:
 	SParameterCascadeFilter(const std::string& color);
 	~SParameterCascadeFilter();
 
-	bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	static std::string GetProtocolName();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;

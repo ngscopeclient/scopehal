@@ -136,8 +136,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	enum VendorIDs
 	{
 		VENDOR_ID_CYPRESS	= 0x01,

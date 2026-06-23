@@ -46,8 +46,8 @@ SDCmdDecoder::SDCmdDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
 	, m_cardtype(m_parameters["Card Type"])
 {
-	CreateInput("CMD");
-	CreateInput("CLK");
+	CreateInput<InputConstraintStreamType>("CMD", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("CLK", Stream::STREAM_TYPE_DIGITAL);
 
 	m_cardtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_cardtype.AddEnumValue("SD", SD_GENERIC);
@@ -61,17 +61,6 @@ SDCmdDecoder::SDCmdDecoder(const string& color)
 string SDCmdDecoder::GetProtocolName()
 {
 	return "SD Card Command Bus";
-}
-
-bool SDCmdDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

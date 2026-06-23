@@ -67,7 +67,7 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_SPECTROGRAM);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	//Default config
 	m_range = 1e9;
@@ -104,20 +104,6 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 
 SpectrogramFilter::~SpectrogramFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

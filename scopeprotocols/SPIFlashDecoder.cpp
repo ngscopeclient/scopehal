@@ -41,9 +41,9 @@ SPIFlashDecoder::SPIFlashDecoder(const string& color)
 	, m_type(m_parameters["Flash Type"])
 	, m_outfile(m_parameters["Dump File"])
 {
-	CreateInput("spi_in");
-	CreateInput("spi_out");
-	CreateInput("qspi");
+	CreateInput<InputConstraintWaveformType<SPIWaveform> >("spi_in");
+	CreateInput<InputConstraintWaveformType<SPIWaveform> >("spi_out");
+	CreateInput<InputConstraintWaveformType<SPIWaveform> >("qspi");
 
 	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_type.AddEnumValue("Generic (3-byte address)", FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
@@ -66,24 +66,6 @@ SPIFlashDecoder::~SPIFlashDecoder()
 		fclose(m_fpOut);
 		m_fpOut = nullptr;
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool SPIFlashDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//Allow null for the QSPI input, since some flashes run in x1 mode
-	if((i == 2) && (stream.m_channel == nullptr) )
-		return true;
-
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 3) && (dynamic_cast<SPIWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

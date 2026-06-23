@@ -47,9 +47,9 @@ SPIDecoder::SPIDecoder(const string& color)
 	, m_cpol(m_parameters["Clock Polarity"])
 {
 	AddProtocolStream("data");
-	CreateInput("clk");
-	CreateInput("cs#");
-	CreateInput("data");
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("cs#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
 
 	m_cpol = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_cpol.AddEnumValue("Idle low", 0);
@@ -59,17 +59,6 @@ SPIDecoder::SPIDecoder(const string& color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool SPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 3) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string SPIDecoder::GetProtocolName()
 {

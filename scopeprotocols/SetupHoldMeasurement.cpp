@@ -50,8 +50,8 @@ SetupHoldMeasurement::SetupHoldMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "tsetup", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_FS), "thold", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	CreateInput("data");
-	CreateInput("clock");
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("clock", Stream::STREAM_TYPE_ANALOG);
 
 	m_vih = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_vih.SetFloatVal(2.0);
@@ -63,20 +63,6 @@ SetupHoldMeasurement::SetupHoldMeasurement(const string& color)
 	m_edgemode.AddEnumValue("Rising", EDGE_RISING);
 	m_edgemode.AddEnumValue("Falling", EDGE_FALLING);
 	m_edgemode.AddEnumValue("Both", EDGE_BOTH);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool SetupHoldMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

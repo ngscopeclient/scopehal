@@ -56,8 +56,22 @@ SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 		for(size_t from = 0; from < 2; from ++)
 		{
 			auto pname = string("S") + to_string(to+1) + to_string(from+1);
-			CreateInput(pname + "Combined_mag");
-			CreateInput(pname + "Combined_ang");
+			CreateInput<InputConstraintAND>(
+				pname + "Combined_mag",
+				initializer_list<shared_ptr<InputConstraint> >
+				{
+					make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+					make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+					make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+				});
+			CreateInput<InputConstraintAND>(
+				pname + "Combined_ang",
+				initializer_list<shared_ptr<InputConstraint> >
+				{
+					make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+					make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+					make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+				});
 		}
 	}
 
@@ -66,8 +80,22 @@ SParameterDeEmbedFilter::SParameterDeEmbedFilter(const string& color)
 		for(size_t from = 0; from < 2; from ++)
 		{
 			auto pname = string("S") + to_string(to+1) + to_string(from+1);
-			CreateInput(pname + "Known_mag");
-			CreateInput(pname + "Known_ang");
+			CreateInput<InputConstraintAND>(
+				pname + "Known_mag",
+				initializer_list<shared_ptr<InputConstraint> >
+				{
+					make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+					make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+					make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+				});
+			CreateInput<InputConstraintAND>(
+				pname + "Known_ang",
+				initializer_list<shared_ptr<InputConstraint> >
+				{
+					make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+					make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+					make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+				});
 		}
 	}
 
@@ -95,37 +123,6 @@ string SParameterDeEmbedFilter::GetProtocolName()
 void SParameterDeEmbedFilter::RefreshPorts()
 {
 	//do nothing
-}
-
-bool SParameterDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//All inputs are required
-	if(stream.m_channel == nullptr)
-		return false;
-
-	//Validate port count
-	if(i >= 16 )
-		return false;
-
-	//X axis must be Hz
-	if(stream.GetXAxisUnits() != Unit(Unit::UNIT_HZ))
-		return false;
-
-	//Angle: Y axis unit must be degrees
-	if(i & 1)
-	{
-		if(stream.GetYAxisUnits() != Unit(Unit::UNIT_DEGREES))
-			return false;
-	}
-
-	//Magnitude: Y axis unit must be dB
-	else
-	{
-		if(stream.GetYAxisUnits() != Unit(Unit::UNIT_DB))
-			return false;
-	}
-
-	return true;
 }
 
 void SParameterDeEmbedFilter::Refresh(
