@@ -45,23 +45,10 @@ VerticalBathtub::VerticalBathtub(const string& color)
 
 	//Set up channels
 	CreateInput("din");
+	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_EYE);
 
 	m_time = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_time.SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool VerticalBathtub::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

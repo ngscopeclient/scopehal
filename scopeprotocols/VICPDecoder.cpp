@@ -41,25 +41,14 @@ VICPDecoder::VICPDecoder(const string& color)
 {
 	CreateInput("TX");
 	CreateInput("RX");
+
+	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<TCPWaveform> >(this);
+	m_inputs[1]->m_constraints = make_shared<InputConstraintWaveformType<TCPWaveform> >(this);
 }
 
 VICPDecoder::~VICPDecoder()
 {
 
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool VICPDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (dynamic_cast<TCPWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

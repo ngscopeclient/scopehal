@@ -36,6 +36,10 @@
 #ifndef InputConstraint_h
 #define InputConstraint_h
 
+#ifdef __GNUC__
+#include <cxxabi.h>
+#endif
+
 /**
 	@brief Base class for constraints on inputs
 
@@ -124,6 +128,50 @@ public:
 
 protected:
 	Stream::StreamType m_type;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+	@brief Match if the input is of the correct class type
+
+	@ingroup core
+ */
+template<class T>
+class InputConstraintWaveformType : public InputConstraint
+{
+public:
+	InputConstraintWaveformType(FlowGraphNode* sink)
+		: InputConstraint(sink)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{
+		//Input must be non-null
+		auto pdata = source.GetData();
+		if(!pdata)
+			return false;
+
+		//Make sure it matches what we expect
+		return ( typeid(*pdata) == typeid(T) );
+	}
+
+	virtual std::string ToString() override
+	{
+		std::string stype;
+
+		//separate path here needed since GCC returns mangled name
+		#ifdef __GNUC__
+			int status;
+			auto tmp = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
+			stype = std::string(tmp);
+			free(tmp);
+		#else
+			stype = typeid(T).name();
+		#endif
+
+		return std::string("Stream type is ") + stype;
+	}
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
