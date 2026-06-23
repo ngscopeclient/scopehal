@@ -57,25 +57,13 @@ const uint8_t SWDDecoder::c_wakeup[16] = {
 SWDDecoder::SWDDecoder(const string& color) : Filter(color, CAT_BUS)
 {
 	AddProtocolStream("data");
-	CreateInput("SWCLK");
-	CreateInput("SWDIO");
+
+	CreateInput<InputConstraintStreamType>("SWCLK", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("SWDIO", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if((i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
-}
 
 string SWDDecoder::GetProtocolName()
 {

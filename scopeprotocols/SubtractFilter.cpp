@@ -40,29 +40,24 @@ SubtractFilter::SubtractFilter(const string& color)
 	, m_computePipeline("shaders/SubtractFilter.spv", 3, sizeof(SubtractFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("IN+");
-	CreateInput("IN-");
+	CreateInput<InputConstraintStreamTypes>(
+		"IN+",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
+	CreateInput<InputConstraintStreamTypes>(
+		"IN-",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
 }
 
 SubtractFilter::~SubtractFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i >= 2)
-		return false;
-
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) || (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

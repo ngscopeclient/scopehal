@@ -39,21 +39,7 @@ using namespace std;
 SWDMemAPDecoder::SWDMemAPDecoder(const string& color)
 	: PacketDecoder(color, CAT_MEMORY)
 {
-	CreateInput("swd");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool SWDMemAPDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<SWDDecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<SWDWaveform> >("swd");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
