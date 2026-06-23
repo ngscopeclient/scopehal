@@ -44,27 +44,14 @@ WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
 	CreateInput("data");
 	CreateInput("clk");
 
+	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
+	m_inputs[1]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
+
 	m_edgeTime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_edgeTime.SetIntVal(10 * 1000);
 
 	m_sampleRate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
 	m_sampleRate.SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));	//100 Gsps
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool WaveformGenerationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -70,25 +70,13 @@ Waterfall::Waterfall(const string& color)
 
 	//Set up channels
 	CreateInput("Spectrum");
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool Waterfall::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) &&
-		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-		(stream.m_channel->GetXAxisUnits() == Unit::UNIT_MICROHZ)
-		)
-	{
-		return true;
-	}
-
-	return false;
+	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(this,
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_MICROHZ)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
