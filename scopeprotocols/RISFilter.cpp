@@ -40,7 +40,7 @@ RISFilter::RISFilter(const string& color)
 	, m_upsampleFactor(m_parameters["Upsample Factor"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_upsampleFactor = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_upsampleFactor.SetIntVal(16);
@@ -48,23 +48,6 @@ RISFilter::RISFilter(const string& color)
 
 RISFilter::~RISFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool RISFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if(i >= 1)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

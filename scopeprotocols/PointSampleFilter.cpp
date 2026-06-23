@@ -38,7 +38,7 @@ PointSampleFilter::PointSampleFilter(const string& color)
 	, m_off(m_parameters["Sample Point"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "sample", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput("in");
+	CreateInput<InputConstraintStreamType>("in", Stream::STREAM_TYPE_ANALOG);
 
 	m_off = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_off.SetIntVal(0);
@@ -93,14 +93,4 @@ void PointSampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 string PointSampleFilter::GetProtocolName()
 {
 	return "Point Sample";
-}
-
-bool PointSampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(i > 0)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-	return false;
 }

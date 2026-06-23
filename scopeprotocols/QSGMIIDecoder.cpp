@@ -47,7 +47,7 @@ QSGMIIDecoder::QSGMIIDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 	, m_displayformat(m_parameters["Display Format"])
 {
-	CreateInput("data");
+	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("data");
 
 	AddProtocolStream("Lane 0");
 	AddProtocolStream("Lane 1");
@@ -64,17 +64,6 @@ QSGMIIDecoder::~QSGMIIDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool QSGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string QSGMIIDecoder::GetProtocolName()
 {

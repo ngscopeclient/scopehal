@@ -44,27 +44,13 @@ PulseWidthMeasurement::PulseWidthMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PulseWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
-		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
+	CreateInput<InputConstraintStreamTypes>(
+		"din",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_DIGITAL
+		});
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -44,7 +44,7 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 {
 	AddDigitalStream("data");
 
-	CreateInput("sampledData");
+	CreateInput<InputConstraintSparseStreamType>("sampledData", Stream::STREAM_TYPE_DIGITAL);
 
 	m_poly = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_poly.AddEnumValue("PRBS-7", PRBSGeneratorFilter::POLY_PRBS7);
@@ -114,20 +114,6 @@ PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
 		}
 		m_prbs31Table.MarkModifiedFromCpu();
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PRBSCheckerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

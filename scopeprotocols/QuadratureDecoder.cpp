@@ -43,8 +43,8 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 	, m_debounce(m_parameters["Debounce Cooldown"])
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("A");
-	CreateInput("B");
+	CreateInput<InputConstraintStreamType>("A", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("B", Stream::STREAM_TYPE_DIGITAL);
 	//CreateInput("Reset");
 
 	m_pulserate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
@@ -60,20 +60,6 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 
 	m_debounce = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_debounce.ParseString("1 ms");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool QuadratureDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

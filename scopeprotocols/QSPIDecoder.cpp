@@ -48,12 +48,12 @@ QSPIDecoder::QSPIDecoder(const string& color)
 	//Remove the x1 SPI inputs
 	m_inputs.clear();
 
-	CreateInput("clk");
-	CreateInput("cs#");
-	CreateInput("dq3");
-	CreateInput("dq2");
-	CreateInput("dq1");
-	CreateInput("dq0");
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("cs#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq3", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq2", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq1", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq0", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,17 +64,6 @@ QSPIDecoder::QSPIDecoder(const string& color)
 string QSPIDecoder::GetProtocolName()
 {
 	return "Quad SPI";
-}
-
-bool QSPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

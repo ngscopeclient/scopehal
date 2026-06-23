@@ -48,7 +48,7 @@ RGBLEDDecoder::RGBLEDDecoder(const string& color) : PacketDecoder(color, CAT_SER
 	, m_displayscale(m_parameters["Brightness Scale"])
 {
 	AddProtocolStream("data");
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_DIGITAL);
 
 	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_type.AddEnumValue("Everlight 19-C47", TYPE_19_C47);
@@ -57,22 +57,6 @@ RGBLEDDecoder::RGBLEDDecoder(const string& color) : PacketDecoder(color, CAT_SER
 
 	m_displayscale = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_displayscale.SetFloatVal(1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool RGBLEDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if((i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
 }
 
 string RGBLEDDecoder::GetProtocolName()
