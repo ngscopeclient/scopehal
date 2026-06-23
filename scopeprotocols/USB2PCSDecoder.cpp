@@ -40,20 +40,8 @@ USB2PCSDecoder::USB2PCSDecoder(const string& color)
 {
 	AddProtocolStream("data");
 	CreateInput("PMA");
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool USB2PCSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<USB2PMADecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<USB2PMAWaveform> >(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

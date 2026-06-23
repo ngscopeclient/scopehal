@@ -137,6 +137,21 @@ bool Unit::IsLogarithmic()
 }
 
 /**
+	@brief Converts this unit to a string in long format
+ */
+string Unit::ToStringLong() const
+{
+	switch(m_type)
+	{
+		case UNIT_DEGREES:
+			return "angular degrees";
+
+		default:
+			return ToString();
+	}
+}
+
+/**
 	@brief Converts this unit to a string
  */
 string Unit::ToString() const

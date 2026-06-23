@@ -133,6 +133,34 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
+	@brief Match if the input is of the correct stream type, and sparse
+
+	@ingroup core
+ */
+class InputConstraintSparseStreamType : public InputConstraintStreamType
+{
+public:
+	InputConstraintSparseStreamType(FlowGraphNode* sink, Stream::StreamType stype)
+		: InputConstraintStreamType(sink, stype)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{
+		//Input must be non-null and sparse
+		auto pdata = dynamic_cast<SparseWaveformBase*>(source.GetData());
+		if(!pdata)
+			return false;
+
+		return (m_type == source.GetType() );
+	}
+
+	virtual std::string ToString() override
+	{ return std::string("Stream type is sparse ") + StreamTypeToString(m_type); }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
 	@brief Match if the input is of the correct class type
 
 	@ingroup core
@@ -224,7 +252,32 @@ public:
 	{ return (m_unit == source.GetXAxisUnits() ); }
 
 	virtual std::string ToString() override
-	{ return std::string("X axis unit is ") + m_unit.ToString();  }
+	{ return std::string("X axis unit is ") + m_unit.ToStringLong();  }
+
+protected:
+	Unit m_unit;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+	@brief Match if the input's Y axis unit is a specific value
+
+	@ingroup core
+ */
+class InputConstraintYUnit : public InputConstraint
+{
+public:
+	InputConstraintYUnit(FlowGraphNode* sink, Unit unit)
+		: InputConstraint(sink)
+		, m_unit(unit)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{ return (m_unit == source.GetYAxisUnits() ); }
+
+	virtual std::string ToString() override
+	{ return std::string("Y axis unit is ") + m_unit.ToStringLong();  }
 
 protected:
 	Unit m_unit;

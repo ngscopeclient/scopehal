@@ -116,6 +116,7 @@ public:
 
 	Unit(const std::string& rhs);
 	std::string ToString() const;
+	std::string ToStringLong() const;
 
 	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true) const;
 	std::string PrettyPrintTabular(double value, int leftdigits = 4, int rightdigits = 3) const;

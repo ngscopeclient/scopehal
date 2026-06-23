@@ -41,28 +41,18 @@ USB2PMADecoder::USB2PMADecoder(const string& color)
 	, m_speed(m_parameters["Speed"])
 {
 	AddProtocolStream("data");
+
 	CreateInput("D+");
 	CreateInput("D-");
+
+	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
+	m_inputs[1]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
 
 	m_speed = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_speed.AddEnumValue("Low (1.5 Mbps)", SPEED_LOW);
 	m_speed.AddEnumValue("Full (12 Mbps)", SPEED_FULL);
 	m_speed.AddEnumValue("High (480 Mbps)", SPEED_HIGH);
 	m_speed.SetIntVal(SPEED_FULL);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool USB2PMADecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

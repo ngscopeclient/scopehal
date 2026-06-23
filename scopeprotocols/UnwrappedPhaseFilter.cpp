@@ -41,22 +41,14 @@ UnwrappedPhaseFilter::UnwrappedPhaseFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("Phase");
 
+	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(this,
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
+
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool UnwrappedPhaseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
-		return false;
-	if(i == 0)
-		return (stream.GetYAxisUnits().GetType() == Unit::UNIT_DEGREES);
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

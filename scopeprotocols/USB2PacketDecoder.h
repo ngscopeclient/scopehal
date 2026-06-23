@@ -115,8 +115,6 @@ public:
 	virtual std::vector<std::string> GetHeaders() override;
 	virtual bool GetShowDataColumn() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(USB2PacketDecoder)
 
 protected:

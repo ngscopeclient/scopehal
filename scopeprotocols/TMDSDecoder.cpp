@@ -47,24 +47,11 @@ TMDSDecoder::TMDSDecoder(const string& color)
 {
 	AddProtocolStream("data");
 	CreateInput("data");
-	CreateInput("clk");
+
+	m_inputs[0]->m_constraints = make_shared<InputConstraintSparseStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
 
 	m_lane = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_lane.SetIntVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TMDSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 string TMDSDecoder::GetProtocolName()
@@ -85,27 +72,18 @@ void TMDSDecoder::Refresh(
 	#endif
 	ClearErrors();
 
-	if(!VerifyAllInputsOK())
+	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		AddErrorMessage("Missing input", "One or more inputs are unconnected");
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or invalid");
 		SetData(nullptr, 0);
 		return;
 	}
-
-	//Get the input data
-	auto din = GetInputWaveform(0);
-	auto clkin = GetInputWaveform(1);
 	din->PrepareForCpuAccess();
-	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = SetupEmptyWaveform<TMDSWaveform>(din, 0);
-	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
-
-	//Record the value of the data stream at each clock edge
-	SparseDigitalWaveform sampdata;
-	SampleOnAnyEdgesBase(din, clkin, sampdata);
 
 	/*
 		Look for preamble data. We need this to synchronize. (HDMI 1.4 spec section 5.4.2)
@@ -126,7 +104,7 @@ void TMDSDecoder::Refresh(
 	for(size_t offset=0; offset < 10; offset ++)
 	{
 		size_t num_preambles[4] = {0};
-		for(size_t i=0; i<sampdata.m_samples.size() - 20; i += 10)
+		for(size_t i=0; i<din->m_samples.size() - 20; i += 10)
 		{
 			//Look for control code "j" at phase "offset", position "i" within the data stream
 			for(size_t j=0; j<4; j++)
@@ -134,7 +112,7 @@ void TMDSDecoder::Refresh(
 				bool match = true;
 				for(size_t k=0; k<10; k++)
 				{
-					if(sampdata.m_samples[i+offset+k] != control_codes[j][k])
+					if(din->m_samples[i+offset+k] != control_codes[j][k])
 						match = false;
 				}
 				if(match)
@@ -175,7 +153,7 @@ void TMDSDecoder::Refresh(
 	} last_symbol_type = TYPE_DATA;
 
 	//Decode the actual data
-	size_t sampmax = sampdata.m_samples.size()-11;
+	size_t sampmax = din->m_samples.size()-11;
 	for(size_t i=max_offset; i<sampmax; i+= 10)
 	{
 		bool match = true;
@@ -186,14 +164,14 @@ void TMDSDecoder::Refresh(
 			match = true;
 			for(size_t k=0; k<10; k++)
 			{
-				if(sampdata.m_samples[i+k] != control_codes[j][k])
+				if(din->m_samples[i+k] != control_codes[j][k])
 					match = false;
 			}
 
 			if(match)
 			{
-				cap->m_offsets.push_back(sampdata.m_offsets[i]);
-				cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
+				cap->m_offsets.push_back(din->m_offsets[i]);
+				cap->m_durations.push_back(din->m_offsets[i+10] - din->m_offsets[i]);
 				cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_CONTROL, j));
 
 				last_symbol_type = TYPE_PREAMBLE;
@@ -210,14 +188,14 @@ void TMDSDecoder::Refresh(
 			match = true;
 			for(size_t k=0; k<10; k++)
 			{
-				if(sampdata.m_samples[i+k] != video_guard[lane][k])
+				if(din->m_samples[i+k] != video_guard[lane][k])
 					match = false;
 			}
 
 			if(match)
 			{
-				cap->m_offsets.push_back(sampdata.m_offsets[i]);
-				cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
+				cap->m_offsets.push_back(din->m_offsets[i]);
+				cap->m_durations.push_back(din->m_offsets[i+10] - din->m_offsets[i]);
 				cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, 0));
 				//last_symbol_type = TYPE_GUARD;
 				break;
@@ -228,17 +206,17 @@ void TMDSDecoder::Refresh(
 			continue;
 
 		//Whatever is left is assumed to be video data
-		bool d9 = sampdata.m_samples[i+9];
-		bool d8 = sampdata.m_samples[i+8];
+		bool d9 = din->m_samples[i+9];
+		bool d8 = din->m_samples[i+8];
 
-		uint8_t d = sampdata.m_samples[i+0] |
-					(sampdata.m_samples[i+1] << 1) |
-					(sampdata.m_samples[i+2] << 2) |
-					(sampdata.m_samples[i+3] << 3) |
-					(sampdata.m_samples[i+4] << 4) |
-					(sampdata.m_samples[i+5] << 5) |
-					(sampdata.m_samples[i+6] << 6) |
-					(sampdata.m_samples[i+7] << 7);
+		uint8_t d = din->m_samples[i+0] |
+					(din->m_samples[i+1] << 1) |
+					(din->m_samples[i+2] << 2) |
+					(din->m_samples[i+3] << 3) |
+					(din->m_samples[i+4] << 4) |
+					(din->m_samples[i+5] << 5) |
+					(din->m_samples[i+6] << 6) |
+					(din->m_samples[i+7] << 7);
 
 		if(d9)
 			d ^= 0xff;
@@ -248,8 +226,8 @@ void TMDSDecoder::Refresh(
 		else
 			d ^= (d << 1) ^ 0xfe;
 
-		cap->m_offsets.push_back(sampdata.m_offsets[i]);
-		cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
+		cap->m_offsets.push_back(din->m_offsets[i]);
+		cap->m_durations.push_back(din->m_offsets[i+10] - din->m_offsets[i]);
 		cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_DATA, d));
 		last_symbol_type = TYPE_DATA;
 	}

@@ -43,6 +43,7 @@ UndershootMeasurement::UndershootMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_VOLTS), "min", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("din");
+	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
 
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
@@ -51,20 +52,6 @@ UndershootMeasurement::UndershootMeasurement(const string& color)
 
 		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool UndershootMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

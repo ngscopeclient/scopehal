@@ -41,20 +41,8 @@ USB2ActivityDecoder::USB2ActivityDecoder(const string& color)
 {
 	AddDigitalStream("data");
 	CreateInput("din");
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool USB2ActivityDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<USB2PCSWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
+	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<USB2PCSWaveform> >(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
