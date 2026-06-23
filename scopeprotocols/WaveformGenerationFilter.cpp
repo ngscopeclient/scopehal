@@ -41,11 +41,8 @@ WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
 	, m_edgeTime(m_parameters["Transition Time"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("data");
-	CreateInput("clk");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
-	m_inputs[1]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
 
 	m_edgeTime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_edgeTime.SetIntVal(10 * 1000);

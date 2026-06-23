@@ -69,8 +69,7 @@ UpsampleFilter::UpsampleFilter(const string& color)
 	, m_computePipeline("shaders/UpsampleFilter.spv", 3, sizeof(UpsampleFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_factor = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_factor.SetIntVal(10);

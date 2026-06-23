@@ -74,4 +74,12 @@ inline size_t FlowGraphNode::GetInputCount()
 	return m_inputs.size();
 }
 
+//Helper for creating a stream with constraints
+template<class T, class... Args>
+inline void FlowGraphNode::CreateInput(const std::string& name, Args&&... args)
+{
+	CreateInput(name);
+	m_inputs[m_inputs.size() - 1]->m_constraints = std::make_shared<T>(this, args...);
+}
+
 #endif

@@ -46,8 +46,14 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
-	CreateInput("Clock");
-	CreateInput("Golden");
+	CreateInput<InputConstraintStreamTypes>(
+		"Clock",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_DIGITAL
+		});
+	CreateInput<InputConstraintStreamType>("Golden", Stream::STREAM_TYPE_DIGITAL);
 
 	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_threshold.SetFloatVal(0);
@@ -67,24 +73,6 @@ TIEMeasurement::TIEMeasurement(const string& color)
 		m_firstPassOutput.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_secondPassOutput.resize(1);
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TIEMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )//allow digital clocks
-		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

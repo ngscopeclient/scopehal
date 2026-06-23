@@ -69,9 +69,8 @@ Waterfall::Waterfall(const string& color)
 	m_maxwidth.SetIntVal(131072);
 
 	//Set up channels
-	CreateInput("Spectrum");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(this,
+	CreateInput<InputConstraintAND>(
+		"Spectrum",
 		initializer_list<shared_ptr<InputConstraint> >
 		{
 			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_MICROHZ)),

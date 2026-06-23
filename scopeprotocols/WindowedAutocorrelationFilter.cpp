@@ -42,11 +42,8 @@ WindowedAutocorrelationFilter::WindowedAutocorrelationFilter(const string& color
 	, m_period(m_parameters["Period"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("I");
-	CreateInput("Q");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
-	m_inputs[1]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("I", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("Q", Stream::STREAM_TYPE_ANALOG);
 
 	m_window = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_window.SetFloatVal(400e6);

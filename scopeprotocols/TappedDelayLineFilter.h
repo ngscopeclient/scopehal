@@ -49,8 +49,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(TappedDelayLineFilter)
 
 	static void DoFilterKernel(

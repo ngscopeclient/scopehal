@@ -39,9 +39,8 @@ UnwrappedPhaseFilter::UnwrappedPhaseFilter(const string& color)
 	: Filter(color, CAT_RF)
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("Phase");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(this,
+	CreateInput<InputConstraintAND>(
+		"Phase",
 		initializer_list<shared_ptr<InputConstraint> >
 		{
 			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES)),

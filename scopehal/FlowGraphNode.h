@@ -173,6 +173,10 @@ protected:
 
 	virtual void CreateInput(const std::string& name);
 
+	//Helper for creating a stream with constraints
+	template<class T, class... Args>
+	void CreateInput(const std::string& name, Args&&... args);
+
 	std::string GetInputDisplayName(size_t i);
 
 public:

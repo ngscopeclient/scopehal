@@ -42,11 +42,8 @@ USB2PMADecoder::USB2PMADecoder(const string& color)
 {
 	AddProtocolStream("data");
 
-	CreateInput("D+");
-	CreateInput("D-");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
-	m_inputs[1]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("D+", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("D-", Stream::STREAM_TYPE_ANALOG);
 
 	m_speed = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_speed.AddEnumValue("Low (1.5 Mbps)", SPEED_LOW);

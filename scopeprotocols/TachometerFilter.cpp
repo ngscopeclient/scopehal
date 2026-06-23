@@ -42,24 +42,10 @@ TachometerFilter::TachometerFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_RPM), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_ticks = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_ticks.SetIntVal(1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TachometerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

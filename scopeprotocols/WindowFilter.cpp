@@ -43,10 +43,8 @@ WindowFilter::WindowFilter(const string& color)
 	, m_duration(m_parameters["Duration"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
-
-	//Set up input validation
-	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(this,
+	CreateInput<InputConstraintAND>(
+		"din",
 		initializer_list<shared_ptr<InputConstraint> >
 		{
 			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_FS)),

@@ -40,23 +40,7 @@ TCPDecoder::TCPDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("ip");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TCPDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<IPv4Waveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	//TODO: support IPv6
-
-	return false;
+	CreateInput<InputConstraintWaveformType<IPv4Waveform> >("ip");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

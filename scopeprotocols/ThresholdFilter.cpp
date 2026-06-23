@@ -41,9 +41,7 @@ ThresholdFilter::ThresholdFilter(const string& color)
 	, m_hysteresis(m_parameters["Hysteresis"])
 {
 	AddDigitalStream("data");
-	CreateInput("din");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_threshold = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_threshold.SetFloatVal(0);

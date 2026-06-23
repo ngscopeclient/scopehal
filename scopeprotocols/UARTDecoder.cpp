@@ -46,8 +46,7 @@ UARTDecoder::UARTDecoder(const string& color)
 	, m_baud(m_parameters["Baud rate"])
 {
 	//Set up channels
-	CreateInput("din");
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_DIGITAL);
 
 	m_baud = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_baud.SetIntVal(115200);

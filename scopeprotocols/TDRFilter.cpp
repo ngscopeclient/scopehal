@@ -43,7 +43,7 @@ TDRFilter::TDRFilter(const string& color)
 	, m_stepEndVoltage(m_parameters["Step end"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("voltage");
+	CreateInput<InputConstraintStreamType>("voltage", Stream::STREAM_TYPE_ANALOG);
 
 	m_mode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_mode.AddEnumValue("Reflection coefficient", MODE_RHO);
@@ -65,20 +65,6 @@ TDRFilter::TDRFilter(const string& color)
 TDRFilter::~TDRFilter()
 {
 
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

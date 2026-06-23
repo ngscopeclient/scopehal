@@ -39,9 +39,8 @@ TwoPortShuntThroughFilter::TwoPortShuntThroughFilter(const string& color)
 	: Filter(color, CAT_RF)
 {
 	AddStream(Unit(Unit::UNIT_OHMS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("S21Mag");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(this,
+	CreateInput<InputConstraintAND>(
+		"S21Mag",
 		initializer_list<shared_ptr<InputConstraint> >
 		{
 			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),

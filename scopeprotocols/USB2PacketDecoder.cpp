@@ -40,9 +40,7 @@ USB2PacketDecoder::USB2PacketDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
 	//Set up channels
-	CreateInput("PCS");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<USB2PCSWaveform> >(this);
+	CreateInput<InputConstraintWaveformType<USB2PCSWaveform> >("PCS");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

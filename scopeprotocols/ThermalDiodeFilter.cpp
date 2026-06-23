@@ -43,7 +43,7 @@ ThermalDiodeFilter::ThermalDiodeFilter(const string& color)
 	, m_diodeType(m_parameters["Diode type"])
 {
 	AddStream(Unit(Unit::UNIT_CELSIUS), "temp", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput("VTEMP");
+	CreateInput<InputConstraintStreamType>("VTEMP", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	m_diodeType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_diodeType.AddEnumValue("LTC3374", DIODE_LTC3374);
@@ -53,22 +53,6 @@ ThermalDiodeFilter::ThermalDiodeFilter(const string& color)
 
 ThermalDiodeFilter::~ThermalDiodeFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ThermalDiodeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i >= 1)
-		return false;
-	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG_SCALAR)
-		return false;
-
-	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

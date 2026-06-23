@@ -39,9 +39,7 @@ USB2PCSDecoder::USB2PCSDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("PMA");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<USB2PMAWaveform> >(this);
+	CreateInput<InputConstraintWaveformType<USB2PMAWaveform> >("PMA");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

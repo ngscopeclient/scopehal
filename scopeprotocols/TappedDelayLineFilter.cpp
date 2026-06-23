@@ -51,7 +51,7 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 	, m_tap7(m_parameters["Tap Value 7"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("in");
+	CreateInput<InputConstraintStreamType>("in", Stream::STREAM_TYPE_ANALOG);
 
 	m_tapDelay = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_tapDelay.SetIntVal(200000);
@@ -79,20 +79,6 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 
 	m_tap7 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_tap7.SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -44,8 +44,7 @@ VerticalBathtub::VerticalBathtub(const string& color)
 	AddStream(Unit(Unit::UNIT_LOG_BER), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
-	CreateInput("din");
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_EYE);
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_EYE);
 
 	m_time = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_time.SetFloatVal(0);

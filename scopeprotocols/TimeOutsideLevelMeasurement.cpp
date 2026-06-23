@@ -44,7 +44,7 @@ TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_measurementType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_measurementType.AddEnumValue("High Level", HIGH_LEVEL);
@@ -53,23 +53,6 @@ TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 
 	m_highlevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_lowlevel = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TimeOutsideLevelMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

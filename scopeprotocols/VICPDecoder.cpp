@@ -39,11 +39,8 @@ using namespace std;
 VICPDecoder::VICPDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
-	CreateInput("TX");
-	CreateInput("RX");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<TCPWaveform> >(this);
-	m_inputs[1]->m_constraints = make_shared<InputConstraintWaveformType<TCPWaveform> >(this);
+	CreateInput<InputConstraintWaveformType<TCPWaveform> >("TX");
+	CreateInput<InputConstraintWaveformType<TCPWaveform> >("RX");
 }
 
 VICPDecoder::~VICPDecoder()

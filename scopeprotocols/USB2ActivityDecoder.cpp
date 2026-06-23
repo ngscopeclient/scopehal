@@ -40,9 +40,7 @@ USB2ActivityDecoder::USB2ActivityDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddDigitalStream("data");
-	CreateInput("din");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintWaveformType<USB2PCSWaveform> >(this);
+	CreateInput<InputConstraintWaveformType<USB2PCSWaveform> >("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

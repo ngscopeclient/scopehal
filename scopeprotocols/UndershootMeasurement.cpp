@@ -42,8 +42,7 @@ UndershootMeasurement::UndershootMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_VOLTS), "min", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput("din");
-	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{

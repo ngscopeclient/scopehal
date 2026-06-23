@@ -46,9 +46,7 @@ TMDSDecoder::TMDSDecoder(const string& color)
 	, m_lane(m_parameters["Lane number"])
 {
 	AddProtocolStream("data");
-	CreateInput("data");
-
-	m_inputs[0]->m_constraints = make_shared<InputConstraintSparseStreamType>(this, Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintSparseStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
 
 	m_lane = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_lane.SetIntVal(0);
@@ -235,7 +233,7 @@ void TMDSDecoder::Refresh(
 	cap->MarkModifiedFromCpu();
 }
 
-std::string TMDSWaveform::GetColor(size_t i)
+string TMDSWaveform::GetColor(size_t i)
 {
 	const TMDSSymbol& s = m_samples[i];
 
