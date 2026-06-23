@@ -51,20 +51,10 @@ XYSweepFilter::XYSweepFilter(const string& color)
 	CreateInput("x");
 	CreateInput("y");
 	CreateInput("gate");
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool XYSweepFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 3) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
+	m_inputs[0]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG_SCALAR);
+	m_inputs[1]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG_SCALAR);
+	m_inputs[2]->m_constraints = make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG_SCALAR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

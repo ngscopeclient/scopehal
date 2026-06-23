@@ -55,6 +55,8 @@ public:
 
 protected:
 	FlowGraphNode* m_sink;
+
+	std::string StreamTypeToString(Stream::StreamType type);
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,8 +69,9 @@ protected:
 class InputConstraintAND : public InputConstraint
 {
 public:
-	InputConstraintAND(FlowGraphNode* sink)
+	InputConstraintAND(FlowGraphNode* sink, std::initializer_list<std::shared_ptr<InputConstraint> > constraints)
 	: InputConstraint(sink)
+	, m_constraints(constraints)
 	{}
 
 	//Match if all children are satisfied
@@ -83,7 +86,16 @@ public:
 	}
 
 	virtual std::string ToString() override
-	{ return "FIXME"; }
+	{
+		std::string ret = "";
+		for(auto p : m_constraints)
+		{
+			if(!ret.empty())
+				ret += "\n";
+			ret += std::string("• ") + p->ToString();
+		}
+		return ret;
+	}
 
 protected:
 	std::vector< std::shared_ptr<InputConstraint> > m_constraints;
@@ -107,10 +119,67 @@ public:
 	virtual bool Check(StreamDescriptor source) override
 	{ return (m_type == source.GetType() ); }
 
-	virtual std::string ToString() override;
+	virtual std::string ToString() override
+	{ return std::string("Stream type is ") + StreamTypeToString(m_type); }
 
 protected:
 	Stream::StreamType m_type;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+	@brief Match if the input is one of a list of stream types
+
+	@ingroup core
+ */
+class InputConstraintStreamTypes : public InputConstraint
+{
+public:
+	InputConstraintStreamTypes(FlowGraphNode* sink, std::initializer_list<Stream::StreamType> stypes)
+		: InputConstraint(sink)
+		, m_types(stypes)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{
+		for(auto t : m_types)
+		{
+			if(t == source.GetType())
+				return true;
+		}
+		return false;
+	}
+
+	virtual std::string ToString() override;
+
+protected:
+	std::vector<Stream::StreamType> m_types;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+	@brief Match if the input's X axis unit is a specific value
+
+	@ingroup core
+ */
+class InputConstraintXUnit : public InputConstraint
+{
+public:
+	InputConstraintXUnit(FlowGraphNode* sink, Unit unit)
+		: InputConstraint(sink)
+		, m_unit(unit)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{ return (m_unit == source.GetXAxisUnits() ); }
+
+	virtual std::string ToString() override
+	{ return std::string("X axis unit is ") + m_unit.ToString();  }
+
+protected:
+	Unit m_unit;
 };
 
 #endif

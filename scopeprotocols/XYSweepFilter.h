@@ -44,12 +44,9 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual void ClearSweeps() override;
 
 	PROTOCOL_DECODER_INITPROC(XYSweepFilter)
-
-protected:
 };
 
 #endif

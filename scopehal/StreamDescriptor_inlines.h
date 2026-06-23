@@ -37,7 +37,10 @@
 
 inline Unit StreamDescriptor::GetXAxisUnits()
 {
-	return m_channel->GetXAxisUnits();
+	if(m_channel == nullptr)
+		return Unit(Unit::UNIT_COUNTS);
+	else
+		return m_channel->GetXAxisUnits();
 }
 
 inline Unit StreamDescriptor::GetYAxisUnits()
