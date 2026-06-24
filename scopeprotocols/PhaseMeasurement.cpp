@@ -46,7 +46,7 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_DEGREES), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_freq = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
 	m_freq.SetIntVal(100e6);
@@ -63,23 +63,6 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 
 		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PhaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

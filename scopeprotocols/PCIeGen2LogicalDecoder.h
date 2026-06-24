@@ -97,14 +97,16 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(PCIeGen2LogicalDecoder)
 
 protected:
 	uint8_t RunScrambler(uint16_t& state);
 
-	void RefreshPorts();
+	//non-virtual shim we can call from signal_changed
+	void RefreshPortsHelper()
+	{ RefreshPorts(); }
+
+	virtual void RefreshPorts();
 
 	FilterParameter& m_portCount;
 };

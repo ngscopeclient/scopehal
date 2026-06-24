@@ -51,7 +51,7 @@ PCIeGen2LogicalDecoder::PCIeGen2LogicalDecoder(const string& color)
 
 	m_portCount = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_portCount.SetIntVal(1);
-	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &PCIeGen2LogicalDecoder::RefreshPorts));
+	m_portCount.signal_changed().connect(sigc::mem_fun(*this, &PCIeGen2LogicalDecoder::RefreshPortsHelper));
 
 	RefreshPorts();
 }
@@ -63,18 +63,6 @@ PCIeGen2LogicalDecoder::~PCIeGen2LogicalDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool PCIeGen2LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	size_t nports = m_portCount.GetIntVal();
-	if( (i <= nports) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string PCIeGen2LogicalDecoder::GetProtocolName()
 {
@@ -88,12 +76,12 @@ void PCIeGen2LogicalDecoder::RefreshPorts()
 {
 	//Create new inputs
 	size_t nports = m_portCount.GetIntVal();
-	for(size_t i=m_inputs.size(); i<nports; i++)
-		CreateInput(string("Lane") + to_string(i+1));
+	for(size_t i = m_inputs.size(); i < nports; i++)
+		CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >(string("Lane") + to_string(i+1));
 
 	//Delete extra inputs
-	for(size_t i=nports; i<m_inputs.size(); i++)
-		SetInput(i, NULL, true);
+	for(size_t i = nports; i < m_inputs.size(); i++)
+		SetInput(i, nullptr, true);
 	m_inputs.resize(nports);
 
 	m_inputsChangedSignal.emit();
@@ -494,7 +482,7 @@ uint8_t PCIeGen2LogicalDecoder::RunScrambler(uint16_t& state)
 	return ret;
 }
 
-std::string PCIeLogicalWaveform::GetColor(size_t i)
+string PCIeLogicalWaveform::GetColor(size_t i)
 {
 	const PCIeLogicalSymbol& s = m_samples[i];
 

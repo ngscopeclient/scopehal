@@ -41,7 +41,13 @@ PhaseNonlinearityFilter::PhaseNonlinearityFilter(const string& color)
 	, m_refHigh(m_parameters["Ref Freq High"])
 {
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("Phase");
+	CreateInput<InputConstraintAND>(
+		"Phase",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
 
 	m_refLow = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
 	m_refLow.SetIntVal(1e9);
@@ -50,21 +56,6 @@ PhaseNonlinearityFilter::PhaseNonlinearityFilter(const string& color)
 	m_refHigh.SetIntVal(2e9);
 
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PhaseNonlinearityFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
-		return false;
-	if(i == 0)
-		return (stream.GetYAxisUnits().GetType() == Unit::UNIT_DEGREES);
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

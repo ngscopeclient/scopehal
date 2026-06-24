@@ -46,7 +46,7 @@ PCIeDataLinkDecoder::PCIeDataLinkDecoder(const string& color)
 	, m_framingMode(m_parameters["Framing Mode"])
 {
 	//Set up channels
-	CreateInput("logical");
+	CreateInput<InputConstraintWaveformType<PCIeLogicalWaveform> >("logical");
 
 	m_framingMode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_framingMode.AddEnumValue("Gen 1/2", MODE_GEN12);
@@ -61,17 +61,6 @@ PCIeDataLinkDecoder::~PCIeDataLinkDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool PCIeDataLinkDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<PCIeLogicalWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string PCIeDataLinkDecoder::GetProtocolName()
 {

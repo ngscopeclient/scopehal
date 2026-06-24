@@ -47,7 +47,7 @@ PCIeTransportDecoder::PCIeTransportDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
 	//Set up channels
-	CreateInput("link");
+	CreateInput<InputConstraintWaveformType<PCIeDataLinkWaveform> >("link");
 }
 
 PCIeTransportDecoder::~PCIeTransportDecoder()
@@ -57,17 +57,6 @@ PCIeTransportDecoder::~PCIeTransportDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool PCIeTransportDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<PCIeDataLinkWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string PCIeTransportDecoder::GetProtocolName()
 {

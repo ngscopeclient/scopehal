@@ -46,8 +46,6 @@ public:
 
 	virtual void ClearSweeps() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(PeakHoldFilter)
 
 protected:

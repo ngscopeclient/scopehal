@@ -49,7 +49,8 @@ PCIeLinkTrainingDecoder::PCIeLinkTrainingDecoder(const string& color)
 	ClearStreams();
 	AddProtocolStream("packets");
 	AddProtocolStream("states");
-	CreateInput("lane");
+
+	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("lane");
 }
 
 PCIeLinkTrainingDecoder::~PCIeLinkTrainingDecoder()
@@ -59,17 +60,6 @@ PCIeLinkTrainingDecoder::~PCIeLinkTrainingDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool PCIeLinkTrainingDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string PCIeLinkTrainingDecoder::GetProtocolName()
 {

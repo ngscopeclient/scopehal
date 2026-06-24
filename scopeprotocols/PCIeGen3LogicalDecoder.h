@@ -53,12 +53,12 @@ public:
 	//cppcheck-suppress duplInheritedMember
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(PCIeGen3LogicalDecoder)
 
 protected:
 	void AddLogicalIdle(PCIeLogicalWaveform* cap, int64_t off, int64_t tend);
+
+	virtual void RefreshPorts() override;
 };
 
 #endif

@@ -46,6 +46,7 @@ using namespace std;
 PCIeGen3LogicalDecoder::PCIeGen3LogicalDecoder(const string& color)
 	: PCIeGen2LogicalDecoder(color)
 {
+	RefreshPorts();
 }
 
 PCIeGen3LogicalDecoder::~PCIeGen3LogicalDecoder()
@@ -56,16 +57,14 @@ PCIeGen3LogicalDecoder::~PCIeGen3LogicalDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PCIeGen3LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
+void PCIeGen3LogicalDecoder::RefreshPorts()
 {
-	if(stream.m_channel == nullptr)
-		return false;
+	//Recreate the inputs
+	PCIeGen2LogicalDecoder::RefreshPorts();
 
-	size_t nports = m_portCount.GetIntVal();
-	if( (i <= nports) && (dynamic_cast<PCIe128b130bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
-		return true;
-
-	return false;
+	//Update constraints
+	for(auto p : m_inputs)
+		p->m_constraints = make_shared<InputConstraintWaveformType<PCIe128b130bWaveform> >(this);
 }
 
 //This is intentionally not virtual since it's a static method used by enumeration
