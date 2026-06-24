@@ -36,6 +36,8 @@
 #ifndef InputConstraint_h
 #define InputConstraint_h
 
+#include <type_traits>
+
 #ifdef __GNUC__
 #include <cxxabi.h>
 #endif
@@ -175,6 +177,9 @@ public:
 
 	virtual bool Check(StreamDescriptor source) override
 	{
+		//Waveform type must be a waveform
+		static_assert(std::is_base_of<WaveformBase, T>::value == true);
+
 		//Input must be non-null
 		auto pdata = source.GetData();
 		if(!pdata)
@@ -219,6 +224,9 @@ public:
 
 	virtual bool Check(StreamDescriptor source) override
 	{
+		//Node type must be a graph node
+		static_assert(std::is_base_of<FlowGraphNode, T>::value == true);
+
 		//Input must be non-null
 		auto chan = source.m_channel;
 		if(!chan)
