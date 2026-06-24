@@ -45,7 +45,7 @@ J1939BitmaskDecoder::J1939BitmaskDecoder(const string& color)
 {
 	AddDigitalStream("data");
 
-	CreateInput("j1939");
+	CreateInput<InputConstraintWaveformType<J1939PDUWaveform> >("j1939");
 
 	m_parameters[m_initValue] = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_initValue].SetIntVal(0);
@@ -58,20 +58,6 @@ J1939BitmaskDecoder::J1939BitmaskDecoder(const string& color)
 
 	m_parameters[m_pattern] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
 	m_parameters[m_pattern].SetIntVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool J1939BitmaskDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<J1939PDUWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

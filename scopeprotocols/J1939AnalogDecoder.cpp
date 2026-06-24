@@ -49,7 +49,7 @@ J1939AnalogDecoder::J1939AnalogDecoder(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_ANALOG);
 
-	CreateInput("j1939");
+	CreateInput<InputConstraintWaveformType<J1939PDUWaveform> >("j1939");
 
 	m_parameters[m_initValue] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_initValue].SetIntVal(0);
@@ -81,20 +81,6 @@ J1939AnalogDecoder::J1939AnalogDecoder(const string& color)
 	m_parameters[m_scalemode].AddEnumValue("Multiply", SCALE_MULT);
 	m_parameters[m_scalemode].AddEnumValue("Divide", SCALE_DIV);
 	m_parameters[m_scalemode].SetIntVal(FORMAT_UINT16);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool J1939AnalogDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<J1939PDUWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

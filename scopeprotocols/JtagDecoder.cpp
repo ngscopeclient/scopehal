@@ -78,28 +78,15 @@ JtagDecoder::JtagDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
 	//Set up channels
-	CreateInput("TDI");
-	CreateInput("TDO");
-	CreateInput("TMS");
-	CreateInput("TCK");
+	CreateInput<InputConstraintStreamType>("TDI", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("TDO", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("TMS", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("TCK", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool JtagDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 4) &&
-		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
-}
 string JtagDecoder::GetProtocolName()
 {
 	return "JTAG";

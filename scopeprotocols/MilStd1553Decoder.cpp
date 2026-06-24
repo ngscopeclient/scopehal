@@ -39,7 +39,7 @@ using namespace std;
 MilStd1553Decoder::MilStd1553Decoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
-	CreateInput("in");
+	CreateInput<InputConstraintStreamType>("in", Stream::STREAM_TYPE_ANALOG);
 }
 
 MilStd1553Decoder::~MilStd1553Decoder()
@@ -52,17 +52,6 @@ MilStd1553Decoder::~MilStd1553Decoder()
 string MilStd1553Decoder::GetProtocolName()
 {
 	return "MIL-STD-1553";
-}
-
-bool MilStd1553Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG))
-		return true;
-
-	return false;
 }
 
 vector<string> MilStd1553Decoder::GetHeaders()

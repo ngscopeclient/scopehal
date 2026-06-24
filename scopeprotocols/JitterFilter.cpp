@@ -44,7 +44,7 @@ JitterFilter::JitterFilter(const string& color)
 
 {
 	AddDigitalStream("data");
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_DIGITAL);
 
 	m_stdev = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
 	m_stdev.SetFloatVal(5000);
@@ -54,20 +54,6 @@ JitterFilter::JitterFilter(const string& color)
 
 	m_pjamplitude = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
 	m_pjamplitude.SetFloatVal(3000);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool JitterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

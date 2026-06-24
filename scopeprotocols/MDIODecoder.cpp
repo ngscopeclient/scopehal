@@ -46,8 +46,8 @@ MDIODecoder::MDIODecoder(const string& color)
 	, m_type(m_parameters["PHY Type"])
 {
 	//Set up channels
-	CreateInput("mdio");
-	CreateInput("mdc");
+	CreateInput<InputConstraintStreamType>("mdio", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("mdc", Stream::STREAM_TYPE_DIGITAL);
 
 	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_type.AddEnumValue("Generic", PHY_TYPE_GENERIC);
@@ -59,17 +59,6 @@ MDIODecoder::MDIODecoder(const string& color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool MDIODecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string MDIODecoder::GetProtocolName()
 {

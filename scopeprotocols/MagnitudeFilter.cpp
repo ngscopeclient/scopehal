@@ -40,22 +40,8 @@ MagnitudeFilter::MagnitudeFilter(const string& color)
 	, m_computePipeline("shaders/Magnitude.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("I");
-	CreateInput("Q");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool MagnitudeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamType>("I", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("Q", Stream::STREAM_TYPE_ANALOG);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

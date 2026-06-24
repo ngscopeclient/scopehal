@@ -47,30 +47,21 @@ JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 
 	SetVoltageRange(250, 0);
 	SetOffset(-125, 0);
+
+	//Patch default FFTFilter input constraints
+	m_inputs[0]->m_constraints = make_shared<InputConstraintAND>(
+		this,
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_FS)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_FS)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
 }
 
 JitterSpectrumFilter::~JitterSpectrumFilter()
 {
 
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool JitterSpectrumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) &&
-		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-		(stream.GetYAxisUnits() == Unit::UNIT_FS)
-		)
-	{
-		return true;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -41,7 +41,7 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 	, m_uniformComputePipeline("shaders/MovingAverageFilter_Uniform.spv", 2, sizeof(MovingAveragePushConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_depth.SetFloatVal(10);
@@ -51,20 +51,6 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 		m_sparseComputePipeline = make_unique<ComputePipeline>(
 			"shaders/MovingAverageFilter_Sparse.spv", 5, sizeof(MovingAveragePushConstants));
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool MovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -39,22 +39,7 @@ MemoryFilter::MemoryFilter(const string& color)
 	: Filter(color, CAT_MATH)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool MemoryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	//TODO: support digital inputs?
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

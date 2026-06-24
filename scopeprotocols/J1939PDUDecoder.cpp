@@ -39,22 +39,11 @@ using namespace std;
 J1939PDUDecoder::J1939PDUDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
-	CreateInput("can");
+	CreateInput<InputConstraintWaveformType<CANWaveform> >("can");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool J1939PDUDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 vector<string> J1939PDUDecoder::GetHeaders()
 {

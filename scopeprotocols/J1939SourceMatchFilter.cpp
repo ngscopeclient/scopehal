@@ -39,7 +39,7 @@ J1939SourceMatchFilter::J1939SourceMatchFilter(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 	, m_sourceAddr("Source address")
 {
-	CreateInput("j1939");
+	CreateInput<InputConstraintWaveformType<J1939PDUWaveform> >("j1939");
 
 	m_parameters[m_sourceAddr] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_sourceAddr].SetIntVal(0);
@@ -47,17 +47,6 @@ J1939SourceMatchFilter::J1939SourceMatchFilter(const string& color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool J1939SourceMatchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<J1939PDUWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 vector<string> J1939SourceMatchFilter::GetHeaders()
 {

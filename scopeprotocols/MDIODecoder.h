@@ -102,8 +102,6 @@ public:
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(MDIODecoder)
 
 protected:

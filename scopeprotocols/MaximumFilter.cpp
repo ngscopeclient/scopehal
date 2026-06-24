@@ -44,7 +44,13 @@ MaximumFilter::MaximumFilter(const string& color)
 	m_streams[2].m_flags = Stream::STREAM_INFREQUENTLY_USED;
 	m_streams[3].m_flags = Stream::STREAM_INFREQUENTLY_USED;
 
-	CreateInput("in");
+	CreateInput<InputConstraintStreamTypes>(
+		"in",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
 
 	ClearSweeps();
 }
@@ -113,24 +119,6 @@ void MaximumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHan
 string MaximumFilter::GetProtocolName()
 {
 	return "Maximum";
-}
-
-bool MaximumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(i > 0)
-		return false;
-
-	switch(stream.GetType())
-	{
-		case Stream::STREAM_TYPE_ANALOG:
-		case Stream::STREAM_TYPE_ANALOG_SCALAR:
-			return true;
-
-		default:
-			return false;
-	}
-
-	return true;
 }
 
 void MaximumFilter::ClearSweeps()
