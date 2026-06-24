@@ -1007,12 +1007,6 @@ string PcapngImportFilter::ReadFixedLengthString(uint16_t len, FILE* fp)
 	return ret;
 }
 
-bool PcapngImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
-{
-	//no inputs allowed
-	return false;
-}
-
 void PcapngImportFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
 {
 	//no-op, everything happens in OnFileNameChanged

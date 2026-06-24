@@ -65,27 +65,13 @@ NCOFilter::NCOFilter(const string& color)
 	m_unit.SetIntVal(Unit::UNIT_VOLTS);
 	m_unit.signal_changed().connect(sigc::mem_fun(*this, &NCOFilter::OnUnitChanged));
 
-	CreateInput("freq");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool NCOFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(!stream.m_channel)
-		return false;
-
-	//Must be an analog frequency signal
-	if( (i == 0) &&
-		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-		(stream.GetYAxisUnits() == Unit(Unit::UNIT_HZ) ))
-	{
-		return true;
-	}
-
-	//no inputs
-	return false;
+	CreateInput<InputConstraintAND>(
+		"freq",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

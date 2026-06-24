@@ -45,22 +45,12 @@ PCIe128b130bDecoder::PCIe128b130bDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("data");
+
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool PCIe128b130bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string PCIe128b130bDecoder::GetProtocolName()
 {

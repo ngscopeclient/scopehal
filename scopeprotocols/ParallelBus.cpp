@@ -46,25 +46,11 @@ ParallelBus::ParallelBus(const string& color)
 	for(size_t i=0; i<16; i++)
 	{
 		snprintf(tmp, sizeof(tmp), "din%zu", i);
-		CreateInput(tmp);
+		CreateInput<InputConstraintStreamType>(tmp, Stream::STREAM_TYPE_DIGITAL);
 	}
 
 	m_width = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_width.SetIntVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ParallelBus::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 16) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

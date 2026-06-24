@@ -50,26 +50,7 @@ PcapngExportFilter::PcapngExportFilter(const string& color)
 	m_parameters[m_fname].m_fileFilterMask = "*.pcapng";
 	m_parameters[m_fname].m_fileFilterName = "PcapNG files (*.pcapng)";
 
-	CreateInput("packets");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PcapngExportFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	//Reject invalid port indexes
-	if(i > 0)
-		return false;
-
-	//Make sure the input is coming from an Ethernet decode (for now)
-	if( (i == 0) && (dynamic_cast<EthernetWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<EthernetWaveform> >("packets");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

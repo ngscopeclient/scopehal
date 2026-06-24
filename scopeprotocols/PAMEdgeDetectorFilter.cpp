@@ -46,7 +46,7 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 {
 	AddDigitalStream("data");
 
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_order = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_order.SetIntVal(3);
@@ -80,20 +80,6 @@ PAMEdgeDetectorFilter::PAMEdgeDetectorFilter(const string& color)
 		m_finalMergeComputePipeline =
 			make_shared<ComputePipeline>("shaders/PAMEdgeDetector_FinalMerge.spv", 5, sizeof(PAMEdgeDetectorMergeConstants));
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PAMEdgeDetectorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -43,8 +43,8 @@ PAM4DemodulatorFilter::PAM4DemodulatorFilter(const string& color)
 {
 	AddDigitalStream("data");
 	AddDigitalStream("clk");
-	CreateInput("data");
-	CreateInput("clk");
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
 
 	m_lowerThresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_lowerThresh.SetFloatVal(-0.07);
@@ -54,22 +54,6 @@ PAM4DemodulatorFilter::PAM4DemodulatorFilter(const string& color)
 
 	m_upperThresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_upperThresh.SetFloatVal(0.09);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool PAM4DemodulatorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

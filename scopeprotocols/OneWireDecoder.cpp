@@ -45,7 +45,7 @@ OneWireDecoder::OneWireDecoder(const string& color)
 	: Filter(color, CAT_BUS)
 {
 	AddProtocolStream("data");
-	CreateInput("data");
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
 }
 
 OneWireDecoder::~OneWireDecoder()
@@ -54,16 +54,6 @@ OneWireDecoder::~OneWireDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool OneWireDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-	return false;
-}
 
 string OneWireDecoder::GetProtocolName()
 {
