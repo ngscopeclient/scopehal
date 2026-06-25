@@ -43,27 +43,16 @@ using namespace std;
 
 CANDecoder::CANDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
-	, m_baudrateName("Bit Rate")
+	, m_baudrate(m_parameters["Bit Rate"])
 {
-	CreateInput("CANH");
+	CreateInput<InputConstraintStreamType>("CANH", Stream::STREAM_TYPE_DIGITAL);
 
-	m_parameters[m_baudrateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
-	m_parameters[m_baudrateName].SetIntVal(250000);
+	m_baudrate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_baudrate.SetIntVal(250000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool CANDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string CANDecoder::GetProtocolName()
 {
@@ -104,7 +93,7 @@ void CANDecoder::Refresh(
 
 	//Calculate some time scale values
 	//Sample point is 3/4 of the way through the UI
-	auto bitrate = m_parameters[m_baudrateName].GetIntVal();
+	auto bitrate = m_baudrate.GetIntVal();
 	int64_t fs_per_ui = FS_PER_SECOND / bitrate;
 	int64_t samples_per_ui = fs_per_ui / din->m_timescale;
 

@@ -37,8 +37,8 @@ using namespace std;
 
 ComplexImportFilter::ComplexImportFilter(const string& color)
 	: ImportFilter(color)
-	, m_formatname(m_parameters["File Format"])
-	, m_sratename(m_parameters["Sample Rate"])
+	, m_format(m_parameters["File Format"])
+	, m_srate(m_parameters["Sample Rate"])
 {
 	m_fpname = "Complex File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));

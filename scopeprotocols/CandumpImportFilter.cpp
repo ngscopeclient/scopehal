@@ -234,14 +234,6 @@ void CandumpImportFilter::OnFileNameChanged()
 	fclose(fp);
 }
 
-bool CandumpImportFilter::ValidateChannel(
-	[[maybe_unused]] size_t i,
-	[[maybe_unused]] StreamDescriptor stream)
-{
-	//no inputs allowed
-	return false;
-}
-
 void CandumpImportFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)

@@ -49,12 +49,10 @@ public:
 
 	std::vector<std::string> GetHeaders() override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(CANDecoder)
 
 protected:
-	std::string m_baudrateName;
+	FilterParameter& m_baudrate;
 };
 
 #endif

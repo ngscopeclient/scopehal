@@ -38,40 +38,26 @@ using namespace std;
 
 CANBitmaskFilter::CANBitmaskFilter(const string& color)
 	: Filter(color, CAT_BUS)
-	, m_initValue("Initial Value")
-	, m_busAddress("Bus Address")
-	, m_bitmask("Pattern Bitmask")
-	, m_pattern("Pattern Target")
+	, m_initValue(m_parameters["Initial Value"])
+	, m_busAddress(m_parameters["Bus Address"])
+	, m_bitmask(m_parameters["Pattern Bitmask"])
+	, m_pattern(m_parameters["Pattern Target"])
 {
 	AddDigitalStream("data");
 
-	CreateInput("din");
+	CreateInput<InputConstraintWaveformType<CANWaveform> >("din");
 
-	m_parameters[m_initValue] = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_initValue].SetIntVal(0);
+	m_initValue = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_initValue.SetIntVal(0);
 
-	m_parameters[m_busAddress] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_busAddress].SetIntVal(0);
+	m_busAddress = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_busAddress.SetIntVal(0);
 
-	m_parameters[m_bitmask] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_bitmask].SetIntVal(0);
+	m_bitmask = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_bitmask.SetIntVal(0);
 
-	m_parameters[m_pattern] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_pattern].SetIntVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool CANBitmaskFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
+	m_pattern = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_pattern.SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,11 +104,11 @@ void CANBitmaskFilter::Refresh(
 	//Initial sample at time zero
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(0);
-	cap->m_samples.push_back(static_cast<bool>(m_parameters[m_initValue].GetIntVal()));
+	cap->m_samples.push_back(static_cast<bool>(m_initValue.GetIntVal()));
 
-	int64_t mask = m_parameters[m_bitmask].GetIntVal();
-	int64_t pattern = m_parameters[m_pattern].GetIntVal();
-	auto targetaddr = m_parameters[m_busAddress].GetIntVal() ;
+	int64_t mask = m_bitmask.GetIntVal();
+	int64_t pattern = m_pattern.GetIntVal();
+	auto targetaddr = m_busAddress.GetIntVal();
 
 	//Process the CAN packet stream
 	//TODO: support CAN-FD which can have longer frames (up to 64 bytes)?

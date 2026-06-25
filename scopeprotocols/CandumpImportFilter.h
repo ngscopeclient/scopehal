@@ -43,7 +43,6 @@ public:
 	std::vector<std::string> GetHeaders() override;
 	virtual void SetDefaultName() override;
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	static std::string GetProtocolName();
 

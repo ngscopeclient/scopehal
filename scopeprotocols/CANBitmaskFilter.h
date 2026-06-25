@@ -44,15 +44,13 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(CANBitmaskFilter)
 
 protected:
-	std::string m_initValue;
-	std::string m_busAddress;
-	std::string m_bitmask;
-	std::string m_pattern;
+	FilterParameter& m_initValue;
+	FilterParameter& m_busAddress;
+	FilterParameter& m_bitmask;
+	FilterParameter& m_pattern;
 };
 
 #endif
