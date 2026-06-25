@@ -46,22 +46,11 @@ DSIFrameDecoder::DSIFrameDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("DSI");
+	CreateInput<InputConstraintBlockType<DSIPacketDecoder> >("DSI");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool DSIFrameDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<DSIPacketDecoder*>(stream.m_channel) != nullptr ) )
-		return true;
-
-	return false;
-}
 
 string DSIFrameDecoder::GetProtocolName()
 {

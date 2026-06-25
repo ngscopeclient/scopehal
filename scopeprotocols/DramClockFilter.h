@@ -44,14 +44,12 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(DramClockFilter)
 
 protected:
-	std::string m_dqsthreshname;
-	std::string m_burstname;
-	std::string m_casname;
+	FilterParameter& m_dqsthresh;
+	FilterParameter& m_burst;
+	FilterParameter& m_cas;
 };
 
 #endif

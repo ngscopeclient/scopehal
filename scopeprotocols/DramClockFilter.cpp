@@ -38,48 +38,30 @@ using namespace std;
 
 DramClockFilter::DramClockFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
+	, m_dqsthresh(m_parameters["DQS Threshold"])
+	, m_burst(m_parameters["Burst Length"])
+	, m_cas(m_parameters["CAS# Latency"])
 {
 	//Set up channels
 	AddStream(Unit(Unit::UNIT_COUNTS), "RD", Stream::STREAM_TYPE_DIGITAL);
 	AddStream(Unit(Unit::UNIT_COUNTS), "WR", Stream::STREAM_TYPE_DIGITAL);
 
 	//Set up channels
-	CreateInput("CMD");
-	CreateInput("CLK");
-	CreateInput("DQS");
+	CreateInput<InputConstraintWaveformType<SDRAMWaveform> >("CMD");
+	CreateInput<InputConstraintStreamType>("CLK", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("DQS", Stream::STREAM_TYPE_ANALOG);
 
-	m_dqsthreshname = "DQS Threshold";
-	m_parameters[m_dqsthreshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_dqsthreshname].SetFloatVal(1.6);
+	m_dqsthresh = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_dqsthresh.SetFloatVal(1.6);
 
-	m_burstname = "Burst Length";
-	m_parameters[m_burstname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_burstname].AddEnumValue("2", 2);
-	m_parameters[m_burstname].AddEnumValue("4", 4);
-	m_parameters[m_burstname].AddEnumValue("8", 8);
-	m_parameters[m_burstname].SetIntVal(8);
+	m_burst = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_burst.AddEnumValue("2", 2);
+	m_burst.AddEnumValue("4", 4);
+	m_burst.AddEnumValue("8", 8);
+	m_burst.SetIntVal(8);
 
-	m_casname = "CAS# Latency";
-	m_parameters[m_casname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_casname].SetFloatVal(2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DramClockFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != nullptr ) )
-		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-	if( (i == 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	m_cas = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
+	m_cas.SetFloatVal(2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +115,7 @@ void DramClockFilter::Refresh(
 	//Find edges in the DQS signal (double rate so we want both polarity)
 	//TODO: support differential DQS for DDR2/3
 	vector<int64_t> edges;
-	float thresh = m_parameters[m_dqsthreshname].GetFloatVal();
+	float thresh = m_dqsthresh.GetFloatVal();
 	if(sdqs)
 		FindZeroCrossings(sdqs, thresh, edges);
 	else
@@ -164,8 +146,8 @@ void DramClockFilter::Refresh(
 	rdclk->m_offsets.push_back(0);
 
 	//Extract some parameters
-	int bl = m_parameters[m_burstname].GetIntVal();
-	float tcas_cycles = m_parameters[m_casname].GetFloatVal();
+	int bl = m_burst.GetIntVal();
+	float tcas_cycles = m_cas.GetFloatVal();
 	int tcas_halfcycles = round(tcas_cycles * 2);
 
 	int64_t tdqs = 0;

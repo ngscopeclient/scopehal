@@ -41,21 +41,7 @@ DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& c
 {
 	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_FS), "min", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<SDRAMWaveform> >("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
