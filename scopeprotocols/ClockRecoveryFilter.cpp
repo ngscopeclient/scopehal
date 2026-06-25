@@ -49,9 +49,15 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	AddDigitalStream("recClk");
 	AddStream(Unit(Unit::UNIT_VOLTS), "sampledData", Stream::STREAM_TYPE_ANALOG);
 
-	CreateInput("IN");
-	CreateInput("Gate");
-	CreateInput("Edges");
+	CreateInput<InputConstraintStreamTypes>(
+		"IN",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_DIGITAL
+		});
+	CreateInput<InputConstraintStreamType>("Gate", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("Edges", Stream::STREAM_TYPE_DIGITAL);
 
 	m_baudRate = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
 	m_baudRate.SetFloatVal(1250000000);	//1.25 Gbps
@@ -88,37 +94,6 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 
 ClockRecoveryFilter::~ClockRecoveryFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	switch(i)
-	{
-		case 0:
-			if(stream.m_channel == nullptr)
-				return false;
-			return
-				(stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
-				(stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
-
-		case 1:
-			if(stream.m_channel == nullptr)	//null is legal for gate
-				return true;
-
-			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
-
-		case 2:
-			if(stream.m_channel == nullptr)	//null is legal for edge detector
-				return true;
-
-			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
-
-		default:
-			return false;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

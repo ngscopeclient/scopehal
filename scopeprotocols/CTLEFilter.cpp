@@ -38,25 +38,25 @@ using namespace std;
 
 CTLEFilter::CTLEFilter(const string& color)
 	: DeEmbedFilter(color)
+	, m_dcGain(m_parameters["DC Gain"])
+	, m_zeroFreq(m_parameters["Zero Frequency"])
+	, m_poleFreq1(m_parameters["Pole Frequency 1"])
+	, m_poleFreq2(m_parameters["Pole Frequency 2"])
 {
 	//delete the de-embed params
 	m_parameters.clear();
 
-	m_dcGainName = "DC Gain";
-	m_parameters[m_dcGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
-	m_parameters[m_dcGainName].SetFloatVal(0);
+	m_dcGain = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_dcGain.SetFloatVal(0);
 
-	m_zeroFreqName = "Zero Frequency";
-	m_parameters[m_zeroFreqName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_zeroFreqName].SetFloatVal(1e7);
+	m_zeroFreq = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_zeroFreq.SetFloatVal(1e7);
 
-	m_poleFreq1Name = "Pole Frequency 1";
-	m_parameters[m_poleFreq1Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_poleFreq1Name].SetFloatVal(1e9);
+	m_poleFreq1 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_poleFreq1.SetFloatVal(1e9);
 
-	m_poleFreq2Name = "Pole Frequency 2";
-	m_parameters[m_poleFreq2Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_poleFreq2Name].SetFloatVal(2e9);
+	m_poleFreq2 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_poleFreq2.SetFloatVal(2e9);
 
 	m_cachedDcGain = 1;
 	m_cachedZeroFreq = 1;
@@ -122,10 +122,10 @@ void CTLEFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle
 	#endif
 
 	//Pull out our settings
-	float dcgain_db = m_parameters[m_dcGainName].GetFloatVal();
-	float zfreq = m_parameters[m_zeroFreqName].GetFloatVal();
-	float pole1 = m_parameters[m_poleFreq1Name].GetFloatVal();
-	float pole2 = m_parameters[m_poleFreq2Name].GetFloatVal();
+	float dcgain_db = m_dcGain.GetFloatVal();
+	float zfreq = m_zeroFreq.GetFloatVal();
+	float pole1 = m_poleFreq1.GetFloatVal();
+	float pole2 = m_poleFreq2.GetFloatVal();
 
 	 if(
 		(dcgain_db != m_cachedDcGain) ||

@@ -58,8 +58,8 @@ ConstellationFilter::ConstellationFilter(const string& color)
 
 	m_xAxisUnit = Unit(Unit::UNIT_MICROVOLTS);
 
-	CreateInput("i");
-	CreateInput("q");
+	CreateInput<InputConstraintStreamType>("i", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("q", Stream::STREAM_TYPE_ANALOG);
 
 	m_modulation = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_modulation.AddEnumValue("None", MOD_NONE);
@@ -100,22 +100,6 @@ ConstellationFilter::ConstellationFilter(const string& color)
 		m_normalizeMaxBuf.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
 		m_normalizeMaxBuf.resize(1);
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ConstellationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

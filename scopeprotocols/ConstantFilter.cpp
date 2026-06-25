@@ -37,29 +37,19 @@ using namespace std;
 
 ConstantFilter::ConstantFilter(const string& color)
 	: Filter(color, CAT_GENERATION)
-	, m_value("Value")
-	, m_unit("Unit")
+	, m_value(m_parameters["Value"])
+	, m_unit(m_parameters["Unit"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	m_parameters[m_value] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_value].SetFloatVal(0);
+	m_value = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_value.SetFloatVal(0);
 
-	m_parameters[m_unit] = FilterParameter::UnitSelector();
-	m_parameters[m_unit].SetIntVal(Unit::UNIT_VOLTS);
-	m_parameters[m_unit].signal_changed().connect(sigc::mem_fun(*this, &ConstantFilter::OnUnitChanged));
+	m_unit = FilterParameter::UnitSelector();
+	m_unit.SetIntVal(Unit::UNIT_VOLTS);
+	m_unit.signal_changed().connect(sigc::mem_fun(*this, &ConstantFilter::OnUnitChanged));
 
 	SetData(nullptr, 0);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ConstantFilter::ValidateChannel([[maybe_unused]] size_t i, [[maybe_unused]] StreamDescriptor stream)
-{
-	//no inputs
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,14 +65,13 @@ string ConstantFilter::GetProtocolName()
 
 void ConstantFilter::OnUnitChanged()
 {
-	auto unit = static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal());
-	m_parameters[m_value] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+	m_value = FilterParameter(FilterParameter::TYPE_FLOAT, m_unit.GetEnumVal<Unit::UnitType>());
 }
 
 void ConstantFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	SetYAxisUnits(static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal()), 0);
-	m_streams[0].m_value = m_parameters[m_value].GetFloatVal();
+	SetYAxisUnits(m_unit.GetEnumVal<Unit::UnitType>(), 0);
+	m_streams[0].m_value = m_value.GetFloatVal();
 }

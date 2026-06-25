@@ -45,17 +45,73 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "forward", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "reverse", Stream::STREAM_TYPE_ANALOG);
 
-	CreateInput("forward");
-	CreateInput("reverse");
-	CreateInput("forwardCoupMag");
-	CreateInput("forwardCoupAng");
-	CreateInput("reverseCoupMag");
-	CreateInput("reverseCoupAng");
+	CreateInput<InputConstraintStreamType>("forward", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("reverse", Stream::STREAM_TYPE_ANALOG);
 
-	CreateInput("forwardLeakMag");
-	CreateInput("forwardLeakAng");
-	CreateInput("reverseLeakMag");
-	CreateInput("reverseLeakAng");
+	CreateInput<InputConstraintAND>(
+		"forwardCoupMag",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+		});
+	CreateInput<InputConstraintAND>(
+		"forwardCoupAng",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+		});
+	CreateInput<InputConstraintAND>(
+		"reverseCoupMag",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+		});
+	CreateInput<InputConstraintAND>(
+		"reverseCoupAng",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+		});
+	CreateInput<InputConstraintAND>(
+		"forwardLeakMag",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+		});
+	CreateInput<InputConstraintAND>(
+		"forwardLeakAng",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+		});
+	CreateInput<InputConstraintAND>(
+		"reverseLeakMag",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+		});
+	CreateInput<InputConstraintAND>(
+		"reverseLeakAng",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+		});
 
 	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_parameters[m_maxGainName].SetFloatVal(30);
@@ -69,44 +125,6 @@ CouplerDeEmbedFilter::CouplerDeEmbedFilter(const string& color)
 
 CouplerDeEmbedFilter::~CouplerDeEmbedFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool CouplerDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	switch(i)
-	{
-		//forward and reverse path signals
-		case 0:
-		case 1:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
-
-		//mag
-		case 2:
-		case 4:
-		case 6:
-		case 8:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-					(stream.GetYAxisUnits() == Unit::UNIT_DB);
-
-		//angle
-		case 3:
-		case 5:
-		case 7:
-		case 9:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-					(stream.GetYAxisUnits() == Unit::UNIT_DEGREES);
-
-		default:
-			return false;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

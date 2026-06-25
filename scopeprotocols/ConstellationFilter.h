@@ -87,8 +87,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	virtual float GetVoltageRange(size_t stream) override;
 	virtual float GetOffset(size_t stream) override;
 

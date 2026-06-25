@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,8 +54,8 @@ public:
 	};
 
 protected:
-	std::string m_formatname;
-	std::string m_sratename;
+	FilterParameter& m_format;
+	FilterParameter& m_srate;
 
 	void Reload();
 };

@@ -39,47 +39,14 @@ using namespace std;
 
 CSVExportFilter::CSVExportFilter(const string& color)
 	: ExportFilter(color)
-	, m_inputCount("Columns")
+	, m_inputCount(m_parameters["Columns"])
 {
 	m_parameters[m_fname].m_fileFilterMask = "*.csv";
 	m_parameters[m_fname].m_fileFilterName = "Comma Separated Value files (*.csv)";
 
-	m_parameters[m_inputCount] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_inputCount].signal_changed().connect(sigc::mem_fun(*this, &CSVExportFilter::OnColumnCountChanged));
-	m_parameters[m_inputCount].SetIntVal(1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool CSVExportFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	//Reject invalid port indexes
-	if(i >= (size_t)m_parameters[m_inputCount].GetIntVal())
-		return false;
-
-	//Reject weird stream types that don't make sense as CSV
-	switch(stream.GetType())
-	{
-		case Stream::STREAM_TYPE_ANALOG:
-		case Stream::STREAM_TYPE_DIGITAL:
-		case Stream::STREAM_TYPE_PROTOCOL:
-			return true;
-
-		case Stream::STREAM_TYPE_DIGITAL_BUS:		//TODO: support this
-
-		case Stream::STREAM_TYPE_ANALOG_SCALAR:
-		case Stream::STREAM_TYPE_EYE:
-		case Stream::STREAM_TYPE_SPECTROGRAM:
-		case Stream::STREAM_TYPE_WATERFALL:
-		case Stream::STREAM_TYPE_TRIGGER:
-		case Stream::STREAM_TYPE_UNDEFINED:
-		default:
-			return false;
-	}
+	m_inputCount = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_inputCount.signal_changed().connect(sigc::mem_fun(*this, &CSVExportFilter::OnColumnCountChanged));
+	m_inputCount.SetIntVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +77,7 @@ void CSVExportFilter::Export()
 	Unit xunit = GetInput(0).GetXAxisUnits();
 	if(!m_fp)
 	{
-		auto mode = static_cast<ExportMode_t>(m_parameters[m_mode].GetIntVal());
+		auto mode = m_parameters[m_mode].GetEnumVal<ExportMode_t>();
 
 		string filename = m_parameters[m_fname].GetFileName();
 		if(filename.empty()){
@@ -250,10 +217,19 @@ void CSVExportFilter::OnColumnCountChanged()
 	m_fp = nullptr;
 
 	//Add new ports
-	size_t sizeNew = m_parameters[m_inputCount].GetIntVal();
+	size_t sizeNew = m_inputCount.GetIntVal();
 	size_t sizeOld = m_inputs.size();
 	for(size_t i=sizeOld; i<sizeNew; i++)
-		CreateInput(string("column") + to_string(i+1));
+	{
+		CreateInput<InputConstraintStreamTypes>(
+			string("column") + to_string(i+1),
+			initializer_list<Stream::StreamType>
+			{
+				Stream::STREAM_TYPE_ANALOG,
+				Stream::STREAM_TYPE_DIGITAL,
+				Stream::STREAM_TYPE_PROTOCOL
+			});
+	}
 
 	//Remove extra ports, if any
 	m_inputs.resize(sizeNew);

@@ -44,8 +44,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(CSVExportFilter)
 
 protected:
@@ -53,7 +51,7 @@ protected:
 
 	void OnColumnCountChanged();
 
-	std::string m_inputCount;
+	FilterParameter& m_inputCount;
 };
 
 #endif

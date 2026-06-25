@@ -37,8 +37,8 @@ using namespace std;
 
 ComplexImportFilter::ComplexImportFilter(const string& color)
 	: ImportFilter(color)
-	, m_formatname("File Format")
-	, m_sratename("Sample Rate")
+	, m_formatname(m_parameters["File Format"])
+	, m_sratename(m_parameters["Sample Rate"])
 {
 	m_fpname = "Complex File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
@@ -46,18 +46,18 @@ ComplexImportFilter::ComplexImportFilter(const string& color)
 	m_parameters[m_fpname].m_fileFilterName = "Complex files (*.complex)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
 
-	m_parameters[m_formatname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit::UNIT_COUNTS);
-	m_parameters[m_formatname].AddEnumValue("Integer (8 bit unsigned)", FORMAT_UNSIGNED_INT8);
-	m_parameters[m_formatname].AddEnumValue("Integer (8 bit signed)", FORMAT_SIGNED_INT8);
-	m_parameters[m_formatname].AddEnumValue("Integer (16 bit signed)", FORMAT_SIGNED_INT16);
-	m_parameters[m_formatname].AddEnumValue("Floating point (32 bit single precision)", FORMAT_FLOAT32);
-	m_parameters[m_formatname].AddEnumValue("Floating point (64 bit double precision)", FORMAT_FLOAT64);
-	m_parameters[m_formatname].SetIntVal(FORMAT_FLOAT32);
-	m_parameters[m_formatname].signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
+	m_format = FilterParameter(FilterParameter::TYPE_ENUM, Unit::UNIT_COUNTS);
+	m_format.AddEnumValue("Integer (8 bit unsigned)", FORMAT_UNSIGNED_INT8);
+	m_format.AddEnumValue("Integer (8 bit signed)", FORMAT_SIGNED_INT8);
+	m_format.AddEnumValue("Integer (16 bit signed)", FORMAT_SIGNED_INT16);
+	m_format.AddEnumValue("Floating point (32 bit single precision)", FORMAT_FLOAT32);
+	m_format.AddEnumValue("Floating point (64 bit double precision)", FORMAT_FLOAT64);
+	m_format.SetIntVal(FORMAT_FLOAT32);
+	m_format.signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
 
-	m_parameters[m_sratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_sratename].SetIntVal(1e6);
-	m_parameters[m_sratename].signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
+	m_srate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_srate.SetIntVal(1e6);
+	m_srate.signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
 
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
@@ -111,7 +111,7 @@ void ComplexImportFilter::Reload()
 	fp = NULL;
 
 	//Create new waveforms
-	int64_t samplerate = m_parameters[m_sratename].GetIntVal();
+	int64_t samplerate = m_srate.GetIntVal();
 	if(samplerate == 0)
 	{
 		AddErrorMessage("Invalid sample rate", "Sample rate is zero");
@@ -135,7 +135,7 @@ void ComplexImportFilter::Reload()
 	qwfm->PrepareForCpuAccess();
 
 	//Figure out actual data element size
-	auto fmt = static_cast<Format>(m_parameters[m_formatname].GetIntVal());
+	auto fmt = m_format.GetEnumVal<Format>();
 	int bytes_per_sample = 1;
 	switch(fmt)
 	{

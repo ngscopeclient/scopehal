@@ -61,8 +61,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(ClockRecoveryFilter)
 
 	///@brief Allow our zero crossings to be reused in downstream filters (e.g. TIE) if valid (input is uniform)

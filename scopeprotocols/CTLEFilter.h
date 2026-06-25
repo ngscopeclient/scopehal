@@ -54,10 +54,10 @@ protected:
 	virtual int64_t GetGroupDelay() override;
 	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts) override;
 
-	std::string m_dcGainName;
-	std::string m_zeroFreqName;
-	std::string m_poleFreq1Name;
-	std::string m_poleFreq2Name;
+	FilterParameter& m_dcGain;
+	FilterParameter& m_zeroFreq;
+	FilterParameter& m_poleFreq1;
+	FilterParameter& m_poleFreq2;
 
 	float m_cachedDcGain;
 	float m_cachedZeroFreq;

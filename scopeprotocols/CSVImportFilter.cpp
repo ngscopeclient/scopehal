@@ -38,8 +38,8 @@ using namespace std;
 
 CSVImportFilter::CSVImportFilter(const string& color)
 	: ImportFilter(color)
-	, m_xunit("X Axis Unit")
-	, m_yunit0("Y Axis Unit 0")
+	, m_xunit(m_parameters["X Axis Unit"])
+	, m_yunit0(m_parameters["Y Axis Unit 0"])
 {
 	m_fpname = "CSV File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
@@ -47,13 +47,13 @@ CSVImportFilter::CSVImportFilter(const string& color)
 	m_parameters[m_fpname].m_fileFilterName = "Comma Separated Value files (*.csv)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
 
-	m_parameters[m_xunit] = FilterParameter::UnitSelector();
-	m_parameters[m_xunit].SetIntVal(Unit::UNIT_FS);
-	m_parameters[m_xunit].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
+	m_xunit = FilterParameter::UnitSelector();
+	m_xunit.SetIntVal(Unit::UNIT_FS);
+	m_xunit.signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
 
-	m_parameters[m_yunit0] = FilterParameter::UnitSelector();;
-	m_parameters[m_yunit0].SetIntVal(Unit::UNIT_VOLTS);
-	m_parameters[m_yunit0].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
+	m_yunit0 = FilterParameter::UnitSelector();;
+	m_yunit0.SetIntVal(Unit::UNIT_VOLTS);
+	m_yunit0.signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,7 +85,7 @@ void CSVImportFilter::OnFileNameChanged()
 	LogIndenter li;
 
 	//Set unit
-	SetXAxisUnits(Unit(static_cast<Unit::UnitType>(m_parameters[m_xunit].GetIntVal())));
+	SetXAxisUnits(Unit(m_xunit.GetEnumVal<Unit::UnitType>()));
 
 	//Set waveform timestamp to file timestamp
 	time_t timestamp = 0;
@@ -136,7 +136,7 @@ void CSVImportFilter::OnFileNameChanged()
 	size_t ncols = 0;
 	char* pbuf = buf;
 	char* pend = buf + flen;
-	bool xUnitIsFs = m_parameters[m_xunit].GetIntVal() == Unit::UNIT_FS;
+	bool xUnitIsFs = m_xunit.GetEnumVal<Unit::UnitType>() == Unit::UNIT_FS;
 	while(true)
 	{
 		nrow ++;
@@ -402,7 +402,7 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			//TODO: support arbitrarily many y axis unit fields, for now use unit 0 for everything
 			AddStream(
-				Unit(static_cast<Unit::UnitType>(m_parameters[m_yunit0].GetIntVal())),
+				Unit(m_yunit0.GetEnumVal<Unit::UnitType>()),
 				names[i],
 				Stream::STREAM_TYPE_ANALOG);
 

@@ -44,9 +44,15 @@ ComplexSpectrogramFilter::ComplexSpectrogramFilter(const string& color)
 	m_inputs.clear();
 
 	//Set up channels
-	CreateInput("I");
-	CreateInput("Q");
-	CreateInput("center");
+	CreateInput<InputConstraintStreamType>("I", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("Q", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintAND>(
+		"center",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG_SCALAR)
+		});
 
 	m_blackmanHarrisComputePipeline.Reinitialize(
 		"shaders/ComplexBlackmanHarrisWindow.spv", 3, sizeof(WindowFunctionArgs));
@@ -61,29 +67,6 @@ ComplexSpectrogramFilter::ComplexSpectrogramFilter(const string& color)
 
 ComplexSpectrogramFilter::~ComplexSpectrogramFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ComplexSpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	switch(i)
-	{
-		case 0:
-		case 1:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
-
-		case 2:
-			return	(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) &&
-					(stream.GetYAxisUnits() == Unit(Unit::UNIT_HZ));
-
-		default:
-			return false;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
