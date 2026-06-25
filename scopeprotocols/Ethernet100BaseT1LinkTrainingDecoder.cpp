@@ -37,35 +37,21 @@ using namespace std;
 
 Ethernet100BaseT1LinkTrainingDecoder::Ethernet100BaseT1LinkTrainingDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
-	, m_scrambler("Scrambler polynomial")
+	, m_scrambler(m_parameters["Scrambler polynomial"])
 {
-	CreateInput("i");
-	CreateInput("q");
+	CreateInput<InputConstraintStreamType>("i", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("q", Stream::STREAM_TYPE_ANALOG);
 
 	AddProtocolStream("data");
 
-	m_parameters[m_scrambler] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_scrambler].AddEnumValue("x^33 + x^13 + 1 (M)", Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
-	m_parameters[m_scrambler].AddEnumValue("x^33 + x^20 + 1 (S)", Ethernet100BaseT1Decoder::SCRAMBLER_S_B19);
-	m_parameters[m_scrambler].SetIntVal(Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
+	m_scrambler = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_scrambler.AddEnumValue("x^33 + x^13 + 1 (M)", Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
+	m_scrambler.AddEnumValue("x^33 + x^20 + 1 (S)", Ethernet100BaseT1Decoder::SCRAMBLER_S_B19);
+	m_scrambler.SetIntVal(Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
 }
 
 Ethernet100BaseT1LinkTrainingDecoder::~Ethernet100BaseT1LinkTrainingDecoder()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool Ethernet100BaseT1LinkTrainingDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +117,9 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 	auto cap = SetupEmptyWaveform<Ethernet100BaseT1LinkTrainingWaveform>(din_i, 0);
 	cap->PrepareForCpuAccess();
 
-	bool masterMode = (m_parameters[m_scrambler].GetIntVal() == Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
+	bool masterMode =
+		(m_scrambler.GetEnumVal<Ethernet100BaseT1Decoder::scrambler_t>() ==
+		Ethernet100BaseT1Decoder::SCRAMBLER_M_B13);
 
 	uint64_t scrambler = 0;
 	uint64_t idlesMatched = 0;

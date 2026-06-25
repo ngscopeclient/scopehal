@@ -44,9 +44,9 @@ EthernetRGMIIDecoder::EthernetRGMIIDecoder(const string& color)
 	m_inputs.clear();
 
 	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	CreateInput("data");
-	CreateInput("clk");
-	CreateInput("ctl");
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_DIGITAL_BUS);
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("ctl", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,29 +55,6 @@ EthernetRGMIIDecoder::EthernetRGMIIDecoder(const string& color)
 string EthernetRGMIIDecoder::GetProtocolName()
 {
 	return "Ethernet - RGMII";
-}
-
-bool EthernetRGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	auto chan = stream.m_channel;
-	if(chan == NULL)
-		return false;
-
-	switch(i)
-	{
-		case 0:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL_BUS)
-				return true;
-			break;
-
-		case 1:
-		case 2:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
-				return true;
-			break;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

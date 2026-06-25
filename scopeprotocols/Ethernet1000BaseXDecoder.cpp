@@ -45,7 +45,7 @@ Ethernet1000BaseXDecoder::Ethernet1000BaseXDecoder(const string& color)
 	m_inputs.clear();
 
 	//Add inputs. We take a single 8b10b coded stream
-	CreateInput("data");
+	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,17 +54,6 @@ Ethernet1000BaseXDecoder::Ethernet1000BaseXDecoder(const string& color)
 string Ethernet1000BaseXDecoder::GetProtocolName()
 {
 	return "Ethernet - 1000BaseX";
-}
-
-bool Ethernet1000BaseXDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

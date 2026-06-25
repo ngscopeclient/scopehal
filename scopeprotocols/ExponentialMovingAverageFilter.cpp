@@ -41,7 +41,7 @@ ExponentialMovingAverageFilter::ExponentialMovingAverageFilter(const string& col
 	, m_computePipeline("shaders/ExponentialMovingAverage.spv", 2, sizeof(ExponentialMovingAverageConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_halflife = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_halflife.SetIntVal(8);
@@ -49,23 +49,6 @@ ExponentialMovingAverageFilter::ExponentialMovingAverageFilter(const string& col
 
 ExponentialMovingAverageFilter::~ExponentialMovingAverageFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ExponentialMovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i >= 1)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

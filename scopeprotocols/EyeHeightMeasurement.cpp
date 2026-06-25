@@ -45,7 +45,7 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "minheight", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("Eye");
+	CreateInput<InputConstraintStreamType>("Eye", Stream::STREAM_TYPE_EYE);
 
 	m_startname = "Begin Time";
 	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
@@ -58,20 +58,6 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	m_posname = "Midpoint Voltage";
 	m_parameters[m_posname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_posname].SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool EyeHeightMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

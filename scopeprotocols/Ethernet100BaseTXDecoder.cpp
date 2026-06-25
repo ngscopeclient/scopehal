@@ -81,7 +81,7 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 {
 	m_inputs.clear();
 
-	CreateInput("sampledData");
+	CreateInput<InputConstraintStreamType>("sampledData", Stream::STREAM_TYPE_ANALOG);
 
 	if(g_hasShaderInt8)
 	{
@@ -125,17 +125,6 @@ Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 string Ethernet100BaseTXDecoder::GetProtocolName()
 {
 	return "Ethernet - 100baseTX";
-}
-
-bool Ethernet100BaseTXDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

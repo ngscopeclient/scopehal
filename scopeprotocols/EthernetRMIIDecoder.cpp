@@ -44,10 +44,10 @@ EthernetRMIIDecoder::EthernetRMIIDecoder(const string& color)
 	m_inputs.clear();
 
 	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	CreateInput("clk");
-	CreateInput("ctl");
-	CreateInput("d0");
-	CreateInput("d1");
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("ctl", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("d0", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("d1", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,21 +56,6 @@ EthernetRMIIDecoder::EthernetRMIIDecoder(const string& color)
 string EthernetRMIIDecoder::GetProtocolName()
 {
 	return "Ethernet - RMII";
-}
-
-bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	auto chan = stream.m_channel;
-	if(chan == nullptr)
-		return false;
-
-	if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
-		return false;
-
-	if(i < 4)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

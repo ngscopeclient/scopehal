@@ -51,7 +51,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(EthernetSGMIIDecoder)
 
 protected:
-	std::string m_speedName;
+	FilterParameter& m_speed;
 
 	enum Speeds
 	{

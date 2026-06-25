@@ -78,15 +78,11 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	virtual std::vector<std::string> GetHeaders() override;
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
 
 	PROTOCOL_DECODER_INITPROC(EthernetBaseXAutonegotiationDecoder)
-
-protected:
 };
 
 #endif

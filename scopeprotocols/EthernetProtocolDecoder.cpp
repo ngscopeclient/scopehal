@@ -39,25 +39,11 @@ EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 }
 
 EthernetProtocolDecoder::~EthernetProtocolDecoder()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool EthernetProtocolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

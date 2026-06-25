@@ -42,21 +42,7 @@ EyeBitRateMeasurement::EyeBitRateMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_BITRATE), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("Eye");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool EyeBitRateMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamType>("Eye", Stream::STREAM_TYPE_EYE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

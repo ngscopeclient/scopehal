@@ -45,22 +45,11 @@ using namespace std;
 EthernetBaseXAutonegotiationDecoder::EthernetBaseXAutonegotiationDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
-	CreateInput("din");
+	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool EthernetBaseXAutonegotiationDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.GetData()) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string EthernetBaseXAutonegotiationDecoder::GetProtocolName()
 {

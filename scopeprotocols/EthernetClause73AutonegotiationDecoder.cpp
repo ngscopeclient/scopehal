@@ -46,7 +46,7 @@ EthernetClause73AutonegotiationDecoder::EthernetClause73AutonegotiationDecoder(c
 	, m_displayformat(m_parameters["Display Format"])
 {
 	AddProtocolStream("data");
-	CreateInput("sampleData");
+	CreateInput<InputConstraintStreamType>("sampleData", Stream::STREAM_TYPE_DIGITAL);
 
 	m_displayformat = MakeDisplayFormatParameter();
 }
@@ -63,17 +63,6 @@ FilterParameter EthernetClause73AutonegotiationDecoder::MakeDisplayFormatParamet
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool EthernetClause73AutonegotiationDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string EthernetClause73AutonegotiationDecoder::GetProtocolName()
 {

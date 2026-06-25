@@ -45,22 +45,11 @@ using namespace std;
 EthernetAutonegotiationPageDecoder::EthernetAutonegotiationPageDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
-	CreateInput("din");
+	CreateInput<InputConstraintWaveformType<EthernetAutonegotiationWaveform> >("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool EthernetAutonegotiationPageDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<EthernetAutonegotiationWaveform*>(stream.GetData()) != nullptr) )
-		return true;
-
-	return false;
-}
 
 string EthernetAutonegotiationPageDecoder::GetProtocolName()
 {

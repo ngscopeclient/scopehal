@@ -40,13 +40,13 @@ using namespace std;
 
 EthernetSGMIIDecoder::EthernetSGMIIDecoder(const string& color)
 	: Ethernet1000BaseXDecoder(color)
-	, m_speedName("Speed")
+	, m_speed(m_parameters["Speed"])
 {
-	m_parameters[m_speedName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_speedName].AddEnumValue("10 Mbps", SPEED_10M);
-	m_parameters[m_speedName].AddEnumValue("100 Mbps", SPEED_100M);
-	m_parameters[m_speedName].AddEnumValue("1000 Mbps", SPEED_1000M);
-	m_parameters[m_speedName].SetIntVal(SPEED_1000M);
+	m_speed = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_speed.AddEnumValue("10 Mbps", SPEED_10M);
+	m_speed.AddEnumValue("100 Mbps", SPEED_100M);
+	m_speed.AddEnumValue("1000 Mbps", SPEED_1000M);
+	m_speed.SetIntVal(SPEED_1000M);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +93,7 @@ void EthernetSGMIIDecoder::Refresh(
 	cap->PrepareForCpuAccess();
 
 	size_t delta = 1;
-	switch(m_parameters[m_speedName].GetIntVal())
+	switch(m_speed.GetEnumVal<Speeds>())
 	{
 		case SPEED_10M:
 			delta = 100;

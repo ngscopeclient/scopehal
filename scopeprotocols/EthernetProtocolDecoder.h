@@ -96,8 +96,6 @@ public:
 	EthernetProtocolDecoder(const std::string& color);
 	virtual ~EthernetProtocolDecoder();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	virtual std::vector<std::string> GetHeaders() override;
 
 protected:
