@@ -52,24 +52,13 @@ DVIDecoder::DVIDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
 	//Set up channels
-	CreateInput("D0 (blue)");
-	CreateInput("D1 (green)");
-	CreateInput("D2 (red)");
+	CreateInput<InputConstraintWaveformType<TMDSWaveform> >("D0 (blue)");
+	CreateInput<InputConstraintWaveformType<TMDSWaveform> >("D1 (green)");
+	CreateInput<InputConstraintWaveformType<TMDSWaveform> >("D2 (red)");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool DVIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i <= 2) && (dynamic_cast<TMDSDecoder*>(stream.m_channel) != nullptr ) )
-		return true;
-
-	return false;
-}
 
 string DVIDecoder::GetProtocolName()
 {

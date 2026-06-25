@@ -45,7 +45,7 @@ Ethernet10GBaseRDecoder::Ethernet10GBaseRDecoder(const string& color)
 	m_inputs.clear();
 
 	//Add inputs. We take a single 64b66b coded stream
-	CreateInput("data");
+	CreateInput<InputConstraintWaveformType<Ethernet64b66bWaveform> >("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,17 +54,6 @@ Ethernet10GBaseRDecoder::Ethernet10GBaseRDecoder(const string& color)
 string Ethernet10GBaseRDecoder::GetProtocolName()
 {
 	return "Ethernet - 10GBaseR";
-}
-
-bool Ethernet10GBaseRDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<Ethernet64b66bWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

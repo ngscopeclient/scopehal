@@ -44,7 +44,7 @@ EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
 	, m_computePipeline("shaders/EmphasisFilter.spv", 2, sizeof(EmphasisFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("in");
+	CreateInput<InputConstraintStreamType>("in", Stream::STREAM_TYPE_ANALOG);
 
 	m_dataRate = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_dataRate.SetIntVal(1250e6);
@@ -56,20 +56,6 @@ EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
 
 	m_emphasisAmount = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_emphasisAmount.SetFloatVal(6);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool EmphasisRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

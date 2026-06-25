@@ -40,34 +40,20 @@ using namespace std;
 
 ESPIDecoder::ESPIDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
-	, m_busWidthName("Bus Width")
+	, m_busWidth(m_parameters["Bus Width"])
 {
-	CreateInput("clk");
-	CreateInput("cs#");
-	CreateInput("dq3");
-	CreateInput("dq2");
-	CreateInput("dq1");
-	CreateInput("dq0");
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("cs#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq3", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq2", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq1", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq0", Stream::STREAM_TYPE_DIGITAL);
 
-	m_parameters[m_busWidthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_busWidthName].AddEnumValue("x1", BUS_WIDTH_X1);
-	m_parameters[m_busWidthName].AddEnumValue("x4", BUS_WIDTH_X4);
-	m_parameters[m_busWidthName].AddEnumValue("Auto", BUS_WIDTH_AUTO);
-	m_parameters[m_busWidthName].SetIntVal(BUS_WIDTH_AUTO);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ESPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
+	m_busWidth = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_busWidth.AddEnumValue("x1", BUS_WIDTH_X1);
+	m_busWidth.AddEnumValue("x4", BUS_WIDTH_X4);
+	m_busWidth.AddEnumValue("Auto", BUS_WIDTH_AUTO);
+	m_busWidth.SetIntVal(BUS_WIDTH_AUTO);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,7 +144,7 @@ void ESPIDecoder::Refresh(
 	};
 
 	//Figure out the bus width to use for protocol decoding
-	auto busWidthMode = static_cast<BusWidth>(m_parameters[m_busWidthName].GetIntVal());
+	auto busWidthMode = m_busWidth.GetEnumVal<BusWidth>();
 	BusWidth busWidthModeNext = busWidthMode;
 	bool busWidthModeChanged = false;
 

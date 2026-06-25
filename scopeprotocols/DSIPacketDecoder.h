@@ -87,8 +87,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	std::vector<std::string> GetHeaders() override;
 
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;

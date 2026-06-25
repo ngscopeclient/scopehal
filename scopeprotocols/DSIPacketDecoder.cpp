@@ -39,21 +39,7 @@ using namespace std;
 DSIPacketDecoder::DSIPacketDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
-	CreateInput("data");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DSIPacketDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<DPhyDataDecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<DPhyDataWaveform> >("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

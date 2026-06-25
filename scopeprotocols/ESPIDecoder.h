@@ -209,8 +209,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
 
@@ -226,7 +224,7 @@ protected:
 		BUS_WIDTH_X4
 	};
 
-	std::string m_busWidthName;
+	FilterParameter& m_busWidth;
 };
 
 #endif
