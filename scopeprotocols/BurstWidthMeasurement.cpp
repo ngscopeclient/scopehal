@@ -37,35 +37,21 @@ using namespace std;
 
 BurstWidthMeasurement::BurstWidthMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
+	, m_idletime(m_parameters["Idle Time"])
 {
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamTypes>(
+		"din",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_DIGITAL
+		});
 
-	m_idletime = "Idle Time";
-	m_parameters[m_idletime] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_idletime].SetIntVal(1000000000000);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool BurstWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
-		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
+	m_idletime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_idletime.SetIntVal(1000000000000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +129,7 @@ void BurstWidthMeasurement::Refresh(
 
 	//Get the idle time to look for. A burst will be detected when difference
 	//between two consecutive edges is greater than the idle time
-	int64_t idletime = m_parameters[m_idletime].GetIntVal();
+	int64_t idletime = m_idletime.GetIntVal();
 
 	for(size_t i = 0; i < (elen - 1); i++)
 	{

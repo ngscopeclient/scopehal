@@ -40,24 +40,16 @@ BandwidthMeasurement::BandwidthMeasurement(const string& color)
 	, m_reference(m_parameters["Reference Level"])
 {
 	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput("din");
+	CreateInput<InputConstraintAND>(
+		"din",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
 
 	m_reference = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_reference.SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool BandwidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) && (stream.GetYAxisUnits() == Unit(Unit::UNIT_DB)) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -40,29 +40,25 @@ AddFilter::AddFilter(const string& color)
 	, m_computePipeline("shaders/AddFilter.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("a");
-	CreateInput("b");
+
+	CreateInput<InputConstraintStreamTypes>(
+		"a",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
+	CreateInput<InputConstraintStreamTypes>(
+		"b",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
 }
 
 AddFilter::~AddFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool AddFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i >= 2)
-		return false;
-
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) || (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

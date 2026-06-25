@@ -45,7 +45,7 @@ AreaMeasurement::AreaMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "final", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
 	m_measurementType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_measurementType.AddEnumValue("Full Record", FULL_RECORD);
@@ -54,23 +54,6 @@ AreaMeasurement::AreaMeasurement(const string& color)
 	m_areaType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_areaType.AddEnumValue("True Area", TRUE_AREA);
 	m_areaType.AddEnumValue("Absolute Area", ABSOLUTE_AREA);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool AreaMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

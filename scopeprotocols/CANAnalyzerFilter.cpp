@@ -39,7 +39,7 @@ using namespace std;
 CANAnalyzerFilter::CANAnalyzerFilter(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
-	CreateInput("din");
+	CreateInput<InputConstraintWaveformType<CANWaveform> >("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,17 +64,6 @@ vector<string> CANAnalyzerFilter::GetHeaders()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-bool CANAnalyzerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
-}
 
 void CANAnalyzerFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,

@@ -40,21 +40,7 @@ ADL5205Decoder::ADL5205Decoder(const string& color)
 	: Filter(color, CAT_MISC)
 {
 	AddProtocolStream("data");
-	CreateInput("spi");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ADL5205Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<SPIWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<SPIWaveform> >("spi");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

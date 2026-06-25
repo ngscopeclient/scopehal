@@ -47,14 +47,12 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(BusHeatmapFilter)
 
 protected:
-	std::string m_maxAddress;
-	std::string m_yBinSize;
-	std::string m_xBinSize;
+	FilterParameter& m_maxAddress;
+	FilterParameter& m_yBinSize;
+	FilterParameter& m_xBinSize;
 };
 
 #endif

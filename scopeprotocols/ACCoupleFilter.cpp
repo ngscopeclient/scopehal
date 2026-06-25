@@ -40,21 +40,7 @@ ACCoupleFilter::ACCoupleFilter(const string& color)
 	, m_computePipeline("shaders/SubtractVectorScalar.spv", 2, sizeof(SubtractVectorScalarConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ACCoupleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

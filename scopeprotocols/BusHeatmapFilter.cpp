@@ -40,44 +40,29 @@ using namespace std;
 
 BusHeatmapFilter::BusHeatmapFilter(const string& color)
 	: Filter(color, CAT_BUS)
-	, m_maxAddress("Max Address")
-	, m_yBinSize("Y Bin Size")
-	, m_xBinSize("X Bin Size")
+	, m_maxAddress(m_parameters["Max Address"])
+	, m_yBinSize(m_parameters["Y Bin Size"])
+	, m_xBinSize(m_parameters["X Bin Size"])
 {
 	AddStream(Unit(Unit::UNIT_HEXNUM), "data", Stream::STREAM_TYPE_SPECTROGRAM);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintWaveformType<CANWaveform> >("din");
 
-	m_parameters[m_maxAddress] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_maxAddress].SetIntVal(2047);
+	m_maxAddress = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_maxAddress.SetIntVal(2047);
 
-	m_parameters[m_yBinSize] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_parameters[m_yBinSize].SetIntVal(1);
+	m_yBinSize = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
+	m_yBinSize.SetIntVal(1);
 
-	m_parameters[m_xBinSize] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_xBinSize].SetIntVal(1000LL * 1000LL * 1000LL * 1000LL * 50); //50 ms
+	m_xBinSize = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_xBinSize.SetIntVal(1000LL * 1000LL * 1000LL * 1000LL * 50); //50 ms
 
 	SetVoltageRange(128, 0);
 }
 
 BusHeatmapFilter::~BusHeatmapFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool BusHeatmapFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	//for now only support canbus
-	if( (i == 0) && (dynamic_cast<CANWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,9 +106,9 @@ void BusHeatmapFilter::Refresh(
 	din->PrepareForCpuAccess();
 
 	//Extract parameters for density scaling
-	int64_t xscale = m_parameters[m_xBinSize].GetIntVal();
-	int64_t yscale = m_parameters[m_yBinSize].GetIntVal();
-	int64_t maxy = m_parameters[m_maxAddress].GetIntVal();
+	int64_t xscale = m_xBinSize.GetIntVal();
+	int64_t yscale = m_yBinSize.GetIntVal();
+	int64_t maxy = m_maxAddress.GetIntVal();
 	if( (xscale == 0) || (yscale == 0) )
 	{
 		AddErrorMessage("Bad scale", "X and Y scale must be nonzero");

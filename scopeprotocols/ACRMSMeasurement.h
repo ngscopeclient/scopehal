@@ -63,8 +63,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 protected:
 	void DoRefreshSparse(SparseAnalogWaveform* wfm);
 	void DoRefreshUniform(
