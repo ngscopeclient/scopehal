@@ -40,21 +40,7 @@ IPv4Decoder::IPv4Decoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("eth");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool IPv4Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<EthernetWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<EthernetWaveform> >("eth");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

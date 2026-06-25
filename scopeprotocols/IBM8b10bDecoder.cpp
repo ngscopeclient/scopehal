@@ -47,7 +47,7 @@ IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	, m_commaSearchWindow(m_parameters["Comma Search Window"])
 {
 	AddProtocolStream("data");
-	CreateInput("data");
+	CreateInput<InputConstraintSparseStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
 
 	m_displayFormat = MakeIBM8b10bDisplayFormatParameter();
 
@@ -66,17 +66,6 @@ FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool IBM8b10bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string IBM8b10bDecoder::GetProtocolName()
 {

@@ -42,7 +42,7 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
-	CreateInput("sampledData");
+	CreateInput<InputConstraintSparseStreamType>("sampledData", Stream::STREAM_TYPE_ANALOG);
 
 	m_alignment = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_alignment.AddEnumValue("None", ALIGN_NONE);
@@ -62,20 +62,6 @@ IQDemuxFilter::IQDemuxFilter(const string& color)
 	m_alignComputePipeline =
 		make_shared<ComputePipeline>("shaders/IQDemuxFilterAlignment.spv", 2, sizeof(uint32_t));
 	m_alignOut.resize(2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool IQDemuxFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

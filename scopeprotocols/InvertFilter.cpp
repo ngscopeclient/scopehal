@@ -41,23 +41,13 @@ InvertFilter::InvertFilter(const string& color)
 	, m_digitalComputePipeline("shaders/InvertFilterDigital.spv", 2, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool InvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamTypes>(
+		"din",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_DIGITAL
+		});
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

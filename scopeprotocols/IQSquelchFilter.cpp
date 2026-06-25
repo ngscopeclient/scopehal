@@ -41,8 +41,9 @@ IQSquelchFilter::IQSquelchFilter(const string& color)
 	, m_holdtime(m_parameters["Hold time"])
 {
 	//Set up channels
-	CreateInput("I");
-	CreateInput("Q");
+	CreateInput<InputConstraintStreamType>("I", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("Q", Stream::STREAM_TYPE_ANALOG);
+
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
@@ -52,20 +53,6 @@ IQSquelchFilter::IQSquelchFilter(const string& color)
 
 	m_holdtime = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_holdtime.SetIntVal(1e6);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool IQSquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
