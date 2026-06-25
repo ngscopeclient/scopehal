@@ -91,7 +91,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 	virtual std::vector<std::string> GetHeaders() override;
 
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;

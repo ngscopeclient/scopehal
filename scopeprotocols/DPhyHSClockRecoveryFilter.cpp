@@ -40,22 +40,8 @@ DPhyHSClockRecoveryFilter::DPhyHSClockRecoveryFilter(const string& color)
 	: Filter(color, CAT_CLOCK)
 {
 	AddDigitalStream("data");
-	CreateInput("clk");
-	CreateInput("data");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DPhyHSClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (dynamic_cast<DPhySymbolDecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintBlockType<DPhySymbolDecoder> >("clk");
+	CreateInput<InputConstraintBlockType<DPhySymbolDecoder> >("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

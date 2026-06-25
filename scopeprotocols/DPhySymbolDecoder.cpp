@@ -45,33 +45,8 @@ DPhySymbolDecoder::DPhySymbolDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("IN+");
-	CreateInput("IN-");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DPhySymbolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//IN+ is required
-	if(i == 0)
-	{
-		if(stream.m_channel == nullptr)
-			return false;
-		return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
-	}
-
-	//IN- can be omitted, but if not specified we can't decode all line states.
-	//For many common interfaces, we can get away with this and save a probe.
-	else if(i == 1)
-	{
-		if(stream.m_channel == nullptr)
-			return true;
-		return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
-	}
-
-	return false;
+	CreateInput<InputConstraintStreamType>("IN+", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("IN-", Stream::STREAM_TYPE_ANALOG);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

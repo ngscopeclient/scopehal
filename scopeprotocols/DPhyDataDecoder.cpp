@@ -40,22 +40,8 @@ DPhyDataDecoder::DPhyDataDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("Clock");
-	CreateInput("Data");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DPhyDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (dynamic_cast<DPhySymbolDecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<DPhySymbolWaveform> >("Clock");
+	CreateInput<InputConstraintWaveformType<DPhySymbolWaveform> >("Data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

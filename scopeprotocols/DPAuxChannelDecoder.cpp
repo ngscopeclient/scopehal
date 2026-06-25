@@ -44,7 +44,7 @@ DPAuxChannelDecoder::DPAuxChannelDecoder(const string& color)
 	, m_dfpType(DFP_TYPE_UNKNOWN)
 	, m_dcpdRevision(0x11)
 {
-	CreateInput("aux");
+	CreateInput<InputConstraintStreamType>("aux", Stream::STREAM_TYPE_ANALOG);
 
 	//Rename default output stream since we have several
 	m_streams[0].m_name = "dpaux";
@@ -67,17 +67,6 @@ string DPAuxChannelDecoder::GetProtocolName()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-bool DPAuxChannelDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
 
 vector<string> DPAuxChannelDecoder::GetHeaders()
 {

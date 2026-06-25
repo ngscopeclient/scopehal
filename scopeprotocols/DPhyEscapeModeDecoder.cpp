@@ -40,21 +40,7 @@ DPhyEscapeModeDecoder::DPhyEscapeModeDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("Data");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DPhyEscapeModeDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<DPhySymbolDecoder*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintWaveformType<DPhySymbolWaveform> >("Data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
