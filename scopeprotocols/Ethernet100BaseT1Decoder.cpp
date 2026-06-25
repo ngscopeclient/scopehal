@@ -46,8 +46,8 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 {
 	m_inputs.clear();
 
-	CreateInput("i");
-	CreateInput("q");
+	CreateInput<InputConstraintStreamType>("i", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("q", Stream::STREAM_TYPE_ANALOG);
 
 	m_scrambler = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_scrambler.AddEnumValue("x^33 + x^13 + 1 (M)", SCRAMBLER_M_B13);
@@ -90,18 +90,6 @@ string Ethernet100BaseT1Decoder::GetProtocolName()
 {
 	return "Ethernet - 100baseT1";
 }
-
-bool Ethernet100BaseT1Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic

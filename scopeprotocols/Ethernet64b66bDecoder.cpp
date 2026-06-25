@@ -47,23 +47,12 @@ Ethernet64b66bDecoder::Ethernet64b66bDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
-	CreateInput("data");
-	CreateInput("clk");
+
+	CreateInput<InputConstraintSparseStreamType>("sampledData", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool Ethernet64b66bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string Ethernet64b66bDecoder::GetProtocolName()
 {
@@ -83,36 +72,25 @@ void Ethernet64b66bDecoder::Refresh(
 
 	//Get the input data
 	ClearErrors();
-	if(!VerifyAllInputsOK())
+	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		for(int i=0; i<2; i++)
-		{
-			if(!GetInput(i))
-				AddErrorMessage("Missing inputs", string("No signal input connected to ") + m_inputs[i]->m_name );
-			else if(!GetInputWaveform(i))
-				AddErrorMessage("Missing inputs", string("No waveform available at input ") + m_inputs[i]->m_name );
-		}
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else
+			AddErrorMessage("Missing inputs", "No waveform available at input");
 
 		SetData(nullptr, 0);
 		return;
 	}
-	auto din = GetInputWaveform(0);
-	auto clkin = GetInputWaveform(1);
 	din->PrepareForCpuAccess();
-	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = SetupEmptyWaveform<Ethernet64b66bWaveform>(din, 0);
-	cap->m_timescale = 1;
-	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
-	//Record the value of the data stream at each clock edge
-	SparseDigitalWaveform data;
-	SampleOnAnyEdgesBase(din, clkin, data);
-
 	//Look at each phase and figure out block alignment
-	size_t end = data.size() - 66;
+	size_t end = din->size() - 66;
 	size_t best_offset = 0;
 	size_t best_errors = end;
 	for(size_t offset=0; offset < 66; offset ++)
@@ -120,7 +98,7 @@ void Ethernet64b66bDecoder::Refresh(
 		size_t errors = 0;
 		for(size_t i=offset; i<end; i+= 66)
 		{
-			if(data.m_samples[i] == data.m_samples[i+1])
+			if(din->m_samples[i] == din->m_samples[i+1])
 				errors ++;
 		}
 
@@ -139,14 +117,14 @@ void Ethernet64b66bDecoder::Refresh(
 	{
 		//Extract the header bits
 		uint8_t header =
-			(data.m_samples[i] ? 2 : 0) |
-			(data.m_samples[i+1] ? 1 : 0);
+			(din->m_samples[i] ? 2 : 0) |
+			(din->m_samples[i+1] ? 1 : 0);
 
 		//Extract the data bits and descramble them.
 		uint64_t codeword = 0;
 		for(size_t j=0; j<64; j++)
 		{
-			bool b = data.m_samples[i + 2 + j];
+			bool b = din->m_samples[i + 2 + j];
 
 			codeword >>= 1;
 			if(b ^ ( (lfsr >> 38) & 1) ^ ( (lfsr >> 57) & 1) )
@@ -185,8 +163,8 @@ void Ethernet64b66bDecoder::Refresh(
 		//Process descrambled data
 		else
 		{
-			cap->m_offsets.push_back(data.m_offsets[i] - data.m_durations[i]/2);
-			cap->m_durations.push_back(data.m_offsets[i+66] - data.m_offsets[i]);
+			cap->m_offsets.push_back(din->m_offsets[i] - din->m_durations[i]/2);
+			cap->m_durations.push_back(din->m_offsets[i+66] - din->m_offsets[i]);
 			cap->m_samples.push_back(Ethernet64b66bSymbol(header, codeword));
 		}
 	}
