@@ -51,8 +51,6 @@ public:
 	virtual float GetOffset(size_t stream) override;
 	virtual void SetOffset(float offset, size_t stream) override;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	virtual void ClearSweeps() override;
 
 	PROTOCOL_DECODER_INITPROC(HistogramFilter)

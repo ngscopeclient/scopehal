@@ -45,8 +45,9 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	, m_termName("Termination")
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("data");
-	CreateInput("clk");
+
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
 
 	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
 	m_parameters[m_sampleRate].SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));	//100 Gsps
@@ -66,20 +67,6 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_cornerName].SetIntVal(CORNER_TYP);
 
 	m_parameters[m_termName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

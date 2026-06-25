@@ -42,24 +42,10 @@ GlitchRemovalFilter::GlitchRemovalFilter(const string& color)
 	AddDigitalStream("data");
 	// AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 
-	CreateInput("Input");
+	CreateInput<InputConstraintStreamType>("Input", Stream::STREAM_TYPE_DIGITAL);
 
 	m_minwidth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_minwidth.SetIntVal(1000000000);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool GlitchRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

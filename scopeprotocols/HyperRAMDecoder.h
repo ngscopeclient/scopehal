@@ -83,8 +83,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(HyperRAMDecoder)
 
 	struct CA

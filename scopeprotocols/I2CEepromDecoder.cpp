@@ -42,7 +42,7 @@ I2CEepromDecoder::I2CEepromDecoder(const string& color)
 	, m_baseaddr(m_parameters["Base Address"])
 	, m_addrpin(m_parameters["Address Pins"])
 {
-	CreateInput("i2c");
+	CreateInput<InputConstraintWaveformType<I2CWaveform> >("i2c");
 
 	m_memtype = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_memtype.AddEnumValue("4 (24C00)", 4);
@@ -78,20 +78,6 @@ I2CEepromDecoder::I2CEepromDecoder(const string& color)
 	m_addrpin.AddEnumValue("A[2:0] = 101", 0xa);
 	m_addrpin.AddEnumValue("A[2:0] = 110", 0xc);
 	m_addrpin.AddEnumValue("A[2:0] = 111", 0xe);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool I2CEepromDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.GetData()) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

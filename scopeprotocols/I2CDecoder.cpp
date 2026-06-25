@@ -46,23 +46,12 @@ using namespace std;
 I2CDecoder::I2CDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
-	CreateInput("sda");
-	CreateInput("scl");
+	CreateInput<InputConstraintStreamType>("sda", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("scl", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool I2CDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string I2CDecoder::GetProtocolName()
 {

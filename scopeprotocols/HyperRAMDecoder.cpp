@@ -43,32 +43,22 @@ HyperRAMDecoder::HyperRAMDecoder(const string& color)
 	: Filter(color, CAT_BUS)
 {
 	AddProtocolStream("data");
-	CreateInput("clk");
-	CreateInput("cs#");
-	CreateInput("rwds");
-	CreateInput("dq0");
-	CreateInput("dq1");
-	CreateInput("dq2");
-	CreateInput("dq3");
-	CreateInput("dq4");
-	CreateInput("dq5");
-	CreateInput("dq6");
-	CreateInput("dq7");
+
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("cs#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("rwds", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq0", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq1", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq2", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq3", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq4", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq5", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq6", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("dq7", Stream::STREAM_TYPE_DIGITAL);
 
 	m_latencyname = "Initial Latency";
 	m_parameters[m_latencyname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_latencyname].SetIntVal(3);
-}
-
-bool HyperRAMDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 11) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 string HyperRAMDecoder::GetProtocolName()

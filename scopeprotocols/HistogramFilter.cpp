@@ -63,7 +63,7 @@ HistogramFilter::HistogramFilter(const string& color)
 	// Retain existing default behavior of 100fs bins
 
 	//Set up channels
-	CreateInput("data");
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_ANALOG);
 
 	m_midpoint = 0.5;
 	m_range = 1;
@@ -77,22 +77,6 @@ HistogramFilter::HistogramFilter(const string& color)
 
 		m_histogramBuf.SetGpuAccessHint(AcceleratorBuffer<uint64_t>::HINT_LIKELY);
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool HistogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -46,25 +46,8 @@ GateFilter::GateFilter(const string& color)
 	m_mode.AddEnumValue("Latch", MODE_LATCH);
 	m_mode.SetIntVal(MODE_LATCH);
 
-	CreateInput("data");
-	CreateInput("enable");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool GateFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintStreamType>("data", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("enable", Stream::STREAM_TYPE_ANALOG_SCALAR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

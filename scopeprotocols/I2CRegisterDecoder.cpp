@@ -41,7 +41,7 @@ I2CRegisterDecoder::I2CRegisterDecoder(const string& color)
 	, m_addrbytes(m_parameters["Address Bytes"])
 	, m_baseaddr(m_parameters["Bus Address"])
 {
-	CreateInput("i2c");
+	CreateInput<InputConstraintWaveformType<I2CWaveform> >("i2c");
 
 	m_addrbytes = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	for(int i=1; i<=4; i++)
@@ -50,20 +50,6 @@ I2CRegisterDecoder::I2CRegisterDecoder(const string& color)
 
 	m_baseaddr = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
 	m_baseaddr.SetIntVal(0x90);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool I2CRegisterDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.m_channel->GetData(0)) != nullptr) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

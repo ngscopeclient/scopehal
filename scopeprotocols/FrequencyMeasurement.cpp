@@ -42,32 +42,18 @@ FrequencyMeasurement::FrequencyMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_HZ), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintStreamTypes>(
+		"din",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_DIGITAL
+		});
 
 	m_span.resize(2);
 
 	if(g_hasShaderInt64 && g_hasShaderFloat64)
 		m_computePipeline = make_shared<ComputePipeline>("shaders/FrequencyMeasurement.spv", 5, sizeof(uint32_t));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool FrequencyMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i > 0)
-		return false;
-
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
-		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
-		return true;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
