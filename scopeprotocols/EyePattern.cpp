@@ -68,8 +68,8 @@ EyePattern::EyePattern(const string& color)
 	AddStream(Unit(Unit::UNIT_UI), "uisIntegrated", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_SAMPLEDEPTH), "samplesIntegrated", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	CreateInput("din");
-	CreateInput("clk");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
 
 	m_parameters[m_saturationName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_saturationName].SetFloatVal(1);
@@ -132,22 +132,6 @@ EyePattern::EyePattern(const string& color)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool EyePattern::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
 string EyePattern::GetProtocolName()
@@ -173,7 +157,7 @@ float EyePattern::GetOffset(size_t /*stream*/)
 
 void EyePattern::ClearSweeps()
 {
-	SetData(NULL, 0);
+	SetData(nullptr, 0);
 }
 
 void EyePattern::Refresh(

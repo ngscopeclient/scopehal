@@ -45,7 +45,7 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "ppj", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("Eye");
+	CreateInput<InputConstraintStreamType>("Eye", Stream::STREAM_TYPE_EYE);
 
 	m_startname = "Start Voltage";
 	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
@@ -54,20 +54,6 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 	m_endname = "End Voltage";
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_endname].SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool EyeJitterMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

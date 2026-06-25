@@ -48,7 +48,7 @@ FIRFilter::FIRFilter(const string& color)
 	, m_computePipeline("shaders/FIRFilter.spv", 3, sizeof(FIRFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("in");
+	CreateInput<InputConstraintStreamType>("in", Stream::STREAM_TYPE_ANALOG);
 
 	m_filterType = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_filterType.AddEnumValue("Low pass", FILTER_TYPE_LOWPASS);
@@ -71,20 +71,6 @@ FIRFilter::FIRFilter(const string& color)
 
 	m_coefficients.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_coefficients.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool FIRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
