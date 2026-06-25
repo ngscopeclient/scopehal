@@ -42,21 +42,7 @@ DCDMeasurement::DCDMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("DDJ");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DCDMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<DDJMeasurement*>(stream.m_channel) != nullptr) )
-		return true;
-
-	return false;
+	CreateInput<InputConstraintBlockType<DDJMeasurement> >("DDJ");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -37,27 +37,13 @@ using namespace std;
 
 DeskewFilter::DeskewFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_skew(m_parameters["Skew"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
 
-	m_skewname = "Skew";
-	m_parameters[m_skewname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
-	m_parameters[m_skewname].SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DeskewFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	m_skew = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_skew.SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,7 +77,7 @@ void DeskewFilter::Refresh(
 		return;
 	}
 
-	float offset = m_parameters[m_skewname].GetFloatVal();
+	float offset = m_skew.GetFloatVal();
 	auto din = GetInputWaveform(0);
 	size_t len = din->size();
 

@@ -41,31 +41,15 @@ DownconvertFilter::DownconvertFilter(const string& color)
 	, m_computePipeline("shaders/Downconvert.spv", 3, sizeof(DownconvertConstants))
 {
 	//Set up channels
-	CreateInput("RF");
+	CreateInput<InputConstraintStreamType>("RF", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
 	//Optional input for LO frequency (overrides parameter)
-	CreateInput("LOFrequency");
+	CreateInput<InputConstraintStreamType>("LOFrequency", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	m_freq = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
 	m_freq.SetFloatVal(1e9);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DownconvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

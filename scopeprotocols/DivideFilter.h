@@ -44,8 +44,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
-
 	PROTOCOL_DECODER_INITPROC(DivideFilter)
 
 	enum OutputFormat
@@ -61,7 +59,7 @@ protected:
 	void DoRefreshScalarScalar();
 	void RefreshScalarVector(size_t iScalar, size_t iVector);
 
-	std::string m_formatName;
+	FilterParameter& m_format;
 };
 
 #endif

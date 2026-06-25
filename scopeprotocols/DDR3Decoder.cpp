@@ -45,28 +45,17 @@ using namespace std;
 DDR3Decoder::DDR3Decoder(const string& color)
 	: SDRAMDecoderBase(color)
 {
-	CreateInput("CLK");
-	CreateInput("WE#");
-	CreateInput("RAS#");
-	CreateInput("CAS#");
-	CreateInput("CS#");
-	CreateInput("A12");
-	CreateInput("A10");
+	CreateInput<InputConstraintStreamType>("CLK", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("WE#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("RAS#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("CAS#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("CS#", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("A12", Stream::STREAM_TYPE_DIGITAL);
+	CreateInput<InputConstraintStreamType>("A10", Stream::STREAM_TYPE_DIGITAL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool DDR3Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i < 7) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
-}
 
 string DDR3Decoder::GetProtocolName()
 {

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,14 +37,14 @@ using namespace std;
 
 DigitalToNRZFilter::DigitalToNRZFilter(const string& color)
 	: WaveformGenerationFilter(color)
-	, m_level0("Level 0")
-	, m_level1("Level 1")
+	, m_level0(m_parameters["Level 0"])
+	, m_level1(m_parameters["Level 1"])
 {
-	m_parameters[m_level0] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_level0].SetFloatVal(0);
+	m_level0 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level0.SetFloatVal(0);
 
-	m_parameters[m_level1] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_level1].SetFloatVal(1.8);
+	m_level1 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level1.SetFloatVal(1.8);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,8 +66,8 @@ size_t DigitalToNRZFilter::GetBitsPerSymbol()
 vector<float> DigitalToNRZFilter::GetVoltageLevels()
 {
 	vector<float> ret;
-	ret.push_back(m_parameters[m_level0].GetFloatVal());
-	ret.push_back(m_parameters[m_level1].GetFloatVal());
+	ret.push_back(m_level0.GetFloatVal());
+	ret.push_back(m_level1.GetFloatVal());
 	return ret;
 }
 

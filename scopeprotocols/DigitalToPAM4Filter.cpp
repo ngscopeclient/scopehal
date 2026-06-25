@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,22 +37,22 @@ using namespace std;
 
 DigitalToPAM4Filter::DigitalToPAM4Filter(const string& color)
 	: WaveformGenerationFilter(color)
-	, m_level00("Level 00")
-	, m_level01("Level 01")
-	, m_level10("Level 10")
-	, m_level11("Level 11")
+	, m_level00(m_parameters["Level 00"])
+	, m_level01(m_parameters["Level 01"])
+	, m_level10(m_parameters["Level 10"])
+	, m_level11(m_parameters["Level 11"])
 {
-	m_parameters[m_level00] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_level00].SetFloatVal(-0.3);
+	m_level00 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level00.SetFloatVal(-0.3);
 
-	m_parameters[m_level01] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_level01].SetFloatVal(-0.1);
+	m_level01 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level01.SetFloatVal(-0.1);
 
-	m_parameters[m_level10] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_level10].SetFloatVal(0.1);
+	m_level10 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level10.SetFloatVal(0.1);
 
-	m_parameters[m_level11] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_level11].SetFloatVal(0.3);
+	m_level11 = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_level11.SetFloatVal(0.3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,10 +74,10 @@ size_t DigitalToPAM4Filter::GetBitsPerSymbol()
 vector<float> DigitalToPAM4Filter::GetVoltageLevels()
 {
 	vector<float> ret;
-	ret.push_back(m_parameters[m_level00].GetFloatVal());
-	ret.push_back(m_parameters[m_level01].GetFloatVal());
-	ret.push_back(m_parameters[m_level10].GetFloatVal());
-	ret.push_back(m_parameters[m_level11].GetFloatVal());
+	ret.push_back(m_level00.GetFloatVal());
+	ret.push_back(m_level01.GetFloatVal());
+	ret.push_back(m_level10.GetFloatVal());
+	ret.push_back(m_level11.GetFloatVal());
 	return ret;
 }
 

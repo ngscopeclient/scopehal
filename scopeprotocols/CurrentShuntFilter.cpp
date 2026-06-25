@@ -37,29 +37,21 @@ using namespace std;
 
 CurrentShuntFilter::CurrentShuntFilter(const string& color)
 	: Filter(color, CAT_POWER)
+	, m_resistance(m_parameters["Resistance"])
 {
 	AddStream(Unit(Unit::UNIT_AMPS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
-	CreateInput("din");
+	CreateInput<InputConstraintAND>(
+		"din",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_VOLTS)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
 
-	m_resistanceName = "Resistance";
-	m_parameters[m_resistanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_resistanceName].SetFloatVal(1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool CurrentShuntFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	m_resistance = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
+	m_resistance.SetFloatVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +91,7 @@ void CurrentShuntFilter::Refresh(
 	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto len = din->size();
 
-	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
+	float rshunt = m_resistance.GetFloatVal();
 	float ishunt = 1.0f / rshunt;
 
 	din->PrepareForCpuAccess();

@@ -41,8 +41,14 @@ DDJMeasurement::DDJMeasurement(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
-	CreateInput("TIE");
-	CreateInput("sampledThreshold");
+	CreateInput<InputConstraintAND>(
+		"TIE",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_FS)),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG)
+		});
+	CreateInput<InputConstraintStreamType>("sampledThreshold", Stream::STREAM_TYPE_DIGITAL);
 
 	for(int i=0; i<256; i++)
 		m_table[i] = 0;
@@ -55,27 +61,6 @@ DDJMeasurement::DDJMeasurement(const string& color)
 		m_computePipeline =
 			make_shared<ComputePipeline>("shaders/DDJMeasurement.spv", 7, sizeof(DDJConstants));
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) &&
-		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-		(stream.GetYAxisUnits() == Unit::UNIT_FS)
-		)
-	{
-		return true;
-	}
-	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

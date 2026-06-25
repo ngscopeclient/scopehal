@@ -37,34 +37,29 @@ using namespace std;
 
 DivideFilter::DivideFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_formatName("Output Format")
+	, m_format(m_parameters["Output Format"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("a");
-	CreateInput("b");
+	CreateInput<InputConstraintStreamTypes>(
+		"a",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
+	CreateInput<InputConstraintStreamTypes>(
+		"b",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG,
+			Stream::STREAM_TYPE_ANALOG_SCALAR
+		});
 
-	m_parameters[m_formatName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_formatName].AddEnumValue("Ratio", FORMAT_RATIO);
-	m_parameters[m_formatName].AddEnumValue("dB", FORMAT_DB);
-	m_parameters[m_formatName].AddEnumValue("Percent", FORMAT_PERCENT);
-	m_parameters[m_formatName].SetIntVal(FORMAT_RATIO);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DivideFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if(i >= 2)
-		return false;
-
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) || (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
-		return true;
-
-	return false;
+	m_format = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_format.AddEnumValue("Ratio", FORMAT_RATIO);
+	m_format.AddEnumValue("dB", FORMAT_DB);
+	m_format.AddEnumValue("Percent", FORMAT_PERCENT);
+	m_format.SetIntVal(FORMAT_RATIO);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,7 +101,7 @@ void DivideFilter::DoRefreshScalarScalar()
 	SetData(nullptr, 0);
 
 	//Different output formats possible besides just a direct division
-	switch(m_parameters[m_formatName].GetIntVal())
+	switch(m_format.GetEnumVal<OutputFormat>())
 	{
 		case FORMAT_RATIO:
 			SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);
@@ -285,7 +280,7 @@ void DivideFilter::DoRefreshVectorVector()
 
 	//Do the actual filter operation
 	size_t i=0;
-	switch(m_parameters[m_formatName].GetIntVal())
+	switch(m_format.GetEnumVal<OutputFormat>())
 	{
 		case FORMAT_RATIO:
 			SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);

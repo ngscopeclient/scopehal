@@ -42,9 +42,23 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("signal");
-	CreateInput("mag");
-	CreateInput("angle");
+	CreateInput<InputConstraintStreamType>("signal", Stream::STREAM_TYPE_ANALOG);
+	CreateInput<InputConstraintAND>(
+		"mag",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DB))
+		});
+	CreateInput<InputConstraintAND>(
+		"angle",
+		initializer_list<shared_ptr<InputConstraint> >
+		{
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_ANALOG),
+			make_shared<InputConstraintXUnit>(this, Unit(Unit::UNIT_HZ)),
+			make_shared<InputConstraintYUnit>(this, Unit(Unit::UNIT_DEGREES))
+		});
 
 	m_maxGainName = "Max Gain";
 	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
@@ -81,37 +95,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 DeEmbedFilter::~DeEmbedFilter()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	switch(i)
-	{
-		//signal
-		case 0:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
-
-		//mag
-		case 1:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-					(stream.GetYAxisUnits() == Unit::UNIT_DB);
-
-		//angle
-		case 2:
-			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
-					(stream.GetYAxisUnits() == Unit::UNIT_DEGREES);
-
-		default:
-			return false;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -43,7 +43,7 @@ DownsampleFilter::DownsampleFilter(const string& color)
 	, m_aaComputePipeline("shaders/DownsampleWithAAFilter.spv", 3, sizeof(DownsamplePushConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("RF");
+	CreateInput<InputConstraintStreamType>("RF", Stream::STREAM_TYPE_ANALOG);
 
 	m_decimationFactor = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_decimationFactor.SetIntVal(10);
@@ -52,20 +52,6 @@ DownsampleFilter::DownsampleFilter(const string& color)
 	m_aaFilterEnabled.SetBoolVal(1);
 
 	m_kernel.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DownsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == nullptr)
-		return false;
-
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
