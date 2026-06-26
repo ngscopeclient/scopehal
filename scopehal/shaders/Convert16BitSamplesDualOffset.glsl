@@ -75,12 +75,24 @@ void main()
 	//Fetch the input sample
 	uint block = pin[nthread + realBufferOffset/2];
 
-	//Rescale gain
-	float gainScaled = gain * 32767;
+	//Four samples per thread
+	for(uint i=0; i<2; i++)
+	{
+		//Make sure we don't go off the end
+		uint j = i + base;
+		if(j >= size)
+			return;
 
-	//Unpack it
-	vec2 vblock = unpackSnorm2x16(block);
-	pout[outbase] = gainScaled * vblock.x - offset;
-	if(base+1 < size)
-		pout[outbase+1] = gainScaled * vblock.y - offset;
+		//Fetch the sample and sign extend
+		uint sampleIn = (block >> (16*i)) & 0xffff;
+		int signExtended = int(sampleIn);
+		if( (sampleIn & 0x8000) == 0x8000)
+		{
+			sampleIn = (~sampleIn + 1) & 0xffff;
+			signExtended = -int(sampleIn);
+		}
+
+		//Do the actual conversion
+		pout[outbase + i] = gain * float(int(signExtended)) - offset;
+	}
 }
