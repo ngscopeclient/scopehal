@@ -73,6 +73,7 @@
 #include "DDR3Decoder.h"
 #include "DeEmbedFilter.h"
 #include "DeskewFilter.h"
+#include "DigitalConstantFilter.h"
 #include "DigitalToPAM4Filter.h"
 #include "DigitalToNRZFilter.h"
 #include "DivideFilter.h"

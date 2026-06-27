@@ -33,6 +33,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DDR3Decoder.cpp
 	DeEmbedFilter.cpp
 	DeskewFilter.cpp
+	DigitalConstantFilter.cpp
 	DigitalToPAM4Filter.cpp
 	DigitalToNRZFilter.cpp
 	DivideFilter.cpp

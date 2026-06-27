@@ -75,6 +75,9 @@ public:
 		//Single analog value
 		STREAM_TYPE_ANALOG_SCALAR,
 
+		//Single digital value
+		STREAM_TYPE_DIGITAL_SCALAR,
+
 		//Other / unspecified
 		STREAM_TYPE_UNDEFINED
 	};
@@ -84,6 +87,8 @@ public:
 		, m_name("stream")
 		, m_waveform(nullptr)
 		, m_value(0)
+		, m_digitalValue(0)
+		, m_digitalValueWidth(0)
 		, m_stype(Stream::STREAM_TYPE_ANALOG)
 		, m_flags(0)
 	{}
@@ -93,6 +98,8 @@ public:
 		, m_name(name)
 		, m_waveform(nullptr)
 		, m_value(0)
+		, m_digitalValue(0)
+		, m_digitalValueWidth(0)
 		, m_stype(type)
 		, m_flags(flags)
 	{}
@@ -108,6 +115,12 @@ public:
 
 	///@brief The current value (only meaningful for analog scalar type)
 	double m_value;
+
+	///@brief The digital value (only meaningful for digital scalar type)
+	uint64_t m_digitalValue;
+
+	///@brief Width of the digital value, in bits (1 to 64)
+	size_t m_digitalValueWidth;
 
 	///@brief General datatype stored in the stream
 	StreamType m_stype;

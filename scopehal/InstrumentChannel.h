@@ -212,6 +212,30 @@ public:
 		m_streams[stream].m_value = value;
 	}
 
+	///@brief Gets the value of a scalar data stream
+	uint64_t GetDigitalScalarValue(size_t stream)
+	{
+		if(stream >= m_streams.size())
+			return 0;
+		return m_streams[stream].m_digitalValue;
+	}
+
+	///@brief Gets the width of a scalar data stream
+	uint64_t GetDigitalScalarWidth(size_t stream)
+	{
+		if(stream >= m_streams.size())
+			return 0;
+		return m_streams[stream].m_digitalValueWidth;
+	}
+
+	///@brief Sets the value of a scalar data stream
+	void SetDigitalScalarValue(size_t stream, uint64_t value)
+	{
+		if(stream >= m_streams.size())
+			return;
+		m_streams[stream].m_digitalValue = value;
+	}
+
 	/**
 		@brief Detach the capture data from this channel
 

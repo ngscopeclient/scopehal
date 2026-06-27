@@ -74,6 +74,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DDR3Decoder);
 	AddDecoderClass(DeEmbedFilter);
 	AddDecoderClass(DeskewFilter);
+	AddDecoderClass(DigitalConstantFilter);
 	AddDecoderClass(DigitalToPAM4Filter);
 	AddDecoderClass(DigitalToNRZFilter);
 	AddDecoderClass(DivideFilter);

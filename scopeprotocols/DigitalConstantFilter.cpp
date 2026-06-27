@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,122 +27,62 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of StreamDescriptor
+#include "../scopehal/scopehal.h"
+#include "DigitalConstantFilter.h"
 
-	@ingroup core
- */
-#ifndef StreamDescriptor_h
-#define StreamDescriptor_h
+using namespace std;
 
-class InstrumentChannel;
-class InputConstraint;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-/**
-	@brief Descriptor for a single stream coming off a channel
- */
-class StreamDescriptor
+DigitalConstantFilter::DigitalConstantFilter(const string& color)
+	: Filter(color, CAT_GENERATION)
+	, m_value(m_parameters["Value"])
+	, m_width(m_parameters["Width"])
 {
-public:
-	StreamDescriptor()
-	: m_channel(NULL)
-	, m_stream(0)
-	{}
+	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_DIGITAL_SCALAR);
 
-	StreamDescriptor(InstrumentChannel* channel, size_t stream = 0)
-		: m_channel(channel)
-		, m_stream(stream)
-	{}
+	m_value = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_HEXNUM));
+	m_value.SetIntVal(0);
 
-	///@return True if this is an invalid stream (index greater than the highest allowed value)
-	bool IsOutOfRange()
-	{ return (m_stream >= m_channel->GetStreamCount()); }
+	m_width = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_width.SetIntVal(1);
+	m_width.signal_changed().connect(sigc::mem_fun(*this, &DigitalConstantFilter::OnWidthChanged));
+	OnWidthChanged();
 
-	operator bool() const
-	{ return (m_channel != NULL); }
+	SetData(nullptr, 0);
+}
 
-	void AddSink(FlowGraphNode* node);
-	void RemoveSink(FlowGraphNode* node);
-	const std::set<FlowGraphNode*>& GetSinks();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	std::string GetName() const;
-
-	InstrumentChannel* m_channel;
-	size_t m_stream;
-
-	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
-	//See StreamDescriptor_inlines.h for implementations
-	Unit GetXAxisUnits();
-	Unit GetYAxisUnits();
-	WaveformBase* GetData() const;
-	bool operator==(const StreamDescriptor& rhs) const;
-	bool operator!=(const StreamDescriptor& rhs) const;
-	bool operator<(const StreamDescriptor& rhs) const;
-	uint8_t GetFlags() const;
-	float GetVoltageRange();
-	float GetOffset();
-	bool IsHighRateOffsetCapable();
-	void SetVoltageRange(float v);
-	void SetOffset(float v);
-	Stream::StreamType GetType();
-	float GetScalarValue();
-	uint64_t GetDigitalScalarValue();
-	size_t GetDigitalScalarWidth();
-	std::string PrettyPrintDigitalScalarHex();
-	std::string PrettyPrintDigitalScalarBinary();
-	std::string PrettyPrintDigitalScalarDecimal();
-	bool IsInverted();
-};
-
-/**
-	@brief Base class for filter graph inputs
-	@ingroup core
-
-	An individual node may override CreateInput() to create derived-class objects with additional metadata.
- */
-class InputDescriptor
+string DigitalConstantFilter::GetProtocolName()
 {
-public:
-	InputDescriptor(const std::string& name = "", const StreamDescriptor source = nullptr)
-		: m_name(name)
-		, m_sourceStream(source)
-	{}
+	return "Digital Constant";
+}
 
-	virtual ~InputDescriptor()
-	{}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
 
-	//not copyable or assignable
-	InputDescriptor(const InputDescriptor& rhs) =delete;
-	InputDescriptor& operator=(const InputDescriptor& rhs) =delete;
+void DigitalConstantFilter::OnWidthChanged()
+{
+	auto width = m_width.GetIntVal();
+	if(width < 1)
+		width = 1;
+	if(width > 64)
+		width = 64;
 
-	//Porting helpers and trivial accessors
-	Unit GetYAxisUnits()
-	{ return m_sourceStream.GetYAxisUnits(); }
+	if( (width == 1) && (m_value.GetType() != FilterParameter::TYPE_BOOL))
+		m_value = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_HEXNUM));
+	else if( (width != 1) && (m_value.GetType() != FilterParameter::TYPE_INT))
+		m_value = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
 
-	Unit GetXAxisUnits()
-	{ return m_sourceStream.GetXAxisUnits(); }
+	m_streams[0].m_digitalValueWidth = width;
+}
 
-	WaveformBase* GetData() const
-	{ return m_sourceStream.GetData(); }
-
-	float GetVoltageRange()
-	{ return m_sourceStream.GetVoltageRange(); }
-
-	/**
-		@brief Name of the input port displayed in the graph editor
-
-		Must be unique within a given node
-	 */
-	std::string m_name;
-
-	///@brief The stream, if any, connected to this input port
-	StreamDescriptor m_sourceStream;
-
-	///@brief Constraints that apply to this input
-	std::shared_ptr<InputConstraint> m_constraints;
-};
-
-
-#endif
+void DigitalConstantFilter::Refresh(
+	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+	[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	m_streams[0].m_digitalValue = m_value.GetIntVal();
+}

@@ -144,6 +144,22 @@ inline float StreamDescriptor::GetScalarValue()
 		return m_channel->GetScalarValue(m_stream);
 }
 
+inline uint64_t StreamDescriptor::GetDigitalScalarValue()
+{
+	if(m_channel == nullptr)
+		return 0;
+	else
+		return m_channel->GetDigitalScalarValue(m_stream);
+}
+
+inline size_t StreamDescriptor::GetDigitalScalarWidth()
+{
+	if(m_channel == nullptr)
+		return 0;
+	else
+		return m_channel->GetDigitalScalarWidth(m_stream);
+}
+
 inline void StreamDescriptor::AddSink(FlowGraphNode* node)
 {
 	if(m_channel)
@@ -159,6 +175,67 @@ inline void StreamDescriptor::RemoveSink(FlowGraphNode* node)
 inline const std::set<FlowGraphNode*>& StreamDescriptor::GetSinks()
 {
 	return m_channel->GetSinks(m_stream);
+}
+
+inline std::string StreamDescriptor::PrettyPrintDigitalScalarHex()
+{
+	auto width = GetDigitalScalarWidth();
+	uint64_t value = GetDigitalScalarValue();
+
+	//Calculate number of hex digits
+	int nibbles = ceil(width / 4.0);
+	if(nibbles < 1)
+		nibbles = 1;
+	if(nibbles > 16)
+		nibbles = 16;
+
+	char format[16];
+	snprintf(format, sizeof(format), "%d'h%%0%d%s", static_cast<int>(width), nibbles, PRIx64);
+
+	//Actually format the value
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), format, value);
+
+	return std::string(tmp);
+}
+
+
+inline std::string StreamDescriptor::PrettyPrintDigitalScalarBinary()
+{
+	auto width = GetDigitalScalarWidth();
+	uint64_t value = GetDigitalScalarValue();
+
+	std::string ret = std::to_string(width) + "'b";
+	for(int i=width-1; i >= 0; i--)
+	{
+		uint64_t mask = static_cast<uint64_t>(1) << i;
+		if( (value & mask) == mask)
+			ret += "1";
+		else
+			ret += "0";
+	}
+
+	return ret;
+}
+
+inline std::string StreamDescriptor::PrettyPrintDigitalScalarDecimal()
+{
+	auto width = GetDigitalScalarWidth();
+	uint64_t value = GetDigitalScalarValue();
+
+	//Calculate number of decimal digits
+	int digits = ceil(log10(pow(2, width)));
+	if(digits > 16)
+		digits = 16;
+
+	char format[32];
+	snprintf(format, sizeof(format), "%d'd%%0%d%s", static_cast<int>(width), digits, PRIu64);
+
+	//Actually format the value
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), format, value);
+
+	return std::string(tmp);
 }
 
 #endif
