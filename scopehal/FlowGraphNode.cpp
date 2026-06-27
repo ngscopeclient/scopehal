@@ -191,7 +191,13 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 	pin->m_sourceStream = stream;
 
 	//We are now a sink of the source
-	stream.m_channel->m_sinks[stream.m_stream].emplace(this);
+	//Make sure the set of sinks is large enough
+	//It's possible to have an empty sinks list in some cases, like when making a properties dialog for an import
+	//filter before the file has been loaded (https://github.com/ngscopeclient/scopehal/issues/1096)
+	auto& sinks = stream.m_channel->m_sinks;
+	if(sinks.size() <= stream.m_stream)
+		sinks.resize(stream.m_stream + 1);
+	sinks[stream.m_stream].emplace(this);
 
 	//Notify the derived class in case it wants to do anything
 	OnInputChanged(i);
