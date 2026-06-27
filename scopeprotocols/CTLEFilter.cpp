@@ -44,7 +44,9 @@ CTLEFilter::CTLEFilter(const string& color)
 	, m_poleFreq2(m_parameters["Pole Frequency 2"])
 {
 	//delete the de-embed params
-	m_parameters.clear();
+	m_parameters.erase(m_maxGainName);
+	m_parameters.erase(m_groupDelayTruncName);
+	m_parameters.erase(m_groupDelayTruncModeName);
 
 	m_dcGain = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_dcGain.SetFloatVal(0);
