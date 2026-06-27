@@ -58,10 +58,14 @@ public:
 
 	///@return True if this is an invalid stream (index greater than the highest allowed value)
 	bool IsOutOfRange()
-	{ return (m_stream >= m_channel->GetStreamCount()); }
+	{
+		if(m_channel == nullptr)
+			return true;
+		return (m_stream >= m_channel->GetStreamCount());
+	}
 
 	operator bool() const
-	{ return (m_channel != NULL); }
+	{ return (m_channel != nullptr); }
 
 	void AddSink(FlowGraphNode* node);
 	void RemoveSink(FlowGraphNode* node);
