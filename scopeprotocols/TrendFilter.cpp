@@ -41,8 +41,13 @@ TrendFilter::TrendFilter(const string& color)
 	, m_depth(m_parameters["Buffer length"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG_SCALAR);
-
+	CreateInput<InputConstraintStreamTypes>(
+		"din",
+		initializer_list<Stream::StreamType>
+		{
+			Stream::STREAM_TYPE_ANALOG_SCALAR,
+			Stream::STREAM_TYPE_DIGITAL_SCALAR
+		});
 	m_depth = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_depth.SetIntVal(10000);
 }
@@ -90,56 +95,129 @@ void TrendFilter::Refresh(
 
 	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
 
-	//See if we have output already
 	double now = GetTime();
-	auto wfm = dynamic_cast<SparseAnalogWaveform*>(GetData(0));
-	if(wfm)
+
+	//Analog path
+	if(din.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
 	{
-		//Remove old samples
-		size_t nmax = m_depth.GetIntVal();
-		while(wfm->m_samples.size() > nmax)
+		//Update output stream type
+		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
+		//See if we have output already
+		auto wfm = dynamic_cast<SparseAnalogWaveform*>(GetData(0));
+		if(wfm)
 		{
-			wfm->m_samples.pop_front();
-			wfm->m_durations.pop_front();
-			wfm->m_offsets.pop_front();
+			//Remove old samples
+			size_t nmax = m_depth.GetIntVal();
+			while(wfm->m_samples.size() > nmax)
+			{
+				wfm->m_samples.pop_front();
+				wfm->m_durations.pop_front();
+				wfm->m_offsets.pop_front();
+			}
 		}
+		else
+		{
+			wfm = new SparseAnalogWaveform;
+			SetData(wfm, 0);
+
+			wfm->m_triggerPhase = 0;
+			wfm->m_timescale = 1;
+			m_tlast = now;
+		}
+		wfm->PrepareForCpuAccess();
+		wfm->m_revision ++;
+
+		//Update timestamp
+		wfm->m_startTimestamp = floor(now);
+		wfm->m_startFemtoseconds = (now - wfm->m_startTimestamp) * FS_PER_SECOND;
+
+		//Update duration of previous sample
+		size_t len = wfm->m_samples.size();
+		double dt = (now - m_tlast) * FS_PER_SECOND;
+		if(len > 0)
+			wfm->m_durations[len-1] = dt;
+
+		//Add the new sample
+		wfm->m_samples.push_back(din.GetScalarValue());
+		wfm->m_durations.push_back(dt);
+		if(wfm->m_offsets.empty())
+			wfm->m_offsets.push_back(0);
+		else
+			wfm->m_offsets.push_back(dt + wfm->m_offsets[len-1]);
+
+		//Update offsets of old samples
+		len = wfm->m_samples.size();
+		for(size_t i=0; i<len; i++)
+			wfm->m_offsets[i] -= dt;
+
+		wfm->MarkModifiedFromCpu();
 	}
+
+	//Digital path
 	else
 	{
-		wfm = new SparseAnalogWaveform;
-		SetData(wfm, 0);
+		//Update output stream type
+		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL;
 
-		wfm->m_triggerPhase = 0;
-		wfm->m_timescale = 1;
-		m_tlast = now;
+		auto width = din.GetDigitalScalarWidth();
+		if(width > 1)
+		{
+			AddErrorMessage("Invalid input", "Trending multi-bit digital values is not yet supported");
+			return;
+		}
+
+		//See if we have output already
+		auto wfm = dynamic_cast<SparseDigitalWaveform*>(GetData(0));
+		if(wfm)
+		{
+			//Remove old samples
+			size_t nmax = m_depth.GetIntVal();
+			while(wfm->m_samples.size() > nmax)
+			{
+				wfm->m_samples.pop_front();
+				wfm->m_durations.pop_front();
+				wfm->m_offsets.pop_front();
+			}
+		}
+		else
+		{
+			wfm = new SparseDigitalWaveform;
+			SetData(wfm, 0);
+
+			wfm->m_triggerPhase = 0;
+			wfm->m_timescale = 1;
+			m_tlast = now;
+		}
+		wfm->PrepareForCpuAccess();
+		wfm->m_revision ++;
+
+		//Update timestamp
+		wfm->m_startTimestamp = floor(now);
+		wfm->m_startFemtoseconds = (now - wfm->m_startTimestamp) * FS_PER_SECOND;
+
+		//Update duration of previous sample
+		size_t len = wfm->m_samples.size();
+		double dt = (now - m_tlast) * FS_PER_SECOND;
+		if(len > 0)
+			wfm->m_durations[len-1] = dt;
+
+
+		//Add the new sample
+		wfm->m_samples.push_back(din.GetDigitalScalarValue());
+		wfm->m_durations.push_back(dt);
+		if(wfm->m_offsets.empty())
+			wfm->m_offsets.push_back(0);
+		else
+			wfm->m_offsets.push_back(dt + wfm->m_offsets[len-1]);
+
+		//Update offsets of old samples
+		len = wfm->m_samples.size();
+		for(size_t i=0; i<len; i++)
+			wfm->m_offsets[i] -= dt;
+
+		wfm->MarkModifiedFromCpu();
 	}
-	wfm->PrepareForCpuAccess();
-	wfm->m_revision ++;
-
-	//Update timestamp
-	wfm->m_startTimestamp = floor(now);
-	wfm->m_startFemtoseconds = (now - wfm->m_startTimestamp) * FS_PER_SECOND;
-
-	//Update duration of previous sample
-	size_t len = wfm->m_samples.size();
-	double dt = (now - m_tlast) * FS_PER_SECOND;
-	if(len > 0)
-		wfm->m_durations[len-1] = dt;
-
-	//Add the new sample
-	wfm->m_samples.push_back(GetInput(0).GetScalarValue());
-	wfm->m_durations.push_back(dt);
-	if(wfm->m_offsets.empty())
-		wfm->m_offsets.push_back(0);
-	else
-		wfm->m_offsets.push_back(dt + wfm->m_offsets[len-1]);
-
-	//Update offsets of old samples
-	len = wfm->m_samples.size();
-	for(size_t i=0; i<len; i++)
-		wfm->m_offsets[i] -= dt;
-
-	wfm->MarkModifiedFromCpu();
 
 	m_tlast = now;
 }
