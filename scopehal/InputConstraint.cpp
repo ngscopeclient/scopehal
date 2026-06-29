@@ -51,16 +51,17 @@ string InputConstraint::StreamTypeToString(Stream::StreamType type)
 {
 	switch(type)
 	{
-		case Stream::STREAM_TYPE_ANALOG:		return "analog waveform";
-		case Stream::STREAM_TYPE_DIGITAL:		return "digital waveform";
-		case Stream::STREAM_TYPE_DIGITAL_BUS:	return "digital bus";
-		case Stream::STREAM_TYPE_EYE:			return "eye pattern";
-		case Stream::STREAM_TYPE_SPECTROGRAM:	return "spectrogram";
-		case Stream::STREAM_TYPE_WATERFALL:		return "waterfall";
-		case Stream::STREAM_TYPE_CONSTELLATION:	return "constellation";
-		case Stream::STREAM_TYPE_TRIGGER:		return "trigger";
-		case Stream::STREAM_TYPE_PROTOCOL:		return "protocol";
-		case Stream::STREAM_TYPE_ANALOG_SCALAR:	return "analog scalar";
+		case Stream::STREAM_TYPE_ANALOG:			return "analog waveform";
+		case Stream::STREAM_TYPE_DIGITAL:			return "digital waveform";
+		case Stream::STREAM_TYPE_DIGITAL_BUS:		return "digital bus";
+		case Stream::STREAM_TYPE_EYE:				return "eye pattern";
+		case Stream::STREAM_TYPE_SPECTROGRAM:		return "spectrogram";
+		case Stream::STREAM_TYPE_WATERFALL:			return "waterfall";
+		case Stream::STREAM_TYPE_CONSTELLATION:		return "constellation";
+		case Stream::STREAM_TYPE_TRIGGER:			return "trigger";
+		case Stream::STREAM_TYPE_PROTOCOL:			return "protocol";
+		case Stream::STREAM_TYPE_ANALOG_SCALAR:		return "analog scalar";
+		case Stream::STREAM_TYPE_DIGITAL_SCALAR:	return "digital scalar";
 
 		case Stream::STREAM_TYPE_UNDEFINED:
 		default:

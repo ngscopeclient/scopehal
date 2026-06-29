@@ -163,6 +163,7 @@ set(SCOPEHAL_SOURCES
 	SpectrometerDarkFrameChannel.cpp
 	SwitchMatrix.cpp
 	RemoteBridgeOscilloscope.cpp
+	VectorGPIOChannel.cpp
 
 	AgilentMultimeter.cpp
 	AgilentOscilloscope.cpp
