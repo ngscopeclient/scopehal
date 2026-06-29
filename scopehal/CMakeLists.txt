@@ -167,6 +167,7 @@ set(SCOPEHAL_SOURCES
 	AgilentMultimeter.cpp
 	AgilentOscilloscope.cpp
 	AlientekPowerSupply.cpp
+	AntikernelLabsGPIO.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLabsTriggerCrossbar.cpp
 	AntikernelLogicAnalyzer.cpp

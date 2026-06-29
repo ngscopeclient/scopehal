@@ -40,6 +40,7 @@
 #include "AgilentOscilloscope.h"
 #include "AlientekPowerSupply.h"
 #include "HP662xAPowerSupply.h"
+#include "AntikernelLabsGPIO.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
 #include "DemoOscilloscope.h"
@@ -328,6 +329,7 @@ void DriverStaticInit()
 
 	AddLoadDriverClass(SiglentLoad);
 
+	AddMiscInstrumentDriverClass(AntikernelLabsGPIO);
 	AddMiscInstrumentDriverClass(CSVStreamInstrument);
 
 	AddMultimeterDriverClass(AgilentMultimeter);
