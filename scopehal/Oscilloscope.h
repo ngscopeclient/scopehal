@@ -40,6 +40,7 @@ class Instrument;
 
 #include "SCPITransport.h"
 #include "WaveformPool.h"
+#include "../xptools/HzClock.h"
 
 /**
 	@brief Generic representation of an oscilloscope, logic analyzer, or spectrum analyzer.
@@ -898,11 +899,16 @@ public:
 	virtual bool PopPendingWaveform();
 	virtual bool IsAppendingToWaveform();
 
+	double GetWaveformDownloadRate()
+	{ return m_downloadClock.GetAverageHz(); }
+
 protected:
 	typedef std::map<StreamDescriptor, WaveformBase*> SequenceSet;
 	std::list<SequenceSet> m_pendingWaveforms;
 	std::mutex m_pendingWaveformsMutex;
 	std::recursive_mutex m_mutex;
+
+	HzClock m_downloadClock;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Diagnostics Access

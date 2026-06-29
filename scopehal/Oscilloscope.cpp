@@ -215,6 +215,8 @@ bool Oscilloscope::PopPendingWaveform()
 		for(auto it : set)
 			it.first.m_channel->SetData(it.second, it.first.m_stream);
 		m_pendingWaveforms.pop_front();
+
+		m_downloadClock.Tick();
 		return true;
 	}
 	return false;
