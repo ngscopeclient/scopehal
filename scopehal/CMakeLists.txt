@@ -165,6 +165,7 @@ set(SCOPEHAL_SOURCES
 	RemoteBridgeOscilloscope.cpp
 	VectorGPIOChannel.cpp
 	VIOInputChannel.cpp
+	VIOOutputChannel.cpp
 
 	AgilentMultimeter.cpp
 	AgilentOscilloscope.cpp

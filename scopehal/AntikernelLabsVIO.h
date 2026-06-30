@@ -58,6 +58,9 @@ public:
 
 protected:
 	size_t m_inputChannelCount;
+	size_t m_outputChannelCount;
+
+	std::vector<uint64_t> m_outputChannelCachedValues;
 
 public:
 	static std::string GetDriverNameInternal();

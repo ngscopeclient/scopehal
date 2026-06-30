@@ -288,6 +288,31 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
+	@brief Match if the input is a scalar with a specific width
+
+	@ingroup core
+ */
+class InputConstraintScalarWidth : public InputConstraint
+{
+public:
+	InputConstraintScalarWidth(FlowGraphNode* sink, size_t width)
+		: InputConstraint(sink)
+		, m_width(width)
+	{}
+
+	virtual bool Check(StreamDescriptor source) override
+	{ return (m_width == source.GetDigitalScalarWidth() ); }
+
+	virtual std::string ToString() override
+	{ return std::string("Scalar bus width is ") + std::to_string(m_width);  }
+
+protected:
+	size_t m_width;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
 	@brief Match if the input's X axis unit is a specific value
 
 	@ingroup core

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,12 +30,11 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of AntikernelLabsVIO
-	@ingroup miscdrivers
+	@brief Implementation of VIOOutputChannel
+	@ingroup core
  */
 
 #include "scopehal.h"
-#include "AntikernelLabsVIO.h"
 
 using namespace std;
 
@@ -43,106 +42,41 @@ using namespace std;
 // Construction / destruction
 
 /**
-	@brief Initialize the driver
+	@brief Initialize a digital GPIO channel
 
-	@param transport	SCPITransport pointing at the instrument
+	@param hwname	Internal hardware name of the channel (should match SCPI name if applicable)
+	@param parent	The instrument this channel is part of
+	@param color	Display color for the channel in plots and the filter graph
+	@param index	Position of this channel within m_channels of the parent instrument
  */
-AntikernelLabsVIO::AntikernelLabsVIO(SCPITransport* transport)
-	: SCPIDevice(transport, true)
-	, SCPIInstrument(transport, true)
-	, m_inputChannelCount(0)
-	, m_outputChannelCount(0)
+VIOOutputChannel::VIOOutputChannel(
+	const string& hwname,
+	Instrument* parent,
+	const string& color,
+	size_t index,
+	size_t width)
+	: InstrumentChannel(parent, hwname, color, Unit(Unit::UNIT_FS), index)
 {
-	//Find inputs
-	for(size_t i=0; i<8; i++)
-	{
-		string hwname = string("IN") + to_string(i);
-		auto name = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NAME?"));
-		auto width = stoi(Trim(m_transport->SendCommandQueuedWithReply(hwname + ":WIDTH?")));
-		if(width > 0)
+	ClearStreams();
+
+	//Set up channels
+	CreateInput<InputConstraintAND>(
+		"dout",
+		initializer_list<shared_ptr<InputConstraint> >
 		{
-			auto chan = new VIOInputChannel(hwname, this, "#808080", m_channels.size(), width);
-			chan->SetDisplayName(name);
-			m_channels.push_back(chan);
-		}
-	}
-	m_inputChannelCount = m_channels.size();
-
-	//Find outputs
-	for(size_t i=0; i<8; i++)
-	{
-		string hwname = string("OUT") + to_string(i);
-		auto name = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NAME?"));
-		auto width = stoi(Trim(m_transport->SendCommandQueuedWithReply(hwname + ":WIDTH?")));
-		if(width > 0)
-		{
-			auto chan = new VIOOutputChannel(hwname, this, "#808080", m_channels.size(), width);
-			chan->SetDisplayName(name);
-			m_channels.push_back(chan);
-		}
-	}
-	m_outputChannelCount = m_channels.size() - m_inputChannelCount;
+			make_shared<InputConstraintScalarWidth>(this, width),
+			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL_SCALAR)
+		});
 }
 
-AntikernelLabsVIO::~AntikernelLabsVIO()
+VIOOutputChannel::~VIOOutputChannel()
 {
-
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Instantiation
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Vertical scaling and stream management
 
-uint32_t AntikernelLabsVIO::GetInstrumentTypes() const
+InstrumentChannel::PhysicalConnector VIOOutputChannel::GetPhysicalConnector()
 {
-	return INST_MISC;
-}
-
-uint32_t AntikernelLabsVIO::GetInstrumentTypesForChannel(size_t /*i*/) const
-{
-	return INST_MISC;
-}
-
-///@brief Returns the constant driver name
-string AntikernelLabsVIO::GetDriverNameInternal()
-{
-	return "akl.vio";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Acquisition
-
-bool AntikernelLabsVIO::AcquireData()
-{
-	//Pull input values
-	for(size_t i=0; i<m_inputChannelCount; i++)
-	{
-		auto chan = dynamic_cast<VIOInputChannel*>(m_channels[i]);
-		if(!chan)
-			continue;
-
-		auto inval = Trim(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":VALUE?"));
-		uint64_t hexinval = 0;
-		sscanf(inval.c_str(), "%" SCNx64, &hexinval);
-
-		chan->SetDigitalScalarValue(0, hexinval);
-	}
-
-	bool cacheWasEmpty = m_outputChannelCachedValues.empty();
-	m_outputChannelCachedValues.resize(m_outputChannelCount);
-
-	for(size_t i=0; i<m_outputChannelCount; i++)
-	{
-		auto chan = dynamic_cast<VIOOutputChannel*>(m_channels[i + m_inputChannelCount]);
-		if(!chan)
-			continue;
-
-		auto outval = chan->GetInput(0).GetDigitalScalarValue();
-
-		if( cacheWasEmpty || (m_outputChannelCachedValues[i] != outval) )
-			m_transport->SendCommandQueued(chan->GetHwname() + ":VALUE " + to_string_hex(outval));
-
-		m_outputChannelCachedValues[i] = outval;
-	}
-
-	return true;
+	return CONNECTOR_SMA;
 }
