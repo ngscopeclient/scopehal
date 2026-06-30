@@ -30,46 +30,31 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of AntikernelLabsGPIO
-	@ingroup miscdrivers
+	@brief Declaration of VIOInputChannel
+	@ingroup core
  */
 
-#ifndef AntikernelLabsGPIO_h
-#define AntikernelLabsGPIO_h
+#ifndef VIOInputChannel_h
+#define VIOInputChannel_h
 
 /**
-	@brief A miscellaneous instrument which provides access to an Antikernel Labs GPIO bridge
+	@brief A multi-bit GPIO channel
 
-	@ingroup miscdrivers
+	@ingroup core
  */
-class AntikernelLabsGPIO
-	: public virtual SCPIMiscInstrument
+class VIOInputChannel : public InstrumentChannel
 {
 public:
-	AntikernelLabsGPIO(SCPITransport* transport);
-	virtual ~AntikernelLabsGPIO();
+	VIOInputChannel(
+		const std::string& hwname,
+		Instrument* parent,
+		const std::string& color = "#808080",
+		size_t index = 0,
+		size_t width = 32);
 
-	//Device information
-	virtual uint32_t GetInstrumentTypes() const override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
+	virtual ~VIOInputChannel();
 
-	//Acquisition
-	virtual bool AcquireData() override;
-
-protected:
-
-	/**
-		@brief Validate instrument and channel configuration from a save file
-	 */
-	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
-
-	bool m_cachedConfigValid;
-	uint32_t m_cachedTris;
-	uint32_t m_cachedOut;
-
-public:
-	static std::string GetDriverNameInternal();
-	MISC_INITPROC(AntikernelLabsGPIO);
+	virtual PhysicalConnector GetPhysicalConnector() override;
 };
 
 #endif

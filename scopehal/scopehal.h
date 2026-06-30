@@ -161,6 +161,7 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "DigitalInputChannel.h"
 #include "DigitalOutputChannel.h"
 #include "VectorGPIOChannel.h"
+#include "VIOInputChannel.h"
 #include "FunctionGenerator.h"
 #include "FunctionGeneratorChannel.h"
 #include "Load.h"

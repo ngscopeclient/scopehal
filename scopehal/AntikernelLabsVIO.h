@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal                                                                                                          *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,140 +30,38 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of AntikernelLabsGPIO
+	@brief Declaration of AntikernelLabsVIO
 	@ingroup miscdrivers
  */
 
-#include "scopehal.h"
-#include "AntikernelLabsGPIO.h"
-
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
+#ifndef AntikernelLabsVIO_h
+#define AntikernelLabsVIO_h
 
 /**
-	@brief Initialize the driver
+	@brief A miscellaneous instrument which provides access to an Antikernel Labs VIO bridge
 
-	@param transport	SCPITransport pointing at the instrument
+	@ingroup miscdrivers
  */
-AntikernelLabsGPIO::AntikernelLabsGPIO(SCPITransport* transport)
-	: SCPIDevice(transport, true)
-	, SCPIInstrument(transport, true)
-	, m_cachedConfigValid(false)
-	, m_cachedTris(0)
-	, m_cachedOut(0)
+class AntikernelLabsVIO
+	: public virtual SCPIMiscInstrument
 {
-	//Create initial stream
-	m_channels.push_back(new VectorGPIOChannel(
-		"GPIO",
-		this,
-		"#808080",
-		0,
-		32));
+public:
+	AntikernelLabsVIO(SCPITransport* transport);
+	virtual ~AntikernelLabsVIO();
 
-	//needs to run *before* the Oscilloscope class implementation
-	m_preloaders.push_front(sigc::mem_fun(*this, &AntikernelLabsGPIO::DoPreLoadConfiguration));
-}
+	//Device information
+	virtual uint32_t GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-AntikernelLabsGPIO::~AntikernelLabsGPIO()
-{
+	//Acquisition
+	virtual bool AcquireData() override;
 
-}
+protected:
+	size_t m_inputChannelCount;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Instantiation
+public:
+	static std::string GetDriverNameInternal();
+	MISC_INITPROC(AntikernelLabsVIO);
+};
 
-uint32_t AntikernelLabsGPIO::GetInstrumentTypes() const
-{
-	return INST_MISC;
-}
-
-uint32_t AntikernelLabsGPIO::GetInstrumentTypesForChannel(size_t /*i*/) const
-{
-	return INST_MISC;
-}
-
-///@brief Returns the constant driver name
-string AntikernelLabsGPIO::GetDriverNameInternal()
-{
-	return "akl.gpio";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Serialization
-
-void AntikernelLabsGPIO::DoPreLoadConfiguration(
-	[[maybe_unused]] int version,
-	[[maybe_unused]] const YAML::Node& node,
-	[[maybe_unused]] IDTable& idmap,
-	[[maybe_unused]] ConfigWarningList& list)
-{
-
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Acquisition
-
-bool AntikernelLabsGPIO::AcquireData()
-{
-	auto chan = dynamic_cast<VectorGPIOChannel*>(m_channels[0]);
-	if(!chan)
-		return false;
-
-	//Get the input value
-	auto inval = Trim(m_transport->SendCommandQueuedWithReply("GPIO:INVAL?"));
-	uint32_t hexinval = 0;
-	sscanf(inval.c_str(), "%x", &hexinval);
-
-	//Push to output streams
-	for(size_t i=0; i<chan->GetStreamCount(); i++)
-	{
-		uint32_t mask = (1 << i);
-		if( (hexinval & mask) == mask)
-			chan->SetDigitalScalarValue(i, 1);
-		else
-			chan->SetDigitalScalarValue(i, 0);
-	}
-
-	//Generate output register values
-	uint32_t tris = 0;
-	uint32_t outval = 0;
-	for(size_t i=0; i<chan->GetStreamCount(); i++)
-	{
-		//If we have no input connected, set the tristate to 1
-		uint32_t mask = (1 << i);
-		auto in = chan->GetInput(i);
-		if(!in)
-		{
-			tris |= mask;
-			continue;
-		}
-
-		//If we have an input, set the output to its scalar value
-		if(in.GetDigitalScalarValue())
-			outval |= mask;
-	}
-
-	//Push tristate and output values
-	//Skip if we didn't change anything
-	if(m_cachedConfigValid && (m_cachedTris == tris) )
-	{}
-	else
-	{
-		m_transport->SendCommandQueued(string("GPIO:TRIS ") + to_string_hex(tris));
-		m_cachedTris = tris;
-	}
-
-	if(m_cachedConfigValid && (m_cachedOut == outval) )
-	{}
-	else
-	{
-		m_transport->SendCommandQueued(string("GPIO:OUTVAL ") + to_string_hex(outval));
-		m_cachedOut = outval;
-	}
-
-	m_cachedConfigValid = true;
-
-	return true;
-}
+#endif

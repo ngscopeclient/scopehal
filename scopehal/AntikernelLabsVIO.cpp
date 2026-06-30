@@ -30,12 +30,12 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of AntikernelLabsGPIO
+	@brief Implementation of AntikernelLabsVIO
 	@ingroup miscdrivers
  */
 
 #include "scopehal.h"
-#include "AntikernelLabsGPIO.h"
+#include "AntikernelLabsVIO.h"
 
 using namespace std;
 
@@ -47,26 +47,30 @@ using namespace std;
 
 	@param transport	SCPITransport pointing at the instrument
  */
-AntikernelLabsGPIO::AntikernelLabsGPIO(SCPITransport* transport)
+AntikernelLabsVIO::AntikernelLabsVIO(SCPITransport* transport)
 	: SCPIDevice(transport, true)
 	, SCPIInstrument(transport, true)
-	, m_cachedConfigValid(false)
-	, m_cachedTris(0)
-	, m_cachedOut(0)
+	, m_inputChannelCount(0)
 {
-	//Create initial stream
-	m_channels.push_back(new VectorGPIOChannel(
-		"GPIO",
-		this,
-		"#808080",
-		0,
-		32));
+	//Find inputs
+	for(size_t i=0; i<8; i++)
+	{
+		string hwname = string("IN") + to_string(i);
+		auto name = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NAME?"));
+		auto width = stoi(Trim(m_transport->SendCommandQueuedWithReply(hwname + ":WIDTH?")));
+		if(width > 0)
+		{
+			auto chan = new VIOInputChannel(hwname, this, "#808080", i, width);
+			chan->SetDisplayName(name);
+			m_channels.push_back(chan);
+		}
+	}
+	m_inputChannelCount = m_channels.size();
 
-	//needs to run *before* the Oscilloscope class implementation
-	m_preloaders.push_front(sigc::mem_fun(*this, &AntikernelLabsGPIO::DoPreLoadConfiguration));
+	//todo outputs
 }
 
-AntikernelLabsGPIO::~AntikernelLabsGPIO()
+AntikernelLabsVIO::~AntikernelLabsVIO()
 {
 
 }
@@ -74,96 +78,42 @@ AntikernelLabsGPIO::~AntikernelLabsGPIO()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Instantiation
 
-uint32_t AntikernelLabsGPIO::GetInstrumentTypes() const
+uint32_t AntikernelLabsVIO::GetInstrumentTypes() const
 {
 	return INST_MISC;
 }
 
-uint32_t AntikernelLabsGPIO::GetInstrumentTypesForChannel(size_t /*i*/) const
+uint32_t AntikernelLabsVIO::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_MISC;
 }
 
 ///@brief Returns the constant driver name
-string AntikernelLabsGPIO::GetDriverNameInternal()
+string AntikernelLabsVIO::GetDriverNameInternal()
 {
-	return "akl.gpio";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Serialization
-
-void AntikernelLabsGPIO::DoPreLoadConfiguration(
-	[[maybe_unused]] int version,
-	[[maybe_unused]] const YAML::Node& node,
-	[[maybe_unused]] IDTable& idmap,
-	[[maybe_unused]] ConfigWarningList& list)
-{
-
+	return "akl.vio";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Acquisition
 
-bool AntikernelLabsGPIO::AcquireData()
+bool AntikernelLabsVIO::AcquireData()
 {
-	auto chan = dynamic_cast<VectorGPIOChannel*>(m_channels[0]);
-	if(!chan)
-		return false;
-
-	//Get the input value
-	auto inval = Trim(m_transport->SendCommandQueuedWithReply("GPIO:INVAL?"));
-	uint32_t hexinval = 0;
-	sscanf(inval.c_str(), "%x", &hexinval);
-
-	//Push to output streams
-	for(size_t i=0; i<chan->GetStreamCount(); i++)
+	//Pull input values
+	for(size_t i=0; i<m_inputChannelCount; i++)
 	{
-		uint32_t mask = (1 << i);
-		if( (hexinval & mask) == mask)
-			chan->SetDigitalScalarValue(i, 1);
-		else
-			chan->SetDigitalScalarValue(i, 0);
-	}
-
-	//Generate output register values
-	uint32_t tris = 0;
-	uint32_t outval = 0;
-	for(size_t i=0; i<chan->GetStreamCount(); i++)
-	{
-		//If we have no input connected, set the tristate to 1
-		uint32_t mask = (1 << i);
-		auto in = chan->GetInput(i);
-		if(!in)
-		{
-			tris |= mask;
+		auto chan = dynamic_cast<VIOInputChannel*>(m_channels[i]);
+		if(!chan)
 			continue;
-		}
 
-		//If we have an input, set the output to its scalar value
-		if(in.GetDigitalScalarValue())
-			outval |= mask;
+		auto inval = Trim(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":VALUE?"));
+		uint64_t hexinval = 0;
+		sscanf(inval.c_str(), "%" SCNx64, &hexinval);
+
+		chan->SetDigitalScalarValue(0, hexinval);
 	}
 
-	//Push tristate and output values
-	//Skip if we didn't change anything
-	if(m_cachedConfigValid && (m_cachedTris == tris) )
-	{}
-	else
-	{
-		m_transport->SendCommandQueued(string("GPIO:TRIS ") + to_string_hex(tris));
-		m_cachedTris = tris;
-	}
-
-	if(m_cachedConfigValid && (m_cachedOut == outval) )
-	{}
-	else
-	{
-		m_transport->SendCommandQueued(string("GPIO:OUTVAL ") + to_string_hex(outval));
-		m_cachedOut = outval;
-	}
-
-	m_cachedConfigValid = true;
+	//TODO: push output values but only if they've changed
 
 	return true;
 }
