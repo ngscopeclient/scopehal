@@ -51,6 +51,14 @@ protected:
 	FilterParameter& m_offset;
 	FilterParameter& m_unit;
 
+	FilterParameter& m_mode;
+
+	enum mode_t
+	{
+		MODE_UNSIGNED_NORMALIZED,
+		MODE_UNSIGNED
+	};
+
 	void OnUnitChanged();
 };
 

@@ -40,6 +40,7 @@ DigitalToAnalogFilter::DigitalToAnalogFilter(const string& color)
 	, m_gain(m_parameters["Gain"])
 	, m_offset(m_parameters["Offset"])
 	, m_unit(m_parameters["Unit"])
+	, m_mode(m_parameters["Mode"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
@@ -54,6 +55,11 @@ DigitalToAnalogFilter::DigitalToAnalogFilter(const string& color)
 	m_unit = FilterParameter::UnitSelector();
 	m_unit.SetIntVal(Unit::UNIT_VOLTS);
 	m_unit.signal_changed().connect(sigc::mem_fun(*this, &DigitalToAnalogFilter::OnUnitChanged));
+
+	m_mode = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_mode.AddEnumValue("Unsigned normalized", MODE_UNSIGNED_NORMALIZED);
+	m_mode.AddEnumValue("Unsigned", MODE_UNSIGNED);
+	m_mode.SetIntVal(MODE_UNSIGNED_NORMALIZED);
 
 	SetData(nullptr, 0);
 }
@@ -95,6 +101,8 @@ void DigitalToAnalogFilter::Refresh(
 
 	//TODO: signed value path, for now assume unsigned
 
+	auto mode = m_mode.GetEnumVal<mode_t>();
+
 	//Get the full-scale value
 	uint64_t fullscale = 0;
 	fullscale = ~fullscale;
@@ -103,7 +111,9 @@ void DigitalToAnalogFilter::Refresh(
 
 	//Normalize and scale the input
 	//TODO: option to not normalize
-	float norm = static_cast<double>(inval) / static_cast<double>(fullscale);
+	double norm = static_cast<double>(inval);
+	if(mode == MODE_UNSIGNED_NORMALIZED)
+		norm /= static_cast<double>(fullscale);
 	norm -= m_offset.GetFloatVal();
 	norm *= m_gain.GetFloatVal();
 
