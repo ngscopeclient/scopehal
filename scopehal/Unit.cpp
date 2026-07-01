@@ -1082,13 +1082,9 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 					out += tmp2[i];
 					i++;
 
-					//Pad with zeroes until we hit a decimal separator or the end of the number
-					for(; i<buflen; i++)
-					{
-						if(!isdigit(tmp2[i]))
-							break;
+					//Pad with zeroes until we hit the end of the number
+					for(; (i < buflen) && (tmp2[i] != 0); i++)
 						out += '0';
-					}
 					break;
 				}
 			}
