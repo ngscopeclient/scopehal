@@ -123,6 +123,9 @@ protected:
 	///@brief Sample rate, in Hz
 	uint64_t m_srate;
 
+	///@brief Trigger position
+	uint32_t m_triggerWordPosition;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(AntikernelLabsSerdesILA8b10b)
