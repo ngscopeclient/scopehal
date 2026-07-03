@@ -133,6 +133,7 @@ set(SCOPEHAL_SOURCES
 	DigitalOutputChannel.cpp
 	FunctionGenerator.cpp
 	FunctionGeneratorChannel.cpp
+	IBM8b10bWaveform.cpp
 	Load.cpp
 	LoadChannel.cpp
 	MockInstrument.cpp
@@ -171,6 +172,7 @@ set(SCOPEHAL_SOURCES
 	AgilentOscilloscope.cpp
 	AlientekPowerSupply.cpp
 	AntikernelLabsGPIO.cpp
+	AntikernelLabsSerdesILA8b10b.cpp
 	AntikernelLabsVIO.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLabsTriggerCrossbar.cpp

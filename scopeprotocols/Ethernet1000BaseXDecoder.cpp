@@ -88,6 +88,7 @@ void Ethernet1000BaseXDecoder::Refresh(
 	//Create the output capture
 	auto cap = SetupEmptyWaveform<EthernetWaveform>(data, 0);
 	cap->PrepareForCpuAccess();
+	cap->m_timescale = 1;
 
 	size_t len = data->m_samples.size();
 	for(size_t i=0; i < len; i++)
@@ -101,12 +102,17 @@ void Ethernet1000BaseXDecoder::Refresh(
 		vector<uint64_t> starts;
 		vector<uint64_t> ends;
 
+		//TODO: more efficient packet formatting to skip this unnecessary scaling
+		auto off = data->m_offsets[i] * data->m_timescale;
+		auto dur = data->m_durations[i] * data->m_timescale;
+
 		//K27.7 is a start-of-frame
+		Unit fs(Unit::UNIT_FS);
 		if(symbol.m_control && (symbol.m_data == 0xfb) )
 		{
 			bytes.push_back(0x55);
-			starts.push_back(data->m_offsets[i]);
-			ends.push_back(data->m_offsets[i] + data->m_durations[i]);
+			starts.push_back(off);
+			ends.push_back(off + dur);
 		}
 
 		//Discard anything else
@@ -120,6 +126,9 @@ void Ethernet1000BaseXDecoder::Refresh(
 		bool error = false;
 		while(i < len)
 		{
+			off = data->m_offsets[i] * data->m_timescale;
+			dur = data->m_durations[i] * data->m_timescale;
+
 			symbol = data->m_samples[i];
 
 			//Expect K29.7 end of frame
@@ -131,8 +140,8 @@ void Ethernet1000BaseXDecoder::Refresh(
 			}
 
 			bytes.push_back(symbol.m_data);
-			starts.push_back(data->m_offsets[i]);
-			ends.push_back(data->m_offsets[i] + data->m_durations[i]);
+			starts.push_back(off);
+			ends.push_back(off + dur);
 			i++;
 		}
 
