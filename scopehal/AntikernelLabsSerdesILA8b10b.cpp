@@ -211,7 +211,7 @@ bool AntikernelLabsSerdesILA8b10b::AcquireData()
 	cap->Resize(m_memDepth);
 	cap->PrepareForCpuAccess();
 
-	cap->SetDisplayFormat(IBM8b10bWaveform::FORMAT_HEX);
+	//cap->SetDisplayFormat(IBM8b10bWaveform::FORMAT_HEX);
 
 	//Get the data
 	auto data = Trim(m_transport->SendCommandQueuedWithReply("DATA?"));

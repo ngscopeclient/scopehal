@@ -959,6 +959,9 @@ string Unit::PrettyPrintInt64(int64_t value, int sigfigs, bool useDisplayLocale)
 					value1 /= digscale;
 				}
 
+				//Low digits must be unsigned otherwise we get garbage like -3.-1
+				value2 = llabs(value2);
+
 				//Use correct decimal separator for user's locale if needed
 				if(useDisplayLocale)
 					snprintf(tmp, sizeof(tmp), formatsDisplay[sigfigs], value1, m_decimalSeparator, value2);
