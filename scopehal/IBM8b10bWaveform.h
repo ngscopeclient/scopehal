@@ -35,37 +35,50 @@
 #ifndef IBM8b10bWaveform_h
 #define IBM8b10bWaveform_h
 
+/**
+	@brief A single 8b/10b symbol
+
+	This class is used for serialization and GPU interchange and must be POD, taking up a two bytes in memory.
+	!!! Any changes to memory layout will break compatibility with saved waveforms !!!
+ */
 class IBM8b10bSymbol
 {
 public:
 	IBM8b10bSymbol()
 	{}
 
-	IBM8b10bSymbol(bool b, bool e5, bool e3, bool ed, uint8_t d, int disp)
-	 : m_control(b)
-	 , m_error5(e5)
-	 , m_error3(e3)
-	 , m_errorDisp(ed)
-	 , m_data(d)
-	 , m_disparity(disp)
-	{}
+	enum flags
+	{
+		FLAG_ERROR_3	= 0x1,	//Invalid 3b4b sub-code
+		FLAG_ERROR_5	= 0x2,	//Invalid 5b6b sub-code
+		FLAG_ERROR_DISP	= 0x4,	//Invalid disparity
+		FLAG_ERROR_MASK	= 0x7,	//Any error
 
-	bool m_control;
-	bool m_error5;
-	bool m_error3;
-	bool m_errorDisp;
+		FLAG_CONTROL	= 0x40,	//K character
+		FLAG_DISP_POS	= 0x80	//Disparity positive
+	};
+
+	IBM8b10bSymbol(bool b, bool e5, bool e3, bool ed, uint8_t d, int8_t disp)
+	 : m_data(d)
+	 , m_flags(0)
+	{
+		if(b)
+			m_flags	|= FLAG_CONTROL;
+		if(e5)
+			m_flags |= FLAG_ERROR_5;
+		if(e3)
+			m_flags |= FLAG_ERROR_3;
+		if(ed)
+			m_flags |= FLAG_ERROR_DISP;
+		if(disp > 0)
+			m_flags |= FLAG_DISP_POS;
+	}
+
 	uint8_t m_data;
-	int m_disparity;
+	uint8_t m_flags;
 
 	bool operator== (const IBM8b10bSymbol& s) const
-	{
-		return (m_control == s.m_control) &&
-			(m_error5 == s.m_error5) &&
-			(m_error3 == s.m_error3) &&
-			(m_errorDisp == s.m_errorDisp) &&
-			(m_data == s.m_data) &&
-			(m_disparity == s.m_disparity);
-	}
+	{ return (m_flags == s.m_flags) && (m_data == s.m_data); }
 };
 
 class IBM8b10bWaveform : public SparseWaveform<IBM8b10bSymbol>

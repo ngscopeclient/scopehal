@@ -150,10 +150,10 @@ void PCIeGen2LogicalDecoder::Refresh(
 		size_t j=0;
 		for(; j<len-3; j++)
 		{
-			if( (in->m_samples[j].m_control && (in->m_samples[j].m_data == 0xbc) ) &&
-				(in->m_samples[j+1].m_control && (in->m_samples[j+1].m_data == 0x1c) ) &&
-				(in->m_samples[j+2].m_control && (in->m_samples[j+2].m_data == 0x1c) ) &&
-				(in->m_samples[j+3].m_control && (in->m_samples[j+3].m_data == 0x1c) ) )
+			if( ((in->m_samples[j].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (in->m_samples[j].m_data == 0xbc) ) &&
+				((in->m_samples[j+1].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (in->m_samples[j+1].m_data == 0x1c) ) &&
+				((in->m_samples[j+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (in->m_samples[j+2].m_data == 0x1c) ) &&
+				((in->m_samples[j+3].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (in->m_samples[j+3].m_data == 0x1c) ) )
 			{
 				break;
 			}
@@ -216,13 +216,13 @@ void PCIeGen2LogicalDecoder::Refresh(
 
 			//Update the scrambler UNLESS we have a SKP character K28.0 (k.1c)
 			uint8_t scrambler_out = 0;
-			if(sym.m_control && (sym.m_data == 0x1c) )
+			if( (sym.m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (sym.m_data == 0x1c) )
 			{}
 			else
 				scrambler_out = RunScrambler(scramblers[j]);
 
 			//Control characters
-			if(sym.m_control)
+			if(sym.m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 			{
 				switch(sym.m_data)
 				{
@@ -238,22 +238,26 @@ void PCIeGen2LogicalDecoder::Refresh(
 						{
 							if(
 								//Link ID must be K23.7 PAD or a D character
-								( (data->m_samples[i+1].m_control && data->m_samples[i+1].m_data == 0xf7) ||
-								(!data->m_samples[i+1].m_control) ) &&
+								( ( (data->m_samples[i+1].m_flags & IBM8b10bSymbol::FLAG_CONTROL) &&
+									data->m_samples[i+1].m_data == 0xf7) ||
+								( (data->m_samples[i+1].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) ) &&
 
 								//Lane ID must be K23.7 or data character with value <= 31
-								( (data->m_samples[i+2].m_control && data->m_samples[i+2].m_data == 0xf7) ||
-								(!data->m_samples[i+2].m_control && (data->m_samples[i+2].m_data <= 31) ) ) &&
+								( ( (data->m_samples[i+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) &&
+									data->m_samples[i+2].m_data == 0xf7) ||
+								( ( (data->m_samples[i+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) &&
+									(data->m_samples[i+2].m_data <= 31) ) ) &&
 
 								//Rate ID must have bit 1 set
-								(!data->m_samples[i+4].m_control && (data->m_samples[i+4].m_data & 2) ) )
+								( ( (data->m_samples[i+4].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) &&
+									(data->m_samples[i+4].m_data & 2) ) )
 							{
 								bool hitTS1 = true;
 								bool hitTS2 = true;
 
 								for(size_t k=0; k<6; k++)
 								{
-									if(data->m_samples[i+10+k].m_control)
+									if(data->m_samples[i+10+k].m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 									{
 										hitTS1 = false;
 										hitTS2 = false;

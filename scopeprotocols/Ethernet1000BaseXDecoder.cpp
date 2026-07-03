@@ -108,7 +108,7 @@ void Ethernet1000BaseXDecoder::Refresh(
 
 		//K27.7 is a start-of-frame
 		Unit fs(Unit::UNIT_FS);
-		if(symbol.m_control && (symbol.m_data == 0xfb) )
+		if( (symbol.m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (symbol.m_data == 0xfb) )
 		{
 			bytes.push_back(0x55);
 			starts.push_back(off);
@@ -132,7 +132,7 @@ void Ethernet1000BaseXDecoder::Refresh(
 			symbol = data->m_samples[i];
 
 			//Expect K29.7 end of frame
-			if(symbol.m_control)
+			if(symbol.m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 			{
 				if(symbol.m_data != 0xfd)
 					error = true;

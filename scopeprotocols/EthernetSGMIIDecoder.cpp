@@ -121,7 +121,7 @@ void EthernetSGMIIDecoder::Refresh(
 		vector<uint64_t> ends;
 
 		//K27.7 is a start-of-frame
-		if(symbol.m_control && (symbol.m_data == 0xfb) )
+		if((symbol.m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (symbol.m_data == 0xfb) )
 		{
 			bytes.push_back(0x55);
 			starts.push_back(data->m_offsets[i]);
@@ -142,7 +142,7 @@ void EthernetSGMIIDecoder::Refresh(
 			symbol = data->m_samples[i];
 
 			//Expect K29.7 end of frame
-			if(symbol.m_control)
+			if(symbol.m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 			{
 				//Can also be K29.7 K23.7, with the K23.7 at the end position
 				if( (symbol.m_data != 0xfd) && (symbol.m_data != 0xf7) )

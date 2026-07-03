@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -127,7 +127,7 @@ void PCIeLinkTrainingDecoder::Refresh(
 	size_t i = 0;
 	for(; i<len-3; i++)
 	{
-		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xbc) )
+		if((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i].m_data == 0xbc) )
 			break;
 	}
 
@@ -146,7 +146,7 @@ void PCIeLinkTrainingDecoder::Refresh(
 	for(; i<end; i++)
 	{
 		//If we see an un-decodeable 8b10b character, keep track.
-		if(din->m_samples[i].m_error5 || din->m_samples[i].m_error3 || din->m_samples[i].m_errorDisp)
+		if(din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_ERROR_MASK)
 		{
 			//We've seen a bad symbol
 			numBadSymbols ++;
@@ -177,7 +177,7 @@ void PCIeLinkTrainingDecoder::Refresh(
 		}
 
 		//If we see a start TLP or start DLLP symbol in DETECT, the link was up and trained before our capture started.
-		if(din->m_samples[i].m_control &&
+		if((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) &&
 			( (din->m_samples[i].m_data == 0xfb) || (din->m_samples[i].m_data == 0x5c) ) &&
 			(lstate == PCIeLTSSMSymbol::TYPE_DETECT) )
 		{
@@ -192,7 +192,7 @@ void PCIeLinkTrainingDecoder::Refresh(
 		}
 
 		//If we see a K28.3 we're entering electrical idle
-		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0x7c) )
+		if((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i].m_data == 0x7c) )
 		{
 			//If in Recovery.Speed transition to Recovery.RcvrLock
 			if(lstate == PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED)
@@ -211,24 +211,24 @@ void PCIeLinkTrainingDecoder::Refresh(
 		}
 
 		//If we see a K28.7 we're exiting electrical idle
-		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xfc) )
+		if((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i].m_data == 0xfc) )
 		{
 			//Skip all subsequent K28.7 symbols
 			while(i < end)
 			{
-				if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xfc) )
+				if((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i].m_data == 0xfc) )
 					i++;
 				else
 					break;
 			}
 
 			//Next symbol is expected to be a D10.2. If so, skip it.
-			if(!din->m_samples[i].m_control && (din->m_samples[i].m_data == 0x4a) )
+			if( ((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) && (din->m_samples[i].m_data == 0x4a) )
 				continue;
 		}
 
 		//All training sets start with a comma. If we see anything else, ignore it.
-		if(!din->m_samples[i].m_control || (din->m_samples[i].m_data != 0xbc) )
+		if(( (din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) || (din->m_samples[i].m_data != 0xbc) )
 		{
 			//If in Configuration or RcvrConfig state, this means we're now in L0
 			if( (lstate == PCIeLTSSMSymbol::TYPE_CONFIGURATION_LINKWIDTH_ACCEPT) ||
@@ -259,9 +259,9 @@ void PCIeLinkTrainingDecoder::Refresh(
 		if(i+3 < end)
 		{
 			if(
-				(din->m_samples[i+1].m_control && (din->m_samples[i+1].m_data == 0x1c) ) &&
-				(din->m_samples[i+2].m_control && (din->m_samples[i+2].m_data == 0x1c) ) &&
-				(din->m_samples[i+3].m_control && (din->m_samples[i+3].m_data == 0x1c) ) )
+				((din->m_samples[i+1].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i+1].m_data == 0x1c) ) &&
+				((din->m_samples[i+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i+2].m_data == 0x1c) ) &&
+				((din->m_samples[i+3].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i+3].m_data == 0x1c) ) )
 			{
 				i += 3;
 				continue;
@@ -270,13 +270,13 @@ void PCIeLinkTrainingDecoder::Refresh(
 
 		//Link ID must be K23.7 PAD or a D character
 		//If we see any other K characters there, reject it
-		if( din->m_samples[i+1].m_control && (din->m_samples[i+1].m_data != 0xf7) )
+		if( (din->m_samples[i+1].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i+1].m_data != 0xf7) )
 			continue;
 
 		//Lane ID must be K23.7 or data character with value <= 31
-		if(din->m_samples[i+2].m_control && din->m_samples[i+2].m_data != 0xf7)
+		if((din->m_samples[i+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && din->m_samples[i+2].m_data != 0xf7)
 			continue;
-		if(!din->m_samples[i+2].m_control && (din->m_samples[i+2].m_data > 31) )
+		if(( (din->m_samples[i+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) && (din->m_samples[i+2].m_data > 31) )
 			continue;
 
 		//Check if it's a TS1 or TS2 set
@@ -285,7 +285,7 @@ void PCIeLinkTrainingDecoder::Refresh(
 
 		for(size_t k=0; k<6; k++)
 		{
-			if(din->m_samples[i+10+k].m_control)
+			if(din->m_samples[i+10+k].m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 			{
 				hitTS1 = false;
 				hitTS2 = false;

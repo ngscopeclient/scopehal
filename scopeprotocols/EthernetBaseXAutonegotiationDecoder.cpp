@@ -110,7 +110,7 @@ void EthernetBaseXAutonegotiationDecoder::Refresh(
 			case STATE_IDLE:
 				{
 					//Comma? Might be start of an idle
-					if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xbc))
+					if((din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) && (din->m_samples[i].m_data == 0xbc))
 					{
 						tstart = tnow;
 						state = STATE_HEADER;
@@ -121,7 +121,7 @@ void EthernetBaseXAutonegotiationDecoder::Refresh(
 			case STATE_HEADER:
 				{
 					//Should be D2.2 0x42 (for C2) or D21.5 0xb5 (for C1)
-					if(!din->m_samples[i].m_control &&
+					if(( (din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0) &&
 						( (din->m_samples[i].m_data == 0x42) || (din->m_samples[i].m_data == 0xb5) ))
 					{
 						state = STATE_FIRST;
@@ -133,7 +133,7 @@ void EthernetBaseXAutonegotiationDecoder::Refresh(
 
 			case STATE_FIRST:
 				{
-					if(!din->m_samples[i].m_control)
+					if( (din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0)
 					{
 						//Low half of ability field
 						low = din->m_samples[i].m_data;
@@ -146,7 +146,7 @@ void EthernetBaseXAutonegotiationDecoder::Refresh(
 
 			case STATE_SECOND:
 				{
-					if(!din->m_samples[i].m_control)
+					if( (din->m_samples[i].m_flags & IBM8b10bSymbol::FLAG_CONTROL) == 0)
 					{
 						uint16_t code = low | (din->m_samples[i].m_data << 8);
 

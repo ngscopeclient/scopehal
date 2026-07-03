@@ -37,14 +37,13 @@
 
 using namespace std;
 
-
 string IBM8b10bWaveform::GetColor(size_t i)
 {
 	const IBM8b10bSymbol& s = m_samples[i];
 
-	if(s.m_error5 || s.m_error3 || s.m_errorDisp)
+	if(s.m_flags & IBM8b10bSymbol::FLAG_ERROR_MASK)
 		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	else if(s.m_control)
+	else if(s.m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 		return StandardColors::colors[StandardColors::COLOR_CONTROL];
 	else
 		return StandardColors::colors[StandardColors::COLOR_DATA];
@@ -60,32 +59,32 @@ string IBM8b10bWaveform::GetText(size_t i)
 	unsigned int left = s.m_data & 0x1F;
 
 	char tmp[32];
-	if(s.m_error5)
+	if(s.m_flags & IBM8b10bSymbol::FLAG_ERROR_5)
 		return "ERROR (5b/6b)";
-	else if(s.m_error3)
+	else if(s.m_flags & IBM8b10bSymbol::FLAG_ERROR_3)
 		return "ERROR (3b/4b)";
-	else if(s.m_errorDisp)
+	else if(s.m_flags & IBM8b10bSymbol::FLAG_ERROR_DISP)
 		return "ERROR (disparity)";
 	else
 	{
 		//Dotted format
 		if(cachedDisplayFormat == FORMAT_DOTTED)
 		{
-			if(s.m_control)
+			if(s.m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 				snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
 			else
 				snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
 
-			if(s.m_disparity < 0)
-				return string(tmp) + "-";
-			else
+			if(s.m_flags & IBM8b10bSymbol::FLAG_DISP_POS)
 				return string(tmp) + "+";
+			else
+				return string(tmp) + "-";
 		}
 
 		//Hex format
 		else
 		{
-			if(s.m_control)
+			if(s.m_flags & IBM8b10bSymbol::FLAG_CONTROL)
 				snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
 			else
 				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
