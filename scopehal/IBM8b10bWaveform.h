@@ -30,127 +30,66 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of QSGMIIDecoder
+	@brief Declaration of IBM8b10bWaveform
  */
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
-#include "IBM8b10bDecoder.h"
-#include "QSGMIIDecoder.h"
+#ifndef IBM8b10bWaveform_h
+#define IBM8b10bWaveform_h
 
-
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-QSGMIIDecoder::QSGMIIDecoder(const string& color)
-	: Filter(color, CAT_SERIAL)
-	, m_displayformat(m_parameters["Display Format"])
+class IBM8b10bSymbol
 {
-	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("data");
+public:
+	IBM8b10bSymbol()
+	{}
 
-	AddProtocolStream("Lane 0");
-	AddProtocolStream("Lane 1");
-	AddProtocolStream("Lane 2");
-	AddProtocolStream("Lane 3");
+	IBM8b10bSymbol(bool b, bool e5, bool e3, bool ed, uint8_t d, int disp)
+	 : m_control(b)
+	 , m_error5(e5)
+	 , m_error3(e3)
+	 , m_errorDisp(ed)
+	 , m_data(d)
+	 , m_disparity(disp)
+	{}
 
-	m_displayformat = IBM8b10bWaveform::MakeIBM8b10bDisplayFormatParameter();
-}
+	bool m_control;
+	bool m_error5;
+	bool m_error3;
+	bool m_errorDisp;
+	uint8_t m_data;
+	int m_disparity;
 
-QSGMIIDecoder::~QSGMIIDecoder()
+	bool operator== (const IBM8b10bSymbol& s) const
+	{
+		return (m_control == s.m_control) &&
+			(m_error5 == s.m_error5) &&
+			(m_error3 == s.m_error3) &&
+			(m_errorDisp == s.m_errorDisp) &&
+			(m_data == s.m_data) &&
+			(m_disparity == s.m_disparity);
+	}
+};
+
+class IBM8b10bWaveform : public SparseWaveform<IBM8b10bSymbol>
 {
+public:
+	IBM8b10bWaveform()
+		: SparseWaveform<IBM8b10bSymbol>(),
+		m_displayFormat(FORMAT_DOTTED)
+	{};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
+	static FilterParameter MakeIBM8b10bDisplayFormatParameter();
 
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-string QSGMIIDecoder::GetProtocolName()
-{
-	return "Ethernet - QSGMII";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void QSGMIIDecoder::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue
-	)
-{
-	#ifdef HAVE_NVTX
-		nvtx3::scoped_range nrange("QSGMIIDecoder::Refresh");
-	#endif
-	ClearErrors();
-
-	if(!VerifyAllInputsOK())
+	enum DisplayFormat
 	{
-		AddErrorMessage("Missing input", "One or more inputs are unconnected");
-		SetData(nullptr, 0);
-		return;
-	}
+		FORMAT_DOTTED,
+		FORMAT_HEX
+	};
 
-	//Get the input waveform
-	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
-	size_t len = din->size();
+	void SetDisplayFormat(DisplayFormat format)
+	{ m_displayFormat = format; }
 
-	//Create the captures
-	//Output is time aligned with the input
-	vector<IBM8b10bWaveform*> caps;
-	for(size_t i=0; i<4; i++)
-	{
-		auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, i);
-		cap->SetDisplayFormat(m_displayformat.GetEnumVal<IBM8b10bWaveform::DisplayFormat>());
-		cap->PrepareForCpuAccess();
-		caps.push_back(cap);
+protected:
+	DisplayFormat m_displayFormat;
+};
 
-		//We know roughly how big each output buffer should be (1/4 the input)
-		//so preallocate that space to avoid excessive allocations
-		cap->Reserve(len/4);
-	}
-
-	//Find the first K28.1 (control 0x3c)
-	size_t phase = 0;
-	bool found = false;
-	for(size_t i=0; i<len; i++)
-	{
-		auto s = din->m_samples[i];
-		if(s.m_control && (s.m_data == 0x3c) )
-		{
-			phase = i & 3;
-			found = true;
-			break;
-		}
-	}
-
-	//If no K28.1, give up
-	if(!found)
-		return;
-
-	//Go through the list of symbols and round-robin them out to each lane
-	for(size_t i=0; i<len; i++)
-	{
-		size_t nlane = (i - phase) & 3;
-
-		caps[nlane]->m_offsets.push_back(din->m_offsets[i]);
-
-		//Copy sample unless it's a K28.1. if so, convert to K28.5
-		auto s = din->m_samples[i];
-		if(s.m_control && (s.m_data == 0x3c) )
-			caps[nlane]->m_samples.push_back(IBM8b10bSymbol(true, false, false, false, 0xbc, s.m_disparity));
-		else
-			caps[nlane]->m_samples.push_back(din->m_samples[i]);
-
-		//Last sample?
-		if(i+4 >= len)
-			caps[nlane]->m_durations.push_back(din->m_durations[i]);
-
-		//No, use duration of this to next one
-		else
-			caps[nlane]->m_durations.push_back(din->m_offsets[i+4] - din->m_offsets[i]);
-	}
-
-	for(size_t i=0; i<4; i++)
-		caps[i]->MarkModifiedFromCpu();
-}
+#endif

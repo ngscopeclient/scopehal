@@ -49,19 +49,10 @@ IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	AddProtocolStream("data");
 	CreateInput<InputConstraintSparseStreamType>("data", Stream::STREAM_TYPE_DIGITAL);
 
-	m_displayFormat = MakeIBM8b10bDisplayFormatParameter();
+	m_displayFormat = IBM8b10bWaveform::MakeIBM8b10bDisplayFormatParameter();
 
 	m_commaSearchWindow = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_UI));
 	m_commaSearchWindow.SetIntVal(20000);
-}
-
-FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
-{
-	auto f = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	f.AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
-	f.AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
-	f.SetIntVal(FORMAT_DOTTED);
-	return f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +99,7 @@ void IBM8b10bDecoder::Refresh(
 	//Create the capture
 	auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, 0);
 	cap->PrepareForCpuAccess();
-	cap->SetDisplayFormat(m_displayFormat.GetIntVal());
+	cap->SetDisplayFormat(m_displayFormat.GetEnumVal<IBM8b10bWaveform::DisplayFormat>());
 
 	//Preallocate output buffer
 	cap->Reserve(din->m_samples.size() / 10);
@@ -429,65 +420,3 @@ void IBM8b10bDecoder::Align(SparseDigitalWaveform* din, size_t& i)
 
 	i += max_offset;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// IBM8b10bWaveform
-
-string IBM8b10bWaveform::GetColor(size_t i)
-{
-	const IBM8b10bSymbol& s = m_samples[i];
-
-	if(s.m_error5 || s.m_error3 || s.m_errorDisp)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	else if(s.m_control)
-		return StandardColors::colors[StandardColors::COLOR_CONTROL];
-	else
-		return StandardColors::colors[StandardColors::COLOR_DATA];
-}
-
-string IBM8b10bWaveform::GetText(size_t i)
-{
-	const IBM8b10bSymbol& s = m_samples[i];
-
-	auto cachedDisplayFormat = static_cast<IBM8b10bDecoder::DisplayFormat>(m_displayFormat);
-
-	unsigned int right = s.m_data >> 5;
-	unsigned int left = s.m_data & 0x1F;
-
-	char tmp[32];
-	if(s.m_error5)
-		return "ERROR (5b/6b)";
-	else if(s.m_error3)
-		return "ERROR (3b/4b)";
-	else if(s.m_errorDisp)
-		return "ERROR (disparity)";
-	else
-	{
-		//Dotted format
-		if(cachedDisplayFormat == IBM8b10bDecoder::FORMAT_DOTTED)
-		{
-			if(s.m_control)
-				snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
-			else
-				snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
-
-			if(s.m_disparity < 0)
-				return string(tmp) + "-";
-			else
-				return string(tmp) + "+";
-		}
-
-		//Hex format
-		else
-		{
-			if(s.m_control)
-				snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
-			else
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-			return string(tmp);
-		}
-	}
-
-	return "";
-}
-

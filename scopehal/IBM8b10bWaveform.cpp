@@ -30,127 +30,77 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of QSGMIIDecoder
+	@brief Implementation of IBM8b10bWaveform
  */
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
-#include "IBM8b10bDecoder.h"
-#include "QSGMIIDecoder.h"
-
+#include "scopehal.h"
+#include "IBM8b10bWaveform.h"
 
 using namespace std;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
 
-QSGMIIDecoder::QSGMIIDecoder(const string& color)
-	: Filter(color, CAT_SERIAL)
-	, m_displayformat(m_parameters["Display Format"])
+string IBM8b10bWaveform::GetColor(size_t i)
 {
-	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("data");
+	const IBM8b10bSymbol& s = m_samples[i];
 
-	AddProtocolStream("Lane 0");
-	AddProtocolStream("Lane 1");
-	AddProtocolStream("Lane 2");
-	AddProtocolStream("Lane 3");
-
-	m_displayformat = IBM8b10bWaveform::MakeIBM8b10bDisplayFormatParameter();
+	if(s.m_error5 || s.m_error3 || s.m_errorDisp)
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
+	else if(s.m_control)
+		return StandardColors::colors[StandardColors::COLOR_CONTROL];
+	else
+		return StandardColors::colors[StandardColors::COLOR_DATA];
 }
 
-QSGMIIDecoder::~QSGMIIDecoder()
+string IBM8b10bWaveform::GetText(size_t i)
 {
+	const IBM8b10bSymbol& s = m_samples[i];
 
-}
+	auto cachedDisplayFormat = m_displayFormat;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+	unsigned int right = s.m_data >> 5;
+	unsigned int left = s.m_data & 0x1F;
 
-string QSGMIIDecoder::GetProtocolName()
-{
-	return "Ethernet - QSGMII";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void QSGMIIDecoder::Refresh(
-	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
-	[[maybe_unused]] shared_ptr<QueueHandle> queue
-	)
-{
-	#ifdef HAVE_NVTX
-		nvtx3::scoped_range nrange("QSGMIIDecoder::Refresh");
-	#endif
-	ClearErrors();
-
-	if(!VerifyAllInputsOK())
+	char tmp[32];
+	if(s.m_error5)
+		return "ERROR (5b/6b)";
+	else if(s.m_error3)
+		return "ERROR (3b/4b)";
+	else if(s.m_errorDisp)
+		return "ERROR (disparity)";
+	else
 	{
-		AddErrorMessage("Missing input", "One or more inputs are unconnected");
-		SetData(nullptr, 0);
-		return;
-	}
-
-	//Get the input waveform
-	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
-	size_t len = din->size();
-
-	//Create the captures
-	//Output is time aligned with the input
-	vector<IBM8b10bWaveform*> caps;
-	for(size_t i=0; i<4; i++)
-	{
-		auto cap = SetupEmptyWaveform<IBM8b10bWaveform>(din, i);
-		cap->SetDisplayFormat(m_displayformat.GetEnumVal<IBM8b10bWaveform::DisplayFormat>());
-		cap->PrepareForCpuAccess();
-		caps.push_back(cap);
-
-		//We know roughly how big each output buffer should be (1/4 the input)
-		//so preallocate that space to avoid excessive allocations
-		cap->Reserve(len/4);
-	}
-
-	//Find the first K28.1 (control 0x3c)
-	size_t phase = 0;
-	bool found = false;
-	for(size_t i=0; i<len; i++)
-	{
-		auto s = din->m_samples[i];
-		if(s.m_control && (s.m_data == 0x3c) )
+		//Dotted format
+		if(cachedDisplayFormat == FORMAT_DOTTED)
 		{
-			phase = i & 3;
-			found = true;
-			break;
+			if(s.m_control)
+				snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
+			else
+				snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
+
+			if(s.m_disparity < 0)
+				return string(tmp) + "-";
+			else
+				return string(tmp) + "+";
+		}
+
+		//Hex format
+		else
+		{
+			if(s.m_control)
+				snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
+			else
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return string(tmp);
 		}
 	}
 
-	//If no K28.1, give up
-	if(!found)
-		return;
+	return "";
+}
 
-	//Go through the list of symbols and round-robin them out to each lane
-	for(size_t i=0; i<len; i++)
-	{
-		size_t nlane = (i - phase) & 3;
-
-		caps[nlane]->m_offsets.push_back(din->m_offsets[i]);
-
-		//Copy sample unless it's a K28.1. if so, convert to K28.5
-		auto s = din->m_samples[i];
-		if(s.m_control && (s.m_data == 0x3c) )
-			caps[nlane]->m_samples.push_back(IBM8b10bSymbol(true, false, false, false, 0xbc, s.m_disparity));
-		else
-			caps[nlane]->m_samples.push_back(din->m_samples[i]);
-
-		//Last sample?
-		if(i+4 >= len)
-			caps[nlane]->m_durations.push_back(din->m_durations[i]);
-
-		//No, use duration of this to next one
-		else
-			caps[nlane]->m_durations.push_back(din->m_offsets[i+4] - din->m_offsets[i]);
-	}
-
-	for(size_t i=0; i<4; i++)
-		caps[i]->MarkModifiedFromCpu();
+FilterParameter IBM8b10bWaveform::MakeIBM8b10bDisplayFormatParameter()
+{
+	auto f = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	f.AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
+	f.AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
+	f.SetIntVal(FORMAT_DOTTED);
+	return f;
 }
