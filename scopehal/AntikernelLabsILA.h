@@ -106,6 +106,7 @@ public:
 	virtual int64_t GetTriggerOffset() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
+	virtual bool HasInterleavingControls() override;
 
 protected:
 

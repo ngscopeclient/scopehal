@@ -370,6 +370,11 @@ vector<uint64_t> AntikernelLabsILA::GetSampleDepthsInterleaved()
 	return GetSampleRatesNonInterleaved();
 }
 
+bool AntikernelLabsILA::HasInterleavingControls()
+{
+	return false;
+}
+
 uint64_t AntikernelLabsILA::GetSampleRate()
 {
 	return m_srate;
