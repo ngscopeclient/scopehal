@@ -255,7 +255,12 @@ void VCDImportFilter::OnFileNameChanged()
 					if(width == 1)
 						wfm = new SparseDigitalWaveform;
 					else
-						wfm = new SparseDigitalBusWaveform;
+					{
+						LogError("digital bus unimplemented\n");
+						continue;
+					}
+
+					//	wfm = new SparseDigitalBusWaveform;
 					wfm->PrepareForCpuAccess();
 
 					wfm->m_timescale = timescale;
@@ -277,6 +282,7 @@ void VCDImportFilter::OnFileNameChanged()
 					//Vector: first char is 'b', then data, space, symbol name
 					if(s[0] == 'b')
 					{
+						/*
 						auto ispace = s.find(' ');
 						auto symbol = s.substr(ispace + 1);
 						auto wfm = dynamic_cast<SparseDigitalBusWaveform*>(waveforms[symbol]);
@@ -313,6 +319,7 @@ void VCDImportFilter::OnFileNameChanged()
 						}
 						else
 							LogError("Symbol \"%s\" is not a valid digital bus waveform\n", symbol.c_str());
+						*/
 					}
 
 					//Scalar: first char is boolean value, rest is symbol name

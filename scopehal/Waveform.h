@@ -670,7 +670,6 @@ typedef SparseWaveform<bool> 					SparseDigitalWaveform;
 typedef UniformWaveform<bool>					UniformDigitalWaveform;
 typedef SparseWaveform<float>					SparseAnalogWaveform;
 typedef UniformWaveform<float>					UniformAnalogWaveform;
-typedef SparseWaveform< std::vector<bool> > 	SparseDigitalBusWaveform;
 
 //Make sure inline helpers aren't warned about if unused
 #pragma GCC diagnostic push

@@ -168,8 +168,8 @@ protected:
 	{ return dynamic_cast<UniformDigitalWaveform*>(GetInputWaveform(i)); }
 
 	///Gets the digital bus waveform attached to the specified input
-	SparseDigitalBusWaveform* GetSparseDigitalBusInputWaveform(size_t i)
-	{ return dynamic_cast<SparseDigitalBusWaveform*>(GetInputWaveform(i)); }
+	//SparseDigitalBusWaveform* GetSparseDigitalBusInputWaveform(size_t i)
+	//{ return dynamic_cast<SparseDigitalBusWaveform*>(GetInputWaveform(i)); }
 
 	virtual void CreateInput(const std::string& name);
 
