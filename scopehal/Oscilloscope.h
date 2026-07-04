@@ -567,7 +567,7 @@ public:
 	virtual bool SetInterleaving(bool combine) =0;
 
 	/**
-		@brief Returns true if the scope has a user controllavble interleaving feature, false if not
+		@brief Returns true if the scope has a user controllable interleaving feature, false if not
 	 */
 	virtual bool HasInterleavingControls();
 
