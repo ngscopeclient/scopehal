@@ -93,7 +93,7 @@ public:
 	Stream::StreamType GetType();
 	float GetScalarValue();
 	uint64_t GetDigitalScalarValue();
-	size_t GetDigitalScalarWidth();
+	size_t GetDigitalWidth();
 	std::string PrettyPrintDigitalScalarHex();
 	std::string PrettyPrintDigitalScalarBinary();
 	std::string PrettyPrintDigitalScalarDecimal();

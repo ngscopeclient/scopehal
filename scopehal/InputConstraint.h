@@ -292,19 +292,19 @@ protected:
 
 	@ingroup core
  */
-class InputConstraintScalarWidth : public InputConstraint
+class InputConstraintDigitalWidth : public InputConstraint
 {
 public:
-	InputConstraintScalarWidth(FlowGraphNode* sink, size_t width)
+	InputConstraintDigitalWidth(FlowGraphNode* sink, size_t width)
 		: InputConstraint(sink)
 		, m_width(width)
 	{}
 
 	virtual bool Check(StreamDescriptor source) override
-	{ return (m_width == source.GetDigitalScalarWidth() ); }
+	{ return (m_width == source.GetDigitalWidth() ); }
 
 	virtual std::string ToString() override
-	{ return std::string("Scalar bus width is ") + std::to_string(m_width);  }
+	{ return std::string("Digital bus width is ") + std::to_string(m_width);  }
 
 protected:
 	size_t m_width;

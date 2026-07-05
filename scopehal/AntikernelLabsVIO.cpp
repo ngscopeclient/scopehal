@@ -113,6 +113,8 @@ string AntikernelLabsVIO::GetDriverNameInternal()
 
 bool AntikernelLabsVIO::AcquireData()
 {
+	m_transport->SendCommandQueued("TRIG");
+
 	//Pull input values
 	for(size_t i=0; i<m_inputChannelCount; i++)
 	{
@@ -143,6 +145,9 @@ bool AntikernelLabsVIO::AcquireData()
 
 		m_outputChannelCachedValues[i] = outval;
 	}
+
+	//Rate limit to ~100 Hz
+	this_thread::sleep_for(chrono::milliseconds(10));
 
 	return true;
 }

@@ -69,16 +69,17 @@ AntikernelLabsILA::AntikernelLabsILA(SCPITransport* transport)
 			m_channelStarts.push_back(startpos);
 			startpos += width;
 
-			//TODO: if width is >1 make it a digital bus
-
 			auto chan = new OscilloscopeChannel(
 				this,
 				hwname,
 				"#00ff00",
 				Unit(Unit::UNIT_FS),
 				Unit(Unit::UNIT_COUNTS),
-				Stream::STREAM_TYPE_DIGITAL,
+				(width > 1) ? Stream::STREAM_TYPE_DIGITAL_BUS : Stream::STREAM_TYPE_DIGITAL,
 				m_channels.size());
+
+			chan->SetDigitalWidth(0, width);
+
 			chan->SetDisplayName(name);
 			m_channels.push_back(chan);
 		}
@@ -236,33 +237,50 @@ bool AntikernelLabsILA::AcquireData()
 
 	//Set up output waveforms
 	vector<WaveformBase*> waves;
-	vector<UniformDigitalWaveform*> digwaves;
+	map<size_t, UniformDigitalWaveform*> digwaves;
+	map<size_t, UniformDigitalBusWaveform32*> bwave32;
 
 	SequenceSet s;
 	for(size_t i=0; i<m_channelWidths.size(); i++)
 	{
 		//Skip multi-bit streams for now
 		auto w = m_channelWidths[i];
-		if(w != 1)
+
+		if(w == 1)
 		{
-			waves.push_back(nullptr);
-			digwaves.push_back(nullptr);
-			continue;
+			//It's a single bit digital waveform if we get here
+			auto u = new UniformDigitalWaveform;
+			u->m_timescale = m_period;
+			u->m_triggerPhase = 0;
+			u->m_startTimestamp = sec;
+			u->m_startFemtoseconds = fs;
+			u->Resize(m_memDepth);
+			u->PrepareForCpuAccess();
+			u->MarkModifiedFromCpu();
+
+			waves.push_back(u);
+			digwaves[i] = u;
+			s[m_channels[i]] = u;
 		}
 
-		//It's a single bit digital waveform if we get here
-		auto u = new UniformDigitalWaveform;
-		u->m_timescale = m_period;
-		u->m_triggerPhase = 0;
-		u->m_startTimestamp = sec;
-		u->m_startFemtoseconds = fs;
-		u->Resize(m_memDepth);
-		u->PrepareForCpuAccess();
-		u->MarkModifiedFromCpu();
+		else if(w <= 32)
+		{
+			auto u = new UniformDigitalBusWaveform32;
+			u->m_timescale = m_period;
+			u->m_triggerPhase = 0;
+			u->m_startTimestamp = sec;
+			u->m_startFemtoseconds = fs;
+			u->Resize(m_memDepth);
+			u->PrepareForCpuAccess();
+			u->MarkModifiedFromCpu();
 
-		waves.push_back(u);
-		digwaves.push_back(u);
-		s[m_channels[i]] = u;
+			waves.push_back(u);
+			bwave32[i] = u;
+			s[m_channels[i]] = u;
+		}
+
+		else
+			waves.push_back(nullptr);
 	}
 
 	//Unpack each sample's data
@@ -278,21 +296,45 @@ bool AntikernelLabsILA::AcquireData()
 
 		for(size_t j=0; j<m_channelWidths.size(); j++)
 		{
+			auto dw = digwaves[j];
+			auto d32 = bwave32[j];
+			auto width = m_channelWidths[j];
+
 			auto bitstart = m_channelStarts[j];
 			auto bytestart = bitstart / 8;
 			auto bitpos = bitstart % 8;
 
 			//Single bit signal
-			if(m_channelWidths[j] == 1)
+			if(dw)
 			{
 				if( (row[bytestart] >> bitpos) & 1)
-					digwaves[j]->m_samples[i] = true;
+					dw->m_samples[i] = true;
 			}
 
-			//Vector signal
-			else
+			//Vector signal of <= 32 bits
+			else if(d32)
 			{
+				//TODO make this more efficient and not copy a bit at a time
+				uint32_t tmp = 0;
+				for(size_t k=0; k<width; k++)
+				{
+					if( (row[bytestart] >> bitpos) & 1)
+						tmp |= (1 << k);
+
+					//bump bit position
+					bitpos ++;
+					if(bitpos >= 8)
+					{
+						bytestart ++;
+						bitpos -= 8;
+					}
+				}
+
+				d32->m_samples[i] = tmp;
 			}
+
+			else
+				continue;
 		}
 	}
 
@@ -306,6 +348,7 @@ bool AntikernelLabsILA::AcquireData()
 		m_triggerArmed = false;
 	else
 		m_transport->SendCommandQueued("TRIG:ARM");
+
 	return true;
 }
 

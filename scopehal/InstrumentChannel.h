@@ -220,12 +220,20 @@ public:
 		return m_streams[stream].m_digitalValue;
 	}
 
-	///@brief Gets the width of a scalar data stream
-	uint64_t GetDigitalScalarWidth(size_t stream)
+	///@brief Gets the width of a digital data stream
+	uint64_t GetDigitalWidth(size_t stream)
 	{
 		if(stream >= m_streams.size())
 			return 0;
 		return m_streams[stream].m_digitalValueWidth;
+	}
+
+	///@brief Set the width of a digital data stream
+	void SetDigitalWidth(size_t stream, uint64_t width)
+	{
+		if(stream >= m_streams.size())
+			return;
+		m_streams[stream].m_digitalValueWidth = width;
 	}
 
 	///@brief Sets the value of a scalar data stream

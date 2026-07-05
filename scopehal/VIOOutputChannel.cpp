@@ -64,7 +64,7 @@ VIOOutputChannel::VIOOutputChannel(
 		"dout",
 		initializer_list<shared_ptr<InputConstraint> >
 		{
-			make_shared<InputConstraintScalarWidth>(this, width),
+			make_shared<InputConstraintDigitalWidth>(this, width),
 			make_shared<InputConstraintStreamType>(this, Stream::STREAM_TYPE_DIGITAL_SCALAR)
 		});
 }

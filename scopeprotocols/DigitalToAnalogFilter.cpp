@@ -97,7 +97,7 @@ void DigitalToAnalogFilter::Refresh(
 	}
 
 	auto inval = din.GetDigitalScalarValue();
-	auto width = din.GetDigitalScalarWidth();
+	auto width = din.GetDigitalWidth();
 
 	//TODO: signed value path, for now assume unsigned
 

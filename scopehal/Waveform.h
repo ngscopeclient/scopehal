@@ -671,6 +671,38 @@ typedef UniformWaveform<bool>					UniformDigitalWaveform;
 typedef SparseWaveform<float>					SparseAnalogWaveform;
 typedef UniformWaveform<float>					UniformAnalogWaveform;
 
+/**
+	@brief A multi-bit (up to 32 bits) digital waveform sampled at uniform rate
+	@ingroup datamodel
+ */
+class UniformDigitalBusWaveform32
+	: public UniformWaveform<uint32_t>
+{
+public:
+	UniformDigitalBusWaveform32(const std::string& name = "")
+		: UniformWaveform<uint32_t>(name)
+	{}
+
+	virtual ~UniformDigitalBusWaveform32()
+	{}
+};
+
+/**
+	@brief A multi-bit (up to 64 bits) digital waveform sampled at uniform rate
+	@ingroup datamodel
+ */
+class UniformDigitalBusWaveform64
+	: public UniformWaveform<uint64_t>
+{
+public:
+	UniformDigitalBusWaveform64(const std::string& name = "")
+		: UniformWaveform<uint64_t>(name)
+	{}
+
+	virtual ~UniformDigitalBusWaveform64()
+	{}
+};
+
 //Make sure inline helpers aren't warned about if unused
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"

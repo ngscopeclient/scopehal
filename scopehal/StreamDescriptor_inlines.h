@@ -152,12 +152,12 @@ inline uint64_t StreamDescriptor::GetDigitalScalarValue()
 		return m_channel->GetDigitalScalarValue(m_stream);
 }
 
-inline size_t StreamDescriptor::GetDigitalScalarWidth()
+inline size_t StreamDescriptor::GetDigitalWidth()
 {
 	if(m_channel == nullptr)
 		return 0;
 	else
-		return m_channel->GetDigitalScalarWidth(m_stream);
+		return m_channel->GetDigitalWidth(m_stream);
 }
 
 inline void StreamDescriptor::AddSink(FlowGraphNode* node)
@@ -179,7 +179,7 @@ inline const std::set<FlowGraphNode*>& StreamDescriptor::GetSinks()
 
 inline std::string StreamDescriptor::PrettyPrintDigitalScalarHex()
 {
-	auto width = GetDigitalScalarWidth();
+	auto width = GetDigitalWidth();
 	uint64_t value = GetDigitalScalarValue();
 
 	//Calculate number of hex digits
@@ -202,7 +202,7 @@ inline std::string StreamDescriptor::PrettyPrintDigitalScalarHex()
 
 inline std::string StreamDescriptor::PrettyPrintDigitalScalarBinary()
 {
-	auto width = GetDigitalScalarWidth();
+	auto width = GetDigitalWidth();
 	uint64_t value = GetDigitalScalarValue();
 
 	std::string ret = std::to_string(width) + "'b";
@@ -220,7 +220,7 @@ inline std::string StreamDescriptor::PrettyPrintDigitalScalarBinary()
 
 inline std::string StreamDescriptor::PrettyPrintDigitalScalarDecimal()
 {
-	auto width = GetDigitalScalarWidth();
+	auto width = GetDigitalWidth();
 	uint64_t value = GetDigitalScalarValue();
 
 	//Calculate number of decimal digits

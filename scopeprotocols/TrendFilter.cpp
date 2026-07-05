@@ -160,7 +160,7 @@ void TrendFilter::Refresh(
 		//Update output stream type
 		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL;
 
-		auto width = din.GetDigitalScalarWidth();
+		auto width = din.GetDigitalWidth();
 		if(width > 1)
 		{
 			AddErrorMessage("Invalid input", "Trending multi-bit digital values is not yet supported");
