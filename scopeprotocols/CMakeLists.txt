@@ -3,6 +3,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ACRMSMeasurement.cpp
 	AddFilter.cpp
 	ADL5205Decoder.cpp
+	APBDecoder.cpp
 	AreaMeasurement.cpp
 	AutocorrelationFilter.cpp
 	AverageFilter.cpp

@@ -288,7 +288,9 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
-	@brief Match if the input is a scalar with a specific width
+	@brief Match if the input's digital width matches the requested value
+
+	Does *not* verify the input is a digital scalar, waveform, or bus; separate constraints are needed for that
 
 	@ingroup core
  */
@@ -304,7 +306,7 @@ public:
 	{ return (m_width == source.GetDigitalWidth() ); }
 
 	virtual std::string ToString() override
-	{ return std::string("Digital bus width is ") + std::to_string(m_width);  }
+	{ return std::string("Digital signal width is ") + std::to_string(m_width);  }
 
 protected:
 	size_t m_width;

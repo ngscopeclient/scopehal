@@ -316,6 +316,10 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 				channelNode["hys"] = GetDigitalHysteresis(i);
 				break;
 
+			case Stream::STREAM_TYPE_DIGITAL_BUS:
+				channelNode["type"] = "bus";
+				break;
+
 			case Stream::STREAM_TYPE_TRIGGER:
 				channelNode["type"] = "trigger";
 				break;
@@ -325,7 +329,6 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 				break;
 
 			//should never get complex channels on a scope
-			//TODO: how to handle digital bus channels? are they possible?
 			//TODO: how to handle eye patterns from sampling scope?
 			default:
 				break;
@@ -380,6 +383,10 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 				channelNode["navg"] = GetNumAverages(i);
 		}
 
+		//width goes under channel node if only one stream for legacy compatibility
+		if( (chan->GetType(0) == Stream::STREAM_TYPE_DIGITAL_BUS) && (nstreams == 1) )
+			channelNode["width"] = chan->GetDigitalWidth(0);
+
 		//Save streams if there's more than one
 		if(nstreams > 1)
 		{
@@ -394,6 +401,9 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 				stream["yunit"] = chan->GetYAxisUnits(j).ToString();
 				stream["vrange"] = chan->GetVoltageRange(j);
 				stream["offset"] = chan->GetOffset(j);
+
+				if(chan->GetType(j) == Stream::STREAM_TYPE_DIGITAL_BUS)
+					stream["width"] = chan->GetDigitalWidth(j);
 
 				streams["stream" + to_string(j)] = stream;
 			}
@@ -565,6 +575,10 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 				if(cnode["hys"])
 					chan->SetDigitalHysteresis(cnode["hys"].as<float>());
 				break;
+
+			case Stream::STREAM_TYPE_DIGITAL_BUS:
+				if(cnode["width"])
+					chan->SetDigitalWidth(0, cnode["width"].as<uint32_t>());
 
 			default:
 				break;

@@ -156,6 +156,8 @@ void MockOscilloscope::DoPreLoadConfiguration(
 			type = Stream::STREAM_TYPE_ANALOG;
 		else if(stype == "digital")
 			type = Stream::STREAM_TYPE_DIGITAL;
+		else if(stype == "bus")
+			type = Stream::STREAM_TYPE_DIGITAL_BUS;
 		else if(stype == "trigger")
 			type = Stream::STREAM_TYPE_TRIGGER;
 		else if(stype == "protocol")

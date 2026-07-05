@@ -40,9 +40,10 @@
 #include "../scopehal/Filter.h"
 
 #include "ACCoupleFilter.h"
-#include "AddFilter.h"
 #include "ACRMSMeasurement.h"
+#include "AddFilter.h"
 #include "ADL5205Decoder.h"
+#include "APBDecoder.h"
 #include "AreaMeasurement.h"
 #include "AverageFilter.h"
 #include "AutocorrelationFilter.h"
