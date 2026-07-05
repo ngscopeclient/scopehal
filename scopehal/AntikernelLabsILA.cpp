@@ -228,7 +228,7 @@ Oscilloscope::TriggerMode AntikernelLabsILA::PollTrigger()
 bool AntikernelLabsILA::AcquireData()
 {
 	//Get the data
-	auto data = Trim(m_transport->SendCommandQueuedWithReply("DATA?"));
+	auto data = m_transport->SendCommandQueuedWithReply("DATA?");
 	auto fields = explode(data, ',');
 
 	double now = GetTime();
