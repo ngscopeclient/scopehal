@@ -58,7 +58,7 @@ AntikernelLabsILA::AntikernelLabsILA(SCPITransport* transport)
 	, m_triggerWordPosition(0)
 {
 	uint32_t startpos = 0;
-	for(size_t i=0; i<16; i++)
+	for(size_t i=0; i<32; i++)
 	{
 		string hwname = string("PROBE") + to_string(i);
 		auto name = Trim(m_transport->SendCommandQueuedWithReply(hwname + ":NAME?"));
