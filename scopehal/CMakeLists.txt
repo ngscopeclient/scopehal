@@ -59,7 +59,6 @@ endif()
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
-	avx_mathfun.cpp
 	VulkanInit.cpp
 
 	FileSystem.cpp

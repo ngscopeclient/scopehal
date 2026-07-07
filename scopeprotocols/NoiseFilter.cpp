@@ -29,10 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "NoiseFilter.h"
-#ifdef __x86_64__
-#include <immintrin.h>
-#include "avx_mathfun.h"
-#endif
 
 using namespace std;
 
