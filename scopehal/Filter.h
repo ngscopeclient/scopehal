@@ -216,8 +216,6 @@ public:
 	Category GetCategory()
 	{ return m_category; }
 
-	virtual bool NeedsConfig();
-
 	/**
 		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
 	 */

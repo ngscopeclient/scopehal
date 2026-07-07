@@ -44,8 +44,6 @@ public:
 	SParameterSourceFilter(const std::string& color, Category cat);
 	virtual ~SParameterSourceFilter();
 
-	virtual bool NeedsConfig();
-
 	const SParameters& GetParams() const
 	{ return m_params; }
 

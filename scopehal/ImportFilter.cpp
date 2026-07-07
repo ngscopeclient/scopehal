@@ -80,11 +80,6 @@ void ImportFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-bool ImportFilter::NeedsConfig()
-{
-	return true;
-}
-
 void ImportFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)

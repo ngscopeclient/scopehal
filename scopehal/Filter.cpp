@@ -1475,20 +1475,6 @@ void Filter::SetDefaultName()
 
 }
 
-/**
-	@brief Determines if we need to display the configuration / setup dialog
-
-	The default implementation returns true if we have more than one input or any parameters, and false otherwise.
- */
-bool Filter::NeedsConfig()
-{
-	if(m_parameters.size())
-		return true;
-	if(m_inputs.size() > 1)
-		return true;
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vertical scaling
 

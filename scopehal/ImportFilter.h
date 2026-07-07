@@ -51,8 +51,6 @@ public:
 
 	virtual void SetDefaultName() override;
 
-	virtual bool NeedsConfig() override;
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	///@brief Returns the name of the parameter for our file name
