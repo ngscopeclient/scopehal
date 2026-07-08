@@ -117,3 +117,22 @@ std::vector<SCPIInstrumentModel> SCPIInstrument::GetDriverSupportedModels()
 	return std::vector<SCPIInstrumentModel>();
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration helpers
+
+string to_string(SCPITransportType transportType)
+{
+	switch(transportType)
+	{
+		case SCPITransportType::TRANSPORT_LAN: return "lan";
+		case SCPITransportType::TRANSPORT_TWINLAN: return "twinlan";
+		case SCPITransportType::TRANSPORT_USBTMC: return "usbtmc";
+		case SCPITransportType::TRANSPORT_UART: return "uart";
+		case SCPITransportType::TRANSPORT_HID: return "hid";
+		case SCPITransportType::TRANSPORT_NULL: return "null";
+		case SCPITransportType::TRANSPORT_VICP: return "vicp";
+		case SCPITransportType::TRANSPORT_SOCKETCAN: return "socketcan";
+		case SCPITransportType::TRANSPORT_LXI: return "lxi";
+	}
+	return "unknown";
+}

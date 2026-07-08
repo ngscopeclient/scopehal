@@ -163,21 +163,6 @@ protected:
 	std::chrono::milliseconds m_rateLimitingInterval;
 };
 
-enum class SCPITransportType
-{
-	TRANSPORT_LAN,
-	TRANSPORT_USBTMC,
-	TRANSPORT_UART,
-	TRANSPORT_HID,
-	TRANSPORT_NULL,
-	TRANSPORT_VICP,
-	TRANSPORT_SOCKETCAN,
-	TRANSPORT_LXI
-};
-
-std::string to_string(SCPITransportType transportType);
-
-
 #define TRANSPORT_INITPROC(T) \
 	static SCPITransport* CreateInstance(const std::string& args) \
 	{ \

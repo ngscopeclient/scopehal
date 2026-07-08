@@ -30,6 +30,22 @@
 #ifndef SCPIInstrument_h
 #define SCPIInstrument_h
 
+enum class SCPITransportType
+{
+	TRANSPORT_LAN,
+	TRANSPORT_TWINLAN,
+	TRANSPORT_USBTMC,
+	TRANSPORT_UART,
+	TRANSPORT_HID,
+	TRANSPORT_NULL,
+	TRANSPORT_VICP,
+	TRANSPORT_SOCKETCAN,
+	TRANSPORT_LXI
+};
+
+///@brief Converts the enumerated ID of a SCPITransportType to the text name
+std::string to_string(SCPITransportType type);
+
 /**
 	@brief SCPI transport information (type and connectionString)
  */
