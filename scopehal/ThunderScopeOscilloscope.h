@@ -178,6 +178,16 @@ protected:
 
 public:
 
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return
+		{
+			{"TS0xxx", {{ SCPITransportType::TRANSPORT_TWINLAN, "localhost:5025:5026" }}}
+        };
+	}
+
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(ThunderScopeOscilloscope);
 };
