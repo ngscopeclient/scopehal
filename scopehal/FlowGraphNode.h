@@ -70,6 +70,8 @@ public:
 	void SetInput(const std::string& name, StreamDescriptor stream, bool force = false);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	bool HasInput(StreamDescriptor desc);
+
 	StreamDescriptor GetInput(size_t i);
 	std::shared_ptr<InputConstraint> GetInputConstraints(size_t i);
 

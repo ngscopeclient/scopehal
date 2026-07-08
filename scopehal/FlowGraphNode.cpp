@@ -113,6 +113,19 @@ void FlowGraphNode::OnInputChanged([[maybe_unused]] size_t i)
 }
 
 /**
+	@brief Checks if the given stream is connected to at least one of our inputs
+ */
+bool FlowGraphNode::HasInput(StreamDescriptor desc)
+{
+	for(auto p : m_inputs)
+	{
+		if(p->m_sourceStream == desc)
+			return true;
+	}
+	return false;
+}
+
+/**
 	@brief Connects a stream to the input of this node
 
 	@param i		Index of the input port to connect
