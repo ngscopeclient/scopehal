@@ -115,12 +115,16 @@ bool AntikernelLabsVIO::AcquireData()
 {
 	m_transport->SendCommandQueued("TRIG");
 
+	bool refreshedAny = false;
+
 	//Pull input values
 	for(size_t i=0; i<m_inputChannelCount; i++)
 	{
 		auto chan = dynamic_cast<VIOInputChannel*>(m_channels[i]);
 		if(!chan)
 			continue;
+
+		refreshedAny = true;
 
 		auto inval = Trim(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":VALUE?"));
 		uint64_t hexinval = 0;
@@ -141,10 +145,18 @@ bool AntikernelLabsVIO::AcquireData()
 		auto outval = chan->GetInput(0).GetDigitalScalarValue();
 
 		if( cacheWasEmpty || (m_outputChannelCachedValues[i] != outval) )
+		{
 			m_transport->SendCommandQueued(chan->GetHwname() + ":VALUE " + to_string_hex(outval));
+			refreshedAny = true;
+		}
 
 		m_outputChannelCachedValues[i] = outval;
 	}
+
+	//If we didn't refresh anything, send an IDN and wait for the reply (but ignore it)
+	//just to avoid the socket buffer getting full of TRIG
+	if(!refreshedAny)
+		m_transport->SendCommandQueuedWithReply("*IDN?");
 
 	//Rate limit to ~100 Hz
 	this_thread::sleep_for(chrono::milliseconds(10));
