@@ -180,6 +180,15 @@ void DPAuxChannelDecoder::Refresh(
 			FRAME_END_2
 		} frame_state = FRAME_PREAMBLE_0;
 
+		//Append the previous packet, if it had any data
+		if(pack && !pack->m_headers.empty())
+		{
+			m_packets.push_back(pack);
+			pack = nullptr;
+		}
+		if(!pack)
+			pack = new Packet;
+
 		//Recover the Manchester bitstream
 		bool current_state = false;
 		int64_t ui_start = GetOffsetScaled(udin, i);
@@ -188,8 +197,6 @@ void DPAuxChannelDecoder::Refresh(
 		int64_t last_edge2 = i;
 		uint32_t addr_hi = 0;
 		LogTrace("[T = %s] Found initial falling edge\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_start).c_str());
-		pack = new Packet;
-		m_packets.push_back(pack);
 		pack->m_offset = ui_start;
 		pack->m_len = 0;
 		char tmp[32];
@@ -657,6 +664,12 @@ void DPAuxChannelDecoder::Refresh(
 			last_edge = i;
 		}
 	}
+
+	//Append the final packet
+	if(!pack->m_headers.empty())
+		m_packets.push_back(pack);
+	else
+		delete pack;
 
 	cap->MarkModifiedFromCpu();
 	i2ccap->MarkModifiedFromCpu();
