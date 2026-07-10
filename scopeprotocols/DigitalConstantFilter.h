@@ -46,6 +46,12 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(DigitalConstantFilter)
 
+	FilterParameter& GetWidth()
+	{ return m_width; }
+
+	FilterParameter& GetValue()
+	{ return m_value; }
+
 protected:
 	FilterParameter& m_value;
 	FilterParameter& m_width;
