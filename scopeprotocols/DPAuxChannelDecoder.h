@@ -99,13 +99,41 @@ public:
 	PROTOCOL_DECODER_INITPROC(DPAuxChannelDecoder)
 
 protected:
+	bool FindFallingEdge(size_t& i, UniformAnalogWaveform* acap, UniformDigitalWaveform* dcap)
+	{
+		if(acap)
+			return FindFallingEdge(i, acap);
+		else
+			return FindFallingEdge(i, dcap);
+	}
+
+	bool FindRisingEdge(size_t& i, UniformAnalogWaveform* acap, UniformDigitalWaveform* dcap)
+	{
+		if(acap)
+			return FindRisingEdge(i, acap);
+		else
+			return FindRisingEdge(i, dcap);
+	}
+
 	bool FindFallingEdge(size_t& i, UniformAnalogWaveform* cap);
 	bool FindRisingEdge(size_t& i, UniformAnalogWaveform* cap);
+
+	bool FindFallingEdge(size_t& i, UniformDigitalWaveform* cap);
+	bool FindRisingEdge(size_t& i, UniformDigitalWaveform* cap);
 
 	std::string DecodeRegisterName(uint32_t nreg);
 	std::string DecodeRegisterContent(uint32_t start_addr, const std::vector<uint8_t>& data);
 
-	bool FindEdge(size_t& i, UniformAnalogWaveform* cap, bool polarity)
+	bool FindEdge(size_t& i, UniformAnalogWaveform* acap, UniformDigitalWaveform* dcap, bool polarity)
+	{
+		if(acap)
+			return FindEdge(i, acap, polarity);
+		else
+			return FindEdge(i, dcap, polarity);
+	}
+
+	template<class T>
+	bool FindEdge(size_t& i, T* cap, bool polarity)
 	{
 		if(polarity)
 			return FindRisingEdge(i, cap);
