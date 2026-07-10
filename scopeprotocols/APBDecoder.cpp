@@ -121,7 +121,6 @@ vector<string> APBDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Op");
 	ret.push_back("Address");
-	ret.push_back("Data");
 	return ret;
 }
 
