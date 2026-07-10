@@ -977,6 +977,12 @@ std::optional<bool> GetDigitalValueAtTime(WaveformBase* waveform, int64_t time_f
 	@brief Gets the value of our channel at the specified timestamp (absolute, not waveform ticks).
 	@ingroup datamodel
  */
+std::optional<uint64_t> GetDigitalBusValueAtTime(WaveformBase* waveform, int64_t time_fs);
+
+/**
+	@brief Gets the value of our channel at the specified timestamp (absolute, not waveform ticks).
+	@ingroup datamodel
+ */
 std::optional<std::string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs);
 
 #pragma GCC diagnostic pop

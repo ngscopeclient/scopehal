@@ -227,6 +227,31 @@ optional<bool> GetDigitalValueAtTime(WaveformBase* waveform, int64_t time_fs)
 	return GetValue(swaveform, uwaveform, index);
 }
 
+optional<uint64_t> GetDigitalBusValueAtTime(WaveformBase* waveform, int64_t time_fs)
+{
+	auto waveform32 = dynamic_cast<UniformDigitalBusWaveform32*>(waveform);
+	auto waveform64 = dynamic_cast<UniformDigitalBusWaveform64*>(waveform);
+
+	//Make sure we have a well formed input
+	if(!waveform32 && !waveform64)
+		return {};
+	if(waveform->empty())
+		return {};
+
+	//Find the approximate index of the sample of interest and interpolate the cursor position
+	bool out_of_range = false;
+	size_t index = GetIndexNearestAtOrBeforeTimestamp(waveform, time_fs, out_of_range);
+
+	if(out_of_range)
+		return {};
+
+	//No interpolation for digital waveforms, and no sparse bus support yet
+	if(waveform32)
+		return waveform32->m_samples[index];
+	else
+		return waveform64->m_samples[index];
+}
+
 optional<string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs)
 {
 	//All protocol waveforms are sparse
