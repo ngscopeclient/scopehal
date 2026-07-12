@@ -53,8 +53,6 @@ using namespace std;
 AntikernelLabsSerdesILA8b10b::AntikernelLabsSerdesILA8b10b(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_triggerWordPosition(0)
 {
 	auto chan = new OscilloscopeChannel(

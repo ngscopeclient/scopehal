@@ -53,8 +53,6 @@ using namespace std;
 AntikernelLabsILA::AntikernelLabsILA(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
 	, m_triggerWordPosition(0)
 {
 	uint32_t startpos = 0;

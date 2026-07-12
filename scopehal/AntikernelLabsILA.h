@@ -110,12 +110,6 @@ public:
 
 protected:
 
-	///@brief True if the trigger is armed
-	bool m_triggerArmed;
-
-	///@brief True if most recent trigger was a single-shot
-	bool m_triggerOneShot;
-
 	///@brief Memory depth
 	uint32_t m_memDepth;
 
