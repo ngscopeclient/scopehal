@@ -372,7 +372,7 @@ void AgilentMultimeter::SetMeterMode(Multimeter::MeasurementTypes type)
 	m_mode = type;
 }
 
-void AgilentMultimeter::SetSecondaryMeterMode(Multimeter::MeasurementTypes type)
+void AgilentMultimeter::SetSecondaryMeterMode([[maybe_unused]] Multimeter::MeasurementTypes type)
 {
 	// 34401A has no secondary measurement capability
 	return;
