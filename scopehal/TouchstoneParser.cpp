@@ -108,7 +108,7 @@ bool TouchstoneParser::Load(const string& fname, SParameters& params)
 	{
 		LogError("S-parameter file %s has invalid size\n", fname.c_str());
 		fclose(fp);
-		return "";
+		return false;
 	}
 
 	//Read entire file into working buffer
