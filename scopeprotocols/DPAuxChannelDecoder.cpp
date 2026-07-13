@@ -338,7 +338,7 @@ void DPAuxChannelDecoder::Refresh(
 					pack->m_len = ui_start - pack->m_offset;
 
 					//Decode packet content
-					if(!pack->m_data.empty())
+					if( !pack->m_data.empty() && (pack->m_headers["Type"] != "AUX_NACK") )
 					{
 						if(pack->m_headers["Info"] != "")
 							pack->m_headers["Info"] += "\n";
@@ -470,7 +470,12 @@ void DPAuxChannelDecoder::Refresh(
 						pack->m_headers["Address"] = tmp;
 
 						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
-						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+
+						//NACKs are displayed as errors
+						if(!last_was_i2c && ((current_byte & 3) == 0x1) )
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+						else
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 
 						current_byte = 0;
 						bitcount = 0;
