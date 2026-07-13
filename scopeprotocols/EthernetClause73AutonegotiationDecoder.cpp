@@ -361,7 +361,8 @@ string Clause73Waveform::GetText(size_t i)
 	EthernetClause73AutonegotiationDecoder::DisplayFormat format =
 		(EthernetClause73AutonegotiationDecoder::DisplayFormat)m_displayformat.GetIntVal();
 
-	if(format == EthernetClause73AutonegotiationDecoder::FORMAT_COMPACT) {
+	if(format == EthernetClause73AutonegotiationDecoder::FORMAT_COMPACT)
+	{
 		// Compact format - single line
 		char tmp[512];
 
@@ -380,7 +381,9 @@ string Clause73Waveform::GetText(size_t i)
 		);
 
 		return string(tmp);
-	} else {
+	}
+	else
+	{
 		// Detailed format - show all fields with bit positions
 		// string out;
 		char out[512];
