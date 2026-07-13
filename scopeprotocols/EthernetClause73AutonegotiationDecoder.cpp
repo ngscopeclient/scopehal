@@ -433,7 +433,7 @@ string Clause73Waveform::GetText(size_t i)
 			page.fec);
 
 		// D[48] Code
-		pos += snprintf(out + pos, sizeof(out) - pos,
+		/* pos += */ snprintf(out + pos, sizeof(out) - pos,
 			" D[48] Code: %d\n",
 			page.code);
 
