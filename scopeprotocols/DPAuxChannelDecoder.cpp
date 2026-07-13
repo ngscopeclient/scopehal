@@ -666,10 +666,13 @@ void DPAuxChannelDecoder::Refresh(
 	}
 
 	//Append the final packet
-	if(!pack->m_headers.empty())
-		m_packets.push_back(pack);
-	else
-		delete pack;
+	if(pack)
+	{
+		if(!pack->m_headers.empty())
+			m_packets.push_back(pack);
+		else
+			delete pack;
+	}
 
 	cap->MarkModifiedFromCpu();
 	i2ccap->MarkModifiedFromCpu();
