@@ -154,7 +154,6 @@ protected:
 	///@brief Digital channels
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
 
-
 	///@brief ADC mode selectors (used to select the simulated channel)
 	enum ChannelModes
 	{
@@ -189,15 +188,6 @@ protected:
 	TestWaveformSource* m_source[4];
 
 	TestDigitalWaveformSource* m_digitalSource;
-
-	///@brief Vulkan queue for ISI channel
-	std::shared_ptr<QueueHandle> m_queue;
-
-	///@brief Vulkan command pool for ISI channel
-	std::unique_ptr<vk::raii::CommandPool> m_pool;
-
-	///@brief Vulkan command buffer for ISI channel
-	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
 
 public:
 	static std::string GetDriverNameInternal();
