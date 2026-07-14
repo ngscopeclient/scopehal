@@ -38,6 +38,7 @@
 #define DemoOscilloscope_h
 
 #include "TestWaveformSource.h"
+#include "TestDigitalWaveformSource.h"
 #include <random>
 
 /**
@@ -121,6 +122,9 @@ public:
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap) override;
 
+	virtual std::vector<DigitalBank> GetDigitalBanks() override;
+
+
 protected:
 
 	///@brief External trigger
@@ -146,6 +150,10 @@ protected:
 
 	///@brief Map of channel ID to ADC mode
 	std::map<size_t, size_t> m_channelModes;
+
+	///@brief Digital channels
+	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
 
 	///@brief ADC mode selectors (used to select the simulated channel)
 	enum ChannelModes
@@ -180,6 +188,17 @@ protected:
 	 */
 	TestWaveformSource* m_source[4];
 
+	TestDigitalWaveformSource* m_digitalSource;
+
+	///@brief Vulkan queue for ISI channel
+	std::shared_ptr<QueueHandle> m_queue;
+
+	///@brief Vulkan command pool for ISI channel
+	std::unique_ptr<vk::raii::CommandPool> m_pool;
+
+	///@brief Vulkan command buffer for ISI channel
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
+
 public:
 	static std::string GetDriverNameInternal();
 
@@ -187,13 +206,12 @@ public:
 	//cppcheck-suppress duplInheritedMember
 	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
 	{
-		return {
-        {"Demo Oscilloscope", {{ SCPITransportType::TRANSPORT_NULL, "" }}}
+		return
+		{
+			{"Demo Oscilloscope", {{ SCPITransportType::TRANSPORT_NULL, "" }}}
         };
 	}
 	OSCILLOSCOPE_INITPROC(DemoOscilloscope)
-
-
 };
 
 #endif
