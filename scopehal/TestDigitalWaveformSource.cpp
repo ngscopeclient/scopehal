@@ -73,6 +73,7 @@ void TestDigitalWaveformSource::GenerateUART(
 {
 	wfm->PrepareForCpuAccess();
 	wfm->m_timescale = sampleperiod;
+	wfm->clear();
 
 	int64_t timeWindow = depth * sampleperiod;
 
@@ -81,7 +82,7 @@ void TestDigitalWaveformSource::GenerateUART(
 
 	int64_t numBits = timeWindow / bitPeriodFs;
 
-	wfm->Resize(numBits+1);
+	wfm->Reserve(numBits+1);
 
 	int64_t currentTime = 0;
 
@@ -147,6 +148,7 @@ void TestDigitalWaveformSource::GenerateUARTClock(
 {
 	wfm->PrepareForCpuAccess();
 	wfm->m_timescale = sampleperiod;
+	wfm->clear();
 
 	int64_t timeWindow = depth * sampleperiod;
 
@@ -155,7 +157,7 @@ void TestDigitalWaveformSource::GenerateUARTClock(
 
 	int64_t numBits = timeWindow / bitPeriodFs;
 
-	wfm->Resize(numBits+1);
+	wfm->Reserve(numBits+1);
 
 	int64_t currentTime = 0;
 
@@ -186,76 +188,110 @@ void TestDigitalWaveformSource::GenerateUARTClock(
 	wfm->MarkTimestampsModifiedFromCpu();
 }
 
-void TestDigitalWaveformSource::GenerateSPI(SparseDigitalWaveform* cs, SparseDigitalWaveform* sclk,	SparseDigitalWaveform* mosi, int64_t sampleperiod, size_t depth)
+void TestDigitalWaveformSource::GenerateSPI(
+	SparseDigitalWaveform* cs,
+	SparseDigitalWaveform* sclk,
+	SparseDigitalWaveform* mosi,
+	int64_t sampleperiod,
+	size_t depth)
 {
 	cs->PrepareForCpuAccess();
-	cs->m_timescale = sampleperiod;
 	sclk->PrepareForCpuAccess();
-	sclk->m_timescale = sampleperiod;
 	mosi->PrepareForCpuAccess();
+
+	cs->m_timescale = sampleperiod;
+	sclk->m_timescale = sampleperiod;
 	mosi->m_timescale = sampleperiod;
 
-	string msg = "Hello ngscopeclient from SPI !\n";
+	cs->clear();
+	sclk->clear();
+	mosi->clear();
 
-	int64_t t = 0;
-	int64_t numBits = msg.size()*8 + 4;
-	const int64_t bitPeriod = depth/numBits;
+	std::string msg = "Hello ngscopeclient from SPI !\n";
+
+	const int64_t idleBits    = 3;
+	const int64_t payloadBits = static_cast<int64_t>(msg.size()) * 8;
+	const int64_t tailBits    = 1;
+	const int64_t totalBits   = idleBits + payloadBits + tailBits;
+	const int64_t bitPeriod   = static_cast<int64_t>(depth) / totalBits;
+
+	// Need at least two timestamp units per SPI bit:
+	// one half-cycle low, one half-cycle high.
+	if(bitPeriod < 2)
+		return;
+
 	const int64_t half = bitPeriod / 2;
 
-	cs->Resize(numBits+1);
-	sclk->Resize(numBits*2+1);
-	mosi->Resize(numBits+1);
+	cs->Reserve(4);
+	sclk->Reserve(payloadBits * 2 + 4);
+	mosi->Reserve(payloadBits + 4);
 
-	auto push = [](SparseDigitalWaveform* w, int64_t time, int64_t duration, bool v)
+	auto push = [](SparseDigitalWaveform* w, int64_t time, int64_t duration, bool value)
 	{
+		if(duration <= 0)
+			return;
+
 		w->m_offsets.push_back(time);
 		w->m_durations.push_back(duration);
-		w->m_samples.push_back(v);
+		w->m_samples.push_back(value);
 	};
 
-	// Idle state
-	push(cs,   t, 3*bitPeriod, true);
-	push(sclk, t, 3*bitPeriod, false);
-	push(mosi, t, 3*bitPeriod, false);
+	int64_t t = 0;
 
-	t += (3*bitPeriod);
+	// Idle state before transaction.
+	// SPI mode 0-style idle:
+	// CS high, SCLK low, MOSI low.
+	push(cs,   t, idleBits * bitPeriod, true);
+	push(sclk, t, idleBits * bitPeriod, false);
+	push(mosi, t, idleBits * bitPeriod, false);
 
-	// Assert CS
-	push(cs, t, bitPeriod*msg.size(), false);
+	t += idleBits * bitPeriod;
+
+	// Assert CS for the entire payload duration.
+	// The old code used msg.size(), which is bytes, not bits.
+	push(cs, t, payloadBits * bitPeriod, false);
 
 	for(uint8_t c : msg)
 	{
 		for(int i = 7; i >= 0; i--)
 		{
-			bool bit = (c >> i) & 1;
+			bool bit = ((c >> i) & 1) != 0;
 
-			// Data setup
+			// MOSI is stable for the whole bit period.
+			// The decoder sampling on the rising edge will see a valid value.
 			push(mosi, t, bitPeriod, bit);
+
+			// SCLK low phase.
 			push(sclk, t, half, false);
-
 			t += half;
 
-			// Clock high (sampling edge)
-			push(sclk, t, half, true);
-
-			t += half;
+			// SCLK high phase.
+			// Use bitPeriod - half so odd bit periods still sum correctly.
+			push(sclk, t, bitPeriod - half, true);
+			t += bitPeriod - half;
 		}
 	}
 
-	// Deassert CS
-	push(cs, t, bitPeriod, true);
-	push(sclk, t, bitPeriod, false);
-	push(mosi, t, bitPeriod, false);
-	t += bitPeriod;
-	// Finale Sample
-	push(cs, t, 1, true);
+	// Deassert CS after the last bit.
+	push(cs, t, tailBits * bitPeriod, true);
+
+	// Return SCLK and MOSI to idle.
+	push(sclk, t, tailBits * bitPeriod, false);
+	push(mosi, t, tailBits * bitPeriod, false);
+
+	t += tailBits * bitPeriod;
+
+	// Final sample to make the terminal idle state explicit.
+	push(cs,   t, 1, true);
 	push(sclk, t, 1, false);
 	push(mosi, t, 1, false);
 
 	cs->MarkSamplesModifiedFromCpu();
 	cs->MarkTimestampsModifiedFromCpu();
+
 	sclk->MarkSamplesModifiedFromCpu();
 	sclk->MarkTimestampsModifiedFromCpu();
+
 	mosi->MarkSamplesModifiedFromCpu();
 	mosi->MarkTimestampsModifiedFromCpu();
 }
@@ -278,14 +314,16 @@ void TestDigitalWaveformSource::GenerateParallel(std::vector<SparseDigitalWavefo
 	auto wfClk = waveforms[0];
 	wfClk->PrepareForCpuAccess();
 	wfClk->m_timescale = sampleperiod;
-	wfClk->Resize(2*numBits+1);
+	wfClk->clear();
+	wfClk->Reserve(2*numBits+1);
 	// Parallel lines waveforms
 	for(int i = 0 ; i < 8 ; i++)
 	{
 		auto wf = waveforms[i+1];
 		wf->PrepareForCpuAccess();
 		wf->m_timescale = sampleperiod;
-		wf->Resize(numBits+1);
+		wf->clear();
+		wf->Reserve(numBits+1);
 	}
 
 	auto push = [](SparseDigitalWaveform* w, int64_t time, int64_t duration, bool v)
