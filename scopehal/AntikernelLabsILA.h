@@ -125,6 +125,9 @@ protected:
 	std::vector<uint32_t> m_channelWidths;
 	std::vector<uint32_t> m_channelStarts;
 
+	///@brief Number of words per row of sample data
+	uint32_t m_wordsPerRowRounded;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(AntikernelLabsILA)

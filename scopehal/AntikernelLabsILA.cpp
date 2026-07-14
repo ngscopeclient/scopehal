@@ -85,6 +85,7 @@ AntikernelLabsILA::AntikernelLabsILA(SCPITransport* transport)
 
 	m_memDepth = stoul(Trim(m_transport->SendCommandQueuedWithReply("MEM:DEPTH?")));
 	m_period = stoull(Trim(m_transport->SendCommandQueuedWithReply("MEM:PERIOD?"))) * 1000;
+	m_wordsPerRowRounded = stoul(Trim(m_transport->SendCommandQueuedWithReply("MEM:ROWSIZE?")));
 
 	m_srate = FS_PER_SECOND / m_period;
 
@@ -225,9 +226,44 @@ Oscilloscope::TriggerMode AntikernelLabsILA::PollTrigger()
 
 bool AntikernelLabsILA::AcquireData()
 {
-	//Get the data
+	//Begin the download
+	m_transport->SendCommandQueued("DOWNLOAD:START");
+
+	//Update progress
+	ChannelsDownloadStarted();
+	for(size_t i=0; i<m_channelWidths.size(); i++)
+		ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS, 0.0);
+
+	//Download the data blocks to working memory slowly so we can report progress
+	size_t totalBufferSize = m_wordsPerRowRounded * m_memDepth;
+	size_t blocksize = 32768;	//must match BLOCK_SIZE server side
+	if(totalBufferSize <= blocksize)
+		m_transport->SendCommandQueuedWithReply("DOWNLOAD:0?");
+	else
+	{
+		for(size_t i=0; i<totalBufferSize; i += blocksize)
+		{
+			float progress = 1.0 * i / totalBufferSize;
+			LogTrace("download progress %.2f\n", progress);
+
+			//ignore reply just wait for anything so we can lockstep
+			m_transport->SendCommandQueuedWithReply(string("DOWNLOAD:") + to_string(i) + "?");
+
+			for(size_t j=0; j<m_channelWidths.size(); j++)
+			{
+				ChannelsDownloadStatusUpdate(
+					j,
+					InstrumentChannel::DownloadState::DOWNLOAD_IN_PROGRESS,
+					progress);
+			}
+		}
+	}
+
+	//Get the data (socket transfer is fast once download finishes)
 	auto data = m_transport->SendCommandQueuedWithReply("DATA?");
 	auto fields = explode(data, ',');
+	if(fields.empty())
+		return false;
 
 	double now = GetTime();
 	int64_t sec = floor(now);
@@ -447,8 +483,6 @@ void AntikernelLabsILA::SetTriggerOffset(int64_t offset)
 
 int64_t AntikernelLabsILA::GetTriggerOffset()
 {
-	LogTrace("Trigger offset %u\n", m_triggerWordPosition);
-
 	return m_triggerWordPosition * m_period;
 }
 
