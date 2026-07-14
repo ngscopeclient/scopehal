@@ -72,7 +72,7 @@ void DDR1Decoder::Refresh(
 		nvtx3::scoped_range nrange("DDR1Decoder::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		for(int i=0; i<6; i++)

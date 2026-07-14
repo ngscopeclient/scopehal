@@ -128,7 +128,7 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

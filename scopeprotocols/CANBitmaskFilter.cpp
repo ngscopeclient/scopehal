@@ -75,7 +75,7 @@ void CANBitmaskFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

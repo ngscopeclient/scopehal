@@ -86,7 +86,7 @@ void BaseMeasurement::Refresh(
 		nvtx3::scoped_range nrange("BaseMeasurement::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 
 	//Set up input
 	auto in = GetInput(0).GetData();

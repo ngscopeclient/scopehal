@@ -60,7 +60,7 @@ AverageFilter::~AverageFilter()
 
 void AverageFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	ClearErrors();
+	ClearMessages();
 
 	auto din = GetInput(0);
 	if(!din)

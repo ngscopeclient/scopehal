@@ -62,7 +62,7 @@ void DSIPacketDecoder::Refresh(
 	#endif
 
 	ClearPackets();
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

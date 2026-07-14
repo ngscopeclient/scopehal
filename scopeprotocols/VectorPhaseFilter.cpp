@@ -62,7 +62,7 @@ void VectorPhaseFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		for(int i=0; i<2; i++)

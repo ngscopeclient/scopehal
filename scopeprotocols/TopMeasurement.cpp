@@ -69,7 +69,7 @@ void TopMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("TopMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

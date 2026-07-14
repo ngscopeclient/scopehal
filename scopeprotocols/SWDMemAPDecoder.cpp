@@ -70,7 +70,7 @@ void SWDMemAPDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SWDMemAPDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())

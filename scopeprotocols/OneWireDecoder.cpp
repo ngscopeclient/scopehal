@@ -71,7 +71,7 @@ void OneWireDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

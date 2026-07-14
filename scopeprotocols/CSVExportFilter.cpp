@@ -66,7 +66,7 @@ void CSVExportFilter::Export()
 		nvtx3::scoped_range nrange("CSVExportFilter::Export");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		AddErrorMessage("Missing inputs", "One or more input ports are not connected");

@@ -68,7 +68,7 @@ void TMDSDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("TMDSDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
 	if(!din)

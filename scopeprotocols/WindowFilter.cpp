@@ -96,7 +96,7 @@ void WindowFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("WindowFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

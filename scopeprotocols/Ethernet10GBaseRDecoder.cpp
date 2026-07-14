@@ -68,7 +68,7 @@ void Ethernet10GBaseRDecoder::Refresh(
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 	if(!VerifyAllInputsOK())
 	{

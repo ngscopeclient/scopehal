@@ -71,7 +71,7 @@ void SquelchFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SquelchFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{

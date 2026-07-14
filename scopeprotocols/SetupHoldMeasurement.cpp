@@ -94,7 +94,7 @@ void SetupHoldMeasurement::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SetupHoldMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

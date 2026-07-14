@@ -73,7 +73,7 @@ void BurstWidthMeasurement::Refresh(
 		nvtx3::scoped_range nrange("BurstWidthMeasurement::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

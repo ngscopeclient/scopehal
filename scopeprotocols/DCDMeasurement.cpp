@@ -64,7 +64,7 @@ void DCDMeasurement::Refresh(
 		nvtx3::scoped_range nrange("DCDMeasurement::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

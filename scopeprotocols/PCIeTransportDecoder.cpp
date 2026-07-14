@@ -74,7 +74,7 @@ void PCIeTransportDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PCIeTransportDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

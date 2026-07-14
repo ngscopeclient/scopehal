@@ -362,7 +362,7 @@ void MDIODecoder::Refresh(
 	ClearPackets();
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		for(int i=0; i<2; i++)

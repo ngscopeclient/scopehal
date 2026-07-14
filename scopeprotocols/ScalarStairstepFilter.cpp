@@ -130,7 +130,7 @@ void ScalarStairstepFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ScalarStairstepFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	SetYAxisUnits(m_unit.GetEnumVal<Unit::UnitType>(), 0);
 

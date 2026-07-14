@@ -76,7 +76,7 @@ void XYSweepFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("XYSweepFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	auto wx = GetInput(0);

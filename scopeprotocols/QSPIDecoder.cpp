@@ -74,7 +74,7 @@ void QSPIDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandl
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("QSPIDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

@@ -93,7 +93,7 @@ void DPAuxChannelDecoder::Refresh(
 	#endif
 
 	ClearPackets();
-	ClearErrors();
+	ClearMessages();
 
 	auto din = GetInputWaveform(0);
 	auto udin = dynamic_cast<UniformWaveformBase*>(din);

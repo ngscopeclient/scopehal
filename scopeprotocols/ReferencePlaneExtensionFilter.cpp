@@ -101,7 +101,7 @@ void ReferencePlaneExtensionFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ReferencePlaneExtensionFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

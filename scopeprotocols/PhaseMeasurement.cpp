@@ -81,7 +81,7 @@ void PhaseMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PhaseMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

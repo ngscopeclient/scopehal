@@ -138,7 +138,7 @@ void ConstellationFilter::Refresh(
 		nvtx3::scoped_range nrange("ConstellationFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 
 	auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));

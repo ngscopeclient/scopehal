@@ -67,7 +67,7 @@ void PCIe128b130bDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PCIe128b130bDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Get the input data
 	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));

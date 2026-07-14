@@ -72,7 +72,7 @@ void ParallelBus::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ParallelBus::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Figure out how wide our input is
 	int width = m_width.GetIntVal();

@@ -169,7 +169,7 @@ void EyePattern::Refresh(
 	#endif
 
 	LogIndenter li;
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

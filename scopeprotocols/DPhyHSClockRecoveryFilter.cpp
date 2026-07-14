@@ -60,7 +60,7 @@ void DPhyHSClockRecoveryFilter::Refresh(
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		for(int i=0; i<2; i++)

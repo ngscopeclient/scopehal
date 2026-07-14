@@ -65,7 +65,7 @@ void ISIMeasurement::Refresh(
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
 	if(!ddj)
 	{

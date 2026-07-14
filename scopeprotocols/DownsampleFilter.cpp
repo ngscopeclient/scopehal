@@ -71,7 +71,7 @@ void DownsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queue
 		nvtx3::scoped_range nrange("DownsampleFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		if(!GetInput(0))

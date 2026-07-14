@@ -78,7 +78,7 @@ void IBM8b10bDecoder::Refresh(
 	LogIndenter li;
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

@@ -58,7 +58,7 @@ string BINImportFilter::GetProtocolName()
 
 void BINImportFilter::OnFileNameChanged()
 {
-	ClearErrors();
+	ClearMessages();
 
 	//Wipe anything we may have had in the past
 	ClearStreams();

@@ -69,7 +69,7 @@ void UartClockRecoveryFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("UartClockRecoveryFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

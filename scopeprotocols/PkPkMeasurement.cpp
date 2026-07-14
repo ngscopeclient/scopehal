@@ -69,7 +69,7 @@ void PkPkMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PkPkMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

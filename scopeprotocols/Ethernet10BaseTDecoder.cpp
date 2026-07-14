@@ -67,7 +67,7 @@ void Ethernet10BaseTDecoder::Refresh(
 	ClearPackets();
 
 	//Get the input data
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		if(!GetInput(0))

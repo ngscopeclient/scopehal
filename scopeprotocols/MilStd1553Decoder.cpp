@@ -79,7 +79,7 @@ void MilStd1553Decoder::Refresh(
 	ClearPackets();
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

@@ -65,7 +65,7 @@ void MinimumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHan
 		nvtx3::scoped_range nrange("MaximumFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	auto din = GetInput(0);
 	if(!din)
 	{

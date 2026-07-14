@@ -70,7 +70,7 @@ void MagnitudeFilter::Refresh(
 	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
 	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
 	auto sb = dynamic_cast<SparseAnalogWaveform*>(b);
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		//Make sure we have valid inputs

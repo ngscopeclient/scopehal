@@ -71,7 +71,7 @@ void Ethernet64b66bDecoder::Refresh(
 	#endif
 
 	//Get the input data
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

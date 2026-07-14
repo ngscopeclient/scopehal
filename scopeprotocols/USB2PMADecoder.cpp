@@ -71,7 +71,7 @@ void USB2PMADecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("USB2PMADecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

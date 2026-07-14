@@ -74,7 +74,7 @@ void EyeWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Qu
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK(true))
 	{
 		if(!GetInput(0))

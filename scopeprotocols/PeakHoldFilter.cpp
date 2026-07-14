@@ -65,7 +65,7 @@ void PeakHoldFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PeakHoldFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

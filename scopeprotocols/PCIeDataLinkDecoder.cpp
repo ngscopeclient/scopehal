@@ -77,7 +77,7 @@ void PCIeDataLinkDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PCIeDataLinkDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())

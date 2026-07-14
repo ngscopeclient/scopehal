@@ -74,7 +74,7 @@ void DDR3Decoder::Refresh(
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		for(int i=0; i<7; i++)

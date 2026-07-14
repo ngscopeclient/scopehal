@@ -83,7 +83,7 @@ void WaveformGenerationFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("WaveformGenerationFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

@@ -98,7 +98,7 @@ void TDRFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("TDRFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)

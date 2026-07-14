@@ -70,7 +70,7 @@ void DPhyEscapeModeDecoder::Refresh(
 	#endif
 
 	ClearPackets();
-	ClearErrors();
+	ClearMessages();
 
 	//Sanity check
 	if(!VerifyAllInputsOK())

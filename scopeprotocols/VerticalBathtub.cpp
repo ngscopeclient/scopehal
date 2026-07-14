@@ -69,7 +69,7 @@ void VerticalBathtub::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("VerticalBathtub::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Get the input data
 	auto eye = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));

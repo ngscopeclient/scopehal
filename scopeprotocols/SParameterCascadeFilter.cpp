@@ -127,7 +127,7 @@ void SParameterCascadeFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SParameterCascadeFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

@@ -78,7 +78,7 @@ void MultiplyFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
-	ClearErrors();
+	ClearMessages();
 
 	//Update units
 	if(m_inputs[0] && m_inputs[1])

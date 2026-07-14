@@ -67,7 +67,7 @@ string ClipFilter::GetProtocolName()
 void ClipFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

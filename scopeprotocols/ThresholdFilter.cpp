@@ -76,7 +76,7 @@ void ThresholdFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<Q
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

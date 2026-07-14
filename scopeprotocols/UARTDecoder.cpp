@@ -83,7 +83,7 @@ void UARTDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())

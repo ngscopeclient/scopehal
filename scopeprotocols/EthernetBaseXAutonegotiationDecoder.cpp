@@ -70,7 +70,7 @@ void EthernetBaseXAutonegotiationDecoder::Refresh(
 	ClearPackets();
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

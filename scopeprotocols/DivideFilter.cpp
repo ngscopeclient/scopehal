@@ -80,7 +80,7 @@ void DivideFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("DivideFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;

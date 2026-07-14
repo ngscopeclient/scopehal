@@ -73,7 +73,7 @@ void ThermalDiodeFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ThermalDiodeFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	SetData(nullptr, 0);
 

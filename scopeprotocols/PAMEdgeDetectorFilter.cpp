@@ -101,7 +101,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		nvtx3::scoped_range nrange("PAMEdgeDetectorFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

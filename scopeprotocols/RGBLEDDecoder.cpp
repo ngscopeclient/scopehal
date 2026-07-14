@@ -74,7 +74,7 @@ void RGBLEDDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("RGBLEDDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())

@@ -61,7 +61,7 @@ void PeriodMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PeriodMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

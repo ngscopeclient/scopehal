@@ -140,7 +140,7 @@ void APBDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("APBDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	//Get the inputs

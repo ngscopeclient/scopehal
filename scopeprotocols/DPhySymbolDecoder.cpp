@@ -69,7 +69,7 @@ void DPhySymbolDecoder::Refresh(
 	#endif
 
 	//We need D+ no matter what
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyInputOK(0))
 	{
 		if(!GetInput(0))

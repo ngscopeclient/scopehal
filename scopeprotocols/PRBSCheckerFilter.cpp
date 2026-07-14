@@ -173,7 +173,7 @@ void PRBSCheckerFilter::Refresh(
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = GetInputWaveform(0);
 	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
 	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);

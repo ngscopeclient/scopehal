@@ -249,7 +249,7 @@ void EthernetClause73AutonegotiationDecoder::Refresh(
 		nvtx3::scoped_range nrange("EthernetClause73AutonegotiationDecoder::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 
 	// Get the input data
 	auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));

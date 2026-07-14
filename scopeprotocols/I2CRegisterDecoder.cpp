@@ -83,7 +83,7 @@ void I2CRegisterDecoder::Refresh(
 	ClearPackets();
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<I2CWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

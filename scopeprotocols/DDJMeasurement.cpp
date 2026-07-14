@@ -82,7 +82,7 @@ void DDJMeasurement::Refresh(
 		nvtx3::scoped_range range("DDJMeasurement::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

@@ -98,7 +98,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 
 	//Get the input data
 	//Current resampling implementation assumes input is uniform, fail if it's not
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

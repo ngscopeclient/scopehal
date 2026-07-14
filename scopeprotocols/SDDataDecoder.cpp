@@ -72,7 +72,7 @@ void SDDataDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SDDataDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())

@@ -83,7 +83,7 @@ void J1939PDUDecoder::Refresh(
 	ClearPackets();
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<CANWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

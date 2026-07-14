@@ -83,7 +83,7 @@ void VICPDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("VICPDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	auto tx = dynamic_cast<TCPWaveform*>(GetInputWaveform(0));

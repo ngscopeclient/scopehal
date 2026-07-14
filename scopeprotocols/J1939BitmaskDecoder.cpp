@@ -81,7 +81,7 @@ void J1939BitmaskDecoder::Refresh(
 
 	//Make sure we've got valid inputs
 	auto din = dynamic_cast<J1939PDUWaveform*>(GetInputWaveform(0));
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

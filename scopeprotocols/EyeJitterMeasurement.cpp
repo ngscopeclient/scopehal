@@ -76,7 +76,7 @@ void EyeJitterMeasurement::Refresh(
 	#endif
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK(true))
 	{
 		if(!GetInput(0))

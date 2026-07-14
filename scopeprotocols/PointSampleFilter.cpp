@@ -53,7 +53,7 @@ void PointSampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	auto din = GetInput(0);
 	if(!din)

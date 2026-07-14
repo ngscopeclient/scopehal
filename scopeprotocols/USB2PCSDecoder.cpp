@@ -61,7 +61,7 @@ void USB2PCSDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	auto din = dynamic_cast<USB2PMAWaveform*>(GetInputWaveform(0));
 	if(!din)

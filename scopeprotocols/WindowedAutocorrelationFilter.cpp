@@ -71,7 +71,7 @@ void WindowedAutocorrelationFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("OneWireDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));

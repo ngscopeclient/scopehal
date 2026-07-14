@@ -116,7 +116,7 @@ void ClockRecoveryFilter::Refresh(
 	#endif
 
 	//Require a data signal, but not necessarily a gate
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyInputOK(0))
 	{
 		if(!GetInput(0))

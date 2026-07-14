@@ -91,7 +91,7 @@ void RiseMeasurement::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("RiseMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

@@ -76,7 +76,7 @@ string ACRMSMeasurement::GetProtocolName()
 void ACRMSMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

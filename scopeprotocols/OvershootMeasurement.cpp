@@ -70,7 +70,7 @@ void OvershootMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("OvershootMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

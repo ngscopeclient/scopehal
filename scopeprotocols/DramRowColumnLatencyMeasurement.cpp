@@ -63,7 +63,7 @@ void DramRowColumnLatencyMeasurement::Refresh(
 		nvtx3::scoped_range nrange("DramRowColumnLatencyMeasurement::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

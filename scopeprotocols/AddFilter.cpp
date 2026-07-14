@@ -78,7 +78,7 @@ void AddFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 		nvtx3::scoped_range nrange("AddFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
@@ -179,7 +179,7 @@ void AddFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
 void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0) || !GetInput(1))

@@ -85,7 +85,7 @@ void CandumpImportFilter::SetDefaultName()
 
 void CandumpImportFilter::OnFileNameChanged()
 {
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	auto fname = m_filePath.ToString();

@@ -63,7 +63,7 @@ void NoiseFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandl
 {
 	//Make sure we've got valid inputs
 	//TODO: sparse path
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		AddErrorMessage("Invalid input", "Expected uniform analog input");

@@ -75,7 +75,7 @@ void EmphasisRemovalFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<
 		nvtx3::scoped_range nrange("EmphasisFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		if(!GetInput(0))

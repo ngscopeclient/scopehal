@@ -64,7 +64,7 @@ void DramRefreshActivateMeasurement::Refresh(
 		nvtx3::scoped_range nrange("DramRefreshActivateMeasurement::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

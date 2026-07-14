@@ -67,7 +67,7 @@ void BandwidthMeasurement::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	ClearErrors();
+	ClearMessages();
 
 	//Set up input
 	auto in = GetInput(0).GetData();

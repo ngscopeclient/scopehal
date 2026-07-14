@@ -67,7 +67,7 @@ void RjBUjFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("RjBUjFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

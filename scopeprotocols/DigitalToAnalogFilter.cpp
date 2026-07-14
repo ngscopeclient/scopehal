@@ -89,7 +89,7 @@ void DigitalToAnalogFilter::Refresh(
 	SetYAxisUnits(m_unit.GetEnumVal<Unit::UnitType>(), 0);
 
 	auto din = GetInput(0);
-	ClearErrors();
+	ClearMessages();
 	if(!din)
 	{
 		AddErrorMessage("Missing inputs", "No signal input connected");

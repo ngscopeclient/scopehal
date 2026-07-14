@@ -97,7 +97,7 @@ void SPIFlashDecoder::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SPIFlashDecoder::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 	ClearPackets();
 
 	auto flashtype = m_type.GetEnumVal<FlashType>();

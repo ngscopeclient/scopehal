@@ -76,7 +76,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range range("SubtractFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Set units as early as possible so we can spawn in the same plot as our parent signal when creating a filter
 	if(GetInput(0))

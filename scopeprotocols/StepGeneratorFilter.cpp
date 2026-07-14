@@ -80,7 +80,7 @@ void StepGeneratorFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("StepGeneratorFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	int64_t samplerate = m_rate.GetIntVal();
 	size_t samplePeriod = FS_PER_SECOND / samplerate;

@@ -76,7 +76,7 @@ string ComplexImportFilter::GetProtocolName()
 
 void ComplexImportFilter::Reload()
 {
-	ClearErrors();
+	ClearMessages();
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
 	{

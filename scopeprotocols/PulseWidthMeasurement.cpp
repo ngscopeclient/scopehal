@@ -69,7 +69,7 @@ void PulseWidthMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PulseWidthMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

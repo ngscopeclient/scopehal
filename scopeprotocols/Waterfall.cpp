@@ -109,7 +109,7 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("Waterfall::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	//Make sure we've got valid inputs
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));

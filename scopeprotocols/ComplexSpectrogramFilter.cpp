@@ -108,7 +108,7 @@ void ComplexSpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 void ComplexSpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
 	auto din_freq = GetInput(2);

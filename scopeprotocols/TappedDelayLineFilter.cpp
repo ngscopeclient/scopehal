@@ -100,7 +100,7 @@ void TappedDelayLineFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("TappedDelayLineFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInput(0).GetData());
 	if(!din)

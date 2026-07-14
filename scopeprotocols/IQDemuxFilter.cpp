@@ -84,7 +84,7 @@ void IQDemuxFilter::Refresh(
 	#endif
 
 	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
-	ClearErrors();
+	ClearMessages();
 	if(!din)
 	{
 		if(!GetInput(0))

@@ -72,7 +72,7 @@ void UndershootMeasurement::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("UndershootMeasurement::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

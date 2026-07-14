@@ -73,7 +73,7 @@ void CSVImportFilter::OnFileNameChanged()
 		nvtx3::scoped_range nrange("CSVImportFilter::OnFileNameChanged");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	auto fname = m_parameters[m_fpname].ToString();
 	if(fname.empty())
 	{

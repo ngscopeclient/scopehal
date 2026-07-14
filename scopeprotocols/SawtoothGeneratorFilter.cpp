@@ -105,7 +105,7 @@ void SawtoothGeneratorFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SawtoothGeneratorFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	int64_t samplerate = m_rate.GetIntVal();
 	int64_t freq = m_freq.GetIntVal();

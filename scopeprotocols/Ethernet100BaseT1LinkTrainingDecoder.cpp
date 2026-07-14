@@ -78,7 +78,7 @@ void Ethernet100BaseT1LinkTrainingDecoder::Refresh(
 	auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!din_i || !din_q)
 	{
 		for(int i=0; i<2; i++)

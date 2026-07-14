@@ -75,7 +75,7 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		nvtx3::scoped_range nrange("EmphasisFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		if(!GetInput(0))

@@ -103,7 +103,7 @@ void NCOFilter::Refresh(
 	#endif
 
 	//Make sure we have a valid input
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))

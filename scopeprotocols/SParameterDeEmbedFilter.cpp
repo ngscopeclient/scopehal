@@ -133,7 +133,7 @@ void SParameterDeEmbedFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SParameterDeEmbedFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

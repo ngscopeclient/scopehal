@@ -71,7 +71,7 @@ void FullWidthHalfMax::Refresh(
 	auto din = GetInputWaveform(0);
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		if(!GetInput(0))

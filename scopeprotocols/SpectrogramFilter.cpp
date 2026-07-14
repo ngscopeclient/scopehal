@@ -162,7 +162,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("SpectrogramFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{

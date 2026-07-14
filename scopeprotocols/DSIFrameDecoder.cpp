@@ -82,7 +82,7 @@ void DSIFrameDecoder::Refresh(
 	#endif
 
 	ClearPackets();
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

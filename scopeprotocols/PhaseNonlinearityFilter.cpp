@@ -77,7 +77,7 @@ void PhaseNonlinearityFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PhaseNonlinearityFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

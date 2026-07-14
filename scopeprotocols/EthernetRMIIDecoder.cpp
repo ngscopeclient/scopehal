@@ -71,7 +71,7 @@ void EthernetRMIIDecoder::Refresh(
 
 	//Make sure we've got valid inputs
 	ClearPackets();
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		for(int i=0; i<4; i++)

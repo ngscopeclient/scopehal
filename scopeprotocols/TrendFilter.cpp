@@ -81,7 +81,7 @@ void TrendFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("TrendFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!ShouldRefresh())
 		return;

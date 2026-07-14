@@ -243,13 +243,7 @@ protected:
 
 	///@brief Remove any messages left over from the last graph refresh
 	void ClearMessages()
-	{
-		m_messages.clear();
-	}
-
-	__attribute_deprecated__
-	void ClearErrors()
-	{ ClearMessages(); }
+	{ m_messages.clear(); }
 
 	///@brief Attach a new message to the node
 	void AddMessage(const FlowGraphNodeMessage& msg)
@@ -261,9 +255,7 @@ protected:
 
 	///@brief Add a new error message
 	void AddErrorMessage(const std::string& err)
-	{
-		AddErrorMessage("Unknown", std::string("• ") + err);
-	}
+	{ AddErrorMessage("Unknown", std::string("• ") + err); }
 
 	/**
 		@brief Add a new error message with a title

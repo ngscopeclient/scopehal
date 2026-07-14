@@ -84,7 +84,7 @@ void J1939TransportDecoder::Refresh(
 	ClearPackets();
 
 	//Make sure we've got valid inputs
-	ClearErrors();
+	ClearMessages();
 	auto din = dynamic_cast<J1939PDUWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{

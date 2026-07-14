@@ -74,7 +74,7 @@ void PAM4DemodulatorFilter::Refresh(
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("PAM4DemodulatorFilter::Refresh");
 	#endif
-	ClearErrors();
+	ClearMessages();
 
 	if(!VerifyAllInputsOK())
 	{

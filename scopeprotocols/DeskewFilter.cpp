@@ -65,7 +65,7 @@ void DeskewFilter::Refresh(
 		nvtx3::scoped_range nrange("DeskewFilter::Refresh");
 	#endif
 
-	ClearErrors();
+	ClearMessages();
 	if(!VerifyAllInputsOK())
 	{
 		if(!GetInput(0))
