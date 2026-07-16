@@ -843,6 +843,8 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x2212: return "VSC_EXT_VESA_SDP_MAX_CHAINING";
 		case 0x2213: return "VSC_EXT_CTA_SDP_MAX_CHAINING";
 
+		case 0xe000d: return "DP tunneling / panel replay optimization";
+
 		case 0xf0000: return "LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV";
 		case 0xf0001: return "8B10B_MAX_LINK_RATE_PHY_REPEATER";
 		case 0xf0002: return "PHY_REPEATER_CNT";
@@ -851,6 +853,14 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0xf0005: return "PHY_REPEATER_EXTENDED_WAKE_TIMEOUT";
 		case 0xf0006: return "MAIN_CHANNEL_CODING_PHY_REPEATER";
 		case 0xf0007: return "PHY_REPEATER_128B/132B_RATES";
+		case 0xf0008: return "Reserved for LTTPR capability/ID";
+		case 0xf0009: return "Reserved for LTTPR capability/ID";
+		case 0xf000a: return "Reserved for LTTPR capability/ID";
+		case 0xf000b: return "Reserved for LTTPR capability/ID";
+		case 0xf000c: return "Reserved for LTTPR capability/ID";
+		case 0xf000d: return "Reserved for LTTPR capability/ID";
+		case 0xf000e: return "Reserved for LTTPR capability/ID";
+		case 0xf000f: return "Reserved for LTTPR capability/ID";
 
 		default:
 			return "";
