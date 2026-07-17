@@ -236,7 +236,7 @@ bool AntikernelLabsILA::AcquireData()
 
 	//Download the data blocks to working memory slowly so we can report progress
 	size_t totalBufferSize = m_wordsPerRowRounded * m_memDepth;
-	size_t blocksize = 32768;	//must match BLOCK_SIZE server side
+	size_t blocksize = 8192;	//must match BLOCK_SIZE server side
 	if(totalBufferSize <= blocksize)
 		m_transport->SendCommandQueuedWithReply("DOWNLOAD:0?");
 	else
@@ -264,6 +264,8 @@ bool AntikernelLabsILA::AcquireData()
 	auto fields = explode(data, ',');
 	if(fields.empty())
 		return false;
+
+	ChannelsDownloadFinished();
 
 	double now = GetTime();
 	int64_t sec = floor(now);
