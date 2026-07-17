@@ -42,10 +42,8 @@
 #include "HP662xAPowerSupply.h"
 #include "AntikernelLabsGPIO.h"
 #include "AntikernelLabsILA.h"
-#include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLabsSerdesILA8b10b.h"
 #include "AntikernelLabsVIO.h"
-#include "AntikernelLogicAnalyzer.h"
 #include "DemoOscilloscope.h"
 #include "DemoPowerSupply.h"
 #include "DigilentOscilloscope.h"
@@ -302,10 +300,8 @@ void DriverStaticInit()
 	AddBERTDriverClass(MultiLaneBERT);
 
 	AddDriverClass(AgilentOscilloscope);
-	AddDriverClass(AntikernelLabsOscilloscope);
 	AddDriverClass(AntikernelLabsILA);
 	AddDriverClass(AntikernelLabsSerdesILA8b10b);
-	//AddDriverClass(AntikernelLogicAnalyzer);
 	AddDriverClass(DemoOscilloscope);
 	AddDriverClass(DigilentOscilloscope);
 	AddDriverClass(DSLabsOscilloscope);
