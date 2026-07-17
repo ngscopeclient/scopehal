@@ -280,14 +280,6 @@ void DPAuxChannelDecoder::Refresh(
 							}
 							break;
 
-						case FRAME_PAYLOAD:
-							if(current_state)
-							{
-								good = true;
-								frame_state = FRAME_END_1;
-							}
-							break;
-
 						case FRAME_END_1:
 							if(!current_state)
 							{
@@ -296,7 +288,13 @@ void DPAuxChannelDecoder::Refresh(
 							}
 							break;
 
+						//Allow mid-packet stop bit
 						default:
+							if(current_state)
+							{
+								good = true;
+								frame_state = FRAME_END_1;
+							}
 							break;
 					}
 				}
@@ -393,8 +391,18 @@ void DPAuxChannelDecoder::Refresh(
 							bool this_is_write = (current_byte & 3) == 0;
 							if(i2c_transaction_open)
 							{
+								//If this is a read without the MOT bit set, end the transaction
+								if(current_byte == 0x1)
+								{
+									auto acklen = (ui_width / cap->m_timescale);
+									i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_STOP, 0));
+									i2ccap->m_offsets.push_back(symbol_start - acklen);
+									i2ccap->m_durations.push_back(acklen);
+									i2c_address_sent = false;
+								}
+
 								//Is this type the same?
-								if(this_is_write == last_i2c_was_write)
+								else if(this_is_write == last_i2c_was_write)
 								{
 									//No action needed
 								}
@@ -466,7 +474,7 @@ void DPAuxChannelDecoder::Refresh(
 						symbol_start = i;
 
 						//Push the address from the previous request
-						snprintf(tmp, sizeof(tmp), "%05x", request_addr);
+						snprintf(tmp, sizeof(tmp), "%05x", request_addr & 0xfe);
 						pack->m_headers["Address"] = tmp;
 
 						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
@@ -474,7 +482,7 @@ void DPAuxChannelDecoder::Refresh(
 						//NACKs are displayed as errors
 						if(!last_was_i2c && ((current_byte & 3) == 0x1) )
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-						else
+						else if(last_was_i2c && ((current_byte & 3) == 0x1) )
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 
 						current_byte = 0;
@@ -545,6 +553,10 @@ void DPAuxChannelDecoder::Refresh(
 						snprintf(tmp, sizeof(tmp), "%05x", request_addr);
 						pack->m_headers["Address"] = tmp;
 
+						//Set read bit if this is a read
+						if(pack->m_headers["Type"].find("Read") != string::npos)
+							request_addr |= 1;
+
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_I2C_ADDRESS, request_addr));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
@@ -555,7 +567,7 @@ void DPAuxChannelDecoder::Refresh(
 
 							i2ccap->m_samples.push_back(I2CSymbol(
 								I2CSymbol::TYPE_ADDRESS,
-								request_addr | !last_i2c_was_write));
+								(request_addr & 0xfe) | !last_i2c_was_write));
 							i2ccap->m_offsets.push_back(symbol_start);
 							i2ccap->m_durations.push_back(i - symbol_start - acklen);
 
@@ -779,6 +791,7 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 
 		case 0x0111: return "MSTM_CTRL";
 
+		case 0x0200: return "SINK_COUNT";
 		case 0x0202: return "LANE0_1_STATUS";
 		case 0x0203: return "LANE2_3_STATUS";
 		case 0x0204: return "LANE_ALIGN_STATUS_UPDATED";
@@ -797,6 +810,19 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x0309: return "Source Hardware Revision";
 		case 0x030a: return "Source Firmware/Software Major Revision";
 		case 0x030b: return "Source Firmware/Software Minor Revision";
+
+		case 0x0400: return "Sink IEEE_OUI[0]";
+		case 0x0401: return "Sink IEEE_OUI[1]";
+		case 0x0402: return "Sink IEEE_OUI[2]";
+		case 0x0403: return "Sink DEVICE_ID[0]";
+		case 0x0404: return "Sink DEVICE_ID[1]";
+		case 0x0405: return "Sink DEVICE_ID[2]";
+		case 0x0406: return "Sink DEVICE_ID[3]";
+		case 0x0407: return "Sink DEVICE_ID[4]";
+		case 0x0408: return "Sink DEVICE_ID[5]";
+		case 0x0409: return "Sink Hardware Revision";
+		case 0x040a: return "Sink Firmware/Software Major Revision";
+		case 0x040b: return "Sink Firmware/Software Minor Revision";
 
 		case 0x0500: return "Branch IEEE_OUI[0]";
 		case 0x0501: return "Branch IEEE_OUI[1]";
@@ -1445,6 +1471,13 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 					out += "Upstream device is branch (or pre DP 1.2 source)";
 				break;
 
+			//SINK_COUNT
+			case 0x200:
+				out += to_string( ((data[i] & 0x80) >> 1) | (data[i] & 0x3f)) + "sinks available\n";
+				if(data[i] & 0x40)
+					out += "CP capable\n";
+				break;
+
 			//ADJUST_REQUEST_LANE_0_1
 			//ADJUST_REQUEST_LANE_2_3
 			case 0x206:
@@ -1503,6 +1536,21 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 				}
 				else
 					out += string("Source firmware major rev ") + to_string(data[i]);
+				break;
+
+			//Sink IEEE_OUI
+			case 0x400:
+				if(data.size() >= i+3)
+				{
+					snprintf(tmp, sizeof(tmp), "Sink OUI %02X-%02X-%02X", data[i], data[i+1], data[i+2]);
+					out += tmp;
+					fieldsize = 3;
+				}
+				else
+				{
+					snprintf(tmp, sizeof(tmp), "Sink OUI[0] = %02X", data[i]);
+					out += tmp;
+				}
 				break;
 
 			//Branch IEEE_OUI
