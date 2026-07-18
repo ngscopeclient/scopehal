@@ -57,7 +57,7 @@ Filter::Filter(
 	const string& color,
 	Category cat,
 	Unit xunit)
-	: OscilloscopeChannel(NULL, "", color, xunit, 0)	//TODO: handle this better?
+	: OscilloscopeChannel(nullptr, "", color, xunit, 0)	//TODO: handle this better?
 	, m_category(cat)
 	, m_usingDefault(true)
 {
@@ -118,7 +118,7 @@ Filter* Filter::CreateFilter(const string& protocol, const string& color)
 	}
 
 	LogError("Invalid filter name: %s\n", protocol.c_str());
-	return NULL;
+	return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,7 +137,7 @@ bool Filter::VerifyInputOK(size_t i, bool allowEmpty)
 	if(p.m_channel == nullptr)
 		return false;
 	auto data = p.GetData();
-	if(data == NULL)
+	if(data == nullptr)
 		return false;
 
 	if(!allowEmpty)
