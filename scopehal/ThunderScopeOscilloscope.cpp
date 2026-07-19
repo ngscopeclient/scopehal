@@ -366,6 +366,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	//Read the sequence number of the current waveform
 	if(!m_transport->ReadRawData(sizeof(m_lastSeq), reinterpret_cast<uint8_t*>(&m_lastSeq)))
 		return false;
+	//LogTrace("Got waveform with sequence %u\n", m_lastSeq);
 
 	//Acknowledge receipt of this waveform
 	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
