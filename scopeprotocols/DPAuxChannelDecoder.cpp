@@ -477,13 +477,17 @@ void DPAuxChannelDecoder::Refresh(
 						snprintf(tmp, sizeof(tmp), "%05x", request_addr & 0xfe);
 						pack->m_headers["Address"] = tmp;
 
-						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
+						{
+							auto sttype = cap->GetText(cap->m_samples.size()-1);
+							pack->m_headers["Type"] = sttype;
 
-						//NACKs are displayed as errors
-						if(!last_was_i2c && ((current_byte & 3) == 0x1) )
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-						else if(last_was_i2c && ((current_byte & 3) == 0x1) )
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							if(sttype.find("NACK") != string::npos)
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+							else if(sttype.find("ACK") != string::npos)
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+							else
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+						}
 
 						current_byte = 0;
 						bitcount = 0;
