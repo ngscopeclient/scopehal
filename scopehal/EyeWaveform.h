@@ -221,6 +221,9 @@ public:
 		m_accumdata.MarkModifiedFromGpu();
 	}
 
+	virtual size_t GetMemoryBytes() const override
+	{ return m_accumdata.GetMemoryBytes() + m_outdata.GetMemoryBytes(); }
+
 protected:
 
 	///@brief Accumulator buffer

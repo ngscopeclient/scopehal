@@ -577,6 +577,12 @@ public:
 public:
 
 	/**
+		@brief Returns the total size of the buffer (wherever it is), in bytes
+	 */
+	size_t GetMemoryBytes() const
+	{ return m_capacity * sizeof(T); }
+
+	/**
 		@brief Returns the total reserved CPU memory, in bytes
 	 */
 	size_t GetCpuMemoryBytes() const
