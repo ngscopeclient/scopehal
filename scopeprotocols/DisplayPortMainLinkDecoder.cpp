@@ -143,6 +143,9 @@ void DisplayPortMainLinkDecoder::Refresh(
 	bool frameLocked = false;
 	uint16_t scrambleState = 1;
 	uint32_t debugCount = 0;
+	int64_t tDesync = data->m_offsets[0];
+
+	Unit fs(Unit::UNIT_FS);
 
 	for(size_t i=0; i<len; i++)
 	{
@@ -154,47 +157,75 @@ void DisplayPortMainLinkDecoder::Refresh(
 		//Scrambler advances on all symbols even K characters
 		uint8_t scram = 0;
 		if(scramblerLocked)
-			RunScrambler(scrambleState);
+			scram = RunScrambler(scrambleState);
 
 		//Descramble it, if applicable
 		uint8_t descrambled = sym.m_data ^ scram;
-		/*if(scramblerLocked)
-		{
-			LogDebug("%02x\n", descrambled);
-			debugCount ++;
-			if(debugCount > 30)
-				break;
-		}*/
 
 		//Look for control characters
 		bool isControl = (sym.m_flags & IBM8b10bSymbol::FLAG_CONTROL) == IBM8b10bSymbol::FLAG_CONTROL;
 
-		if(isControl)
+		//Handle data characters in frame body
+		if(scramblerLocked && frameLocked && !isControl)
 		{
-			//K28.0 is start of a scrambler reset
+			/*if(debugCount < 30)
+				LogDebug("%02x n=%zu state=%04x\n", descrambled, i, scrambleState);
+			debugCount ++;*/
+		}
+
+		else if(isControl)
+		{
+			//K28.0 is start of a scrambler reset which behaves the same as a blanking start
 			if(sym.m_data == 0x1c)
 			{
 				//Expect SR BF BF SR = K28.0 K28.3 K28.3 K28.0 = 1c 7c 7c 1c
-				/*
-				LogDebug("Found SR at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(tstart).c_str());
-				i += 4;
+				LogTrace("!!!! Found SR at %s\n", fs.PrettyPrint(tstart).c_str());
+				LogIndenter li;
+
+				//Skip the SR symbol
+				i ++;
+
 				scrambleState = 0xffff;
-				scramblerLocked = true;*/
+				scramblerLocked = true;
 
-				//Descramble the first few values
-				//i++;
-				/*
-				for(size_t j=0; j<32; j++)
+				//Advance scrambler and skip the next 3 symbols (BF BF SR) without decoding them
+				i += 2;
+
+				//Find end of blanking period (k27.7 = BE)
+				size_t iend = 0;
+				for(size_t j=i+1; j<len; j++)
 				{
-					auto b = data->m_samples[i+j].m_data;
-					auto d = RunScrambler(scrambleState);
-					auto s = b ^ d;
-					LogDebug("%02x, %02x, %02x\n", b, d, s);
+					auto jsym = data->m_samples[j];
+					if(
+						((jsym.m_flags & IBM8b10bSymbol::FLAG_CONTROL) == IBM8b10bSymbol::FLAG_CONTROL) &&
+						(jsym.m_data == 0xfb )
+						)
+					{
+						iend = j;
+						break;
+					}
 				}
-				return;
-				*/
 
-				frameLocked = true;
+				if(iend > 0)
+				{
+					//Run scrambler for blanking data
+					//TODO: decode the blanking interval data
+					size_t nblank = iend - i;
+					LogTrace("SR blanking period ends at %s (%zu symbols)\n", fs.PrettyPrint(tstart).c_str(), nblank);
+
+					for(size_t j=0; j<nblank; j++)
+					{
+						auto d = RunScrambler(scrambleState);
+
+						auto b = data->m_samples[i+j+1].m_data;
+						auto s = b ^ d;
+						if(j < 16)
+							LogTrace("%02x, %02x, %02x\n", b, d, s);
+					}
+					i += nblank;
+				}
+				else
+					LogWarning("iend invalid\n");
 			}
 
 			//BS (start of blanking period)
@@ -219,7 +250,9 @@ void DisplayPortMainLinkDecoder::Refresh(
 
 				//TODO: verify next 3 symbols are BF BF BS
 
-				LogDebug("Found BS at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(tstart).c_str());
+				LogTrace("Found blanking period start at %s\n", fs.PrettyPrint(tstart).c_str());
+				LogIndenter li;
+
 				frameLocked = true;
 
 				//Add blanking-start symbol
@@ -227,33 +260,46 @@ void DisplayPortMainLinkDecoder::Refresh(
 				cap->m_durations.push_back(data->m_offsets[i+3] + data->m_durations[i+3] - tbase);
 				cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_BS));
 
-				//Run scrambler and skip the next 3 symbols
+				//Advance scrambler and skip the next 3 symbols (BF BF BS) without decoding them
 				for(size_t j=0; j<3; j++)
 					RunScrambler(scrambleState);
 				i += 3;
 
-				//TODO: decode the blanking interval data
-			}
-
-			//BE (end of blanking period, start pixel data)
-			//0xfb = k27.7 = BE
-			else if(sym.m_data == 0xfb)
-			{
-				if(!scramblerLocked)
-					continue;
-
-				LogDebug("Found BE at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(tstart).c_str());
-
-				//i++;
-				/*
-				for(size_t j=0; j<64; j++)
+				//Find end of blanking period (k27.7 = BE)
+				size_t iend = 0;
+				for(size_t j=i+1; j<len; j++)
 				{
-					auto b = data->m_samples[i+j].m_data;
-					auto d = RunScrambler(scrambleState);
-					auto s = b ^ d;
-					LogDebug("%02x, %02x, %02x\n", b, d, s);
+					auto jsym = data->m_samples[j];
+					if(
+						((jsym.m_flags & IBM8b10bSymbol::FLAG_CONTROL) == IBM8b10bSymbol::FLAG_CONTROL) &&
+						(jsym.m_data == 0xfb )
+						)
+					{
+						iend = j;
+						break;
+					}
 				}
-				return;*/
+
+				if(iend > 0)
+				{
+					//Run scrambler for blanking data
+					//TODO: decode the blanking interval data
+					size_t nblank = iend - i;
+					LogTrace("Blanking period ends at %s (%zu symbols)\n", fs.PrettyPrint(tstart).c_str(), nblank);
+
+					for(size_t j=0; j<nblank; j++)
+					{
+						auto d = RunScrambler(scrambleState);
+
+						auto b = data->m_samples[i+j+1].m_data;
+						auto s = b ^ d;
+						if(j < 16)
+							LogTrace("%02x, %02x, %02x\n", b, d, s);
+					}
+					i += nblank;
+				}
+				else
+					LogWarning("iend invalid\n");
 			}
 
 			//Fill
@@ -274,13 +320,13 @@ void DisplayPortMainLinkDecoder::Refresh(
 					else
 						iLastFill = j;
 				}
-				size_t numFillSymbols = iLastFill - iFirstFill;
+				size_t numFillSymbols = iLastFill - iFirstFill + 1;
 
 				//If scrambler was not locked, add a filler symbol
 				if(!scramblerLocked)
 				{
-					cap->m_offsets.push_back(data->m_offsets[0]);
-					cap->m_durations.push_back(tbase - data->m_offsets[0]);
+					cap->m_offsets.push_back(tDesync);
+					cap->m_durations.push_back(tbase - tDesync);
 					cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_SCRAMBLER_DESYNC));
 				}
 
@@ -308,32 +354,54 @@ void DisplayPortMainLinkDecoder::Refresh(
 				//If we are synchronized, just skip the fill block and move on
 				if(scramblerLocked)
 				{
-					//TODO: verify the fill is in fact zeroes and show error or resync if not?
-					i = iFE;
+					//Skip the FS symbol
+					i++;
+
+					//Verify the fill is in fact zeroes
+					//TODO: try to re-sync if it doesn't decode properly?
+					for(; i < iFE; i++)
+					{
+						auto expected = RunScrambler(scrambleState);
+						auto observed = data->m_samples[i].m_data;
+						if(expected != observed)
+						{
+							//Change fill to an error symbol
+							cap->m_samples[cap->m_samples.size() - 1] =
+								DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_ERROR);
+
+							LogTrace("Couldn't lock to filler, expected %02x got %02x\n", expected, observed);
+							scramblerLocked = false;
+							tDesync = data->m_offsets[iFE] + data->m_durations[iFE];
+							break;
+						}
+					}
+
+					//We are going to have the loop bump i one more time when we advance to the next iteration
+					//in order to skip the FE symbol. So run the scrambler to keep counter and loop index in sync
+					RunScrambler(scrambleState);
 					continue;
 				}
 
 				//Log it
-				LogDebug("Found FS at %s (%zu symbols) with scrambler unlocked\n",
-					Unit(Unit::UNIT_FS).PrettyPrint(tstart).c_str(), numFillSymbols);
+				LogTrace("Found FS at %s (%zu symbols) with scrambler unlocked\n",
+					fs.PrettyPrint(tstart).c_str(), numFillSymbols);
 				LogIndenter li;
 
 				//We need at least four fill symbols to get and verify a lock
 				if(numFillSymbols < 4)
 				{
-					LogDebug("Not enough filler symbols to lock scrambler to, skipping\n");
-					i = iFE;
+					LogTrace("Not enough filler symbols to lock scrambler to, skipping\n");
+					//for(; i < iFE; i++)
+					//	RunScrambler(scrambleState);
 					continue;
 				}
 
+				//Skip the FS symbol itself, no need to advance scrambler since we aren't synced yet
+				i++;
+
 				//Debug
-				vector<uint8_t> target;
-				for(size_t j=0; j<numFillSymbols; j++)
-				{
-					auto b = data->m_samples[iFirstFill+j].m_data;
-					LogDebug("fill[%zu] = %02x\n", j, b);
-					target.push_back(b);
-				}
+				//for(size_t j=0; j<numFillSymbols; j++)
+				//	LogDebug("fill[%zu] = %02x\n", j, data->m_samples[iFirstFill+j].m_data);
 
 				//Scrambled data is XOR'd with the most significant 8 bits in reverse order
 				//So we can bitswap the filler (known a priori to be all zeroes) and use that as the LFSR state
@@ -342,311 +410,30 @@ void DisplayPortMainLinkDecoder::Refresh(
 				RunScrambler(scrambleState);
 				scrambleState = (scrambleState & 0xff) | (g_bitswapTable[data->m_samples[iFirstFill+1].m_data] << 8);
 
+				//Skip the first fill symbol because we already ran the scrambler for it
+				i++;
+
 				//Run the scrambler through the filler block and verify we get matching values for every symbol
 				//(this also advances the scrambler for later)
 				scramblerLocked = true;
-				for(size_t j=0; j<(numFillSymbols-1); j++)
+				for(; i < iFE; i++)
 				{
 					auto expected = RunScrambler(scrambleState);
-					auto observed = data->m_samples[iFirstFill+j+1].m_data;
+					auto observed = data->m_samples[i].m_data;
 					if(expected != observed)
 					{
-						LogDebug("expected %02x got %02x\n", expected, observed);
+						LogTrace("Couldn't lock to filler, expected %02x got %02x\n", expected, observed);
 						scramblerLocked = false;
 						break;
 					}
 				}
 
-				i = iFE;
+				//We are going to have the loop bump i one more time when we advance to the next iteration
+				//in order to skip the FE symbol. So run the scrambler to keep counter and loop index in sync
+				RunScrambler(scrambleState);
 			}
 		}
-
-		/*
-			Scrambler not synced? Look for one of the two possible sync points:
-			1) Scrambler reset for normal and content protection
-			SR BF BF SR
-			K28.0 K28.3 K28.3 K28.0
-
-			2) Fill sequence
-			FS (zero or more data characters) FE
-			K30.7 (payload) K23.7
-			Payload is all zeroes before scrambling
-			Payload length is variable, we need at least 3 to ensure good lock (TODO more?)
-		 */
 	}
-
-	/*
-	enum
-	{
-		STATE_UNKNOWN,
-		STATE_IDLE,
-		STATE_HS_REQUEST,
-		STATE_HS_SYNC_0,
-		STATE_HS_SYNC_1,
-		STATE_HS_SYNC_2,
-		STATE_HS_SYNC_3,
-		STATE_HS_SYNC_4,
-		STATE_HS_DATA
-	} state = STATE_UNKNOWN;
-
-	//If our data is a single-ended decode, we have to infer some states we can't see.
-	auto data_decoder = dynamic_cast<DPhySymbolDecoder*>(GetInput(1).m_channel);
-	bool single_ended_data = data_decoder->GetInput(1).m_channel == nullptr;
-
-	//Process the data
-	DPMainLinkDataSymbol samp;
-	size_t clklen = clk->m_samples.size();
-	size_t datalen = data->m_samples.size();
-	size_t iclk = 0;
-	size_t idata = 0;
-	int64_t timestamp	= 0;
-	bool last_clk = 0;
-	int count = 0;
-	uint8_t cur_byte = 0;
-	int64_t tstart = 0;
-	while(true)
-	{
-		//Get the current samples
-		auto cur_clk = clk->m_samples[iclk];
-		auto cur_data = data->m_samples[idata];
-
-		//Get timestamps of next event on each channel
-		int64_t next_data = GetNextEventTimestamp(data, idata, datalen, timestamp);
-		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
-		int64_t next_timestamp = min(next_clk, next_data);
-		if(next_timestamp == timestamp)
-			break;
-
-		size_t nlast = cap->m_samples.size()-1;
-		int64_t tend = data->m_offsets[idata] + data->m_durations[idata];
-		int64_t tclkstart = clk->m_offsets[iclk];
-
-		//Look for clock edges
-		bool clock_rising = false;
-		bool clock_falling = false;
-		if(cur_clk.m_type == DPhySymbol::STATE_HS1)
-		{
-			if(!last_clk)
-				clock_rising = true;
-			last_clk = true;
-		}
-		else if(cur_clk.m_type == DPhySymbol::STATE_HS0)
-		{
-			if(last_clk)
-				clock_falling = true;
-			last_clk = false;
-		}
-		bool clock_toggling = clock_rising || clock_falling;
-
-		switch(state)
-		{
-			//Just started decoding. We don't know what's going on.
-			//Wait for the link to go idle.
-			case STATE_UNKNOWN:
-
-				//LP-11 is a STOP sequence. The partial packet before this point can be safely discarded.
-				//Emit an "IDLE" state for the duration of the LP-11.
-				if(cur_data.m_type == DPhySymbol::STATE_LP11)
-					state = STATE_IDLE;
-				break;	//end STATE_UNKNOWN
-
-			//Link is idle, wait for a start-of-transmission or escape sequence
-			case STATE_IDLE:
-
-				//LP-01 is a HS-REQUEST.
-				//If doing a single-ended decode, we can't see the LP-01. We seem to jump straight to LP-00.
-				if( (cur_data.m_type == DPhySymbol::STATE_LP01) ||
-					(single_ended_data && (cur_data.m_type == DPhySymbol::STATE_LP00) ) )
-				{
-					state = STATE_HS_REQUEST;
-
-					cap->m_offsets.push_back(data->m_offsets[idata]);
-					cap->m_durations.push_back(data->m_durations[idata]);
-					cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_SOT));
-				}
-
-				break;	//end STATE_IDLE
-
-			//Starting a start-of-transmission sequence
-			case STATE_HS_REQUEST:
-
-				switch(cur_data.m_type)
-				{
-					//Ignore any LP states other than LP-11 which resets us
-					case DPhySymbol::STATE_LP11:
-						state = STATE_IDLE;
-						break;
-
-					//If we see HS-0, we're in the sync stage
-					case DPhySymbol::STATE_HS0:
-						state = STATE_HS_SYNC_0;
-						break;
-
-					default:
-						break;
-				}
-
-				break;	//end STATE_HS_REQUEST
-
-			//Wait for a HS-1 state on a rising clock edge to continue the sync
-			case STATE_HS_SYNC_0:
-
-				//Reset on LP-11
-				if(cur_data.m_type == DPhySymbol::STATE_LP11)
-				{
-					state = STATE_IDLE;
-					break;
-				}
-
-				//We got the HS-1. Extend the sample.
-				if(clock_falling && cur_data.m_type == DPhySymbol::STATE_HS1)
-				{
-					state = STATE_HS_SYNC_1;
-					count = 1;
-
-					cap->m_durations[nlast] = tclkstart - cap->m_offsets[nlast];
-				}
-
-				break;	//end STATE_HS_SYNC_0
-
-			//Expect three HS-1's in a row.
-			case STATE_HS_SYNC_1:
-				if(clock_toggling)
-				{
-					if(cur_data.m_type == DPhySymbol::STATE_HS1)
-					{
-						count ++;
-						cap->m_durations[nlast] = tend - cap->m_offsets[nlast];
-
-						if(count == 3)
-							state = STATE_HS_SYNC_2;
-					}
-
-					else
-						state = STATE_HS_SYNC_0;
-				}
-				break;	//end STATE_HS_SYNC_1
-
-			//Expect a single HS-0
-			case STATE_HS_SYNC_2:
-				if(clock_toggling)
-				{
-					if(cur_data.m_type == DPhySymbol::STATE_HS0)
-					{
-						cap->m_durations[nlast] = tend - cap->m_offsets[nlast];
-						state = STATE_HS_SYNC_3;
-					}
-
-					else
-						state = STATE_HS_SYNC_0;
-				}
-				break;	//end STATE_HS_SYNC_2
-
-			//Expect a single HS-1
-			case STATE_HS_SYNC_3:
-				if(clock_toggling)
-				{
-					if(cur_data.m_type == DPhySymbol::STATE_HS1)
-					{
-						cap->m_durations[nlast] = tclkstart - cap->m_offsets[nlast];
-						count = 0;
-						tstart = tclkstart;
-						cur_byte = 0;
-						state = STATE_HS_DATA;
-					}
-
-					else
-						state = STATE_HS_SYNC_0;
-				}
-				break;	//end STATE_HS_SYNC_2
-
-			//Read data bytes, LSB first
-			case STATE_HS_DATA:
-
-				if(clock_toggling)
-				{
-					//HS data bit
-					if( (cur_data.m_type == DPhySymbol::STATE_HS0) || (cur_data.m_type == DPhySymbol::STATE_HS1) )
-					{
-						cur_byte >>= 1;
-						if(cur_data.m_type == DPhySymbol::STATE_HS1)
-							cur_byte |= 0x80;
-
-						count ++;
-
-						if(count == 8)
-						{
-							cap->m_offsets.push_back(tstart);
-							cap->m_durations.push_back(tclkstart - tstart);
-							cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_HS_DATA, cur_byte));
-							tstart = tclkstart;
-							cur_byte = 0;
-							count = 0;
-						}
-					}
-
-					//End of packet
-					else if(cur_data.m_type == DPhySymbol::STATE_LP11)
-					{
-						//Trim garbage at end of packet
-						if(cap->m_offsets.size() >= 4)
-						{
-							//Discard last 3 bytes of data
-							for(size_t i=0; i<3; i++)
-							{
-								cap->m_offsets.pop_back();
-								cap->m_durations.pop_back();
-								cap->m_samples.pop_back();
-							}
-
-							//Discard all bytes with the same value
-							size_t endlen = cap->m_samples.size()-1;
-							uint8_t last = cap->m_samples[endlen].m_data;
-							while(cap->m_samples[endlen].m_data == last)
-							{
-								cap->m_offsets.pop_back();
-								cap->m_durations.pop_back();
-								cap->m_samples.pop_back();
-
-								endlen --;
-								if(endlen == 0)
-									break;
-							}
-
-							//Add a new "end" sample
-							endlen = cap->m_samples.size()-1;
-							tstart = cap->m_offsets[endlen] + cap->m_durations[endlen];
-							cap->m_offsets.push_back(tstart);
-							cap->m_durations.push_back(tclkstart - tstart);
-							cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_EOT));
-						}
-
-						state = STATE_IDLE;
-					}
-
-					//Something illegal
-					else
-					{
-						cap->m_offsets.push_back(data->m_offsets[idata]);
-						cap->m_durations.push_back(data->m_durations[idata]);
-						cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_ERROR));
-						state = STATE_UNKNOWN;
-					}
-
-				}
-
-				break;	//end STATE_HS_DATA
-
-			default:
-				break;
-		}
-
-		//All good, move on
-		timestamp = next_timestamp;
-		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
-		AdvanceToTimestamp(data, idata, datalen, timestamp);
-	}
-	*/
 }
 
 string DPMainLinkWaveform::GetColor(size_t i)
@@ -657,19 +444,17 @@ string DPMainLinkWaveform::GetColor(size_t i)
 	{
 		case DPMainLinkDataSymbol::TYPE_SCRAMBLER_DESYNC:
 		case DPMainLinkDataSymbol::TYPE_FRAME_DESYNC:
-		case DPMainLinkDataSymbol::TYPE_FILL:
 			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 		case DPMainLinkDataSymbol::TYPE_BS:
+		case DPMainLinkDataSymbol::TYPE_SR:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-		/*
-		case DPMainLinkDataSymbol::TYPE_EOT:
+		case DPMainLinkDataSymbol::TYPE_FILL:
 			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
-		case DPMainLinkDataSymbol::TYPE_HS_DATA:
+		case DPMainLinkDataSymbol::TYPE_PIXEL_DATA:
 			return StandardColors::colors[StandardColors::COLOR_DATA];
-		*/
 
 		case DPMainLinkDataSymbol::TYPE_ERROR:
 		default:
@@ -696,14 +481,12 @@ string DPMainLinkWaveform::GetText(size_t i)
 		case DPMainLinkDataSymbol::TYPE_BS:
 			return "Blanking Start";
 
-		/*
-		case DPMainLinkDataSymbol::TYPE_EOT:
-			return "EOT";
+		case DPMainLinkDataSymbol::TYPE_SR:
+			return "Scrambler Reset";
 
-		case DPMainLinkDataSymbol::TYPE_HS_DATA:
+		case DPMainLinkDataSymbol::TYPE_PIXEL_DATA:
 			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
 			return tmp;
-		*/
 
 		case DPMainLinkDataSymbol::TYPE_ERROR:
 		default:

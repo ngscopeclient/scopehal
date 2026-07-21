@@ -45,7 +45,9 @@ public:
 		TYPE_FILL,
 		TYPE_FRAME_DESYNC,
 		TYPE_ERROR,
-		TYPE_BS
+		TYPE_BS,
+		TYPE_SR,
+		TYPE_PIXEL_DATA
 	};
 
 	DPMainLinkDataSymbol(SymbolType t=DPMainLinkDataSymbol::TYPE_ERROR, uint8_t data=0)
