@@ -41,6 +41,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DivideFilter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
+	DisplayPortMainLinkDecoder.cpp
 	DPAuxChannelDecoder.cpp
 	DPhyDataDecoder.cpp
 	DPhyEscapeModeDecoder.cpp

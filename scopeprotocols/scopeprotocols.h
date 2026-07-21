@@ -82,6 +82,7 @@
 #include "DownconvertFilter.h"
 #include "DownsampleFilter.h"
 #include "DPAuxChannelDecoder.h"
+#include "DisplayPortMainLinkDecoder.h"
 #include "DPhyDataDecoder.h"
 #include "DPhyEscapeModeDecoder.h"
 #include "DPhyHSClockRecoveryFilter.h"
