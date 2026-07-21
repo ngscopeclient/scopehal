@@ -35,6 +35,11 @@
 #ifndef DisplayPortMainLinkDecoder_h
 #define DisplayPortMainLinkDecoder_h
 
+#include "PacketDecoder.h"
+
+//needed for VideoScanlinePacket until we move it elsewhere
+#include "DVIDecoder.h"
+
 class DPMainLinkDataSymbol
 {
 public:
@@ -50,13 +55,13 @@ public:
 		TYPE_PIXEL_DATA
 	};
 
-	DPMainLinkDataSymbol(SymbolType t=DPMainLinkDataSymbol::TYPE_ERROR, uint8_t data=0)
+	DPMainLinkDataSymbol(SymbolType t=DPMainLinkDataSymbol::TYPE_ERROR, uint32_t data=0)
 	 : m_type(t)
 	 , m_data(data)
 	{}
 
 	SymbolType m_type;
-	uint8_t m_data;
+	uint32_t m_data;
 
 	bool operator== (const DPMainLinkDataSymbol& s) const
 	{
@@ -72,7 +77,7 @@ public:
 	virtual std::string GetColor(size_t) override;
 };
 
-class DisplayPortMainLinkDecoder : public Filter
+class DisplayPortMainLinkDecoder : public PacketDecoder
 {
 public:
 	DisplayPortMainLinkDecoder(const std::string& color);
@@ -80,6 +85,8 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
+	virtual bool GetShowImageColumn() override;
+	virtual std::vector<std::string> GetHeaders() override;
 
 	PROTOCOL_DECODER_INITPROC(DisplayPortMainLinkDecoder)
 

@@ -57,7 +57,7 @@ const uint8_t g_bitswapTable[] =
 // Construction / destruction
 
 DisplayPortMainLinkDecoder::DisplayPortMainLinkDecoder(const string& color)
-	: Filter(color, CAT_SERIAL)
+	: PacketDecoder(color, CAT_SERIAL)
 {
 	AddProtocolStream("data");
 
@@ -71,6 +71,18 @@ DisplayPortMainLinkDecoder::DisplayPortMainLinkDecoder(const string& color)
 string DisplayPortMainLinkDecoder::GetProtocolName()
 {
 	return "DisplayPort - Main Link";
+}
+
+vector<string> DisplayPortMainLinkDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Pixels");
+	return ret;
+}
+
+bool DisplayPortMainLinkDecoder::GetShowImageColumn()
+{
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,15 +138,19 @@ void DisplayPortMainLinkDecoder::Refresh(
 
 	//Make sure we've got valid inputs
 	ClearMessages();
+	ClearPackets();
 	if(!data)
 	{
 		AddErrorMessage("Missing inputs", "No waveform available at input");
 		SetData(nullptr, 0);
 		return;
 	}
+	data->PrepareForCpuAccess();
 
 	//Create output waveform
 	auto cap = SetupEmptyWaveform<DPMainLinkWaveform>(data, 0);
+	cap->PrepareForCpuAccess();
+	cap->MarkModifiedFromCpu();
 
 	//Handle the actual decoding
 	//TODO: multi lane support
@@ -142,16 +158,25 @@ void DisplayPortMainLinkDecoder::Refresh(
 	bool scramblerLocked = false;
 	bool frameLocked = false;
 	uint16_t scrambleState = 1;
-	uint32_t debugCount = 0;
 	int64_t tDesync = data->m_offsets[0];
 
 	Unit fs(Unit::UNIT_FS);
+
+	VideoScanlinePacket* pack = nullptr;
+
+	//Partially decoded pixel
+	uint8_t pixelPhase = 0;
+	size_t iPixelStart = 0;
+	uint8_t pixelR = 0;
+	uint8_t pixelG = 0;
+	uint8_t pixelB = 0;
 
 	for(size_t i=0; i<len; i++)
 	{
 		auto sym = data->m_samples[i];
 
 		auto tbase = data->m_offsets[i];
+		auto tbend = tbase + data->m_durations[i];
 		auto tstart = (data->m_timescale * tbase) + data->m_triggerPhase;
 
 		//Scrambler advances on all symbols even K characters
@@ -165,12 +190,60 @@ void DisplayPortMainLinkDecoder::Refresh(
 		//Look for control characters
 		bool isControl = (sym.m_flags & IBM8b10bSymbol::FLAG_CONTROL) == IBM8b10bSymbol::FLAG_CONTROL;
 
-		//Handle data characters in frame body
+		//Handle data characters in scanline body
+		//For now, assume pixels are in groups of 3 at RGB24 color depth
+		//TODO: implement other color depths
+		//Note: RGB triplets can be broken up at byte boundaries with rate-matching filler blocks
 		if(scramblerLocked && frameLocked && !isControl)
 		{
-			/*if(debugCount < 30)
-				LogDebug("%02x n=%zu state=%04x\n", descrambled, i, scrambleState);
-			debugCount ++;*/
+			//See what index within the pixel we are
+			switch(pixelPhase)
+			{
+				//Start of a pixel, R component
+				case 0:
+					pixelPhase = 1;
+					iPixelStart = i;
+					pixelR = descrambled;
+					break;
+
+				//Middle of a pixel, G component
+				case 1:
+					pixelPhase = 2;
+					pixelG = descrambled;
+
+					//If the pixel did not start one sample ago, update the start to our position
+					if(iPixelStart < (i-1) )
+						iPixelStart = i;
+
+					break;
+
+				//End of a pixel, B component
+				case 2:
+				default:
+					pixelB = descrambled;
+					pixelPhase = 0;
+
+					//If the pixel did not start one or two samples ago, update the start to our position
+					if(iPixelStart < (i-2) )
+						iPixelStart = i;
+
+					//Append to the packet
+					if(pack)
+					{
+						pack->m_data.push_back(pixelR);
+						pack->m_data.push_back(pixelG);
+						pack->m_data.push_back(pixelB);
+						pack->m_len = (tbend * data->m_timescale) + data->m_triggerPhase - pack->m_offset;
+					}
+
+					cap->m_offsets.push_back(data->m_offsets[iPixelStart]);
+					cap->m_durations.push_back(tbend - data->m_offsets[iPixelStart]);
+					cap->m_samples.push_back(DPMainLinkDataSymbol(
+						DPMainLinkDataSymbol::TYPE_PIXEL_DATA,
+						(pixelR << 16) | (pixelG << 8) | pixelB));
+
+					break;
+			}
 		}
 
 		else if(isControl)
@@ -179,7 +252,7 @@ void DisplayPortMainLinkDecoder::Refresh(
 			if(sym.m_data == 0x1c)
 			{
 				//Expect SR BF BF SR = K28.0 K28.3 K28.3 K28.0 = 1c 7c 7c 1c
-				LogTrace("!!!! Found SR at %s\n", fs.PrettyPrint(tstart).c_str());
+				LogTrace("Found SR at %s\n", fs.PrettyPrint(tstart).c_str());
 				LogIndenter li;
 
 				//Skip the SR symbol
@@ -219,13 +292,20 @@ void DisplayPortMainLinkDecoder::Refresh(
 
 						auto b = data->m_samples[i+j+1].m_data;
 						auto s = b ^ d;
-						if(j < 16)
-							LogTrace("%02x, %02x, %02x\n", b, d, s);
+						//if(j < 16)
+						//	LogTrace("%02x, %02x, %02x\n", b, d, s);
 					}
 					i += nblank;
 				}
 				else
 					LogWarning("iend invalid\n");
+
+				//Start a new video scanline
+				if(pack)
+					pack->m_headers["Pixels"] = to_string(pack->m_data.size() / 3);
+				pack = new VideoScanlinePacket;
+				pack->m_offset = data->m_offsets[i] * data->m_timescale + data->m_triggerPhase;
+				m_packets.push_back(pack);
 			}
 
 			//BS (start of blanking period)
@@ -293,13 +373,20 @@ void DisplayPortMainLinkDecoder::Refresh(
 
 						auto b = data->m_samples[i+j+1].m_data;
 						auto s = b ^ d;
-						if(j < 16)
-							LogTrace("%02x, %02x, %02x\n", b, d, s);
+						//if(j < 16)
+						//	LogTrace("%02x, %02x, %02x\n", b, d, s);
 					}
 					i += nblank;
 				}
 				else
 					LogWarning("iend invalid\n");
+
+				//Start a new video scanline
+				if(pack)
+					pack->m_headers["Pixels"] = to_string(pack->m_data.size() / 3);
+				pack = new VideoScanlinePacket;
+				pack->m_offset = data->m_offsets[i] * data->m_timescale + data->m_triggerPhase;
+				m_packets.push_back(pack);
 			}
 
 			//Fill
@@ -434,10 +521,29 @@ void DisplayPortMainLinkDecoder::Refresh(
 			}
 		}
 	}
+
+	//If we have at least two packets and the last one is shorter, assume it was truncated by end-of-capture
+	auto npackets = m_packets.size();
+	if(npackets >= 2)
+	{
+		auto prevPacket = m_packets[npackets - 2];
+		auto lastPacket = m_packets[npackets - 1];
+
+		auto prevLen = prevPacket->m_data.size();
+		auto lastLen = lastPacket->m_data.size();
+
+		if( (lastLen < prevLen) && (lastPacket->m_headers.find("Pixels") == lastPacket->m_headers.end() ) )
+		{
+			lastPacket->m_headers["Pixels"] = to_string(lastLen / 3);
+			for(size_t i=lastLen; i < prevLen; i++)
+				lastPacket->m_data.push_back(0x80);
+		}
+	}
 }
 
 string DPMainLinkWaveform::GetColor(size_t i)
 {
+	char tmp[32];
 	const DPMainLinkDataSymbol& s = m_samples[i];
 
 	switch(s.m_type)
@@ -454,7 +560,10 @@ string DPMainLinkWaveform::GetColor(size_t i)
 			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 		case DPMainLinkDataSymbol::TYPE_PIXEL_DATA:
-			return StandardColors::colors[StandardColors::COLOR_DATA];
+			snprintf(tmp, sizeof(tmp), "#%06x", s.m_data);
+			return tmp;
+
+			//return StandardColors::colors[StandardColors::COLOR_DATA];
 
 		case DPMainLinkDataSymbol::TYPE_ERROR:
 		default:
@@ -485,7 +594,7 @@ string DPMainLinkWaveform::GetText(size_t i)
 			return "Scrambler Reset";
 
 		case DPMainLinkDataSymbol::TYPE_PIXEL_DATA:
-			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			snprintf(tmp, sizeof(tmp), "#%06x", s.m_data);
 			return tmp;
 
 		case DPMainLinkDataSymbol::TYPE_ERROR:
