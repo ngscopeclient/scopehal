@@ -79,6 +79,7 @@ vector<string> DPAuxChannelDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Type");
 	ret.push_back("Address");
+	ret.push_back("I2C Reg");
 	ret.push_back("Length");
 	ret.push_back("Info");
 	return ret;
@@ -136,6 +137,10 @@ void DPAuxChannelDecoder::Refresh(
 	bool packetIsRequest = true;
 
 	Packet* pack = nullptr;
+
+	//I2C eeprom pointers
+	//For now assume every device has a single-byte pointer
+	map<uint8_t, uint8_t> i2cDevicePointers;
 
 	size_t i = 0;
 	bool done = false;
@@ -219,7 +224,7 @@ void DPAuxChannelDecoder::Refresh(
 			int64_t delta = edgepos - ui_start;
 			if(delta > 10 * ui_width)
 			{
-				LogTrace("Premature end of frame (middle of a bit)\n");
+				//LogTrace("Premature end of frame (middle of a bit)\n");
 				i++;
 				break;
 			}
@@ -230,7 +235,7 @@ void DPAuxChannelDecoder::Refresh(
 				bool good = false;
 				if((delta > sync_width_min) && (delta < sync_width_max) )
 				{
-					LogTrace("sync path, state=%d, current=%d\n", frame_state, current_state);
+					//LogTrace("sync path, state=%d, current=%d\n", frame_state, current_state);
 
 					switch(frame_state)
 					{
@@ -304,7 +309,9 @@ void DPAuxChannelDecoder::Refresh(
 				current_state = !current_state;
 
 				if(!good)
-					LogTrace("Edge was in the wrong place (delta=%" PRId64 "), skipping it and attempting resync\n", delta);
+				{
+					//LogTrace("Edge was in the wrong place (delta=%" PRId64 "), skipping it and attempting resync\n", delta);
+				}
 				else if(frame_state == FRAME_PAYLOAD)
 					LogTrace("Got valid sync pattern\n");
 				else if(frame_state == FRAME_END_1)
@@ -338,15 +345,18 @@ void DPAuxChannelDecoder::Refresh(
 					//Decode packet content
 					if( !pack->m_data.empty() && (pack->m_headers["Type"] != "AUX_NACK") )
 					{
-						if(pack->m_headers["Info"] != "")
-							pack->m_headers["Info"] += "\n";
-						pack->m_headers["Info"] += DecodeRegisterContent(request_addr, pack->m_data);
+						//TODO decode i2c reads/writes etc?
+						if(last_was_i2c)
+						{
+						}
+						else
+							pack->m_headers["Info"] = DecodeRegisterContent(request_addr, pack->m_data);
 					}
 
 					break;
 				}
-				else
-					LogTrace("continuing with sync\n");
+				/*else
+					LogTrace("continuing with sync\n");*/
 
 				last_edge2 = last_edge;
 				last_edge = i;
@@ -474,7 +484,10 @@ void DPAuxChannelDecoder::Refresh(
 						symbol_start = i;
 
 						//Push the address from the previous request
-						snprintf(tmp, sizeof(tmp), "%05x", request_addr & 0xfe);
+						if(last_was_i2c)
+							snprintf(tmp, sizeof(tmp), "%02x", request_addr & 0xfe);
+						else
+							snprintf(tmp, sizeof(tmp), "%05x", request_addr & 0xfe);
 						pack->m_headers["Address"] = tmp;
 
 						{
@@ -539,8 +552,8 @@ void DPAuxChannelDecoder::Refresh(
 						request_addr = addr_hi;
 
 						snprintf(tmp, sizeof(tmp), "%05x", addr_hi);
+
 						pack->m_headers["Address"] = tmp;
-						pack->m_headers["Info"] = DecodeRegisterName(addr_hi);
 
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_ADDRESS, addr_hi));
 						cap->m_offsets.push_back(symbol_start);
@@ -554,7 +567,7 @@ void DPAuxChannelDecoder::Refresh(
 					case FRAME_I2C_ADDR:
 						request_addr = current_byte << 1;	//shift left 1 bit to match scopehal left-aligned standard
 
-						snprintf(tmp, sizeof(tmp), "%05x", request_addr);
+						snprintf(tmp, sizeof(tmp), "%02x", request_addr);
 						pack->m_headers["Address"] = tmp;
 
 						//Set read bit if this is a read
@@ -609,6 +622,7 @@ void DPAuxChannelDecoder::Refresh(
 						if(last_was_i2c)
 						{
 							auto acklen = (ui_width / cap->m_timescale);
+							auto realAddr = request_addr & 0xfe;
 
 							i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_DATA, current_byte));
 							i2ccap->m_offsets.push_back(symbol_start);
@@ -619,10 +633,28 @@ void DPAuxChannelDecoder::Refresh(
 							i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ACK, 0));
 							i2ccap->m_offsets.push_back(i - acklen);
 							i2ccap->m_durations.push_back(acklen);
+
+							//Log pointers on EEPROM read/write
+							bool setPointer = false;
+							if(pack->m_data.size() == 1)
+							{
+								//Update pointer on write
+								if(pack->m_headers["Type"] == "I2C Write MOT")
+								{
+									i2cDevicePointers[realAddr] = current_byte;
+									setPointer = true;
+								}
+
+								//Read or write displays pointer
+								pack->m_headers["I2C Reg"] = to_string_hex(i2cDevicePointers[realAddr], true, 2);
+							}
+
+							//Bump the I2C pointer UNLESS this is a write and we are updating it instead
+							if(!setPointer)
+								i2cDevicePointers[realAddr] ++;
 						}
 
 						symbol_start = i;
-
 						symbolDone = true;
 						break;
 
@@ -796,11 +828,28 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x0111: return "MSTM_CTRL";
 
 		case 0x0200: return "SINK_COUNT";
+		case 0x0201: return "DEVICE_SERVICE_IRQ_VECTOR";
 		case 0x0202: return "LANE0_1_STATUS";
 		case 0x0203: return "LANE2_3_STATUS";
 		case 0x0204: return "LANE_ALIGN_STATUS_UPDATED";
 		case 0x0206: return "ADJUST_REQUEST_LANE0_1";
 		case 0x0207: return "ADJUST_REQUEST_LANE2_3";
+		case 0x0208: return "TRAINING_SCORE_LANE0";
+		case 0x0209: return "TRAINING_SCORE_LANE1";
+		case 0x020a: return "TRAINING_SCORE_LANE2";
+		case 0x020b: return "TRAINING_SCORE_LANE3";
+		case 0x020c: return "RESERVED_DEPRECATED_20C";
+		case 0x020d: return "RESERVED_DEPRECATED_20D";
+		case 0x020e: return "RESERVED_DEPRECATED_20E";
+		case 0x020f: return "DSC_STATUS";
+		case 0x0210: return "SYMBOL_ERROR_COUNT_LANE0";
+		case 0x0211: return "";
+		case 0x0212: return "SYMBOL_ERROR_COUNT_LANE1";
+		case 0x0213: return "";
+		case 0x0214: return "SYMBOL_ERROR_COUNT_LANE2";
+		case 0x0215: return "";
+		case 0x0216: return "SYMBOL_ERROR_COUNT_LANE3";
+		case 0x0217: return "";
 
 		case 0x0300: return "Source IEEE_OUI[0]";
 		case 0x0301: return "Source IEEE_OUI[1]";
@@ -891,9 +940,18 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0xf000d: return "Reserved for LTTPR capability/ID";
 		case 0xf000e: return "Reserved for LTTPR capability/ID";
 		case 0xf000f: return "Reserved for LTTPR capability/ID";
+		case 0xf009d: return "LTTPR 2 OUI[0]";
+		case 0xf009e: return "LTTPR 2 OUI[1]";
+		case 0xf009f: return "LTTPR 2 OUI[2]";
+		case 0xf00a0: return "LTTPR 2 ID[0]";
+		case 0xf00a1: return "LTTPR 2 ID[1]";
+		case 0xf00a2: return "LTTPR 2 ID[2]";
+		case 0xf00a3: return "LTTPR 2 ID[3]";
+		case 0xf00a4: return "LTTPR 2 ID[4]";
+		case 0xf00a5: return "LTTPR 2 ID[5]";
 
 		default:
-			return "";
+			return "(unknown register)";
 	}
 }
 
@@ -904,22 +962,26 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 	char tmp[128];
 	while(i < data.size())
 	{
+		string out;
+		auto regname = DecodeRegisterName(start_addr);
+		if(!regname.empty())
+			out += regname + "\n";
+
 		//Decode known register bitfields
-		string out = "";
 		size_t fieldsize = 1;
 		switch(start_addr)
 		{
 			//DCPD_REV (and extended)
 			case 0x00000:
 			case 0x02200:
-				out = string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				out += string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
 				m_dcpdRevision = data[i];
 				break;
 
 			//MAX_LANE_COUNT (and extended)
 			case 0x00002:
 			case 0x02202:
-				out = string("Max lanes: ") + to_string(data[i] & 0x1f) + "\n";
+				out += string("Max lanes: ") + to_string(data[i] & 0x1f) + "\n";
 				if(data[i] & 0x20)
 					out += "POST_LT_ADJ_REQ supported\n";
 				else
@@ -959,9 +1021,9 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 			case 0x0000e:
 			case 0x0220e:
 				if(data[i] & 0x80)
-					out = "Extended RX capability field present\n";
+					out += "Extended RX capability field present\n";
 				else
-					out = "Extended RX capability field not present\n";
+					out += "Extended RX capability field not present\n";
 				out += "LANEx_CR_DONE polling interval: 100 μs\n";
 				switch(data[i] & 0x7f)
 				{
@@ -1477,7 +1539,7 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 
 			//SINK_COUNT
 			case 0x200:
-				out += to_string( ((data[i] & 0x80) >> 1) | (data[i] & 0x3f)) + "sinks available\n";
+				out += to_string( ((data[i] & 0x80) >> 1) | (data[i] & 0x3f)) + " sinks available\n";
 				if(data[i] & 0x40)
 					out += "CP capable\n";
 				break;
@@ -1961,9 +2023,9 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 			//LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV
 			case 0xf0000:
 				if(data[i] == 0)
-					out = "No LTTPR";
+					out += "No LTTPR";
 				else
-					out = string("LTTPR ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+					out += string("LTTPR ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
 				break;
 
 			//Unknown? Don't print any decode, skip it
@@ -1978,6 +2040,11 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 		//Concatenate lines
 		if(!out.empty())
 		{
+			//Remove trailing newline if we have an extra
+			auto end = out.size()-1;
+			if(out[end] == '\n')
+				out.resize(end);
+
 			if(ret.empty())
 				ret = out;
 			else
@@ -1988,8 +2055,21 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 	return ret;
 }
 
-bool DPAuxChannelDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
+bool DPAuxChannelDecoder::CanMerge(Packet* first, [[maybe_unused]] Packet* cur, Packet* next)
 {
+	bool addressMatch = (first->m_headers["Address"] == next->m_headers["Address"]);
+	bool startIsReadMot = (first->m_headers["Type"] == "I2C Read MOT");
+	bool startIsRead = (first->m_headers["Type"] == "I2C Read");
+	bool startIsWriteMot = (first->m_headers["Type"] == "I2C Write MOT");
+	bool startIsWrite = (first->m_headers["Type"] == "I2C Write");
+	bool nextIsRead = (next->m_headers["Type"] == "I2C Read");
+	bool nextIsReadMot = (next->m_headers["Type"] == "I2C Read MOT");
+	bool nextIsWrite = (next->m_headers["Type"] == "I2C Write");
+	bool nextIsWriteMot = (next->m_headers["Type"] == "I2C Write MOT");
+	bool nextIsAck = (next->m_headers["Type"] == "I2C_ACK");
+
+	bool startIsI2C = startIsRead || startIsReadMot || startIsWrite || startIsWriteMot;
+
 	//Merge reads and writes with their completions
 	if( (first->m_headers["Type"] == "DP Read") && (next->m_headers["Type"] == "AUX_ACK") )
 		return true;
@@ -2000,22 +2080,14 @@ bool DPAuxChannelDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
 	}
 
 	//Merge I2C reads and writes with ACKs
-	if( (first->m_headers["Type"].find("I2C Write") == 0) && (next->m_headers["Type"] == "I2C_ACK") )
-		return true;
-	if( (first->m_headers["Type"].find("I2C Read") == 0) && (next->m_headers["Type"] == "I2C_ACK") )
+	if(startIsI2C && nextIsAck)
 		return true;
 
-	//Merge Read MOT with any subsequent Read MOT or ACK using the same address
-	if( (first->m_headers["Type"] == "I2C Read MOT") &&
-		( (next->m_headers["Type"] == "I2C Read MOT") || (next->m_headers["Type"] == "I2C_ACK") ) &&
-		(first->m_headers["Address"] == next->m_headers["Address"]) )
-	{
-		//Do not merge anything new if the current packet has data
-		if( (cur != first) && (!cur->m_data.empty()) )
-			return false;
-
+	//Merge Read MOT with any consecutive Read using the same address, ditto for Write
+	if(startIsReadMot && (nextIsRead || nextIsReadMot) && addressMatch)
 		return true;
-	}
+	if(startIsWriteMot && (nextIsWrite || nextIsWriteMot) && addressMatch)
+		return true;
 
 	return false;
 }
@@ -2023,17 +2095,48 @@ bool DPAuxChannelDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
 Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
 {
 	//Default passthrough of first packet
-	Packet* ret = new Packet;
+	auto ret = new Packet;
+	const auto& baseAddress = pack->m_headers["Address"];
+	const auto& baseType = pack->m_headers["Type"];
 	ret->m_offset = pack->m_offset;
 	ret->m_len = pack->m_len;
-	ret->m_headers["Type"] = pack->m_headers["Type"];
-	ret->m_headers["Address"] = pack->m_headers["Address"];
-	ret->m_headers["Length"] = pack->m_headers["Length"];
-	ret->m_headers["Info"] = pack->m_headers["Info"];
+	ret->m_headers["Address"] = baseAddress;
 	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
 
+	auto& outReg = ret->m_headers["I2C Reg"];
+	auto baseReg = pack->m_headers["I2C Reg"];
+	if(!baseReg.empty())
+		outReg = baseReg;
+
+	//Fix up type so we don't have MOT in the header
+	bool baseIsI2CRead = (baseType.find("I2C Read") == 0);
+	bool baseIsI2CWrite = (baseType.find("I2C Write") == 0);
+	if(baseIsI2CRead)
+		ret->m_headers["Type"] = "I2C Read";
+	else if(baseIsI2CWrite)
+		ret->m_headers["Type"] = "I2C Write";
+	else
+		ret->m_headers["Type"] = baseType;
+
+	//Copy info by default unless the top level packet has no data
+	string& info = ret->m_headers["Info"];
+	if( (baseType.find("DP") == 0) && pack->m_data.empty())
+		info = "";
+	else
+		info = pack->m_headers["Info"];
+
+	if(baseIsI2CRead || baseIsI2CWrite)
+	{
+		if(baseAddress == "60")
+			info = "EDID segment pointer";
+		else if(baseAddress == "a0")
+			info = "EDID EEPROM";
+	}
+
+	//Don't copy length header, we can recreate that
+
 	//Combine DP read with completion
-	if(pack->m_headers["Type"] == "DP Read")
+	if(baseType == "DP Read")
 	{
 		//Add data from reply, if available
 		if(i+1 < m_packets.size())
@@ -2042,14 +2145,18 @@ Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			ret->m_data = next->m_data;
 			ret->m_len = next->m_offset + next->m_len - pack->m_offset;
 
-			auto info = next->m_headers["Info"];
-			if(!info.empty())
-				ret->m_headers["Info"] += "\n" + info;
+			auto nextInfo = next->m_headers["Info"];
+			if(!nextInfo.empty())
+			{
+				if(!info.empty() && (info[info.size()-1] != '\n') )
+					info += "\n";
+				info += nextInfo;
+			}
 		}
 	}
 
 	//Combine DP write with completion
-	if(pack->m_headers["Type"] == "DP Write")
+	else if(baseType == "DP Write")
 	{
 		ret->m_data = pack->m_data;
 
@@ -2061,57 +2168,64 @@ Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
 		}
 	}
 
-	//Combine I2C read or write with ACK
-	if( (pack->m_headers["Type"].find("I2C Write") == 0) || (pack->m_headers["Type"].find("I2C Read") == 0) )
+	//Combine I2C read or write with ACKs and followups
+	else if( baseIsI2CRead || baseIsI2CWrite )
 	{
+		//Start by copying base data
 		ret->m_data = pack->m_data;
 
-		//If not a MOT, stop after one
-		if(pack->m_headers["Type"].find("MOT") == string::npos)
+		//Assume base level is MOT for now
+		while(i+1 < m_packets.size())
 		{
-			if(i+1 < m_packets.size())
+			auto next = m_packets[i+1];
+			const auto& nextType = next->m_headers["Type"];
+			const auto& nextAddress = next->m_headers["Address"];
+
+			//Do not merge if address mismatch
+			bool ok = false;
+			if(baseAddress != nextAddress)
+			{}
+
+			//Always merge with ACKs
+			else if(nextType == "I2C_ACK")
+				ok = true;
+
+			//Always merge with same type with or without MOT
+			else if(baseIsI2CRead && (nextType.find("I2C Read") == 0))
+				ok = true;
+			else if(baseIsI2CWrite && (nextType.find("I2C Write") == 0))
+				ok = true;
+
+			//Stop if not proceeding
+			if(!ok)
 			{
-				auto next = m_packets[i+1];
-				ret->m_len = next->m_offset + next->m_len - pack->m_offset;
-
-				//append the data, if any
-				for(auto d : next->m_data)
-					ret->m_data.push_back(d);
+				//LogTrace("Not merging: basetype = %s, nexttype = %s, baseAddress=%s, nextAddress=%s\n",
+				//	baseType.c_str(), nextType.c_str(), baseAddress.c_str(), nextAddress.c_str());
+				break;
 			}
-		}
 
-		//If MOT, keep going as long as we find matches
-		else
-		{
-			//Remove the MOT flag from the top level packet
-			if(pack->m_headers["Type"] == "I2C Write MOT")
-				ret->m_headers["Type"] = "I2C Write";
-			else
-				ret->m_headers["Type"] = "I2C Read";
-
-			while(i+1 < m_packets.size())
+			//Merge headers
+			auto nextInfo = Trim(next->m_headers["Info"]);	//not sure where trailing newline is coming from, TODO fix
+			if(!nextInfo.empty())
 			{
-				//Not the same type or ACK? Stop
-				auto next = m_packets[i+1];
-				if( (pack->m_headers["Type"] != next->m_headers["Type"]) && (next->m_headers["Type"] != "I2C_ACK") )
-					break;
-				if(pack->m_headers["Address"] != next->m_headers["Address"])
-					break;
-
-				ret->m_len = next->m_offset + next->m_len - pack->m_offset;
-
-				//append the data, if any
-				for(auto d : next->m_data)
-					ret->m_data.push_back(d);
-
-				//If we had data, stop
-				if(next->m_data.size())
-					break;
-
-				i++;
+				if(!info.empty())
+					info += "\n";
+				info += nextInfo;
 			}
+
+			auto nextReg = next->m_headers["I2C Reg"];
+			if(!nextReg.empty() && outReg.empty())
+				outReg = nextReg;
+
+			//Append packet data
+			ret->m_data.insert(ret->m_data.end(), next->m_data.begin(), next->m_data.end());
+
+			i++;
 		}
 	}
+
+	//Recalculate length
+	ret->m_headers["Length"] = to_string(ret->m_data.size());
 
 	return ret;
 }
