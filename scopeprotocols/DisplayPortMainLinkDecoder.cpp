@@ -252,8 +252,27 @@ void DisplayPortMainLinkDecoder::Refresh(
 			if(sym.m_data == 0x1c)
 			{
 				//Expect SR BF BF SR = K28.0 K28.3 K28.3 K28.0 = 1c 7c 7c 1c
+				if(i+3 >= len)
+					continue;
+				if(
+					((data->m_samples[i+1].m_flags & IBM8b10bSymbol::FLAG_CONTROL) != IBM8b10bSymbol::FLAG_CONTROL) ||
+					(data->m_samples[i+1].m_data != 0x7c) ||
+					((data->m_samples[i+2].m_flags & IBM8b10bSymbol::FLAG_CONTROL) != IBM8b10bSymbol::FLAG_CONTROL) ||
+					(data->m_samples[i+2].m_data != 0x7c) ||
+					((data->m_samples[i+3].m_flags & IBM8b10bSymbol::FLAG_CONTROL) != IBM8b10bSymbol::FLAG_CONTROL) ||
+					(data->m_samples[i+3].m_data != 0x1c)
+					)
+				{
+					continue;
+				}
+
 				LogTrace("Found SR at %s\n", fs.PrettyPrint(tstart).c_str());
 				LogIndenter li;
+
+				//Add scrambler-reset symbol
+				cap->m_offsets.push_back(tbase);
+				cap->m_durations.push_back(data->m_offsets[i+3] + data->m_durations[i+3] - tbase);
+				cap->m_samples.push_back(DPMainLinkDataSymbol(DPMainLinkDataSymbol::TYPE_SR));
 
 				//Skip the SR symbol
 				i ++;
