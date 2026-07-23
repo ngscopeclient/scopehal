@@ -129,6 +129,17 @@ protected:
 	uint32_t m_wordsPerRowRounded;
 
 public:
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return
+		{
+			{"ila", {{ SCPITransportType::TRANSPORT_LAN, "localhost:5025" }}}
+        };
+	}
+
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(AntikernelLabsILA)
 };

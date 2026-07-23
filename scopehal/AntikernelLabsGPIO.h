@@ -68,6 +68,17 @@ protected:
 	uint32_t m_cachedOut;
 
 public:
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return
+		{
+			{"gpio", {{ SCPITransportType::TRANSPORT_LAN, "localhost:5025" }}}
+        };
+	}
+
 	static std::string GetDriverNameInternal();
 	MISC_INITPROC(AntikernelLabsGPIO);
 };

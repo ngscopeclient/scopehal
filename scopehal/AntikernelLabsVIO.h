@@ -63,6 +63,16 @@ protected:
 	std::vector<uint64_t> m_outputChannelCachedValues;
 
 public:
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return
+		{
+			{"vio", {{ SCPITransportType::TRANSPORT_LAN, "localhost:5025" }}}
+        };
+	}
+
 	static std::string GetDriverNameInternal();
 	MISC_INITPROC(AntikernelLabsVIO);
 };
