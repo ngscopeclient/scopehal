@@ -159,6 +159,9 @@ void ClockRecoveryFilter::Refresh(
 	if(gate)
 		gate->PrepareForCpuAccess();
 
+	//Update units of threshold
+	m_threshold.SetUnit(GetInput(0).GetYAxisUnits());
+
 	//Timestamps of the edges
 	size_t nedges = 0;
 	AcceleratorBuffer<int64_t> vedges;
