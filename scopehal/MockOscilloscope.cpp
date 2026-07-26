@@ -49,7 +49,12 @@ MockOscilloscope::MockOscilloscope(
 	const string& serial,
 	const std::string& transport,
 	const std::string& driver,
-	const std::string& args) : SCPIDevice(nullptr, false), SCPIInstrument(nullptr, false), MockInstrument(name, vendor, serial, transport, driver, args)
+	const std::string& args)
+		: SCPIDevice(nullptr, false)
+		, SCPIInstrument(nullptr, false)
+		, MockInstrument(name, vendor, serial, transport, driver, args)
+		, m_sampleRate(0)
+		, m_sampleDepth(0)
 {
 	//Need to run this loader prior to the main Oscilloscope loader
 	m_preloaders.push_front(sigc::mem_fun(*this, &MockOscilloscope::DoPreLoadConfiguration));
@@ -282,15 +287,15 @@ void MockOscilloscope::SetChannelOffset(size_t i, size_t stream, float offset)
 
 vector<uint64_t> MockOscilloscope::GetSampleRatesNonInterleaved()
 {
-	//no-op
 	vector<uint64_t> ret;
+	ret.push_back(m_sampleRate);
 	return ret;
 }
 
 vector<uint64_t> MockOscilloscope::GetSampleRatesInterleaved()
 {
-	//no-op
 	vector<uint64_t> ret;
+	ret.push_back(m_sampleRate);
 	return ret;
 }
 
@@ -303,15 +308,15 @@ set<Oscilloscope::InterleaveConflict> MockOscilloscope::GetInterleaveConflicts()
 
 vector<uint64_t> MockOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	//no-op
 	vector<uint64_t> ret;
+	ret.push_back(m_sampleDepth);
 	return ret;
 }
 
 vector<uint64_t> MockOscilloscope::GetSampleDepthsInterleaved()
 {
-	//no-op
 	vector<uint64_t> ret;
+	ret.push_back(m_sampleDepth);
 	return ret;
 }
 
