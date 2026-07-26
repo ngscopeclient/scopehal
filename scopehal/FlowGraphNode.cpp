@@ -54,13 +54,8 @@ FlowGraphNode::FlowGraphNode()
 
 FlowGraphNode::~FlowGraphNode()
 {
-	//Release any inputs we currently have refs to
-	for(auto c : m_inputs)
-	{
-		auto schan = dynamic_cast<OscilloscopeChannel*>(c->m_sourceStream.m_channel);
-		if(schan)
-			schan->Release();
-	}
+	for(size_t i=0; i<m_inputs.size(); i++)
+		SetInput(i, StreamDescriptor(nullptr, 0), true);
 }
 
 /**
@@ -73,9 +68,9 @@ void FlowGraphNode::DetachInputs()
 {
 	for(auto& c : m_inputs)
 	{
-		c->m_sourceStream.m_channel = nullptr;
-
-		//TODO: disconnect us from their sinks
+		auto& sourceChan = c->m_sourceStream.m_channel;
+		sourceChan->RemoveSink(c->m_sourceStream.m_stream, this);
+		sourceChan = nullptr;
 	}
 }
 
