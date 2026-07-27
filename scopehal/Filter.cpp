@@ -1091,17 +1091,20 @@ SparseAnalogWaveform* Filter::SetupEmptySparseAnalogOutputWaveform(WaveformBase*
 {
 	//Create the waveform, but only if necessary
 	auto cap = dynamic_cast<SparseAnalogWaveform*>(GetData(stream));
-	if(cap == NULL)
+	if(cap == nullptr)
 	{
 		cap = new SparseAnalogWaveform;
 		SetData(cap, stream);
 	}
 
 	//Copy configuration
-	cap->m_startTimestamp 		= din->m_startTimestamp;
-	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
-	cap->m_triggerPhase			= din->m_triggerPhase;
-	cap->m_timescale			= din->m_timescale;
+	if(din != nullptr)
+	{
+		cap->m_startTimestamp 		= din->m_startTimestamp;
+		cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+		cap->m_triggerPhase			= din->m_triggerPhase;
+		cap->m_timescale			= din->m_timescale;
+	}
 
 	//Bump rev number
 	cap->m_revision ++;

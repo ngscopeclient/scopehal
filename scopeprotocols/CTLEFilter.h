@@ -37,7 +37,7 @@
 
 #include "DeEmbedFilter.h"
 
-class CTLEFilter : public DeEmbedFilter
+class CTLEFilter : public Filter
 {
 public:
 	CTLEFilter(const std::string& color);
@@ -51,18 +51,18 @@ public:
 	PROTOCOL_DECODER_INITPROC(CTLEFilter)
 
 protected:
-	virtual int64_t GetGroupDelay() override;
-	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts) override;
 
 	FilterParameter& m_dcGain;
 	FilterParameter& m_zeroFreq;
 	FilterParameter& m_poleFreq1;
 	FilterParameter& m_poleFreq2;
+	FilterParameter& m_maxFreq;
 
 	float m_cachedDcGain;
 	float m_cachedZeroFreq;
 	float m_cachedPole1Freq;
 	float m_cachedPole2Freq;
+	float m_cachedMaxFreq;
 };
 
 #endif
