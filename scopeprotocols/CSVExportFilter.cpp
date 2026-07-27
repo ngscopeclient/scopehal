@@ -132,6 +132,8 @@ void CSVExportFilter::Export()
 	for(size_t i=0; i<GetInputCount(); i++)
 	{
 		auto data = GetInput(i).GetData();
+		data->PrepareForCpuAccess();
+
 		sparse.push_back(dynamic_cast<SparseWaveformBase*>(data));
 		uniform.push_back(dynamic_cast<UniformWaveformBase*>(data));
 		sa.push_back(dynamic_cast<SparseAnalogWaveform*>(data));
