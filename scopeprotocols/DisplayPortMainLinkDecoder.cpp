@@ -59,8 +59,6 @@ const uint8_t g_bitswapTable[] =
 DisplayPortMainLinkDecoder::DisplayPortMainLinkDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 {
-	AddProtocolStream("data");
-
 	//Add inputs. We take a single 8b10b coded stream
 	CreateInput<InputConstraintWaveformType<IBM8b10bWaveform> >("data");
 }
@@ -307,12 +305,13 @@ void DisplayPortMainLinkDecoder::Refresh(
 
 					for(size_t j=0; j<nblank; j++)
 					{
-						auto d = RunScrambler(scrambleState);
-
+						/*auto d = */RunScrambler(scrambleState);
+						/*
 						auto b = data->m_samples[i+j+1].m_data;
 						auto s = b ^ d;
-						//if(j < 16)
-						//	LogTrace("%02x, %02x, %02x\n", b, d, s);
+						if(j < 16)
+							LogTrace("%02x, %02x, %02x\n", b, d, s);
+						*/
 					}
 					i += nblank;
 				}
@@ -388,12 +387,13 @@ void DisplayPortMainLinkDecoder::Refresh(
 
 					for(size_t j=0; j<nblank; j++)
 					{
-						auto d = RunScrambler(scrambleState);
-
+						/*auto d = */RunScrambler(scrambleState);
+						/*
 						auto b = data->m_samples[i+j+1].m_data;
 						auto s = b ^ d;
-						//if(j < 16)
-						//	LogTrace("%02x, %02x, %02x\n", b, d, s);
+						if(j < 16)
+							LogTrace("%02x, %02x, %02x\n", b, d, s);
+						*/
 					}
 					i += nblank;
 				}
