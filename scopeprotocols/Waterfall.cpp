@@ -38,13 +38,8 @@ using namespace std;
 
 WaterfallWaveform::WaterfallWaveform(size_t width, size_t height)
 	: DensityFunctionWaveform(width, height)
-	, m_tempBuf("WaterfallWaveform.m_tempBuf")
+	, m_writePtr(0)
 {
-	//Temporary buffer is GPU-only
-	m_tempBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
-	m_tempBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-
-	m_tempBuf.resize(width*height);
 }
 
 WaterfallWaveform::~WaterfallWaveform()
@@ -138,6 +133,7 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 		m_width = capwidth;
 		SetData(cap, 0);
 	}
+	cap->BumpWriteRow();
 
 	//Figure out the frequency span of the input
 	int64_t spanIn = din->m_timescale * inlen;
@@ -152,44 +148,23 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	args.width = m_width;
 	args.height = m_height;
 	args.inlen = inlen;
+	args.writerow = cap->GetWriteRow();
 	args.vrange = m_inputs[0]->GetVoltageRange(); //db from min to max scale
 	args.vfs = args.vrange/2 - m_inputs[0]->m_sourceStream.GetOffset();
 
 	//TODO: is this OK or are we going to lose too much precision doing this?
 	args.timescaleRatio = cap->m_timescale * 1.0 / din->m_timescale;
 
-	//Make sure input is ready
-	din->PrepareForGpuAccess();
-	cap->PrepareForGpuAccess();
-	cap->m_tempBuf.PrepareForGpuAccess();
-
 	cmdBuf.begin({});
 
 	//Run the actual compute on the GPU
 	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
 	m_computePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf);
-	m_computePipeline.BindBufferNonblocking(2, cap->m_tempBuf, cmdBuf, true);
 	const uint32_t compute_block_count = GetComputeBlockCount(args.width, 64);
 	m_computePipeline.Dispatch(
 		cmdBuf, args,
 		min(compute_block_count, 32768u),
-		m_height,
 		compute_block_count / 32768 + 1);
-
-	//Wait for the shader to finish
-	cmdBuf.pipelineBarrier(
-		vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eTransfer,
-		vk::PipelineStageFlagBits::eTransfer,
-		{},
-		vk::MemoryBarrier(
-			vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eTransferWrite,
-			vk::AccessFlagBits::eTransferRead),
-		{},
-		{});
-
-	//Copy the output buffer over the input
-	vk::BufferCopy region(0, 0, cap->GetOutData().size() * sizeof(float));
-	cmdBuf.copyBuffer(cap->m_tempBuf.GetBuffer(), cap->GetOutData().GetBuffer(), {region});
 
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);

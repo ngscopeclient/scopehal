@@ -35,12 +35,7 @@ layout(std430, binding=0) restrict readonly buffer buf_dnew
 	float dnew[];
 };
 
-layout(std430, binding=1) restrict readonly buffer buf_din
-{
-	float din[];
-};
-
-layout(std430, binding=2) restrict writeonly buffer buf_dout
+layout(std430, binding=1) restrict buffer buf_dout
 {
 	float dout[];
 };
@@ -50,6 +45,7 @@ layout(std430, push_constant) uniform constants
 	uint width;
 	uint height;
 	uint inlen;
+	uint writerow;
 	float vrange;
 	float vfs;
 	float timescaleRatio;
@@ -60,34 +56,22 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//Bounds check
-	uint xpos = (gl_GlobalInvocationID.z * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint xpos = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 	if(xpos >= width)
 		return;
-	if(gl_GlobalInvocationID.y >= height)
-		return;
 
-	//Lower rows move down
-	if(gl_GlobalInvocationID.y < (height-1) )
+	//Write new data at the write position, downsampling the full FFT width to fit the output buffer
+	float vmin = 1.0 / 255.0;
+
+	uint binMin = uint(round(xpos * timescaleRatio));
+	uint binMax = uint(round((xpos+1) * timescaleRatio)) - 1;
+
+	float maxAmplitude = vmin;
+	for(uint i=binMin; (i <= binMax) && (i <= inlen); i++)
 	{
-		dout[gl_GlobalInvocationID.y * width + xpos] =
-			din[(gl_GlobalInvocationID.y+1) * width + xpos];
+		float v = 1 - ( (dnew[i] - vfs) / -vrange);
+		maxAmplitude = max(maxAmplitude, v);
 	}
 
-	//Topmost row gets new content
-	else
-	{
-		float vmin = 1.0 / 255.0;
-
-		uint binMin = uint(round(xpos * timescaleRatio));
-		uint binMax = uint(round((xpos+1) * timescaleRatio)) - 1;
-
-		float maxAmplitude = vmin;
-		for(uint i=binMin; (i <= binMax) && (i <= inlen); i++)
-		{
-			float v = 1 - ( (dnew[i] - vfs) / -vrange);
-			maxAmplitude = max(maxAmplitude, v);
-		}
-
-		dout[gl_GlobalInvocationID.y * width + xpos] = maxAmplitude;
-	}
+	dout[writerow * width + xpos] = maxAmplitude;
 }

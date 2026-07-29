@@ -42,6 +42,7 @@ struct WaterfallFilterArgs
 	uint32_t width;
 	uint32_t height;
 	uint32_t inlen;
+	uint32_t writerow;
 	float vrange;
 	float vfs;
 	float timescaleRatio;
@@ -63,7 +64,14 @@ public:
 	virtual bool HasGpuBuffer() override
 	{ return false; }
 
-	AcceleratorBuffer<float> m_tempBuf;
+	uint32_t GetWriteRow()
+	{ return m_writePtr; }
+
+	void BumpWriteRow()
+	{ m_writePtr = (m_writePtr + 1) % m_height; }
+
+protected:
+	uint32_t m_writePtr;
 };
 
 class Waterfall : public Filter
