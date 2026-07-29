@@ -54,7 +54,7 @@ PeakDetectionFilter::PeakDetectionFilter(const string& color, Category cat)
 	, m_peakwindow(m_parameters["Peak Window"])
 {
 	m_numpeaks = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_numpeaks.SetIntVal(10);
+	m_numpeaks.SetIntVal(0);	//Temporary default to off because peak detection is sloooow
 
 	m_peakwindow = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
 	m_peakwindow.SetFloatVal(500000); //500 kHz between peaks
