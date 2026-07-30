@@ -55,6 +55,19 @@ public:
 	virtual ~VIOOutputChannel();
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
+
+	uint64_t GetInternalValue()
+	{ return m_internalValue; }
+
+	void SetInternalValue(uint64_t v)
+	{ m_internalValue = v; }
+
+	size_t GetWidth()
+	{ return m_width; }
+
+protected:
+	size_t m_width;
+	uint64_t m_internalValue;
 };
 
 #endif

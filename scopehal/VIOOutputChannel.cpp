@@ -56,6 +56,8 @@ VIOOutputChannel::VIOOutputChannel(
 	size_t index,
 	size_t width)
 	: InstrumentChannel(parent, hwname, color, Unit(Unit::UNIT_FS), index)
+	, m_width(width)
+	, m_internalValue(0)
 {
 	ClearStreams();
 

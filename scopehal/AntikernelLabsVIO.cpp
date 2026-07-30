@@ -79,6 +79,12 @@ AntikernelLabsVIO::AntikernelLabsVIO(SCPITransport* transport)
 			auto chan = new VIOOutputChannel(hwname, this, "#808080", m_channels.size(), width);
 			chan->SetDisplayName(name);
 			m_channels.push_back(chan);
+
+			//Get the initial value
+			auto inval = Trim(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":VALUE?"));
+			uint64_t hexinval = 0;
+			sscanf(inval.c_str(), "%" SCNx64, &hexinval);
+			chan->SetInternalValue(hexinval);
 		}
 	}
 	m_outputChannelCount = m_channels.size() - m_inputChannelCount;
@@ -142,7 +148,13 @@ bool AntikernelLabsVIO::AcquireData()
 		if(!chan)
 			continue;
 
-		auto outval = chan->GetInput(0).GetDigitalScalarValue();
+		//Get the new value
+		uint64_t outval;
+		auto vin = chan->GetInput(0);
+		if(vin)
+			outval = vin.GetDigitalScalarValue();
+		else
+			outval = chan->GetInternalValue();
 
 		if( cacheWasEmpty || (m_outputChannelCachedValues[i] != outval) )
 		{
@@ -151,6 +163,7 @@ bool AntikernelLabsVIO::AcquireData()
 		}
 
 		m_outputChannelCachedValues[i] = outval;
+		chan->SetInternalValue(outval);
 	}
 
 	//If we didn't refresh anything, send an IDN and wait for the reply (but ignore it)
