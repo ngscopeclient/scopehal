@@ -55,7 +55,7 @@ Waterfall::Waterfall(const string& color)
 	, m_width(1)
 	, m_height(1)
 	, m_maxwidth(m_parameters["Max width"])
-	, m_computePipeline("shaders/WaterfallFilter.spv", 3, sizeof(WaterfallFilterArgs))
+	, m_computePipeline("shaders/WaterfallFilter.spv", 2, sizeof(WaterfallFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_WATERFALL);
 	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
@@ -163,6 +163,7 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	const uint32_t compute_block_count = GetComputeBlockCount(args.width, 64);
 	m_computePipeline.Dispatch(
 		cmdBuf, args,
+		1,
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
 

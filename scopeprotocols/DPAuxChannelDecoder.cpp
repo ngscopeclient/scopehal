@@ -2079,6 +2079,8 @@ bool DPAuxChannelDecoder::CanMerge(Packet* first, [[maybe_unused]] Packet* cur, 
 		return true;
 	}
 
+	//Merge reads with defer replies
+
 	//Merge I2C reads and writes with ACKs
 	if(startIsI2C && nextIsAck)
 		return true;
