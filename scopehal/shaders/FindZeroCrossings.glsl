@@ -124,7 +124,7 @@ void main()
 		barrier();
 	}
 
-	//Save number of outputs we found
+	//Save number of outputs we found at the first word in the block
 	if(gl_LocalInvocationID.x == 0)
 		pout[outstart] = nouts;
 }

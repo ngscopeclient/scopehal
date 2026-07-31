@@ -56,8 +56,8 @@ LevelCrossingDetector::LevelCrossingDetector()
 			sizeof(PreGatherPushConstants));
 
 		//we need this readable from the CPU to get the final index count
-		m_gatherIndexes.SetCpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
-		m_gatherIndexes.SetGpuAccessHint(AcceleratorBuffer<int64_t>::HINT_LIKELY);
+		m_gatherIndexes.SetCpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+		m_gatherIndexes.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
 
 		m_gatherPipeline = make_unique<ComputePipeline>(
 			"shaders/Gather.spv",
@@ -154,7 +154,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	m_gatherPipeline->Dispatch(cmdBuf, gpush, GetComputeBlockCount(numThreads, 64), 1);
 
 	m_outbuf.MarkModifiedFromGpu();
-
+	m_gatherIndexes.MarkModifiedFromGpu();
 	m_gatherIndexes.PrepareForCpuAccessNonblocking(cmdBuf);
 
 	cmdBuf.end();

@@ -48,7 +48,7 @@ layout(std430, binding=1) restrict readonly buffer buf_pin
 
 layout(std430, binding=2) restrict readonly buffer buf_indexes
 {
-	int64_t idx[];
+	uint idx[];
 };
 
 layout(std430, push_constant) uniform constants
@@ -71,8 +71,8 @@ void main()
 		return;
 
 	//Get start/end output indexes
-	uint outbase = uint(idx[nthread]);
-	uint len = uint(idx[nthread+1]) - outbase;
+	uint outbase = idx[nthread];
+	uint len = idx[nthread+1] - outbase;
 
 	//Base input index for the copy operation (offset by 1 to skip the length at the start)
 	uint inbase = (nthread * stride) + 1;

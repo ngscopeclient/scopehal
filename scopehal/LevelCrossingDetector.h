@@ -97,7 +97,7 @@ protected:
 	std::unique_ptr<ComputePipeline> m_gatherPipeline;
 
 	AcceleratorBuffer<int64_t> m_temporaryResults;
-	AcceleratorBuffer<int64_t> m_gatherIndexes;
+	AcceleratorBuffer<uint32_t> m_gatherIndexes;
 	AcceleratorBuffer<int64_t> m_outbuf;
 };
 

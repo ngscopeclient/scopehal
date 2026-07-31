@@ -38,7 +38,7 @@
 
 layout(std430, binding=0) restrict writeonly buffer buf_pout
 {
-	int64_t pout[];
+	uint pout[];
 };
 
 layout(std430, binding=1) restrict readonly buffer buf_pin
@@ -64,9 +64,9 @@ void main()
 		return;
 
 	//Sum all of the start values
-	int64_t nstart = 0;
+	uint nstart = 0;
 	for(uint i=0; i<nthread; i++)
-		nstart += pin[i*stride];
+		nstart += uint(pin[i*stride]);
 
 	//Save output
 	pout[nthread] = nstart;
