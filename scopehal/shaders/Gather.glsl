@@ -66,18 +66,18 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
  */
 void main()
 {
-	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-	if(nthread >= numBlocks)
+	uint nblock = (gl_GlobalInvocationID.z * gl_NumWorkGroups.y * gl_WorkGroupSize.y) + gl_GlobalInvocationID.y;
+	if(nblock >= numBlocks)
 		return;
 
 	//Get start/end output indexes
-	uint outbase = idx[nthread];
-	uint len = idx[nthread+1] - outbase;
+	uint outbase = idx[nblock];
+	uint len = idx[nblock+1] - outbase;
 
 	//Base input index for the copy operation (offset by 1 to skip the length at the start)
-	uint inbase = (nthread * stride) + 1;
+	uint inbase = (nblock * stride) + 1;
 
 	//Do the actual copy
-	for(uint i=0; i<len; i++)
+	for(uint i=gl_LocalInvocationID.x; i<len; i += gl_WorkGroupSize.x)
 		pout[outbase + i] = pin[inbase + i];
 }

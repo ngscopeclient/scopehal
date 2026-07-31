@@ -148,10 +148,11 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	gpush.stride = zpush.outputPerThread;
 	m_outbuf.resize(depth);
 
+	const size_t numGatherThreadsPerBlock = 1;
 	m_gatherPipeline->BindBufferNonblocking(0, m_outbuf, cmdBuf, true);
 	m_gatherPipeline->BindBufferNonblocking(1, m_temporaryResults, cmdBuf);
 	m_gatherPipeline->BindBufferNonblocking(2, m_gatherIndexes, cmdBuf);
-	m_gatherPipeline->Dispatch(cmdBuf, gpush, GetComputeBlockCount(numThreads, 64), 1);
+	m_gatherPipeline->Dispatch(cmdBuf, gpush, 1, GetComputeBlockCount(numThreads, numGatherThreadsPerBlock), 1);
 
 	m_outbuf.MarkModifiedFromGpu();
 	m_gatherIndexes.MarkModifiedFromGpu();

@@ -64,6 +64,7 @@ void main()
 		return;
 
 	//Sum all of the start values
+	//Input is actually little endian int64 but the values are limited to 32 bits
 	uint nstart = 0;
 	for(uint i=0; i<nthread; i++)
 		nstart += uint(pin[i*stride]);
