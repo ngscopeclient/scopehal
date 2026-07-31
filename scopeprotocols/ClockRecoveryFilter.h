@@ -141,6 +141,9 @@ protected:
 			Final edge position
 	 */
 	AcceleratorBuffer<int64_t> m_secondPassState;
+
+	///@brief Number of edges found last PLL iteration
+	size_t m_lastIterationOutputCount;
 };
 
 #endif

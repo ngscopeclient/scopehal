@@ -100,7 +100,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 
 	//This value experimentally gives the best speedup for NVIDIA 3070 TI and AMD R9700 AI Top vs Xeon 8362
 	//Maybe consider dynamic tuning in the future at initialization?
-	const uint64_t numThreads = 2048;
+	const uint64_t numThreads = 1024;
 
 	cmdBuf.begin({});
 

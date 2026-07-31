@@ -45,6 +45,7 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	, m_threshold(m_parameters["Threshold"])
 	, m_mtMode(m_parameters["Multithreading"])
 	, m_secondPassState("ClockRecoveryFilter.m_secondPassState")
+	, m_lastIterationOutputCount(0)
 {
 	AddDigitalStream("recClk");
 	AddStream(Unit(Unit::UNIT_VOLTS), "sampledData", Stream::STREAM_TYPE_ANALOG);
@@ -202,12 +203,6 @@ void ClockRecoveryFilter::Refresh(
 		pedges = &vedges;
 	auto& edges = *pedges;
 
-	//Get the previous number of edges, if any
-	auto oldData = GetData(0);
-	uint64_t lastNumEdges = 0;
-	if(oldData)
-		lastNumEdges = oldData->size();
-
 	//Create the output waveform and copy our timescales
 	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->Rename("ClockRecoveryFilter.recClk");
@@ -292,11 +287,15 @@ void ClockRecoveryFilter::Refresh(
 			//Default to the larger of nyquist/8 and the previous edge count plus some margin
 			//Goal is a stable state with minimal reallocations, but without wasting a lot of VRAM
 			uint64_t baselineEdgeCount = realMaxEdges/16;
-			uint64_t lastEdgesPadded = lastNumEdges + 2*numThreads;
-			baselineEdgeCount = max(baselineEdgeCount, lastEdgesPadded);
+			const uint64_t extraEdgesToAllow = 64;
+			baselineEdgeCount = max(baselineEdgeCount, m_lastIterationOutputCount + extraEdgesToAllow*numThreads);
 
 			for(uint64_t maxEdges = baselineEdgeCount; maxEdges < (din->size() - 1); maxEdges *= 2)
 			{
+				#ifdef HAVE_NVTX
+					nvtx3::scoped_range range2("Main loop");
+				#endif
+
 				//On the last iteration, due to rounding we can go slightly above realMaxEdges
 				if(maxEdges > realMaxEdges)
 					maxEdges = realMaxEdges;
@@ -419,8 +418,16 @@ void ClockRecoveryFilter::Refresh(
 				//Figure out how many edges we ended up with
 				//TODO: can we avoid this readback?
 				uint64_t numSamples = (*firstPassState)[0];
+				int64_t maxPerThread = 0;
 				for(uint64_t i=0; i<numThreads; i++)
-					numSamples += m_secondPassState[i*3];
+				{
+					auto u = m_secondPassState[i*3];
+					maxPerThread = max(maxPerThread, u);
+					numSamples += u;
+				}
+				m_lastIterationOutputCount = maxPerThread * numThreads;
+				LogTrace("Calculated output count for next iteration is %zu (%zu max per thread)\n",
+					m_lastIterationOutputCount, maxPerThread);
 
 				//Resize to final edge count
 				cap->Resize(numSamples);
@@ -450,6 +457,10 @@ void ClockRecoveryFilter::Refresh(
 
 	else if(g_hasShaderInt8 && g_hasShaderInt64)
 	{
+		#ifdef HAVE_NVTX
+			nvtx3::scoped_range range2("Output");
+		#endif
+
 		//Allocate output buffers as needed
 		size_t len = cap->m_offsets.size();
 		cap->m_samples.resize(len);
