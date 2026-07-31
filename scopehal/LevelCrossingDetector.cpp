@@ -82,6 +82,10 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
 {
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range range("LevelCrossingDetector::FindZeroCrossings");
+	#endif
+
 	//Fallback in case GPU has no int64 support
 	if(!g_hasShaderInt64)
 	{
@@ -94,9 +98,9 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 		return len;
 	}
 
-	//This value experimentally gives the best speedup for an NVIDIA 2080 Ti vs an Intel Xeon Gold 6144
+	//This value experimentally gives the best speedup for NVIDIA 3070 TI and AMD R9700 AI Top vs Xeon 8362
 	//Maybe consider dynamic tuning in the future at initialization?
-	const uint64_t numThreads = 8192;
+	const uint64_t numThreads = 2048;
 
 	cmdBuf.begin({});
 
@@ -105,6 +109,7 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	ZeroCrossingPushConstants zpush;
 	zpush.triggerPhase = wfm->m_triggerPhase;
 	zpush.timescale = wfm->m_timescale;
+	zpush.ftimescale = wfm->m_timescale;
 	zpush.inputSize = depth;
 	zpush.inputPerThread = (zpush.inputSize + numThreads) / numThreads;
 	zpush.outputPerThread = zpush.inputPerThread + 1;
@@ -113,8 +118,10 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 
 	m_zeroCrossingPipeline->BindBufferNonblocking(0, m_temporaryResults, cmdBuf, true);
 	m_zeroCrossingPipeline->BindBufferNonblocking(1, wfm->m_samples, cmdBuf);
-	const uint32_t compute_block_count = GetComputeBlockCount(numThreads, 64);
+	const uint32_t firstStageThreadsPerBlock = 1;
+	const uint32_t compute_block_count = GetComputeBlockCount(numThreads, firstStageThreadsPerBlock);
 	m_zeroCrossingPipeline->Dispatch(cmdBuf, zpush,
+		1,
 		min(compute_block_count, 32768u),
 		compute_block_count / 32768 + 1);
 

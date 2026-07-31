@@ -27,7 +27,7 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#version 430
+#version 460
 #pragma shader_stage(compute)
 #extension GL_ARB_gpu_shader_int64 : require
 
@@ -50,11 +50,17 @@ layout(std430, push_constant) uniform constants
 	uint outputPerThread;	//Number of output samples handled by one thread
 							//(must be 1+inputPerThread to allow for the size field in the first slot)
 	float threshold;
+	float ftimescale;		//Input waveform timebase units per tick, rounded to float
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define X_SIZE 64
+
+layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
 
 #include "InterpolateTime.h.glsl"
+
+shared bool g_hit[X_SIZE];
+shared float g_tfrac[X_SIZE];
 
 /**
 	@brief First-pass zero crossing detection
@@ -65,7 +71,7 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//Find our block of inputs
-	uint nthread = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	uint nthread = (gl_GlobalInvocationID.z * gl_NumWorkGroups.y * gl_WorkGroupSize.y) + gl_GlobalInvocationID.y;
 	uint instart = nthread * inputPerThread;
 	uint inend = instart + inputPerThread;
 	if(inend > inputSize)
@@ -76,31 +82,49 @@ void main()
 	uint outstart = nthread * outputPerThread;
 	uint iout = outstart + 1;
 
-	float fscale = float(timescale);
-
 	//Search for level crossings within our block
-	for(uint i=instart; i<inend; i++)
+	for(uint i=instart; i<inend; i += X_SIZE)
 	{
-		//If this is the first sample, we can't find an edge by definition
-		if(i == 0)
-			continue;
+		//Get actual sample index
+		uint ireal = i + gl_LocalInvocationID.x;
 
-		float fa = pin[i-1];
-		float fb = pin[i];
-
-		bool prevValue = fa > threshold;
-		bool currentValue = fb > threshold;
-
-		if(currentValue != prevValue)
+		//Bounds check: need to be not the first sample, and not off the end
+		if( (ireal > 0) && (ireal < inend) )
 		{
-			float tfrac = fscale * InterpolateTime(fa, fb, threshold);
+			float fa = pin[ireal - 1];
+			float fb = pin[ireal];
 
-			pout[iout] = triggerPhase + timescale*int64_t(i-1) + int64_t(tfrac);
-			iout ++;
-			nouts ++;
+			bool prevValue = fa > threshold;
+			bool currentValue = fb > threshold;
+
+			if(currentValue != prevValue)
+			{
+				g_hit[gl_LocalInvocationID.x] = true;
+				g_tfrac[gl_LocalInvocationID.x] = ftimescale * InterpolateTime(fa, fb, threshold);
+			}
+			else
+				g_hit[gl_LocalInvocationID.x] = false;
 		}
+		else
+			g_hit[gl_LocalInvocationID.x] = false;
+
+		barrier();
+
+		//Write back results
+		for(uint j=0; j<X_SIZE; j++)
+		{
+			if(g_hit[j])
+			{
+				pout[iout] = triggerPhase + timescale*int64_t(j + i - 1) + int64_t(g_tfrac[j]);
+				iout ++;
+				nouts ++;
+			}
+		}
+
+		barrier();
 	}
 
 	//Save number of outputs we found
-	pout[outstart] = nouts;
+	if(gl_LocalInvocationID.x == 0)
+		pout[outstart] = nouts;
 }

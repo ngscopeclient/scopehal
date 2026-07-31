@@ -43,6 +43,7 @@ struct __attribute__((packed)) ZeroCrossingPushConstants
 	uint32_t inputPerThread;
 	uint32_t outputPerThread;
 	float threshold;
+	float ftimescale;
 };
 
 struct __attribute__((packed)) PreGatherPushConstants

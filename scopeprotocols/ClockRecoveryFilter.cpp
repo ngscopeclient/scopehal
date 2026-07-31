@@ -320,7 +320,7 @@ void ClockRecoveryFilter::Refresh(
 				//TODO: we should have a U32_GPU_SMALL pool here once that exists, for now use U32_GPU_WAVEFORM
 				ScratchBuffer_uint32_t bufferTooSmall(ScratchBufferManager::U32_GPU_WAVEFORM);
 				bufferTooSmall->resize(1);
-				bufferTooSmall->PrepareForCpuAccess();
+				bufferTooSmall->PrepareForCpuAccessIgnoringGpuData();
 				(*bufferTooSmall)[0] = 0;
 				bufferTooSmall->MarkModifiedFromCpu();
 
@@ -351,9 +351,9 @@ void ClockRecoveryFilter::Refresh(
 
 				//Run the first pass
 				m_firstPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
-				m_firstPassComputePipeline->BindBufferNonblocking(1, *firstPassTimestamps, cmdBuf);
-				m_firstPassComputePipeline->BindBufferNonblocking(2, *firstPassState, cmdBuf);
-				m_firstPassComputePipeline->BindBufferNonblocking(3, *bufferTooSmall, cmdBuf);
+				m_firstPassComputePipeline->BindBufferNonblocking(1, *firstPassTimestamps, cmdBuf, true);
+				m_firstPassComputePipeline->BindBufferNonblocking(2, *firstPassState, cmdBuf, true);
+				m_firstPassComputePipeline->BindBufferNonblocking(3, *bufferTooSmall, cmdBuf, true);
 				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 				m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
@@ -364,8 +364,8 @@ void ClockRecoveryFilter::Refresh(
 				m_secondPassComputePipeline->BindBufferNonblocking(0, edges, cmdBuf);
 				m_secondPassComputePipeline->BindBufferNonblocking(1, *firstPassTimestamps, cmdBuf);
 				m_secondPassComputePipeline->BindBufferNonblocking(2, *firstPassState, cmdBuf);
-				m_secondPassComputePipeline->BindBufferNonblocking(3, *secondPassTimestamps, cmdBuf);
-				m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassState, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(3, *secondPassTimestamps, cmdBuf, true);
+				m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassState, cmdBuf, true);
 				m_secondPassComputePipeline->BindBufferNonblocking(5, *bufferTooSmall, cmdBuf);
 				m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 				m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
@@ -380,10 +380,10 @@ void ClockRecoveryFilter::Refresh(
 				m_finalPassComputePipeline->BindBufferNonblocking(1, *firstPassState, cmdBuf);
 				m_finalPassComputePipeline->BindBufferNonblocking(2, *secondPassTimestamps, cmdBuf);
 				m_finalPassComputePipeline->BindBufferNonblocking(3, m_secondPassState, cmdBuf);
-				m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf);
-				m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf);
-				m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf);
-				m_finalPassComputePipeline->BindBufferNonblocking(7, sacap->m_samples, cmdBuf);
+				m_finalPassComputePipeline->BindBufferNonblocking(4, cap->m_offsets, cmdBuf, true);
+				m_finalPassComputePipeline->BindBufferNonblocking(5, cap->m_samples, cmdBuf, true);
+				m_finalPassComputePipeline->BindBufferNonblocking(6, cap->m_durations, cmdBuf, true);
+				m_finalPassComputePipeline->BindBufferNonblocking(7, sacap->m_samples, cmdBuf, true);
 				//this assumes input is uniformly sampled for now
 				m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
 				m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
