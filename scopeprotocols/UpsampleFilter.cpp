@@ -147,22 +147,25 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	cap->Resize(outlen);
 
 	cmdBuf.begin({});
+	{
+		NamedDebugRange debugRange(cmdBuf, "UpsampleFilter");
 
-	//Update our descriptor sets with current buffers
-	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(1, m_filter, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+		//Update our descriptor sets with current buffers
+		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, m_filter, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
-	UpsampleFilterArgs args;
-	args.imax = imax;
-	args.upsample_factor = upsample_factor;
-	args.kernel = kernel;
+		UpsampleFilterArgs args;
+		args.imax = imax;
+		args.upsample_factor = upsample_factor;
+		args.kernel = kernel;
 
-	const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-	m_computePipeline.Dispatch(cmdBuf, args,
-		upsample_factor,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
+		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+		m_computePipeline.Dispatch(cmdBuf, args,
+			upsample_factor,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+	}
 
 	//Done, submit to the queue and wait
 	cmdBuf.end();

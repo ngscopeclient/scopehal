@@ -508,22 +508,27 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_queue->WaitIdle();
 
 				m_cmdBuf->begin({});
+				{
+					NamedDebugRange shaderRange(*m_cmdBuf, "Convert8BitSamples");
 
-				m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversion8BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
+					m_conversion8BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+					m_conversion8BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
-				ConvertRawSamplesShaderArgs args;
-				args.size = cap->size();
-				args.gain = scales[i];
-				args.offset = -offsets[i];
+					ConvertRawSamplesShaderArgs args;
+					args.size = cap->size();
+					args.gain = scales[i];
+					args.offset = -offsets[i];
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*4); //4 samples per thread
-				m_conversion8BitPipeline->Dispatch(
-					*m_cmdBuf, args,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
+					const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*4); //4 samples per thread
 
-				cap->MarkModifiedFromGpu();
+					m_conversion8BitPipeline->Dispatch(
+						*m_cmdBuf, args,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
+
+					cap->MarkModifiedFromGpu();
+				}
+
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
@@ -532,21 +537,26 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 				m_queue->WaitIdle();
 				m_cmdBuf->begin({});
 
-				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversion16BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
+				{
+					NamedDebugRange shaderRange(*m_cmdBuf, "Convert16BitSamples");
 
-				ConvertRawSamplesShaderArgs args;
-				args.size = cap->size();
-				args.gain = scales[i];
-				args.offset = -offsets[i];
+					m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+					m_conversion16BitPipeline->BindBufferNonblocking(1, *abuf, *m_cmdBuf);
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
-				m_conversion16BitPipeline->Dispatch(
-					*m_cmdBuf, args,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
+					ConvertRawSamplesShaderArgs args;
+					args.size = cap->size();
+					args.gain = scales[i];
+					args.offset = -offsets[i];
 
-				cap->MarkModifiedFromGpu();
+					const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
+					m_conversion16BitPipeline->Dispatch(
+						*m_cmdBuf, args,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
+
+					cap->MarkModifiedFromGpu();
+				}
+
 				m_cmdBuf->end();
 				m_queue->Submit(*m_cmdBuf);
 			}
