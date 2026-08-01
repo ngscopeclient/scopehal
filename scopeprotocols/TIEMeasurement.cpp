@@ -152,45 +152,59 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	if(g_hasShaderInt64 && pcdr && sgolden)
 	{
 		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "TIEMeasurement fast path");
 
-		//Allocate output buffer, we know there should be one edge for each input sample at max
-		//Entry 0 is number of edges written
-		//Entry 2i + 1 is offset
-		//Entry 2i + 2 is TIE
-		const uint32_t numThreads = 16384;
-		const uint32_t threadsPerBlock = 64;
-		const uint32_t numBlocks = numThreads / threadsPerBlock;
-		const uint32_t maxEdgesPerThread = GetComputeBlockCount(m_clockEdgesMuxed->size(), numThreads);
-		const uint32_t blockBufferSize = 2*maxEdgesPerThread + 1;
-		m_firstPassOutput.resize(blockBufferSize * numThreads);
+			//Allocate output buffer, we know there should be one edge for each input sample at max
+			//Entry 0 is number of edges written
+			//Entry 2i + 1 is offset
+			//Entry 2i + 2 is TIE
+			const uint32_t numThreads = 16384;
+			const uint32_t threadsPerBlock = 64;
+			const uint32_t numBlocks = numThreads / threadsPerBlock;
+			const uint32_t maxEdgesPerThread = GetComputeBlockCount(m_clockEdgesMuxed->size(), numThreads);
+			const uint32_t blockBufferSize = 2*maxEdgesPerThread + 1;
+			m_firstPassOutput.resize(blockBufferSize * numThreads);
 
-		//Push constants
-		TIEConstants cfg;
-		cfg.nedges = m_clockEdgesMuxed->size();
-		cfg.ngolden = sgolden->m_offsets.size();
-		cfg.blockBufferSize = blockBufferSize;
-		cfg.skip_time = skip_time;
-		cfg.maxEdgesPerThread = maxEdgesPerThread;
+			//Push constants
+			TIEConstants cfg;
+			cfg.nedges = m_clockEdgesMuxed->size();
+			cfg.ngolden = sgolden->m_offsets.size();
+			cfg.blockBufferSize = blockBufferSize;
+			cfg.skip_time = skip_time;
+			cfg.maxEdgesPerThread = maxEdgesPerThread;
 
-		//Run the first pass
-		m_firstPassComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
-		m_firstPassComputePipeline->BindBufferNonblocking(1, sgolden->m_offsets, cmdBuf);
-		m_firstPassComputePipeline->BindBufferNonblocking(2, m_firstPassOutput, cmdBuf);
-		m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
-		m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
-		m_firstPassOutput.MarkModifiedFromGpu();
+			//Run the first pass
+			{
+				NamedDebugRange shaderRange(cmdBuf, "First pass");
+				m_firstPassComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
+				m_firstPassComputePipeline->BindBufferNonblocking(1, sgolden->m_offsets, cmdBuf);
+				m_firstPassComputePipeline->BindBufferNonblocking(2, m_firstPassOutput, cmdBuf);
+				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+				m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+				m_firstPassOutput.MarkModifiedFromGpu();
+			}
 
-		//Second pass: merge the outputs of the first pass and calculate durations
-		m_secondPassComputePipeline->BindBufferNonblocking(0, m_firstPassOutput, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassOutput, cmdBuf);
-		m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
-		m_secondPassOutput.MarkModifiedFromGpu();
-		cap->MarkModifiedFromGpu();
+			//Second pass: merge the outputs of the first pass and calculate durations
+			{
+				NamedDebugRange shaderRange(cmdBuf, "Second pass");
 
-		m_secondPassOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(0, m_firstPassOutput, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(4, m_secondPassOutput, cmdBuf);
+				m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+				m_secondPassOutput.MarkModifiedFromGpu();
+				cap->MarkModifiedFromGpu();
+			}
+
+			//Done, get the output
+			{
+				NamedDebugRange shaderRange(cmdBuf, "Copy results");
+				m_secondPassOutput.PrepareForCpuAccessNonblocking(cmdBuf);
+			}
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);

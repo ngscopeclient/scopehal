@@ -1098,6 +1098,8 @@ void EyePattern::DensePackedInnerLoopGPU(
 {
 	cmdBuf.begin({});
 
+	NamedDebugRange debugRange(cmdBuf, "EyePattern::DensePackedInnerLoopGPU");
+
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 
 	const uint32_t threadsPerBlock = 64;
@@ -1123,25 +1125,34 @@ void EyePattern::DensePackedInnerLoopGPU(
 	cfg.numSamplesPerThread = numSamplesPerThread;
 
 	//Allocate and fill index buffer
-	EyeIndexConstants indexCfg;
-	indexCfg.timescale = waveform->m_timescale;
-	indexCfg.triggerPhase = waveform->m_triggerPhase;
-	indexCfg.len = m_clockEdgesMuxed->size();
-	indexCfg.numSamplesPerThread = numSamplesPerThread;
+	{
+		NamedDebugRange shaderRange(cmdBuf, "Index search");
 
-	m_indexBuffer.resize(numThreads);
-	m_eyeIndexSearchPipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
-	m_eyeIndexSearchPipeline->BindBufferNonblocking(1, m_indexBuffer, cmdBuf);
-	m_eyeIndexSearchPipeline->Dispatch(cmdBuf, indexCfg, GetComputeBlockCount(numThreads, threadsPerBlock));
-	m_eyeIndexSearchPipeline->AddComputeMemoryBarrier(cmdBuf);
-	m_indexBuffer.MarkModifiedFromGpu();
+		EyeIndexConstants indexCfg;
+		indexCfg.timescale = waveform->m_timescale;
+		indexCfg.triggerPhase = waveform->m_triggerPhase;
+		indexCfg.len = m_clockEdgesMuxed->size();
+		indexCfg.numSamplesPerThread = numSamplesPerThread;
+
+		m_indexBuffer.resize(numThreads);
+		m_eyeIndexSearchPipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
+		m_eyeIndexSearchPipeline->BindBufferNonblocking(1, m_indexBuffer, cmdBuf);
+		m_eyeIndexSearchPipeline->Dispatch(cmdBuf, indexCfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+		m_eyeIndexSearchPipeline->AddComputeMemoryBarrier(cmdBuf);
+		m_indexBuffer.MarkModifiedFromGpu();
+	}
 
 	//Run the main integration kernel
-	m_eyeComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
-	m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
-	m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);
-	m_eyeComputePipeline->BindBufferNonblocking(3, m_indexBuffer, cmdBuf);
-	m_eyeComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+	{
+		NamedDebugRange shaderRange(cmdBuf, "Eye");
+
+		m_eyeComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
+		m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
+		m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);
+		m_eyeComputePipeline->BindBufferNonblocking(3, m_indexBuffer, cmdBuf);
+		m_eyeComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+	}
+
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
