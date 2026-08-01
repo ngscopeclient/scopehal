@@ -138,21 +138,24 @@ void EnvelopeFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		umin->Resize(len);
 
 		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "EnvelopeFilter");
 
-		//Push constants
-		EnvelopeFilterConstants cfg;
-		cfg.oldlen = oldlen;
-		cfg.len = len;
-		cfg.delta = 1.0f * (umin->m_triggerPhase - udata->m_triggerPhase) / udata->m_timescale;
+			//Push constants
+			EnvelopeFilterConstants cfg;
+			cfg.oldlen = oldlen;
+			cfg.len = len;
+			cfg.delta = 1.0f * (umin->m_triggerPhase - udata->m_triggerPhase) / udata->m_timescale;
 
-		m_computePipeline.BindBufferNonblocking(0, udata->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, umin->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(2, umax->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(0, udata->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(1, umin->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(2, umax->m_samples, cmdBuf);
 
-		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-		m_computePipeline.Dispatch(cmdBuf, cfg,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+			m_computePipeline.Dispatch(cmdBuf, cfg,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
