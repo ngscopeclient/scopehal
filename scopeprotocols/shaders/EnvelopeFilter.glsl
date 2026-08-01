@@ -62,7 +62,16 @@ void main()
 	if(i >= len)
 		return;
 
-	float f = InterpolateValue(din[i], din[i+1], delta);
+	float f = 0;
+	if(delta < 0)
+	{
+		if(i == 0)
+			f = din[i];
+		else
+			f = InterpolateValue(din[i-1], din[i], 1 + delta);
+	}
+	else
+		f = InterpolateValue(din[i], din[i+1], delta);
 
 	//If in overlap region, do min/max
 	if(i < oldlen)
