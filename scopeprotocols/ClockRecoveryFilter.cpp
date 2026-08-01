@@ -445,7 +445,7 @@ void ClockRecoveryFilter::Refresh(
 					numSamples += u;
 				}
 				m_lastIterationOutputCount = maxPerThread * numThreads;
-				LogTrace("Calculated output count for next iteration is %zu (%zu max per thread)\n",
+				LogTrace("Calculated output count for next iteration is %zu (%" PRIi64 " max per thread)\n",
 					m_lastIterationOutputCount, maxPerThread);
 
 				//Resize to final edge count
