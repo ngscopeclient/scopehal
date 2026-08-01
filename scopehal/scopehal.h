@@ -209,6 +209,7 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 #include "FilterGraphExecutor.h"
 
 #include "QueueManager.h"
+#include "NamedDebugRange.h"
 
 uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
 
