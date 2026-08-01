@@ -111,13 +111,16 @@ void main()
 		barrier();
 
 		//Write back results
-		for(uint j=0; j<X_SIZE; j++)
+		if(gl_LocalInvocationID.x == 0)
 		{
-			if(g_hit[j])
+			for(uint j=0; j<X_SIZE; j++)
 			{
-				pout[iout] = triggerPhase + timescale*int64_t(j + i - 1) + int64_t(g_tfrac[j]);
-				iout ++;
-				nouts ++;
+				if(g_hit[j])
+				{
+					pout[iout] = triggerPhase + timescale*int64_t(j + i - 1) + int64_t(g_tfrac[j]);
+					iout ++;
+					nouts ++;
+				}
 			}
 		}
 
