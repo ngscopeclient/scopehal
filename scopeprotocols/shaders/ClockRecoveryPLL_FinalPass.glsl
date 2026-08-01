@@ -91,8 +91,8 @@ layout(std430, push_constant) uniform constants
 	uint	maxInputSamples;
 };
 
-#define X_SIZE 8
-#define Y_SIZE 64
+#define X_SIZE 64
+#define Y_SIZE 1
 
 layout(local_size_x=X_SIZE, local_size_y=Y_SIZE, local_size_z=1) in;
 

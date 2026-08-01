@@ -398,7 +398,7 @@ void ClockRecoveryFilter::Refresh(
 						m_finalPassComputePipeline->BindBufferNonblocking(7, sacap->m_samples, cmdBuf, true);
 						//this assumes input is uniformly sampled for now
 						m_finalPassComputePipeline->BindBufferNonblocking(8, uadin->m_samples, cmdBuf);
-						m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocks);
+						m_finalPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numThreads); //1 thread block local size
 						m_finalPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 						firstPassState->PrepareForCpuAccessNonblocking(cmdBuf);
