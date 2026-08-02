@@ -160,6 +160,17 @@ protected:
 	int64_t m_integrationTime;
 
 public:
+
+	//This is intentionally not virtual since it's a static method used by enumeration
+	//cppcheck-suppress duplInheritedMember
+	static std::vector<SCPIInstrumentModel> GetDriverSupportedModels()
+	{
+		return
+		{
+			{"lr1", {{ SCPITransportType::TRANSPORT_TWINLAN, "localhost:5025:5026" }}}
+        };
+	}
+
 	static std::string GetDriverNameInternal();
 	SPECTROMETER_INITPROC(AseqSpectrometer)
 };
