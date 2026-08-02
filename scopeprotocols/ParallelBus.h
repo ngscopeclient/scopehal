@@ -48,6 +48,8 @@ public:
 
 protected:
 	FilterParameter& m_width;
+
+	void OnWidthChanged();
 };
 
 #endif

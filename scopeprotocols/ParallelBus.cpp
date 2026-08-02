@@ -41,16 +41,36 @@ ParallelBus::ParallelBus(const string& color)
 {
 	AddStream( Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_DIGITAL_BUS);
 
+	m_width = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_width.SetIntVal(8);
+	m_width.signal_changed().connect(sigc::mem_fun(*this, &ParallelBus::OnWidthChanged));
+
+	OnWidthChanged();
+}
+
+void ParallelBus::OnWidthChanged()
+{
+	//Create new ports
+	size_t nports = m_width.GetIntVal();
+
 	//Set up channels
 	char tmp[32];
-	for(size_t i=0; i<16; i++)
+	for(size_t i=0; i<nports; i++)
 	{
+		//If we already have this input, do nothing
+		if(i < m_inputs.size())
+			continue;
+
 		snprintf(tmp, sizeof(tmp), "din%zu", i);
 		CreateInput<InputConstraintStreamType>(tmp, Stream::STREAM_TYPE_DIGITAL);
 	}
 
-	m_width = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_width.SetIntVal(0);
+	//Delete extra inputs
+	for(size_t i=nports; i<m_inputs.size(); i++)
+		SetInput(i, nullptr, true);
+	m_inputs.resize(nports);
+
+	m_inputsChangedSignal.emit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,23 +88,29 @@ void ParallelBus::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	/*
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ParallelBus::Refresh");
 	#endif
 	ClearMessages();
 
 	//Figure out how wide our input is
-	int width = m_width.GetIntVal();
+	//TODO: 64 bit support
+	size_t width = m_width.GetIntVal();
+	if( (width > 32) || (width <= 0) )
+	{
+		AddErrorMessage("Invalid configuration", "Input must be 1-32 bits");
+		SetData(nullptr, 0);
+		return;
+	}
 
 	//Make sure we have an input for each channel in use
-	vector<SparseDigitalWaveform*> inputs;
-	for(int i=0; i<width; i++)
+	vector<UniformDigitalWaveform*> inputs;
+	for(size_t i=0; i<width; i++)
 	{
-		auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(i));
+		auto din = dynamic_cast<UniformDigitalWaveform*>(GetInputWaveform(i));
 		if(din == nullptr)
 		{
-			AddErrorMessage("Missing input", "One or more inputs are unconnected");
+			AddErrorMessage("Missing input", "One or more inputs are unconnected or invalid");
 			SetData(nullptr, 0);
 			return;
 		}
@@ -100,41 +126,23 @@ void ParallelBus::Refresh(
 
 	//Figure out length of the output
 	size_t len = inputs[0]->m_samples.size();
-	for(int j=1; j<width; j++)
+	for(size_t j=1; j<width; j++)
 		len = min(len, inputs[j]->m_samples.size());
 
-	//Merge all of our samples
-	//TODO: handle variable sample rates etc
-	auto cap = new SparseDigitalBusWaveform;
+	//Make the output waveform
+	auto cap = SetupEmptyWaveform<UniformDigitalBusWaveform32>(inputs[0], 0);
 	cap->PrepareForCpuAccess();
 	cap->Resize(len);
-	cap->CopyTimestamps(inputs[0]);
-	#pragma omp parallel for
+
+	//Pack it
+	//TODO: how to shader with dynamic number of inputs? do we make one for each count and dynamic dispatch?
 	for(size_t i=0; i<len; i++)
 	{
-		for(int j=0; j<width; j++)
-			cap->m_samples[i].push_back(inputs[j]->m_samples[i]);
-	}
-	SetData(cap, 0);
-
-	//Copy our time scales from the input
-	cap->m_timescale = inputs[0]->m_timescale;
-	cap->m_startTimestamp = inputs[0]->m_startTimestamp;
-	cap->m_startFemtoseconds = inputs[0]->m_startFemtoseconds;
-
-	//Set all unused channels to NULL
-	for(size_t i=width; i < 16; i++)
-	{
-		auto chan = m_inputs[i]->m_sourceStream.m_channel;
-		if(chan)
-		{
-			auto schan = dynamic_cast<OscilloscopeChannel*>(chan);
-			if(schan)
-				schan->Release();
-			m_inputs[i]->m_sourceStream.m_channel = nullptr;
-		}
+		uint32_t n = 0;
+		for(size_t j=0; j<width; j++)
+			n |= inputs[j]->m_samples[i] << j;
+		cap->m_samples[i] = n;
 	}
 
 	cap->MarkModifiedFromCpu();
-	*/
 }
