@@ -697,6 +697,22 @@ public:
 };
 
 /**
+	@brief A multi-bit (up to 32 bits) digital waveform sampled at variable rate
+	@ingroup datamodel
+ */
+class SparseDigitalBusWaveform32
+	: public SparseWaveform<uint32_t>
+{
+public:
+	SparseDigitalBusWaveform32(const std::string& name = "")
+		: SparseWaveform<uint32_t>(name)
+	{}
+
+	virtual ~SparseDigitalBusWaveform32()
+	{}
+};
+
+/**
 	@brief A multi-bit (up to 64 bits) digital waveform sampled at uniform rate
 	@ingroup datamodel
  */

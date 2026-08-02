@@ -64,14 +64,16 @@ void EthernetRGMIIDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
-	//TODO refresh
-
-	/*
+	#ifdef HAVE_NVTX
+		nvtx3::scoped_range nrange("EthernetRGMIIDecoder::Refresh");
+	#endif
+	ClearMessages();
 	ClearPackets();
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("Missing inputs", "One or more inputs are missing or invalid");
+		SetData(nullptr, 0);
 		return;
 	}
 
@@ -82,7 +84,7 @@ void EthernetRGMIIDecoder::Refresh(
 
 	//Sample everything on the clock edges
 	SparseDigitalWaveform dctl;
-	SparseDigitalBusWaveform ddata;
+	SparseDigitalBusWaveform32 ddata;
 	SampleOnAnyEdgesBase(ctl, clk, dctl);
 	SampleOnAnyEdgesBase(data, clk, ddata);
 
@@ -94,16 +96,15 @@ void EthernetRGMIIDecoder::Refresh(
 	size_t len = min(dctl.size(), ddata.size());
 	if(len < 100)
 	{
-		SetData(NULL, 0);
+		AddErrorMessage("No data", "Not enough points after sampling on clock edges (clock stopped?)");
+		SetData(nullptr, 0);
 		return;
 	}
 	len -= 4;
 
 	//Create the output capture
-	auto cap = new EthernetWaveform;
+	auto cap = SetupEmptyWaveform<EthernetWaveform>(data, 0);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
 	//skip first 2 samples so we can get a full clock cycle before starting
@@ -113,12 +114,7 @@ void EthernetRGMIIDecoder::Refresh(
 		if(!dctl.m_samples[i])
 		{
 			//Extract in-band status
-			uint8_t status = 0;
-			for(size_t j=0; j<4; j++)
-			{
-				if(ddata.m_samples[i][j])
-					status |= (1 << j);
-			}
+			uint8_t status = ddata.m_samples[i];
 
 			//Same status? Merge samples
 			bool extend = false;
@@ -168,50 +164,22 @@ void EthernetRGMIIDecoder::Refresh(
 
 			if(ddr)
 			{
-				//Convert bits to bytes
-				uint8_t dval = 0;
-				for(size_t j=0; j<8; j++)
-				{
-					if(j < 4)
-					{
-						if(ddata.m_samples[i][j])
-							dval |= (1 << j);
-					}
-					else if(ddata.m_samples[i+1][j-4])
-						dval |= (1 << j);
-				}
-				bytes.push_back(dval);
-
+				bytes.push_back(ddata.m_samples[i] | (ddata.m_samples[i+1] << 4));
 				ends.push_back(ddata.m_offsets[i+1] + ddata.m_durations[i+1]);
 				i += 2;
 			}
 
 			else
 			{
-				//Convert bits to bytes
-				uint8_t dval = 0;
-				for(size_t j=0; j<8; j++)
-				{
-					if(j < 4)
-					{
-						if(ddata.m_samples[i][j])
-							dval |= (1 << j);
-					}
-					else if(ddata.m_samples[i+2][j-4])
-						dval |= (1 << j);
-				}
-				bytes.push_back(dval);
-
+				bytes.push_back(ddata.m_samples[i] | (ddata.m_samples[i+2] << 4));
 				ends.push_back(ddata.m_offsets[i+3] + ddata.m_durations[i+3]);
 				i += 4;
 			}
 		}
+
 		//Crunch the data
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
-	*/
 }
