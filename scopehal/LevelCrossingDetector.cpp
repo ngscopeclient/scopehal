@@ -196,6 +196,8 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	wfm->PrepareForCpuAccess();
+
 	//TODO: GPU version
 	vector<int64_t> edges;
 	Filter::FindZeroCrossings(wfm, threshold, edges);
@@ -208,6 +210,8 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	wfm->PrepareForCpuAccess();
+
 	//TODO: GPU version
 	vector<int64_t> edges;
 	Filter::FindZeroCrossings(wfm, edges);
@@ -221,6 +225,8 @@ int64_t LevelCrossingDetector::FindZeroCrossings(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	wfm->PrepareForCpuAccess();
+
 	//TODO: GPU version
 	vector<int64_t> edges;
 	Filter::FindZeroCrossings(wfm, edges);
