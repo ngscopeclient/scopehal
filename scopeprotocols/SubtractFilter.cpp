@@ -88,6 +88,18 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
+	bool scala = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR;
+	bool scalb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR;
+
+	//If either input is bogus, bail out
+	if(!(veca || scala) || !(vecb || scalb) )
+	{
+		AddErrorMessage("Missing input", "One or more inputs are unconnected or invalid");
+		SetData(nullptr, 0);
+		m_streams[0].m_stype = Stream::STREAM_TYPE_UNDEFINED;
+		return;
+	}
+
 	if(veca && vecb)
 		DoRefreshVectorVector(cmdBuf, queue);
 	else if(!veca && !vecb)
