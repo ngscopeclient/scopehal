@@ -138,7 +138,12 @@ public:
 		@brief Returns the Y axis unit for a specified stream
 	 */
 	virtual Unit GetYAxisUnits(size_t stream)
-	{ return m_streams[stream].m_yAxisUnit; }
+	{
+		if(stream < m_streams.size())
+			return m_streams[stream].m_yAxisUnit;
+		else
+			return Unit(Unit::UNIT_VOLTS);
+	}
 
 	/**
 		@brief Changes the X axis unit for this channel
