@@ -48,11 +48,11 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 	CreateInput<InputConstraintStreamType>("Eye", Stream::STREAM_TYPE_EYE);
 
 	m_startname = "Start Voltage";
-	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_startname].SetFloatVal(0);
 
 	m_endname = "End Voltage";
-	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_endname].SetFloatVal(0);
 }
 
