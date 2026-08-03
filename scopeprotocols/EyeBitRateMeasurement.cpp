@@ -64,22 +64,20 @@ void EyeBitRateMeasurement::Refresh(
 		nvtx3::scoped_range nrange("EyeBitRateMeasurement::Refresh");
 	#endif
 
-	//Make sure we've got valid inputs
+	//Get the input data
+	//No need to PrepareForCPUAccess because metadata is always on the CPU and we're not touching waveform data
 	ClearMessages();
-	if(!VerifyAllInputsOK())
+	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
 		if(!GetInput(0))
 			AddErrorMessage("Missing inputs", "No signal input connected");
-		else if(!GetInputWaveform(0))
+		else
 			AddErrorMessage("Missing inputs", "No waveform available at input");
 
 		m_streams[0].m_value = NAN;
 		return;
 	}
-
-	//Get the input data
-	//No need to PrepareForCPUAccess because metadata is always on the CPU and we're not touching waveform data
-	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
 
 	//Do the actual bit rate calculation
 	m_streams[0].m_value = FS_PER_SECOND / din->m_uiWidth;
