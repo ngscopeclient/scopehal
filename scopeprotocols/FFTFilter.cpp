@@ -247,55 +247,69 @@ void FFTFilter::DoRefresh(
 
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
-
-	//Apply the window function
-	ComputePipeline* wpipe = nullptr;
-	switch(window)
 	{
-		case WINDOW_BLACKMAN_HARRIS:
-			wpipe = &m_blackmanHarrisComputePipeline;
-			break;
+		NamedDebugRange debugRange(cmdBuf, "FFTFilter");
+		const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
 
-		case WINDOW_HANN:
-		case WINDOW_HAMMING:
-			wpipe = &m_cosineSumComputePipeline;
-			break;
+		//Apply the window function
+		{
+			NamedDebugRange shaderRange(cmdBuf, "Window function");
 
-		default:
-		case WINDOW_RECTANGULAR:
-			wpipe = &m_rectangularComputePipeline;
-			break;
+			ComputePipeline* wpipe = nullptr;
+			switch(window)
+			{
+				case WINDOW_BLACKMAN_HARRIS:
+					wpipe = &m_blackmanHarrisComputePipeline;
+					break;
+
+				case WINDOW_HANN:
+				case WINDOW_HAMMING:
+					wpipe = &m_cosineSumComputePipeline;
+					break;
+
+				default:
+				case WINDOW_RECTANGULAR:
+					wpipe = &m_rectangularComputePipeline;
+					break;
+			}
+			wpipe->BindBufferNonblocking(0, data, cmdBuf);
+			wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
+			wpipe->Dispatch(cmdBuf, args,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+			wpipe->AddComputeMemoryBarrier(cmdBuf);
+			m_rdinbuf.MarkModifiedFromGpu();
+		}
+
+		//Do the actual FFT operation
+		{
+			NamedDebugRange shaderRange(cmdBuf, "FFT");
+			m_vkPlan->AppendForward(m_rdinbuf, m_rdoutbuf, cmdBuf);
+		}
+
+		//Convert complex to real
+		{
+			NamedDebugRange shaderRange(cmdBuf, "Postprocess");
+
+			ComputePipeline& pipe = log_output ?
+				m_complexToLogMagnitudeComputePipeline : m_complexToMagnitudeComputePipeline;
+			ComplexToMagnitudeArgs cargs;
+			cargs.npoints = nouts;
+			if(log_output)
+			{
+				const float impedance = 50;
+				cargs.scale = scale * scale / impedance;
+			}
+			else
+				cargs.scale = scale;
+			pipe.BindBufferNonblocking(0, m_rdoutbuf, cmdBuf);
+			pipe.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+			pipe.AddComputeMemoryBarrier(cmdBuf);
+			pipe.Dispatch(cmdBuf, cargs,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+		}
 	}
-	wpipe->BindBufferNonblocking(0, data, cmdBuf);
-	wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
-	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
-	wpipe->Dispatch(cmdBuf, args,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
-	wpipe->AddComputeMemoryBarrier(cmdBuf);
-	m_rdinbuf.MarkModifiedFromGpu();
-
-	//Do the actual FFT operation
-	m_vkPlan->AppendForward(m_rdinbuf, m_rdoutbuf, cmdBuf);
-
-	//Convert complex to real
-	ComputePipeline& pipe = log_output ?
-		m_complexToLogMagnitudeComputePipeline : m_complexToMagnitudeComputePipeline;
-	ComplexToMagnitudeArgs cargs;
-	cargs.npoints = nouts;
-	if(log_output)
-	{
-		const float impedance = 50;
-		cargs.scale = scale * scale / impedance;
-	}
-	else
-		cargs.scale = scale;
-	pipe.BindBuffer(0, m_rdoutbuf);
-	pipe.BindBuffer(1, cap->m_samples);
-	pipe.AddComputeMemoryBarrier(cmdBuf);
-	pipe.Dispatch(cmdBuf, cargs,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
 
 	//Done, block until the compute operations finish
 	cmdBuf.end();

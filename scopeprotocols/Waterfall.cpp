@@ -156,16 +156,19 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	args.timescaleRatio = cap->m_timescale * 1.0 / din->m_timescale;
 
 	cmdBuf.begin({});
+	{
+		NamedDebugRange debugRange(cmdBuf, "Waterfall");
 
-	//Run the actual compute on the GPU
-	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf);
-	const uint32_t compute_block_count = GetComputeBlockCount(args.width, 64);
-	m_computePipeline.Dispatch(
-		cmdBuf, args,
-		1,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
+		//Run the actual compute on the GPU
+		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf);
+		const uint32_t compute_block_count = GetComputeBlockCount(args.width, 64);
+		m_computePipeline.Dispatch(
+			cmdBuf, args,
+			1,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+	}
 
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
