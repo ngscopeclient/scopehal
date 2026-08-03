@@ -98,7 +98,7 @@ void main()
 
 	//Main loop
 	int state = 0;
-	float last = -1e20;
+	float last = 1e-20;
 	uint numOutputSamples = 0;
 	int64_t tedge = 0;
 	for(uint i=startpos; i < endpos; i++)
@@ -106,30 +106,39 @@ void main()
 		float cur = samplesIn[i];
 		int64_t tnow = int64_t(i) * timescale;
 
-		//Find start of edge
-		if(state == 0)
+		switch(state)
 		{
-			if( (cur < vstart) && (last >= vstart) )
-			{
-				float xdelta = InterpolateTime(last, cur, vstart) * float(timescale);
-				tedge = tnow - timescale + int64_t(xdelta);
-				state = 1;
-			}
-		}
+			//Wait until above start voltage
+			case 0:
+				if(cur > vstart)
+					state = 1;
+				break;
 
-		//Find end of edge
-		else if(state == 1)
-		{
-			if( (cur < vend) && (last >= vend) )
-			{
-				float xdelta = InterpolateTime(last, cur, vend) * float(timescale);
-				int64_t dt = int64_t(xdelta) + tnow - timescale - tedge;
+			//Wait until below start voltage
+			case 1:
+				if(cur < vstart)
+				{
+					float xdelta = InterpolateTime(last, cur, vstart) * float(timescale);
+					tedge = tnow - timescale + int64_t(xdelta);
+					state = 2;
+				}
+				break;
 
-				uint iout = outbase + numOutputSamples + 1;
-				samplesOut[iout] = float(dt);
-				offsetsOut[iout] = tedge;
-				numOutputSamples ++;
-			}
+			//Wait until below end voltage
+			case 2:
+				if(cur < vend)
+				{
+					float xdelta = InterpolateTime(last, cur, vend) * float(timescale);
+					int64_t dt = int64_t(xdelta) + tnow - timescale - tedge;
+
+					uint iout = outbase + numOutputSamples + 1;
+					samplesOut[iout] = float(dt);
+					offsetsOut[iout] = tedge;
+					numOutputSamples ++;
+
+					state = 0;
+				}
+				break;
 		}
 
 		last = cur;

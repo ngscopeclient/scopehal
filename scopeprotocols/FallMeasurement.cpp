@@ -216,13 +216,11 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 		din->PrepareForCpuAccess();
 		cap->PrepareForCpuAccess();
 
-		float last = -1e20;
 		int64_t tedge = 0;
 
 		int state = 0;
 		int64_t tlast = 0;
 
-		//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
 		KahanSummation sum;
 		int64_t num = 0;
 
@@ -234,42 +232,47 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 				float cur = sdin->m_samples[i];
 				int64_t tnow = sdin->m_offsets[i] * din->m_timescale;
 
-				//Find start of edge
-				if(state == 0)
+				switch(state)
 				{
-					if( (cur < vstart) && (last >= vstart) )
-					{
-						int64_t xdelta = InterpolateTime(sdin, i-1, vstart) * din->m_timescale;
-						tedge = tnow - din->m_timescale + xdelta;
-						state = 1;
-					}
+					//Wait until above start voltage
+					case 0:
+						if(cur > vstart)
+							state = 1;
+						break;
+
+					//Wait until below start voltage
+					case 1:
+						if(cur < vstart)
+						{
+							int64_t xdelta = InterpolateTime(sdin, i-1, vstart) * din->m_timescale;
+							tedge = tnow - din->m_timescale + xdelta;
+							state = 2;
+						}
+						break;
+
+					//Find end of edge
+					case 2:
+						if(cur < vend)
+						{
+							int64_t xdelta = InterpolateTime(sdin, i-1, vend) * din->m_timescale;
+							int64_t dt = xdelta + tnow - din->m_timescale - tedge;
+
+							auto outlen = cap->m_offsets.size();
+							if(outlen)
+								cap->m_durations[outlen-1] = tnow - tlast;
+
+							cap->m_offsets.push_back(tnow);
+							cap->m_durations.push_back(tnow - tlast);
+							cap->m_samples.push_back(dt);
+							tlast = tnow;
+
+							sum += dt;
+							num ++;
+
+							state = 0;
+						}
+						break;
 				}
-
-				//Find end of edge
-				else if(state == 1)
-				{
-					if( (cur < vend) && (last >= vend) )
-					{
-						int64_t xdelta = InterpolateTime(sdin, i-1, vend) * din->m_timescale;
-						int64_t dt = xdelta + tnow - din->m_timescale - tedge;
-
-						auto outlen = cap->m_offsets.size();
-						if(outlen)
-							cap->m_durations[outlen-1] = tnow - tlast;
-
-						cap->m_offsets.push_back(tnow);
-						cap->m_durations.push_back(tnow - tlast);
-						cap->m_samples.push_back(dt);
-						tlast = tnow;
-
-						sum += dt;
-						num ++;
-
-						state = 0;
-					}
-				}
-
-				last = cur;
 			}
 		}
 
@@ -281,42 +284,47 @@ void FallMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueH
 				float cur = udin->m_samples[i];
 				int64_t tnow = i * din->m_timescale;
 
-				//Find start of edge
-				if(state == 0)
+				switch(state)
 				{
-					if( (cur < vstart) && (last >= vstart) )
-					{
-						int64_t xdelta = InterpolateTime(udin, i-1, vstart) * din->m_timescale;
-						tedge = tnow - din->m_timescale + xdelta;
-						state = 1;
-					}
+					//Wait until above start voltage
+					case 0:
+						if(cur > vstart)
+							state = 1;
+						break;
+
+					//Wait until below start voltage
+					case 1:
+						if(cur < vstart)
+						{
+							int64_t xdelta = InterpolateTime(udin, i-1, vstart) * din->m_timescale;
+							tedge = tnow - din->m_timescale + xdelta;
+							state = 2;
+						}
+						break;
+
+					//Find end of edge
+					case 2:
+						if(cur < vend)
+						{
+							int64_t xdelta = InterpolateTime(udin, i-1, vend) * din->m_timescale;
+							int64_t dt = xdelta + tnow - din->m_timescale - tedge;
+
+							auto outlen = cap->m_offsets.size();
+							if(outlen)
+								cap->m_durations[outlen-1] = tnow - tlast;
+
+							cap->m_offsets.push_back(tnow);
+							cap->m_durations.push_back(1);
+							cap->m_samples.push_back(dt);
+							tlast = tnow;
+
+							sum += dt;
+							num ++;
+
+							state = 0;
+						}
+						break;
 				}
-
-				//Find end of edge
-				else if(state == 1)
-				{
-					if( (cur < vend) && (last >= vend) )
-					{
-						int64_t xdelta = InterpolateTime(udin, i-1, vend) * din->m_timescale;
-						int64_t dt = xdelta + tnow - din->m_timescale - tedge;
-
-						auto outlen = cap->m_offsets.size();
-						if(outlen)
-							cap->m_durations[outlen-1] = tnow - tlast;
-
-						cap->m_offsets.push_back(tnow);
-						cap->m_durations.push_back(1);
-						cap->m_samples.push_back(dt);
-						tlast = tnow;
-
-						sum += dt;
-						num ++;
-
-						state = 0;
-					}
-				}
-
-				last = cur;
 			}
 		}
 
