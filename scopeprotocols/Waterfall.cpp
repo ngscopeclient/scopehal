@@ -168,6 +168,7 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 			1,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
+		m_computePipeline.AddComputeMemoryBarrier(cmdBuf);
 	}
 
 	cmdBuf.end();
