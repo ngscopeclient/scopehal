@@ -157,7 +157,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	InitVulkanQueue("ThunderScopeOscilloscope");
 
 	m_conversion8BitPipeline = make_unique<ComputePipeline>(
-		"shaders/Convert8BitSamplesQuad.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+		"shaders/Convert8BitSamplesBlock.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 	m_conversion16BitPipeline = make_unique<ComputePipeline>(
 		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 
@@ -519,7 +519,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 					args.gain = scales[i];
 					args.offset = -offsets[i];
 
-					const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*4); //4 samples per thread
+					const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*16); //16 samples per thread
 
 					m_conversion8BitPipeline->Dispatch(
 						*m_cmdBuf, args,
