@@ -168,11 +168,20 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 			return make_shared<QueueHandle>(m_queues[i].Handle, name);
 		}
 
-		//Otherwise find the queue with the fewest existing handles
+		//If we did not have a queue at all, this one will work. Use it until/unless we find something better
 		if(chosenIdx == -1)
 			chosenIdx = i;
+
+		//If the new queue has less handles, prefer it
 		else if(m_queues[i].Handle.use_count() < m_queues[chosenIdx].Handle.use_count())
+		{
+			//If the new queue has more flags, don't prefer it.
+			//This prevents e.g. blocking the graphics queue when allocating compute queues
+			if(m_queues[chosenIdx].Flags < m_queues[i].Flags )
+				continue;
+
 			chosenIdx = i;
+		}
 	}
 
 	if(chosenIdx < 0)
