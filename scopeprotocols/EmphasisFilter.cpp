@@ -135,14 +135,17 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	cfg.tap1 = taps[1];
 
 	cmdBuf.begin({});
+	{
+		NamedDebugRange debugRange(cmdBuf, "EmphasisFilter");
 
-	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
-	m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
 
-	const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
-	m_computePipeline.Dispatch(cmdBuf, cfg,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
+		const uint32_t compute_block_count = GetComputeBlockCount(outlen, 64);
+		m_computePipeline.Dispatch(cmdBuf, cfg,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+	}
 
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
