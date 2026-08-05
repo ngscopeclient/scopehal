@@ -117,6 +117,8 @@ void IQDemuxFilter::Refresh(
 		//Do the alignment check on the GPU
 		cmdBuf.begin({});
 
+		NamedDebugRange debugRange(cmdBuf, "IQDemux align");
+
 		m_alignComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
 		m_alignComputePipeline->BindBufferNonblocking(1, m_alignOut, cmdBuf, true);
 		m_alignComputePipeline->Dispatch(cmdBuf, (uint32_t)window, 2);
@@ -146,6 +148,8 @@ void IQDemuxFilter::Refresh(
 	if(g_hasShaderInt64)
 	{
 		cmdBuf.begin({});
+
+		NamedDebugRange debugRange(cmdBuf, "IQDemux");
 
 		IQDemuxConstants cfg;
 		cfg.istart = istart;

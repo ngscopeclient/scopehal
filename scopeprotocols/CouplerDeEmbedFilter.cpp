@@ -273,67 +273,73 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
+	{
+		NamedDebugRange debugRange(cmdBuf, "CouplerDeEmbed");
 
-	//FFT both inputs
-	//vec1 = raw rev, vec3 = raw fwd
-	//m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf3, cmdBuf);
-	//m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf1, cmdBuf);
+		//FFT both inputs
+		//vec1 = raw rev, vec3 = raw fwd
+		//m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf3, cmdBuf);
+		//m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf1, cmdBuf);
 
-	//I don't understand why doing this in reverse order is necessary.
-	//Original design called for fwd -> tempBuf1 and rev->tempBuf3.
-	//But this seems to consistently work???
-	//Need a second set of eyes to figure out if we got the ordering backwards in the original code
-	m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf1, cmdBuf);
-	m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf3, cmdBuf);
-	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		//I don't understand why doing this in reverse order is necessary.
+		//Original design called for fwd -> tempBuf1 and rev->tempBuf3.
+		//But this seems to consistently work???
+		//Need a second set of eyes to figure out if we got the ordering backwards in the original code
+		{
+			NamedDebugRange shaderRange(cmdBuf, "FFT");
+			m_vkForwardPlan->AppendForward(dinFwd->m_samples, *vectorTempBuf1, cmdBuf);
+			m_vkForwardPlan2->AppendForward(dinRev->m_samples, *vectorTempBuf3, cmdBuf);
+			m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		}
 
-	//De-embed the forward path, then calculate forward path leakage from that
-	//TODO: calculate and correct for group delay in the leakage path
-	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
-	//to get signal at coupler input
-	//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
-	ForwardPath(
-		cmdBuf,
-		*vectorTempBuf1,
-		*vectorTempBuf3,
-		*vectorTempBuf2,
-		m_forwardCoupledParams,
-		m_forwardLeakageParams,
-		m_reverseCoupledParams,
-		npoints,
-		nouts);
+		//De-embed the forward path, then calculate forward path leakage from that
+		//TODO: calculate and correct for group delay in the leakage path
+		//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
+		//to get signal at coupler input
+		//vec1 = raw reverse, vec2 = fwd leakage, vec3 = raw fwd, vec4 = clean reverse
+		ForwardPath(
+			cmdBuf,
+			*vectorTempBuf1,
+			*vectorTempBuf3,
+			*vectorTempBuf2,
+			m_forwardCoupledParams,
+			m_forwardLeakageParams,
+			m_reverseCoupledParams,
+			npoints,
+			nouts);
 
-	//Generate final clean reverse path output
-	size_t istart = 0;
-	size_t iend = npoints;
-	int64_t phaseshift = 0;
-	GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(
-		cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
+		//Generate final clean reverse path output
+		size_t istart = 0;
+		size_t iend = npoints;
+		int64_t phaseshift = 0;
+		GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
+		GenerateScalarOutput(
+			cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
 
-	//De-embed reverse path then calculate reverse path leakage
-	//TODO: calculate and correct for group delay in the leakage path
-	//Calculate forward path signal minus leakage from the reverse path
-	//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
-	//to get signal at coupler input
-	//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward, vec4 = final reverse output
-	ForwardPath(
-		cmdBuf,
-		*vectorTempBuf3,
-		*vectorTempBuf1,
-		*vectorTempBuf2,
-		m_reverseCoupledParams,
-		m_reverseLeakageParams,
-		m_forwardCoupledParams,
-		npoints,
-		nouts);
+		//De-embed reverse path then calculate reverse path leakage
+		//TODO: calculate and correct for group delay in the leakage path
+		//Calculate forward path signal minus leakage from the reverse path
+		//Given signal minus leakage (enhanced isolation at the coupler output), de-embed coupler response
+		//to get signal at coupler input
+		//vec1 = raw rev, vec2 = reverse leakage, vec3 = clean forward, vec4 = final reverse output
+		ForwardPath(
+			cmdBuf,
+			*vectorTempBuf3,
+			*vectorTempBuf1,
+			*vectorTempBuf2,
+			m_reverseCoupledParams,
+			m_reverseLeakageParams,
+			m_forwardCoupledParams,
+			npoints,
+			nouts);
 
-	//Generate final clean forward path output
-	istart = 0;
-	iend = npoints;
-	GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
-	GenerateScalarOutput(
-		cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
+		//Generate final clean forward path output
+		istart = 0;
+		iend = npoints;
+		GroupDelayCorrection(m_forwardCoupledParams, istart, iend, phaseshift, true);
+		GenerateScalarOutput(
+			cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
+	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -390,23 +396,30 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 	cap->m_triggerPhase = phaseshift;
 
 	//Do the actual FFT operation
-	plan->AppendReverse(samplesIn, samplesOut, cmdBuf);
+	{
+		NamedDebugRange shaderRange(cmdBuf, "IFFT");
+		plan->AppendReverse(samplesIn, samplesOut, cmdBuf);
+	}
 
 	//Copy and normalize output
 	//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
-	DeEmbedNormalizationArgs nargs;
-	nargs.outlen = outlen;
-	nargs.istart = istart;
-	nargs.scale = scale;
-	m_normalizeComputePipeline.Bind(cmdBuf);
-	m_normalizeComputePipeline.BindBufferNonblocking(0, samplesOut, cmdBuf);
-	m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+	{
+		NamedDebugRange shaderRange(cmdBuf, "Normalize");
 
-	const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
-	m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs,
-		min(compute_block_count, 32768u),
-		compute_block_count / 32768 + 1);
-	m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		DeEmbedNormalizationArgs nargs;
+		nargs.outlen = outlen;
+		nargs.istart = istart;
+		nargs.scale = scale;
+		m_normalizeComputePipeline.Bind(cmdBuf);
+		m_normalizeComputePipeline.BindBufferNonblocking(0, samplesOut, cmdBuf);
+		m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+
+		const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
+		m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+		m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	}
 
 	cap->MarkModifiedFromGpu();
 }
@@ -427,6 +440,8 @@ void CouplerDeEmbedFilter::ForwardPath(
 		size_t npoints,
 		size_t nouts)
 {
+	NamedDebugRange shaderRange(cmdBuf, "Forward path");
+
 	m_forwardPathComputePipeline.Bind(cmdBuf);
 	m_forwardPathComputePipeline.BindBufferNonblocking(0, samplesInP, cmdBuf);
 	m_forwardPathComputePipeline.BindBufferNonblocking(1, samplesInN, cmdBuf);
