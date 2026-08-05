@@ -49,13 +49,17 @@ class ConcurrentDispatchBatch
 {
 public:
 
-	ConcurrentDispatchBatch(uint32_t flags, const std::set<FlowGraphNode*>& nodes)
-		: m_flags(flags)
+	ConcurrentDispatchBatch(bool needBegin, bool needEnd, const std::set<FlowGraphNode*>& nodes)
+		: m_needBegin(needBegin)
+		, m_needEnd(needEnd)
 		, m_nodes(nodes)
 	{}
 
-	uint32_t GetFlags()
-	{ return m_flags; }
+	bool GetNeedBegin()
+	{ return m_needBegin; }
+
+	bool GetNeedEnd()
+	{ return m_needEnd; }
 
 	const std::set<FlowGraphNode*>& GetNodes()
 	{ return m_nodes; }
@@ -70,7 +74,8 @@ public:
 	}
 
 protected:
-	uint32_t m_flags;
+	bool m_needBegin;
+	bool m_needEnd;
 	std::set<FlowGraphNode*> m_nodes;
 };
 

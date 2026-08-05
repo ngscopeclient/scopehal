@@ -154,17 +154,14 @@ public:
 		//Nothing special
 		None					= 0,
 
-		//Node uses Vulkan internally and will enqueue something into the provided command buffer
-		VulkanAccelerated 		= 1,
-
 		//Node does not call begin() on the command buffer, executor must do that for us
-		CommandBufferAppend		= 2,
+		CommandBufferAppend		= 1,
 
 		//Node does not call SubmitAndBlock() on the command buffer, executor must do that for us
-		CommandBufferTailCall	= 4,
+		CommandBufferTailCall	= 2,
 
 		//Node has essentially zero CPU-side compute, refresh just enqueues stuff
-		VulkanOnly				= 8
+		VulkanOnly				= 4
 	};
 
 	///@brief Returns a bitmask of ExecutionCapabilities fields

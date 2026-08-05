@@ -44,18 +44,34 @@ using namespace std;
 
 void SubmitBatch::Run(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	if(m_batches.empty())
+		return;
+
 	LogTrace("Running batch\n");
 	LogIndenter li;
 
-	//TODO: open command buffer if needed
+	//Open command buffer if needed for first node
+	if(m_batches[0].GetNeedBegin())
+		cmdBuf.begin({});
 
-	for(size_t i=0; i<m_batches.size(); i++)
+	//Run the batches
+	auto nbatches = m_batches.size();
+	for(size_t i=0; i<nbatches; i++)
 	{
 		auto& b = m_batches[i];
 		b.Run(cmdBuf, queue);
+
+		//Add barriers between batches if tail calling
+		if(b.GetNeedEnd() && (i+1 < nbatches) )
+			ComputePipeline::AddComputeMemoryBarrier(cmdBuf);
 	}
 
-	//TODO: submit if needed
+	//Submit if needed
+	if(m_batches[m_batches.size() - 1].GetNeedEnd())
+	{
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+	}
 }
 
 set<FlowGraphNode*> SubmitBatch::GetNodes()
@@ -194,24 +210,45 @@ SubmitBatch FilterGraphExecutor::GetNextBatch()
 				//Check flags on the anchor node
 				auto flags = anchor->GetExecutionCapabilitiesMask();
 
-				//If it's vulkan-only, look for anything else vulkan-only that is eligible
-				//for concurrent dispatch
-				if(flags & (uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly)
+				//Short names for some long flags
+				const uint32_t canAppend =
+					(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferAppend;
+				const uint32_t canTailChain =
+					(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall;
+				const uint32_t isVulkan =
+					(uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly;
+
+				//If it's vulkan-only and we can tail chain, look for more stuff
+				bool needBegin = (flags & canAppend) != 0;
+				bool needEnd = (flags & canTailChain) != 0;
+				if(flags & (canTailChain | isVulkan))
 				{
+					LogTrace("Anchor can tail chain, looking for more nodes\n");
+
 					for(auto f : m_runnableNodes)
 					{
 						if(f == anchor)
 							continue;
-						if(f->GetExecutionCapabilitiesMask() & (uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly)
+						auto mask = f->GetExecutionCapabilitiesMask();
+						if(mask & (canAppend | isVulkan) )
 						{
 							LogTrace("Adding node %s\n", GetName(f).c_str());
 							set.emplace(f);
+
+							if( (mask & canTailChain) == 0)
+							{
+								needEnd = false;
+								LogTrace("New node is not tail chain capable, stopping\n");
+								break;
+							}
 						}
 					}
 				}
 
 				//Make a concurrent batch and mark everything in it as running
-				ConcurrentDispatchBatch cbatch(flags, set);
+				LogTrace("Making batch with %zu nodes (needBegin=%d, needEnd=%d)\n",
+					set.size(), needBegin, needEnd);
+				ConcurrentDispatchBatch cbatch(needBegin, needEnd, set);
 				for(auto f : set)
 				{
 					m_runnableNodes.erase(f);

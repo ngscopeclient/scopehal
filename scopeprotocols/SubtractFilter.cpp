@@ -80,7 +80,6 @@ uint32_t SubtractFilter::GetExecutionCapabilitiesMask()
 	if(veca && vecb)
 	{
 		return
-			(uint32_t)ExecutionCapabilities::VulkanAccelerated |
 			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
 			(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
 			(uint32_t)ExecutionCapabilities::VulkanOnly;
@@ -249,7 +248,6 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	//Just regular subtraction, use the GPU filter
 	else
 	{
-		cmdBuf.begin({});
 		{
 			NamedDebugRange debugRange(cmdBuf, "SubtractFilter");
 
@@ -266,9 +264,6 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 				min(compute_block_count, 32768u),
 				compute_block_count / 32768 + 1);
 		}
-
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
 
 		if(scap)
 			scap->m_samples.MarkModifiedFromGpu();
