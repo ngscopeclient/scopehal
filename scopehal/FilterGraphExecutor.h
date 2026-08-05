@@ -41,6 +41,60 @@
 #include <atomic>
 
 /**
+	@brief A set of filters that can be issued to the GPU concurrently and have no mutual dependencies.
+
+	No memory barriers are needed between filters in a batch.
+ */
+class ConcurrentDispatchBatch
+{
+public:
+
+	ConcurrentDispatchBatch(uint32_t flags, const std::set<FlowGraphNode*>& nodes)
+		: m_flags(flags)
+		, m_nodes(nodes)
+	{}
+
+	uint32_t GetFlags()
+	{ return m_flags; }
+
+	const std::set<FlowGraphNode*>& GetNodes()
+	{ return m_nodes; }
+
+	/**
+		@brief Enqueue all of the filters in this batch to the command buffer, and possibly submit it
+	 */
+	void Run(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
+	{
+		for(auto p : m_nodes)
+			p->Refresh(cmdBuf, queue);
+	}
+
+protected:
+	uint32_t m_flags;
+	std::set<FlowGraphNode*> m_nodes;
+};
+
+/**
+	@brief A set of filters that can be issued to the GPU in a single submit call, but may have dependencies
+ */
+class SubmitBatch
+{
+public:
+	void AddBatch(ConcurrentDispatchBatch batch)
+	{ m_batches.push_back(batch); }
+
+	void Run(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+
+	bool empty()
+	{ return m_batches.empty(); }
+
+	std::set<FlowGraphNode*> GetNodes();
+
+protected:
+	std::vector<ConcurrentDispatchBatch> m_batches;
+};
+
+/**
 	@brief Execution manager / scheduler for the filter graph
 	@ingroup core
  */
@@ -52,6 +106,8 @@ public:
 
 	void RunBlocking(const std::set<FlowGraphNode*>& nodes);
 
+	SubmitBatch GetNextBatch();
+
 	FlowGraphNode* GetNextRunnableNode();
 
 	///@brief Get the run times of the most recent filter graph evaluation
@@ -59,6 +115,15 @@ public:
 	{
 		std::lock_guard<std::mutex> lock(m_perfStatsMutex);
 		return m_lastExecutionTime;
+	}
+
+	std::string GetName(FlowGraphNode* node)
+	{
+		auto f = dynamic_cast<InstrumentChannel*>(node);
+		if(f)
+			return f->GetDisplayName();
+		else
+			return "(non-filter node)";
 	}
 
 protected:

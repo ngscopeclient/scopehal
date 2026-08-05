@@ -40,6 +40,39 @@
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubmitBatch
+
+void SubmitBatch::Run(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+{
+	LogTrace("Running batch\n");
+	LogIndenter li;
+
+	//TODO: open command buffer if needed
+
+	for(size_t i=0; i<m_batches.size(); i++)
+	{
+		auto& b = m_batches[i];
+		b.Run(cmdBuf, queue);
+	}
+
+	//TODO: submit if needed
+}
+
+set<FlowGraphNode*> SubmitBatch::GetNodes()
+{
+	set<FlowGraphNode*> ret;
+
+	for(auto& b : m_batches)
+	{
+		auto& nodes = b.GetNodes();
+		for(auto n : nodes)
+			ret.emplace(n);
+	}
+
+	return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 FilterGraphExecutor::FilterGraphExecutor(size_t numThreads)
@@ -124,6 +157,78 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scheduling
+
+/**
+	@brief Returns the next batch of filters to run
+ */
+SubmitBatch FilterGraphExecutor::GetNextBatch()
+{
+	LogTrace("Filling work batch\n");
+	LogIndenter li;
+
+	SubmitBatch batch;
+
+	while(true)
+	{
+		//Check for stuff
+		{
+			lock_guard<mutex> lock(m_mutex);
+
+			//Nothing left to run? Stop
+			if(m_incompleteNodes.empty())
+				break;
+
+			//Nothing ready to run? Update the run queue
+			if(m_runnableNodes.empty())
+				UpdateRunnable();
+
+			//If there is something ready to run, grab it
+			set<FlowGraphNode*> set;
+			FlowGraphNode* anchor = nullptr;
+			if(!m_runnableNodes.empty())
+			{
+				anchor = *m_runnableNodes.begin();
+				LogTrace("Anchor node is %s\n", GetName(anchor).c_str());
+				set.emplace(anchor);
+
+				//Check flags on the anchor node
+				auto flags = anchor->GetExecutionCapabilitiesMask();
+
+				//If it's vulkan-only, look for anything else vulkan-only that is eligible
+				//for concurrent dispatch
+				if(flags & (uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly)
+				{
+					for(auto f : m_runnableNodes)
+					{
+						if(f == anchor)
+							continue;
+						if(f->GetExecutionCapabilitiesMask() & (uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly)
+						{
+							LogTrace("Adding node %s\n", GetName(f).c_str());
+							set.emplace(f);
+						}
+					}
+				}
+
+				//Make a concurrent batch and mark everything in it as running
+				ConcurrentDispatchBatch cbatch(flags, set);
+				for(auto f : set)
+				{
+					m_runnableNodes.erase(f);
+					m_runningNodes.emplace(f);
+				}
+				batch.AddBatch(cbatch);
+				break;
+			}
+		}
+
+		//Still nothing to run? Block
+		unique_lock<mutex> lock(m_workerCvarMutex);
+		m_workerCvar.wait(lock);
+	}
+
+	return batch;
+}
 
 /**
 	@brief Returns the next filter available to run, blocking if none are ready.
@@ -274,25 +379,40 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		if(m_allWorkersComplete)
 			continue;
 
-		//Evaluate nodes as they become available, then stop when there's nothing left to do
-		FlowGraphNode* f;
-		while( (f = GetNextRunnableNode()) != nullptr)
+		//Get the next batch of work
+		while(true)
 		{
-			shared_lock<shared_mutex> lock(g_vulkanActivityMutex);
+			//Pull the next batch from the scheduler and stop if it has no more work for us
+			SubmitBatch batch = GetNextBatch();
+			if(batch.empty())
+				break;
 
-			//Actually execute the filter
+			//Get the list of filters in the batch
+			auto filters = batch.GetNodes();
+			LogTrace("Runner %zu: got batch of %zu nodes\n", i, filters.size());
+
+			//Run the batch
 			double start = GetTime();
-			f->Refresh(cmdbuf, queue);
+			batch.Run(cmdbuf, queue);
 			double dt = GetTime() - start;
+			int64_t fs = dt * FS_PER_SECOND;
+
+			//Update performance stats
 			{
 				lock_guard<mutex> slock(m_perfStatsMutex);
-				m_currentExecutionTime[f] = dt * FS_PER_SECOND;
+				for(auto f : filters)
+					m_currentExecutionTime[f] = fs;
 			}
 
-			//Filter execution has completed, remove it from the running list and mark as completed
-			lock_guard<mutex> lock2(m_mutex);
-			m_runningNodes.erase(f);
-			m_incompleteNodes.erase(f);
+			//Filter execution has completed, remove them from the running list and mark as completed
+			{
+				lock_guard<mutex> lock2(m_mutex);
+				for(auto f : filters)
+				{
+					m_runningNodes.erase(f);
+					m_incompleteNodes.erase(f);
+				}
+			}
 
 			//Wake up all threads that might have been waiting on this filter to complete
 			m_workerCvar.notify_all();
