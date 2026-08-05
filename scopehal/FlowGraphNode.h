@@ -147,6 +147,31 @@ public:
 	bool IsDownstreamOf(std::set<FlowGraphNode*> nodes);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Tail call optimization etc
+
+	enum class ExecutionCapabilities
+	{
+		//Nothing special
+		None					= 0,
+
+		//Node uses Vulkan internally and will enqueue something into the provided command buffer
+		VulkanAccelerated 		= 1,
+
+		//Node does not call begin() on the command buffer, executor must do that for us
+		CommandBufferAppend		= 2,
+
+		//Node does not call SubmitAndBlock() on the command buffer, executor must do that for us
+		CommandBufferTailCall	= 4,
+
+		//Node has essentially zero CPU-side compute, refresh just enqueues stuff
+		VulkanOnly				= 8
+	};
+
+	///@brief Returns a bitmask of ExecutionCapabilities fields
+	virtual uint32_t GetExecutionCapabilitiesMask()
+	{ return (uint32_t) ExecutionCapabilities::None; }
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Filter evaluation
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) =0;
