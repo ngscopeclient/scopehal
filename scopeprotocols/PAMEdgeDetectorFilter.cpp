@@ -191,50 +191,58 @@ void PAMEdgeDetectorFilter::Refresh(
 		edgeStates->resize(len);
 		edgeRising->resize(len);
 
-		cmdBuf.begin({});
-
 		uint64_t numThreads = 8192;
 		uint64_t blockSize = 64;
 		uint64_t numBlocks = numThreads / blockSize;
 
-		//Constants shared by all passes
-		PAMEdgeDetectorConstants cfg;
-		cfg.len = len;
-		cfg.order = order;
-		cfg.inputPerThread = GetComputeBlockCount(len, numThreads);
-		cfg.outputPerThread = cfg.inputPerThread;
+		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "PAMEdgeDetector edge search");
 
-		//Run the first pass
-		m_firstPassComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_firstPassComputePipeline->BindBufferNonblocking(1, m_thresholds, cmdBuf);
-		m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
-		m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
-		m_firstPassComputePipeline->BindBufferNonblocking(4, *edgeRisingScratch, cmdBuf, true);
-		m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
-		m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			//Constants shared by all passes
+			PAMEdgeDetectorConstants cfg;
+			cfg.len = len;
+			cfg.order = order;
+			cfg.inputPerThread = GetComputeBlockCount(len, numThreads);
+			cfg.outputPerThread = cfg.inputPerThread;
 
-		m_edgeIndexesScratch.MarkModifiedFromGpu();
-		m_edgeStatesScratch.MarkModifiedFromGpu();
-		edgeRisingScratch->MarkModifiedFromGpu();
+			//Run the first pass
+			{
+				NamedDebugRange shaderRange(cmdBuf, "First pass");
+				m_firstPassComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+				m_firstPassComputePipeline->BindBufferNonblocking(1, m_thresholds, cmdBuf);
+				m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
+				m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
+				m_firstPassComputePipeline->BindBufferNonblocking(4, *edgeRisingScratch, cmdBuf, true);
+				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+				m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			}
 
-		//Run the second pass
-		m_secondPassComputePipeline->BindBufferNonblocking(0, m_edgeIndexesScratch, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(1, m_edgeStatesScratch, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(2, *edgeRisingScratch, cmdBuf);
-		m_secondPassComputePipeline->BindBufferNonblocking(3, m_edgeIndexes, cmdBuf, true);
-		m_secondPassComputePipeline->BindBufferNonblocking(4, *edgeStates, cmdBuf, true);
-		m_secondPassComputePipeline->BindBufferNonblocking(5, *edgeRising, cmdBuf, true);
-		m_secondPassComputePipeline->BindBufferNonblocking(6, m_edgeCount, cmdBuf, true);
-		m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
-		m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			m_edgeIndexesScratch.MarkModifiedFromGpu();
+			m_edgeStatesScratch.MarkModifiedFromGpu();
+			edgeRisingScratch->MarkModifiedFromGpu();
 
-		m_edgeIndexes.MarkModifiedFromGpu();
-		edgeStates->MarkModifiedFromGpu();
-		edgeRising->MarkModifiedFromGpu();
-		m_edgeCount.MarkModifiedFromGpu();
+			//Run the second pass
+			{
+				NamedDebugRange shaderRange(cmdBuf, "Second pass");
+				m_secondPassComputePipeline->BindBufferNonblocking(0, m_edgeIndexesScratch, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(1, m_edgeStatesScratch, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(2, *edgeRisingScratch, cmdBuf);
+				m_secondPassComputePipeline->BindBufferNonblocking(3, m_edgeIndexes, cmdBuf, true);
+				m_secondPassComputePipeline->BindBufferNonblocking(4, *edgeStates, cmdBuf, true);
+				m_secondPassComputePipeline->BindBufferNonblocking(5, *edgeRising, cmdBuf, true);
+				m_secondPassComputePipeline->BindBufferNonblocking(6, m_edgeCount, cmdBuf, true);
+				m_secondPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+				m_secondPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			}
 
-		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
+			m_edgeIndexes.MarkModifiedFromGpu();
+			edgeStates->MarkModifiedFromGpu();
+			edgeRising->MarkModifiedFromGpu();
+			m_edgeCount.MarkModifiedFromGpu();
 
+			m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
+		}
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
@@ -248,55 +256,66 @@ void PAMEdgeDetectorFilter::Refresh(
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Second shader pass: merge everything
 
-		cmdBuf.begin({});
-
 		numThreads = 4096;
 		blockSize = 64;
 		numBlocks = numThreads / blockSize;
 
-		//Push constants
-		PAMEdgeDetectorMergeConstants mergecfg;
-		mergecfg.halfui = ui / 2;
-		mergecfg.timescale = din->m_timescale;
-		mergecfg.numIndexes = m_edgeIndexes.size();
-		mergecfg.numSamples = din->size();
-		mergecfg.inputPerThread = GetComputeBlockCount(mergecfg.numIndexes, numThreads);
-		mergecfg.outputPerThread = mergecfg.inputPerThread + 1;
-		mergecfg.order = order;
-		mergecfg.triggerPhase = din->m_triggerPhase;
+		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "PAMEdgeDetector merge");
 
-		ScratchBuffer_int64_t edgeOffsetsScratch(ScratchBufferManager::I64_GPU_WAVEFORM);
-		edgeOffsetsScratch->resize(mergecfg.outputPerThread * numThreads);
+			//Push constants
+			PAMEdgeDetectorMergeConstants mergecfg;
+			mergecfg.halfui = ui / 2;
+			mergecfg.timescale = din->m_timescale;
+			mergecfg.numIndexes = m_edgeIndexes.size();
+			mergecfg.numSamples = din->size();
+			mergecfg.inputPerThread = GetComputeBlockCount(mergecfg.numIndexes, numThreads);
+			mergecfg.outputPerThread = mergecfg.inputPerThread + 1;
+			mergecfg.order = order;
+			mergecfg.triggerPhase = din->m_triggerPhase;
 
-		//Run the first pass
-		m_initialMergeComputePipeline->BindBufferNonblocking(0, m_edgeIndexes, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(1, *edgeStates, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(2, *edgeRising, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
-		m_initialMergeComputePipeline->BindBufferNonblocking(5, *edgeOffsetsScratch, cmdBuf, true);
-		m_initialMergeComputePipeline->Dispatch(cmdBuf, mergecfg, numBlocks);
-		m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			ScratchBuffer_int64_t edgeOffsetsScratch(ScratchBufferManager::I64_GPU_WAVEFORM);
+			edgeOffsetsScratch->resize(mergecfg.outputPerThread * numThreads);
 
-		edgeOffsetsScratch->MarkModifiedFromGpu();
+			//Run the first pass
+			{
+				NamedDebugRange shaderRange(cmdBuf, "First pass");
 
-		//Reserve space in the output buffer (this is an overestimate but will be corrected)
-		cap->Resize(mergecfg.outputPerThread * numThreads);
+				m_initialMergeComputePipeline->BindBufferNonblocking(0, m_edgeIndexes, cmdBuf);
+				m_initialMergeComputePipeline->BindBufferNonblocking(1, *edgeStates, cmdBuf);
+				m_initialMergeComputePipeline->BindBufferNonblocking(2, *edgeRising, cmdBuf);
+				m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
+				m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
+				m_initialMergeComputePipeline->BindBufferNonblocking(5, *edgeOffsetsScratch, cmdBuf, true);
+				m_initialMergeComputePipeline->Dispatch(cmdBuf, mergecfg, numBlocks);
+				m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			}
 
-		//Run the final pass
-		m_finalMergeComputePipeline->BindBufferNonblocking(0, *edgeOffsetsScratch, cmdBuf);
-		m_finalMergeComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
-		m_finalMergeComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
-		m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
-		m_finalMergeComputePipeline->BindBufferNonblocking(4, m_edgeCount, cmdBuf, true);
+			edgeOffsetsScratch->MarkModifiedFromGpu();
 
-		m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, /*numBlocks*/numThreads);
-		m_finalMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			//Reserve space in the output buffer (this is an overestimate but will be corrected)
+			cap->Resize(mergecfg.outputPerThread * numThreads);
 
-		cap->MarkModifiedFromGpu();
-		m_edgeCount.MarkModifiedFromGpu();
+			//Run the final pass
+			{
+				NamedDebugRange shaderRange(cmdBuf, "Final pass");
 
-		m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
+				m_finalMergeComputePipeline->BindBufferNonblocking(0, *edgeOffsetsScratch, cmdBuf);
+				m_finalMergeComputePipeline->BindBufferNonblocking(1, cap->m_offsets, cmdBuf, true);
+				m_finalMergeComputePipeline->BindBufferNonblocking(2, cap->m_durations, cmdBuf, true);
+				m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
+				m_finalMergeComputePipeline->BindBufferNonblocking(4, m_edgeCount, cmdBuf, true);
+
+				m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, /*numBlocks*/numThreads);
+				m_finalMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+			}
+
+			cap->MarkModifiedFromGpu();
+			m_edgeCount.MarkModifiedFromGpu();
+
+			m_edgeCount.PrepareForCpuAccessNonblocking(cmdBuf);
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
