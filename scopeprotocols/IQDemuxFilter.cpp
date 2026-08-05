@@ -116,14 +116,14 @@ void IQDemuxFilter::Refresh(
 
 		//Do the alignment check on the GPU
 		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "IQDemux align");
 
-		NamedDebugRange debugRange(cmdBuf, "IQDemux align");
-
-		m_alignComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_alignComputePipeline->BindBufferNonblocking(1, m_alignOut, cmdBuf, true);
-		m_alignComputePipeline->Dispatch(cmdBuf, (uint32_t)window, 2);
-		m_alignOut.PrepareForCpuAccessNonblocking(cmdBuf);
-
+			m_alignComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+			m_alignComputePipeline->BindBufferNonblocking(1, m_alignOut, cmdBuf, true);
+			m_alignComputePipeline->Dispatch(cmdBuf, (uint32_t)window, 2);
+			m_alignOut.PrepareForCpuAccessNonblocking(cmdBuf);
+		}
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 
@@ -148,30 +148,31 @@ void IQDemuxFilter::Refresh(
 	if(g_hasShaderInt64)
 	{
 		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "IQDemux");
 
-		NamedDebugRange debugRange(cmdBuf, "IQDemux");
+			IQDemuxConstants cfg;
+			cfg.istart = istart;
+			cfg.outlen = outlen;
 
-		IQDemuxConstants cfg;
-		cfg.istart = istart;
-		cfg.outlen = outlen;
+			uint64_t numThreads = outlen;
+			const uint64_t blockSize = 64;
+			const uint64_t numBlocks = GetComputeBlockCount(numThreads, blockSize);
 
-		uint64_t numThreads = outlen;
-		const uint64_t blockSize = 64;
-		const uint64_t numBlocks = GetComputeBlockCount(numThreads, blockSize);
+			//Do the demux
+			m_demuxComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+			m_demuxComputePipeline->BindBufferNonblocking(1, din->m_offsets, cmdBuf);
+			m_demuxComputePipeline->BindBufferNonblocking(2, iout->m_samples, cmdBuf, true);
+			m_demuxComputePipeline->BindBufferNonblocking(3, iout->m_offsets, cmdBuf, true);
+			m_demuxComputePipeline->BindBufferNonblocking(4, iout->m_durations, cmdBuf, true);
+			m_demuxComputePipeline->BindBufferNonblocking(5, qout->m_samples, cmdBuf, true);
+			m_demuxComputePipeline->BindBufferNonblocking(6, qout->m_offsets, cmdBuf, true);
+			m_demuxComputePipeline->BindBufferNonblocking(7, qout->m_durations, cmdBuf, true);
+			m_demuxComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
 
-		//Do the demux
-		m_demuxComputePipeline->BindBufferNonblocking(0, din->m_samples, cmdBuf);
-		m_demuxComputePipeline->BindBufferNonblocking(1, din->m_offsets, cmdBuf);
-		m_demuxComputePipeline->BindBufferNonblocking(2, iout->m_samples, cmdBuf, true);
-		m_demuxComputePipeline->BindBufferNonblocking(3, iout->m_offsets, cmdBuf, true);
-		m_demuxComputePipeline->BindBufferNonblocking(4, iout->m_durations, cmdBuf, true);
-		m_demuxComputePipeline->BindBufferNonblocking(5, qout->m_samples, cmdBuf, true);
-		m_demuxComputePipeline->BindBufferNonblocking(6, qout->m_offsets, cmdBuf, true);
-		m_demuxComputePipeline->BindBufferNonblocking(7, qout->m_durations, cmdBuf, true);
-		m_demuxComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
-
-		iout->MarkModifiedFromGpu();
-		qout->MarkModifiedFromGpu();
+			iout->MarkModifiedFromGpu();
+			qout->MarkModifiedFromGpu();
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);

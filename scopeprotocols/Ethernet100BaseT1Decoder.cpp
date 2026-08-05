@@ -192,7 +192,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		#endif
 
 		cmdBuf.begin({});
-
+		{
 			NamedDebugRange debugRange(cmdBuf, "Symbol decode");
 
 			m_pam3DecodeComputePipeline->Bind(cmdBuf);
@@ -239,7 +239,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
 				m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
 			}
-
+		}
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 	}
@@ -283,7 +283,6 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	if(g_hasShaderInt64 && g_hasShaderInt8 && g_hasPushDescriptor)
 	{
 		cmdBuf.begin({});
-		NamedDebugRange debugRange(cmdBuf, "Frame decode");
 
 		uint32_t	nthreads = 4096;
 		uint32_t	threadsPerBlock = 64;
