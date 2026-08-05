@@ -71,6 +71,26 @@ string SubtractFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t SubtractFilter::GetExecutionCapabilitiesMask()
+{
+	//for now, only vector-vector path is gpu accelerated
+	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
+	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
+
+	if(veca && vecb)
+	{
+		return
+			(uint32_t)ExecutionCapabilities::VulkanAccelerated |
+			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+
+	//everything else is nothing special
+	else
+		return 0;
+}
+
 void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
@@ -230,19 +250,22 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	else
 	{
 		cmdBuf.begin({});
+		{
+			NamedDebugRange debugRange(cmdBuf, "SubtractFilter");
 
-		SubtractFilterConstants cfg;
-		cfg.offsetP = offsetP;
-		cfg.offsetN = offsetN;
-		cfg.size = len;
+			SubtractFilterConstants cfg;
+			cfg.offsetP = offsetP;
+			cfg.offsetN = offsetN;
+			cfg.size = len;
 
-		m_computePipeline.BindBufferNonblocking(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples, cmdBuf);
-		m_computePipeline.BindBufferNonblocking(2, scap ? scap->m_samples : ucap->m_samples, cmdBuf, true);
-		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
-		m_computePipeline.Dispatch(cmdBuf, cfg,
-			min(compute_block_count, 32768u),
-			compute_block_count / 32768 + 1);
+			m_computePipeline.BindBufferNonblocking(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples, cmdBuf);
+			m_computePipeline.BindBufferNonblocking(2, scap ? scap->m_samples : ucap->m_samples, cmdBuf, true);
+			const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
+			m_computePipeline.Dispatch(cmdBuf, cfg,
+				min(compute_block_count, 32768u),
+				compute_block_count / 32768 + 1);
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
