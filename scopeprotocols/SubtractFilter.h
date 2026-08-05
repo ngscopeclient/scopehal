@@ -59,7 +59,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(SubtractFilter)
 
 protected:
-	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf);
 	void DoRefreshScalarScalar();
 	void DoRefreshScalarVector(size_t iScalar, size_t iVector);
 

@@ -113,8 +113,6 @@ public:
 
 	SubmitBatch GetNextBatch();
 
-	FlowGraphNode* GetNextRunnableNode();
-
 	///@brief Get the run times of the most recent filter graph evaluation
 	std::map<FlowGraphNode*, int64_t> GetRunTimes()
 	{
@@ -132,6 +130,12 @@ public:
 	}
 
 protected:
+	void FindConcurrentNodes(
+		FlowGraphNode* anchor,
+		std::set<FlowGraphNode*>& workingSet,
+		bool& needBegin,
+		bool& needEnd);
+
 	static void ExecutorThread(FilterGraphExecutor* pThis, size_t i);
 	void DoExecutorThread(size_t i);
 

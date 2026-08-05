@@ -77,7 +77,8 @@ uint32_t SubtractFilter::GetExecutionCapabilitiesMask()
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
-	if(veca && vecb)
+	//degrees are not accelerated because modulo reduction needed in a shader that doesnt yet exist
+	if(veca && vecb && (GetYAxisUnits(0) != Unit::UNIT_DEGREES) )
 	{
 		return
 			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
@@ -90,7 +91,7 @@ uint32_t SubtractFilter::GetExecutionCapabilitiesMask()
 		return 0;
 }
 
-void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range range("SubtractFilter::Refresh");
@@ -120,7 +121,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	}
 
 	if(veca && vecb)
-		DoRefreshVectorVector(cmdBuf, queue);
+		DoRefreshVectorVector(cmdBuf);
 	else if(!veca && !vecb)
 		DoRefreshScalarScalar();
 	else if(veca)
@@ -140,7 +141,7 @@ void SubtractFilter::DoRefreshScalarScalar()
 	m_streams[0].m_value = GetInput(0).GetScalarValue() - GetInput(1).GetScalarValue();
 }
 
-void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
+void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

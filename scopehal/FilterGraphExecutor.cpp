@@ -174,6 +174,74 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scheduling
 
+void FilterGraphExecutor::FindConcurrentNodes(
+	FlowGraphNode* anchor,
+	set<FlowGraphNode*>& workingSet,
+	bool& needBegin,
+	bool& needEnd)
+{
+	//All physical instrument inputs can be chained if eligible to run
+	//(assume none use vulkan, this might break if they do?)
+	auto chan = dynamic_cast<InstrumentChannel*>(anchor);
+	if(chan && chan->GetInstrument() != nullptr)
+	{
+		LogTrace("Anchor is physical instrument channel, looking for more\n");
+
+		for(auto f : m_runnableNodes)
+		{
+			if(f == anchor)
+				continue;
+
+			auto fchan = dynamic_cast<InstrumentChannel*>(f);
+			if(fchan && (fchan->GetInstrument() != nullptr) )
+			{
+				LogTrace("Adding node %s\n", GetName(f).c_str());
+				workingSet.emplace(f);
+			}
+		}
+	}
+
+	else
+	{
+		//Check flags on the anchor node
+		auto flags = anchor->GetExecutionCapabilitiesMask();
+
+		//Short names for some long flags
+		const uint32_t canAppend =
+			(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferAppend;
+		const uint32_t canTailChain =
+			(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall;
+		const uint32_t isVulkan =
+			(uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly;
+
+		//If it's vulkan-only and we can tail chain, look for more stuff
+		needBegin = (flags & canAppend) != 0;
+		needEnd = (flags & canTailChain) != 0;
+		if(flags & (canTailChain | isVulkan))
+		{
+			LogTrace("Anchor can tail chain, looking for more nodes\n");
+
+			for(auto f : m_runnableNodes)
+			{
+				if(f == anchor)
+					continue;
+				auto mask = f->GetExecutionCapabilitiesMask();
+				if(mask & (canAppend | isVulkan) )
+				{
+					LogTrace("Adding node %s\n", GetName(f).c_str());
+					workingSet.emplace(f);
+
+					if( (mask & canTailChain) == 0)
+					{
+						needEnd = false;
+						LogTrace("New node is not tail chain capable, stopping\n");
+						break;
+					}
+				}
+			}
+		}
+	}
+}
 /**
 	@brief Returns the next batch of filters to run
  */
@@ -199,62 +267,31 @@ SubmitBatch FilterGraphExecutor::GetNextBatch()
 				UpdateRunnable();
 
 			//If there is something ready to run, grab it
-			set<FlowGraphNode*> set;
+			set<FlowGraphNode*> workingSet;
 			FlowGraphNode* anchor = nullptr;
 			if(!m_runnableNodes.empty())
 			{
 				anchor = *m_runnableNodes.begin();
 				LogTrace("Anchor node is %s\n", GetName(anchor).c_str());
-				set.emplace(anchor);
+				workingSet.emplace(anchor);
 
-				//Check flags on the anchor node
-				auto flags = anchor->GetExecutionCapabilitiesMask();
-
-				//Short names for some long flags
-				const uint32_t canAppend =
-					(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferAppend;
-				const uint32_t canTailChain =
-					(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall;
-				const uint32_t isVulkan =
-					(uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly;
-
-				//If it's vulkan-only and we can tail chain, look for more stuff
-				bool needBegin = (flags & canAppend) != 0;
-				bool needEnd = (flags & canTailChain) != 0;
-				if(flags & (canTailChain | isVulkan))
-				{
-					LogTrace("Anchor can tail chain, looking for more nodes\n");
-
-					for(auto f : m_runnableNodes)
-					{
-						if(f == anchor)
-							continue;
-						auto mask = f->GetExecutionCapabilitiesMask();
-						if(mask & (canAppend | isVulkan) )
-						{
-							LogTrace("Adding node %s\n", GetName(f).c_str());
-							set.emplace(f);
-
-							if( (mask & canTailChain) == 0)
-							{
-								needEnd = false;
-								LogTrace("New node is not tail chain capable, stopping\n");
-								break;
-							}
-						}
-					}
-				}
+				//Look for more stuff to run alongside it
+				bool needBegin = false;
+				bool needEnd = false;
+				FindConcurrentNodes(anchor, workingSet, needBegin, needEnd);
 
 				//Make a concurrent batch and mark everything in it as running
 				LogTrace("Making batch with %zu nodes (needBegin=%d, needEnd=%d)\n",
-					set.size(), needBegin, needEnd);
-				ConcurrentDispatchBatch cbatch(needBegin, needEnd, set);
-				for(auto f : set)
+					workingSet.size(), needBegin, needEnd);
+				ConcurrentDispatchBatch cbatch(needBegin, needEnd, workingSet);
+				for(auto f : workingSet)
 				{
 					m_runnableNodes.erase(f);
 					m_runningNodes.emplace(f);
 				}
 				batch.AddBatch(cbatch);
+
+				//TODO: Look for next hop nodes we can run after a barrier
 				break;
 			}
 		}
@@ -265,43 +302,6 @@ SubmitBatch FilterGraphExecutor::GetNextBatch()
 	}
 
 	return batch;
-}
-
-/**
-	@brief Returns the next filter available to run, blocking if none are ready.
-
-	Returns null if there are no remaining filters to evaluate.
- */
-FlowGraphNode* FilterGraphExecutor::GetNextRunnableNode()
-{
-	while(true)
-	{
-		//Check for stuff
-		{
-			lock_guard<mutex> lock(m_mutex);
-
-			//Nothing left to run? Stop
-			if(m_incompleteNodes.empty())
-				return nullptr;
-
-			//Nothing ready to run? Update the run queue
-			if(m_runnableNodes.empty())
-				UpdateRunnable();
-
-			//If there is something ready to run, grab it
-			if(!m_runnableNodes.empty())
-			{
-				auto f = *m_runnableNodes.begin();
-				m_runnableNodes.erase(f);
-				m_runningNodes.emplace(f);
-				return f;
-			}
-		}
-
-		//Still nothing to run? Block
-		unique_lock<mutex> lock(m_workerCvarMutex);
-		m_workerCvar.wait(lock);
-	}
 }
 
 /**
