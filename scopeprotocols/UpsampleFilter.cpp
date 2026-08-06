@@ -90,6 +90,14 @@ string UpsampleFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t UpsampleFilter::GetExecutionCapabilitiesMask()
+{
+ 	return
+		(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+		(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+		(uint32_t)ExecutionCapabilities::VulkanOnly;
+}
+
 void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
@@ -146,7 +154,6 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	size_t outlen = imax*upsample_factor;
 	cap->Resize(outlen);
 
-	cmdBuf.begin({});
 	{
 		NamedDebugRange debugRange(cmdBuf, "UpsampleFilter");
 
@@ -167,8 +174,6 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 			compute_block_count / 32768 + 1);
 	}
 
-	//Done, submit to the queue and wait
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
+	//Done
 	cap->MarkModifiedFromGpu();
 }

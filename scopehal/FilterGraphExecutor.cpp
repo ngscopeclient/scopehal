@@ -180,8 +180,6 @@ void FilterGraphExecutor::FindConcurrentNodes(
 	bool& needBegin,
 	bool& needEnd)
 {
-	LogTrace("FindConcurrentNodes\n");
-
 	//All physical instrument inputs can be chained if eligible to run
 	//(assume none use vulkan, this might break if they do?)
 	auto chan = dynamic_cast<InstrumentChannel*>(anchor);

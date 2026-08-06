@@ -321,6 +321,7 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		GroupDelayCorrection(m_reverseCoupledParams, istart, iend, phaseshift, true);
 		GenerateScalarOutput(
 			cmdBuf, m_vkReversePlan, istart, iend, dinRev, 1, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
+		m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 
 		//De-embed reverse path then calculate reverse path leakage
 		//TODO: calculate and correct for group delay in the leakage path
@@ -418,7 +419,6 @@ void CouplerDeEmbedFilter::GenerateScalarOutput(
 		m_normalizeComputePipeline.DispatchNoRebind(cmdBuf, nargs,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
-		m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
 	}
 
 	cap->MarkModifiedFromGpu();
