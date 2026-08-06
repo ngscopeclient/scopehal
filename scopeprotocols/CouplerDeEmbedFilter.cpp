@@ -347,6 +347,11 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		GenerateScalarOutput(
 			cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
 	}
+
+	//Mark our scratch buffers as in use
+	queue->MarkScratchBufferUsed(vectorTempBuf1);
+	queue->MarkScratchBufferUsed(vectorTempBuf2);
+	queue->MarkScratchBufferUsed(vectorTempBuf3);
 }
 
 /**

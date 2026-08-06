@@ -39,6 +39,19 @@
 using namespace std;
 extern bool g_hasDebugUtils;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// QueueHandle
+
+ScratchBufferBase::ScratchBufferBase()
+{
+}
+
+ScratchBufferBase::~ScratchBufferBase()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 QueueHandle::QueueHandle(std::shared_ptr<QueueWrapper>& queue, const string& name)
 	: m_queue(queue)
 	, m_fence(make_unique<vk::raii::Fence>(*queue->GetDevice(), vk::FenceCreateInfo()))
@@ -121,6 +134,7 @@ bool QueueHandle::WaitIdleWithTimeout(uint64_t nanoseconds)
 	//If we get here, the most recent wait was the one that finished
 	m_fenceBusy = false;
 	m_queue->GetDevice()->resetFences(**m_fence);
+	m_usedScratchBuffers.clear();
 	return true;
 }
 
@@ -136,4 +150,5 @@ void QueueHandle::_waitFence()
 
 	m_fenceBusy = false;
 	m_queue->GetDevice()->resetFences(**m_fence);
+	m_usedScratchBuffers.clear();
 }

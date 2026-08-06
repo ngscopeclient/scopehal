@@ -45,6 +45,14 @@
 
 #include "QueueWrapper.h"
 
+//needs to be here not in ScratchBufferManager so QueueHandle can use it
+class ScratchBufferBase
+{
+public:
+	ScratchBufferBase();
+	virtual ~ScratchBufferBase();
+};
+
 /**
 	@brief Wrapper around a Vulkan Queue object
 
@@ -68,6 +76,16 @@ public:
 
 	const std::string GetName() const
 	{ return m_queue->GetName(); }
+
+	/**
+		@brief Mark a scratch buffer as in use by command buffers pending for this queue
+
+		This prevents other filters from using the buffer until the fence completes
+
+		(Implementation is in ScratchBufferManager.h)
+	 */
+	template<class T>
+	void MarkScratchBufferUsed(T& buf);
 
 	/**
 		@brief Wait for all previous submits to complete
@@ -103,6 +121,9 @@ protected:
 
 	///@brief The mutex controlling access to the fence
 	std::recursive_mutex m_fenceMutex;
+
+	///@brief Scratch buffers used by jobs in the queue
+	std::set<std::unique_ptr<ScratchBufferBase> > m_usedScratchBuffers;
 };
 
 

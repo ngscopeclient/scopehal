@@ -127,7 +127,7 @@ protected:
 	@brief RAII helper for allocations
  */
 template<class ID, class T>
-class ScratchBuffer
+class ScratchBuffer : public ScratchBufferBase
 {
 public:
 
@@ -136,12 +136,21 @@ public:
 		, m_pool(static_cast<ID>(0))
 	{}
 
+	//move one scratchbuffer to another, disconnecting the original one
+	ScratchBuffer(ScratchBuffer<ID, T>&& rhs)
+	{
+		m_ptr = rhs.m_ptr;
+		m_pool = rhs.m_pool;
+
+		rhs.m_ptr = nullptr;
+	}
+
 	ScratchBuffer(ID id)
 		: m_ptr(ScratchBufferManager::Allocate(id))
 		, m_pool(id)
 	{}
 
-	~ScratchBuffer()
+	virtual ~ScratchBuffer()
 	{
 		if(m_ptr != nullptr)
 			ScratchBufferManager::Free(m_ptr, m_pool);
@@ -173,6 +182,11 @@ protected:
 	///@brief The pool we were allocated from
 	ID m_pool;
 };
+
+//needs to be after ScratchBufferManager declaration
+template<class T>
+void QueueHandle::MarkScratchBufferUsed(T& buf)
+{ m_usedScratchBuffers.emplace(std::make_unique<T>(std::move(buf))); }
 
 typedef ScratchBuffer<ScratchBufferManager::PoolID_uint8, uint8_t> ScratchBuffer_uint8_t;
 typedef ScratchBuffer<ScratchBufferManager::PoolID_uint32, uint32_t> ScratchBuffer_uint32_t;
