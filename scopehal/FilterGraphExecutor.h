@@ -85,7 +85,7 @@ protected:
 class SubmitBatch
 {
 public:
-	void AddBatch(ConcurrentDispatchBatch batch)
+	void AddBatch(const ConcurrentDispatchBatch& batch)
 	{ m_batches.push_back(batch); }
 
 	void Run(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
