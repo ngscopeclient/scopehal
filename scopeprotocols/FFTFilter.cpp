@@ -102,6 +102,23 @@ string FFTFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t FFTFilter::GetExecutionCapabilitiesMask()
+{
+	if(m_numpeaks.GetIntVal() > 0)
+	{
+		return
+			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+	else
+	{
+		return
+			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+}
+
 void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts)
 {
 	m_cachedNumPoints = npoints_raw;
@@ -245,8 +262,6 @@ void FFTFilter::DoRefresh(
 	}
 	args.alpha1 = 1 - args.alpha0;
 
-	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
-	cmdBuf.begin({});
 	{
 		NamedDebugRange debugRange(cmdBuf, "FFTFilter");
 		const uint32_t compute_block_count = GetComputeBlockCount(npoints, 64);
@@ -311,12 +326,15 @@ void FFTFilter::DoRefresh(
 		}
 	}
 
-	//Done, block until the compute operations finish
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
 	cap->MarkModifiedFromGpu();
 
-	//Peak search (for now this runs on the CPU)
-	FindPeaks(cap, cmdBuf, queue);
+	//If doing peak detection, block now
+	if(m_numpeaks.GetIntVal() > 0)
+	{
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		//Peak search (for now this runs on the CPU)
+		FindPeaks(cap, cmdBuf, queue);
+	}
 }

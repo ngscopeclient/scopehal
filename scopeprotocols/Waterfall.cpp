@@ -99,7 +99,15 @@ void Waterfall::ClearSweeps()
 	SetData(nullptr, 0);
 }
 
-void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+uint32_t Waterfall::GetExecutionCapabilitiesMask()
+{
+	return
+		(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+		(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+		(uint32_t)ExecutionCapabilities::VulkanOnly;
+}
+
+void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("Waterfall::Refresh");
@@ -155,7 +163,6 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 	//TODO: is this OK or are we going to lose too much precision doing this?
 	args.timescaleRatio = cap->m_timescale * 1.0 / din->m_timescale;
 
-	cmdBuf.begin({});
 	{
 		NamedDebugRange debugRange(cmdBuf, "Waterfall");
 
@@ -168,11 +175,7 @@ void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle>
 			1,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
-		m_computePipeline.AddComputeMemoryBarrier(cmdBuf);
 	}
-
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
 
 	cap->GetOutData().MarkModifiedFromGpu();
 }
