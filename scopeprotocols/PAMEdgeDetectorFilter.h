@@ -68,6 +68,7 @@ public:
 	PAMEdgeDetectorFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual uint32_t GetExecutionCapabilitiesMask() override;
 
 	static std::string GetProtocolName();
 

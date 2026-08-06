@@ -72,6 +72,18 @@ string IQDemuxFilter::GetProtocolName()
 	return "IQ Demux";
 }
 
+uint32_t IQDemuxFilter::GetExecutionCapabilitiesMask()
+{
+	if(g_hasShaderInt64)
+	{
+		return
+			(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+	else
+		return 0;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -173,9 +185,6 @@ void IQDemuxFilter::Refresh(
 			iout->MarkModifiedFromGpu();
 			qout->MarkModifiedFromGpu();
 		}
-
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
 	}
 
 	else

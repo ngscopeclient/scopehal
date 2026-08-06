@@ -226,10 +226,13 @@ void FilterGraphExecutor::FindConcurrentNodes(
 		const uint32_t isVulkan =
 			(uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly;
 
+		const uint32_t sourceFlags = canTailChain | isVulkan;
+		const uint32_t sinkFlags = canAppend | isVulkan | canTailChain;
+
 		//If it's vulkan-only and we can tail chain, look for more stuff
 		needBegin = (flags & canAppend) != 0;
 		needEnd = (flags & canTailChain) != 0;
-		if(flags & (canTailChain | isVulkan))
+		if( (flags & sourceFlags) == sourceFlags )
 		{
 			LogTrace("Anchor can tail chain, looking for more nodes\n");
 
@@ -239,10 +242,10 @@ void FilterGraphExecutor::FindConcurrentNodes(
 					continue;
 				auto mask = f->GetExecutionCapabilitiesMask();
 
-				//Tail call capability required for now
+				//Tail call capability required for now if we already have stuff in the working set
 				//because we can't guarantee a non-tail-callable node is going to execute
 				//at the end of the batch
-				if(mask & (canAppend | isVulkan | canTailChain) )
+				if( (mask & sinkFlags) == sinkFlags )
 				{
 					LogTrace("Adding node %s\n", GetName(f).c_str());
 					workingSet.emplace(f);
@@ -354,14 +357,13 @@ bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
 	//Don't look at anything in m_runnableNodes, we already considered those
 
 	//Mask required for new nodes
-	//For now, require tail call capability because we use std::set sorting
-	//which means we cannot guarantee a non-tail-callable node will execute at the end of the batch
 	const uint32_t nextHopMask =
 		(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferAppend |
-		(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall |
 		(uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly;
+	const uint32_t tailCallMask = (uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall;
 
 	//Look for new filters that are eligible to run
+	bool needEnd = true;
 	for(auto f : m_incompleteNodes)
 	{
 		//If it's already running (this includes the pending queue, so no need to check it here)
@@ -372,8 +374,19 @@ bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
 		//If this node is not purely GPU based, stop.
 		//It might do CPU processing beforehand that depends on data we haven't generated yet!
 		//Also bail if it can't be appended to an open command buffer.
-		if( (f->GetExecutionCapabilitiesMask() & nextHopMask) != nextHopMask)
+		auto fmask = f->GetExecutionCapabilitiesMask();
+		if( (fmask & nextHopMask) != nextHopMask)
 			continue;
+
+		//If it's not tail call capable, we can merge but only if we have nothing else already pending
+		bool stopAfterThis = false;
+		if( (fmask & tailCallMask) != tailCallMask )
+		{
+			if(nodes.empty())
+				stopAfterThis = true;
+			else
+				continue;
+		}
 
 		//Not actively running.
 		//Is it blocked by anything earlier in the batch?
@@ -399,12 +412,17 @@ bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
 		{
 			LogTrace("Adding node %s\n", GetName(f).c_str());
 			nodes.emplace(f);
+			if(stopAfterThis)
+			{
+				needEnd = false;
+				break;
+			}
 		}
 	}
 
 	if(!nodes.empty())
 	{
-		MakeBatchForNodes(batch, nodes, true, true);
+		MakeBatchForNodes(batch, nodes, true, needEnd);
 		return true;
 	}
 

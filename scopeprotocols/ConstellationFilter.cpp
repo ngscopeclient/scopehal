@@ -130,6 +130,18 @@ void ConstellationFilter::ClearSweeps()
 	m_evmCount = 0;
 }
 
+uint32_t ConstellationFilter::GetExecutionCapabilitiesMask()
+{
+	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
+	{
+		return
+			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+	else
+		return 0;
+}
+
 void ConstellationFilter::Refresh(
 	vk::raii::CommandBuffer& cmdBuf,
 	shared_ptr<QueueHandle> queue)
@@ -183,11 +195,12 @@ void ConstellationFilter::Refresh(
 	//GPU side integration
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
-		cmdBuf.begin({});
+		const uint32_t threadsPerBlock = 64;
+		const uint32_t numThreads = 16384;
+		{
+			NamedDebugRange debugRange(cmdBuf, "Constellation");
 
 			//Push constants
-			const uint32_t threadsPerBlock = 64;
-			const uint32_t numThreads = 16384;
 			ConstellationPushConstants cfg;
 			cfg.width = m_width;
 			cfg.height = m_height;
@@ -221,6 +234,7 @@ void ConstellationFilter::Refresh(
 				m_normalizeReduceComputePipeline,
 				m_normalizeScaleComputePipeline,
 				m_normalizeMaxBuf);
+		}
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);

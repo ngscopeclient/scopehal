@@ -93,6 +93,18 @@ string PAMEdgeDetectorFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t PAMEdgeDetectorFilter::GetExecutionCapabilitiesMask()
+{
+	if(g_hasShaderInt64 && g_hasShaderInt8)
+	{
+		return
+			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+	else
+		return 0;
+}
+
 void PAMEdgeDetectorFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
@@ -195,7 +207,6 @@ void PAMEdgeDetectorFilter::Refresh(
 		uint64_t blockSize = 64;
 		uint64_t numBlocks = numThreads / blockSize;
 
-		cmdBuf.begin({});
 		{
 			NamedDebugRange debugRange(cmdBuf, "PAMEdgeDetector edge search");
 
