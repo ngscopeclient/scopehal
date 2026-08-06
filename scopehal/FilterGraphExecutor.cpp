@@ -180,6 +180,8 @@ void FilterGraphExecutor::FindConcurrentNodes(
 	bool& needBegin,
 	bool& needEnd)
 {
+	LogTrace("FindConcurrentNodes\n");
+
 	//All physical instrument inputs can be chained if eligible to run
 	//(assume none use vulkan, this might break if they do?)
 	auto chan = dynamic_cast<InstrumentChannel*>(anchor);
@@ -192,11 +194,23 @@ void FilterGraphExecutor::FindConcurrentNodes(
 			if(f == anchor)
 				continue;
 
+			//Physical instrument channels are good
 			auto fchan = dynamic_cast<InstrumentChannel*>(f);
 			if(fchan && (fchan->GetInstrument() != nullptr) )
 			{
 				LogTrace("Adding node %s\n", GetName(f).c_str());
 				workingSet.emplace(f);
+				continue;
+			}
+
+			//Import / waveform generation filters need to run early to get them out of the way too
+			//TODO: some generation filters may use vulkan so that will influence our dispatching
+			//but for now assume they're lightweight
+			auto t = dynamic_cast<Filter*>(f);
+			if(t && (t->GetCategory() == Filter::CAT_GENERATION) )
+			{
+				LogTrace("Adding node %s\n", GetName(f).c_str());
+				workingSet.emplace(t);
 			}
 		}
 	}
@@ -226,21 +240,20 @@ void FilterGraphExecutor::FindConcurrentNodes(
 				if(f == anchor)
 					continue;
 				auto mask = f->GetExecutionCapabilitiesMask();
-				if(mask & (canAppend | isVulkan) )
+
+				//Tail call capability required for now
+				//because we can't guarantee a non-tail-callable node is going to execute
+				//at the end of the batch
+				if(mask & (canAppend | isVulkan | canTailChain) )
 				{
 					LogTrace("Adding node %s\n", GetName(f).c_str());
 					workingSet.emplace(f);
-
-					if( (mask & canTailChain) == 0)
-					{
-						needEnd = false;
-						LogTrace("New node is not tail chain capable, stopping\n");
-						break;
-					}
 				}
 			}
 		}
 	}
+
+	LogTrace("Found %zu nodes\n", workingSet.size());
 }
 /**
 	@brief Returns the next batch of filters to run
@@ -279,19 +292,16 @@ SubmitBatch FilterGraphExecutor::GetNextBatch()
 				bool needBegin = false;
 				bool needEnd = false;
 				FindConcurrentNodes(anchor, workingSet, needBegin, needEnd);
+				MakeBatchForNodes(batch, workingSet, needBegin, needEnd);
 
-				//Make a concurrent batch and mark everything in it as running
-				LogTrace("Making batch with %zu nodes (needBegin=%d, needEnd=%d)\n",
-					workingSet.size(), needBegin, needEnd);
-				ConcurrentDispatchBatch cbatch(needBegin, needEnd, workingSet);
-				for(auto f : workingSet)
+				//Look for next hop nodes we can run after a barrier
+				//(unless the last node includes a submit, in which case stop)
+				while(needEnd)
 				{
-					m_runnableNodes.erase(f);
-					m_runningNodes.emplace(f);
+					if(!FindNextHopNodes(batch))
+						break;
 				}
-				batch.AddBatch(cbatch);
 
-				//TODO: Look for next hop nodes we can run after a barrier
 				break;
 			}
 		}
@@ -302,6 +312,105 @@ SubmitBatch FilterGraphExecutor::GetNextBatch()
 	}
 
 	return batch;
+}
+
+void FilterGraphExecutor::MakeBatchForNodes(
+	SubmitBatch& batch,
+	set<FlowGraphNode*>& workingSet,
+	bool needBegin,
+	bool needEnd)
+{
+	LogTrace("Making batch with %zu nodes (needBegin=%d, needEnd=%d)\n",
+		workingSet.size(), needBegin, needEnd);
+	ConcurrentDispatchBatch cbatch(needBegin, needEnd, workingSet);
+	for(auto f : workingSet)
+	{
+		m_runnableNodes.erase(f);
+		m_runningNodes.emplace(f);
+	}
+	batch.AddBatch(cbatch);
+}
+
+/**
+	@brief Searches for nodes that will be eligible to run once anything in the batch has run and adds it
+
+	Assumes m_mutex is locked
+
+	@return True if we should keep searching for more hops, false if nothing more to do
+ */
+bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
+{
+	LogTrace("Looking for next-hop nodes\n");
+	LogIndenter li;
+
+	set<FlowGraphNode*> nodes;
+
+	if(m_incompleteNodes.empty())
+		return false;
+
+	//Get the nodes already in the batch
+	//These can't unblock filters in OTHER batches, as we haven't submitted them, so aren't "complete" WRT scheduler
+	//but they can unblock filters in *this* batch since we can put a queue barrier between them
+	set<FlowGraphNode*> pending = batch.GetNodes();
+
+	//Don't look at anything in m_runnableNodes, we already considered those
+
+	//Mask required for new nodes
+	//For now, require tail call capability because we use std::set sorting
+	//which means we cannot guarantee a non-tail-callable node will execute at the end of the batch
+	const uint32_t nextHopMask =
+		(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferAppend |
+		(uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall |
+		(uint32_t)FlowGraphNode::ExecutionCapabilities::VulkanOnly;
+
+	//Look for new filters that are eligible to run
+	for(auto f : m_incompleteNodes)
+	{
+		//If it's already running (this includes the pending queue, so no need to check it here)
+		//no point in starting it again, skip it
+		if(m_runningNodes.find(f) != m_runningNodes.end())
+			continue;
+
+		//If this node is not purely GPU based, stop.
+		//It might do CPU processing beforehand that depends on data we haven't generated yet!
+		//Also bail if it can't be appended to an open command buffer.
+		if( (f->GetExecutionCapabilitiesMask() & nextHopMask) != nextHopMask)
+			continue;
+
+		//Not actively running.
+		//Is it blocked by anything earlier in the batch?
+		bool ok = true;
+		for(size_t i=0; i<f->GetInputCount(); i++)
+		{
+			auto in = f->GetInput(i).m_channel;
+
+			//If the source of this input is already done, we're good
+			if(m_incompleteNodes.find(in) == m_incompleteNodes.end())
+				continue;
+
+			//If the source is not the current batch, we're blocked - stall
+			if(pending.find(in) == pending.end())
+			{
+				ok = false;
+				break;
+			}
+		}
+
+		//Not blocked, it's runnable. Add to the batch
+		if(ok)
+		{
+			LogTrace("Adding node %s\n", GetName(f).c_str());
+			nodes.emplace(f);
+		}
+	}
+
+	if(!nodes.empty())
+	{
+		MakeBatchForNodes(batch, nodes, true, true);
+		return true;
+	}
+
+	return false;
 }
 
 /**

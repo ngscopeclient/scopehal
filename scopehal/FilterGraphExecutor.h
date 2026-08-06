@@ -136,6 +136,9 @@ protected:
 		bool& needBegin,
 		bool& needEnd);
 
+	void MakeBatchForNodes(SubmitBatch& batch, std::set<FlowGraphNode*>& workingSet, bool needBegin, bool needEnd);
+	bool FindNextHopNodes(SubmitBatch& batch);
+
 	static void ExecutorThread(FilterGraphExecutor* pThis, size_t i);
 	void DoExecutorThread(size_t i);
 
