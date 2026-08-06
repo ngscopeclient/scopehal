@@ -138,6 +138,14 @@ string CouplerDeEmbedFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t CouplerDeEmbedFilter::GetExecutionCapabilitiesMask()
+{
+ 	return
+		(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+		(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+		(uint32_t)ExecutionCapabilities::VulkanOnly;
+}
+
 void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
@@ -271,8 +279,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
-	cmdBuf.begin({});
 	{
 		NamedDebugRange debugRange(cmdBuf, "CouplerDeEmbed");
 
@@ -340,12 +346,6 @@ void CouplerDeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		GenerateScalarOutput(
 			cmdBuf, m_vkReversePlan, istart, iend, dinFwd, 0, npoints, phaseshift, *vectorTempBuf2, m_scalarTempBuf1);
 	}
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	//Done, block until the compute operations finish
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
 }
 
 /**

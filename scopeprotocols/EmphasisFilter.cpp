@@ -69,6 +69,14 @@ string EmphasisFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t EmphasisFilter::GetExecutionCapabilitiesMask()
+{
+ 	return
+		(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+		(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+		(uint32_t)ExecutionCapabilities::VulkanOnly;
+}
+
 void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
@@ -134,7 +142,6 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	cfg.tap0 = taps[0];
 	cfg.tap1 = taps[1];
 
-	cmdBuf.begin({});
 	{
 		NamedDebugRange debugRange(cmdBuf, "EmphasisFilter");
 
@@ -146,9 +153,5 @@ void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
 	}
-
-	cmdBuf.end();
-	queue->SubmitAndBlock(cmdBuf);
-
 	cap->m_samples.MarkModifiedFromGpu();
 }
