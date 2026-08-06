@@ -138,10 +138,9 @@ public:
 
 	//move one scratchbuffer to another, disconnecting the original one
 	ScratchBuffer(ScratchBuffer<ID, T>&& rhs)
+		: m_ptr(rhs.m_ptr)
+		, m_pool(rhs.m_pool)
 	{
-		m_ptr = rhs.m_ptr;
-		m_pool = rhs.m_pool;
-
 		rhs.m_ptr = nullptr;
 	}
 
