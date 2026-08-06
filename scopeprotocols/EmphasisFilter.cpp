@@ -77,7 +77,7 @@ uint32_t EmphasisFilter::GetExecutionCapabilitiesMask()
 		(uint32_t)ExecutionCapabilities::VulkanOnly;
 }
 
-void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("EmphasisFilter::Refresh");

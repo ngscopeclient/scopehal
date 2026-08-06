@@ -98,7 +98,7 @@ uint32_t UpsampleFilter::GetExecutionCapabilitiesMask()
 		(uint32_t)ExecutionCapabilities::VulkanOnly;
 }
 
-void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("UpsampleFilter::Refresh");
