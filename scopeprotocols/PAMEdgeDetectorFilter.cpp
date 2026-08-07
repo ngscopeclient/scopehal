@@ -271,6 +271,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		numThreads = 4096;
 		blockSize = 64;
 		numBlocks = numThreads / blockSize;
+		uint32_t numBlocksFirstPass = numThreads;
 
 		cmdBuf.begin({});
 		{
@@ -300,7 +301,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
 				m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
 				m_initialMergeComputePipeline->BindBufferNonblocking(5, *edgeOffsetsScratch, cmdBuf, true);
-				m_initialMergeComputePipeline->Dispatch(cmdBuf, mergecfg, numBlocks);
+				m_initialMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, numBlocksFirstPass);
 				m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 			}
 
@@ -319,7 +320,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
 				m_finalMergeComputePipeline->BindBufferNonblocking(4, m_edgeCount, cmdBuf, true);
 
-				m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, /*numBlocks*/numThreads);
+				m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, numThreads);
 				m_finalMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 			}
 
