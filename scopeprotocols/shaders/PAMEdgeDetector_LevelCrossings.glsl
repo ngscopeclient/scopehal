@@ -67,8 +67,6 @@ layout(std430, push_constant) uniform constants
 
 #define X_SIZE 64
 
-shared uint s_rising[X_SIZE];
-shared uint s_states[X_SIZE];
 shared bool s_hit[X_SIZE];
 
 layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
@@ -108,6 +106,9 @@ void main()
 	uint numThresholds = order-1;
 	uint maxOuts = outputPerThread - 1;
 
+	uint cur_rising = 0;
+	uint cur_state = 0;
+
 	for(uint i = instart; (i < inend) && (nouts < maxOuts); i += X_SIZE)
 	{
 		//Need to bounds check within the loop since we can run up to X_SIZE off the end in the last iteration
@@ -126,8 +127,8 @@ void main()
 				if( (prev <= t) && (cur > t) )
 				{
 					s_hit[gl_LocalInvocationID.x] = true;
-					s_rising[gl_LocalInvocationID.x] = 1;
-					s_states[gl_LocalInvocationID.x] = j+1;
+					cur_rising = 1;
+					cur_state = j+1;
 					break;
 				}
 
@@ -135,8 +136,8 @@ void main()
 				else if( (prev >= t) && (cur < t) )
 				{
 					s_hit[gl_LocalInvocationID.x] = true;
-					s_rising[gl_LocalInvocationID.x] = 0;
-					s_states[gl_LocalInvocationID.x] = j;
+					cur_rising = 0;
+					cur_state = j;
 					break;
 				}
 			}
@@ -155,8 +156,8 @@ void main()
 					idx[iout] = i + j;
 
 					//TODO: can we merge these into less 32-bit writes?
-					rising[iout] = uint8_t(s_rising[j]);
-					states[iout] = uint8_t(s_states[j]);
+					rising[iout] = uint8_t(cur_rising);
+					states[iout] = uint8_t(cur_state);
 				}
 
 				nouts ++;
