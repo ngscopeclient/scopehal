@@ -357,6 +357,14 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				size_t numEntries = pstart[outbase];
 				if(numEntries != 0)
 				{
+					if(numEntries > cfg.maxOutputPerThread)
+					{
+						LogError("GPU reported implausible number of packets %zu, should be <= %u\n",
+							numEntries,
+							cfg.maxOutputPerThread);
+						continue;
+					}
+
 					for(size_t j=0; j<numEntries; j++)
 					{
 						packetStarts->push_back(pstart[outbase + j + 1]);
@@ -444,6 +452,13 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			uint32_t length = (*gpuStarts)[base];
 			if(length == 0)
 				continue;
+
+			//Sanity check
+			if(length > maxPacketBytes)
+			{
+				LogError("Got implausible frame length %u (should not be more than %zu)\n", length, maxPacketBytes);
+				continue;
+			}
 
 			bytes.resize(length);
 			starts.resize(length);
