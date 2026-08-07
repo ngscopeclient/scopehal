@@ -206,6 +206,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		uint64_t numThreads = 8192;
 		uint64_t blockSize = 64;
 		uint64_t numBlocks = numThreads / blockSize;
+		uint64_t numBlocksEdgeSearch = numThreads;
 
 		{
 			NamedDebugRange debugRange(cmdBuf, "PAMEdgeDetector edge search");
@@ -225,7 +226,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
 				m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
 				m_firstPassComputePipeline->BindBufferNonblocking(4, *edgeRisingScratch, cmdBuf, true);
-				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocksEdgeSearch);
 				m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 			}
 

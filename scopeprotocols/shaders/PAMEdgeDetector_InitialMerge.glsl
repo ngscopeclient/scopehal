@@ -32,7 +32,6 @@
 
 #extension GL_EXT_shader_8bit_storage : require
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_debug_printf : enable
 
 layout(std430, binding=0) restrict readonly buffer buf_indexes
 {
