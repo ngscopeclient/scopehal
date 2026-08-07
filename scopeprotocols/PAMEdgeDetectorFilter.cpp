@@ -203,7 +203,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		edgeStates->resize(len);
 		edgeRising->resize(len);
 
-		uint64_t numThreads = 8192;
+		uint64_t numThreads = 4096;
 		uint64_t blockSize = 64;
 		uint64_t numBlocks = numThreads / blockSize;
 		uint64_t numBlocksEdgeSearch = numThreads;

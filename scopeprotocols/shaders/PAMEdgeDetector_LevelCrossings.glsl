@@ -143,13 +143,12 @@ void main()
 		}
 
 		//Sync and write back
-		//TODO parallelize this part
 		barrier();
-		if(gl_LocalInvocationID.x == 0)
+		for(uint j=0; j<gl_WorkGroupSize.x; j++)
 		{
-			for(uint j=0; j<gl_WorkGroupSize.x; j++)
+			if(s_hit[j])
 			{
-				if(s_hit[j])
+				if(j == gl_LocalInvocationID.x)
 				{
 					uint iout = (nouts + 1) * numThreads + gl_GlobalInvocationID.y;
 
@@ -158,12 +157,12 @@ void main()
 					//TODO: can we merge these into less 32-bit writes?
 					rising[iout] = uint8_t(s_rising[j]);
 					states[iout] = uint8_t(s_states[j]);
-
-					nouts ++;
-
-					if(nouts >= maxOuts)
-						break;
 				}
+
+				nouts ++;
+
+				if(nouts >= maxOuts)
+					break;
 			}
 		}
 		barrier();
