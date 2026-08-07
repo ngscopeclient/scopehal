@@ -233,7 +233,6 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf, std::functi
 
 			if (m_data_in_staging_buf <= 0)
 				m_data_in_staging_buf = 0;
-			m_data_offset = 0;
 		}
 
 		unsigned int data_left = m_data_in_staging_buf - m_data_offset;
