@@ -97,6 +97,18 @@ string Ethernet100BaseT1Decoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+uint32_t Ethernet100BaseT1Decoder::GetExecutionCapabilitiesMask()
+{
+	if(g_hasShaderInt64 && g_hasShaderInt8 && g_hasPushDescriptor)
+	{
+		return
+			(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+	else
+		return 0;
+}
+
 void Ethernet100BaseT1Decoder::SymbolDecode(
 	vk::raii::CommandBuffer& cmdBuf,
 	size_t ilen,
@@ -291,7 +303,7 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	if(g_hasShaderInt64 && g_hasShaderInt8 && g_hasPushDescriptor)
 	{
-		cmdBuf.begin({});
+		//don't open the command buffer, we'll append to an existing one
 
 		uint32_t	nthreads = 4096;
 		uint32_t	threadsPerBlock = 64;
