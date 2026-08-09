@@ -45,6 +45,8 @@ using namespace std;
 SPIDecoder::SPIDecoder(const string& color)
 	: Filter(color, CAT_BUS)
 	, m_cpol(m_parameters["Clock Polarity"])
+	, m_cpha(m_parameters["Clock Phase Alignment"])
+	, m_bendian(m_parameters["Byte Endianness"])
 {
 	AddProtocolStream("data");
 	CreateInput<InputConstraintStreamType>("clk", Stream::STREAM_TYPE_DIGITAL);
@@ -55,6 +57,16 @@ SPIDecoder::SPIDecoder(const string& color)
 	m_cpol.AddEnumValue("Idle low", 0);
 	m_cpol.AddEnumValue("Idle high", 1);
 	m_cpol.SetIntVal(0);
+
+	m_cpha = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_cpha.AddEnumValue("Sample Rising CLK", 0);
+	m_cpha.AddEnumValue("Sample Falling CLK", 1);
+	m_cpha.SetIntVal(0);
+
+	m_bendian = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_bendian.AddEnumValue("LSB First", 0);
+	m_bendian.AddEnumValue("MSB First", 1);
+	m_bendian.SetIntVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,8 +78,57 @@ string SPIDecoder::GetProtocolName()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
 
+// Sample the current data-bit.
+void SPIDecoder::sampleBit(SPIWaveform* cap, size_t timestamp, int endian, uint8_t& current_byte, uint8_t& bitcount, int64_t& bytestart,
+			bool cur_data, bool first)
+{
+	if(bitcount == 0)
+	{
+		//Add a "chip selected" event
+		if(first)
+		{
+			cap->m_offsets.push_back(bytestart);
+			cap->m_durations.push_back(timestamp - bytestart);
+			cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_SELECT, 0));
+			first = false;
+		}
+
+		//Extend the last byte until this edge
+		else if(!cap->m_samples.empty())
+		{
+			size_t ilast = cap->m_samples.size()-1;
+			if(cap->m_samples[ilast].m_stype == SPISymbol::TYPE_DATA)
+				cap->m_durations[ilast] = timestamp- cap->m_offsets[ilast];
+		}
+
+		bytestart = timestamp;
+	}
+
+	if(endian == 0) { // LSB
+		if(cur_data)
+			current_byte = (1 << bitcount) | current_byte;
+	} else { // MSB
+		if(cur_data)
+			current_byte = 1 | (current_byte << 1);
+		else
+			current_byte = (current_byte << 1);
+	}
+	bitcount ++;
+
+	if(bitcount == 8)
+	{
+		cap->m_offsets.push_back(bytestart);
+		cap->m_durations.push_back(timestamp - bytestart);
+		cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DATA, current_byte));
+
+		bitcount = 0;
+		current_byte = 0;
+		bytestart = timestamp;
+	}
+}
+
+// Actual decoder logic
 void SPIDecoder::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue
@@ -107,8 +168,6 @@ void SPIDecoder::Refresh(
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
-	//TODO: different cpha/cpol modes
-
 	//TODO: packets based on CS# pulses?
 
 	//Loop over the data and look for transactions
@@ -137,6 +196,9 @@ void SPIDecoder::Refresh(
 
 	//Get SPI clock polarity
 	auto cpol = m_cpol.GetIntVal();
+	auto cpha = m_cpha.GetIntVal();
+	// LSB/MSB for data
+	auto endian = m_bendian.GetIntVal();
 
 	bool active_clk;
 	if(cpol == 0)
@@ -175,47 +237,9 @@ void SPIDecoder::Refresh(
 			case STATE_SELECTED_CLK_INACTIVE:
 				if(cur_clk == active_clk)
 				{
-					if(bitcount == 0)
-					{
-						//Add a "chip selected" event
-						if(first)
-						{
-							cap->m_offsets.push_back(bytestart);
-							cap->m_durations.push_back(timestamp - bytestart);
-							cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_SELECT, 0));
-							first = false;
-						}
-
-						//Extend the last byte until this edge
-						else if(!cap->m_samples.empty())
-						{
-							size_t ilast = cap->m_samples.size()-1;
-							if(cap->m_samples[ilast].m_stype == SPISymbol::TYPE_DATA)
-								cap->m_durations[ilast] = timestamp - cap->m_offsets[ilast];
-						}
-
-						bytestart = timestamp;
-					}
-
+					if(cpha == 0)
+						sampleBit(cap, timestamp, endian, current_byte, bitcount, bytestart, cur_data, first);
 					state = STATE_SELECTED_CLK_ACTIVE;
-
-					//TODO: selectable msb/lsb first direction
-					bitcount ++;
-					if(cur_data)
-						current_byte = 1 | (current_byte << 1);
-					else
-						current_byte = (current_byte << 1);
-
-					if(bitcount == 8)
-					{
-						cap->m_offsets.push_back(bytestart);
-						cap->m_durations.push_back(timestamp - bytestart);
-						cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DATA, current_byte));
-
-						bitcount = 0;
-						current_byte = 0;
-						bytestart = timestamp;
-					}
 				}
 
 				//end of packet
@@ -233,8 +257,11 @@ void SPIDecoder::Refresh(
 
 			//wait for falling edge of clk
 			case STATE_SELECTED_CLK_ACTIVE:
-				if(cur_clk != active_clk)
+				if(cur_clk != active_clk) {
+					if(cpha == 1)
+						sampleBit(cap, timestamp, endian, current_byte, bitcount, bytestart, cur_data, first);
 					state = STATE_SELECTED_CLK_INACTIVE;
+				}
 
 				//end of packet
 				//TODO: error if a byte is truncated
