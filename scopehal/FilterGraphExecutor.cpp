@@ -121,6 +121,9 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 	if(nodes.empty())
 		return;
 
+	LogTrace("Start graph refresh\n");
+	LogIndenter li;
+
 	{
 		lock_guard<mutex> lock(m_perfStatsMutex);
 		m_currentExecutionTime.clear();
@@ -169,6 +172,8 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 		for(auto& it : m_currentExecutionTime)
 			m_lastExecutionTime[it.first] = (m_lastExecutionTime[it.first] * decay) + (it.second * (1-decay));
 	}
+
+	LogTrace("Graph refresh done\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
