@@ -27,81 +27,89 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseT1Decoder
- */
-#ifndef Ethernet100BaseT1Decoder_h
-#define Ethernet100BaseT1Decoder_h
+#version 460
+#pragma shader_stage(compute)
 
-#include "EthernetProtocolDecoder.h"
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_ARB_gpu_shader_int64 : require
 
-class PAM3DecodeConstants
+layout(std430, binding=0) restrict readonly buffer buf_startsIn
 {
-public:
-	uint32_t	nsamples;
-	float		cuthi;
-	float		cutlo;
+	uint startsIn[];
 };
 
-class BaseT1DescrambleConstants
+layout(std430, binding=1) restrict readonly buffer buf_scramblersIn
 {
-public:
-	uint32_t	len;
-	uint32_t	samplesPerThread;
-	uint32_t	maxOutputPerThread;
-	uint8_t		masterMode;
+	uint64_t scramblersIn[];
 };
 
-class BaseT1DecodeConstants
+layout(std430, binding=2) restrict writeonly buffer buf_startsOut
 {
-public:
-	uint32_t	npackets;
-	uint32_t	maxPacketBytes;
-	uint32_t	inputLength;
-	uint32_t	masterMode;
+	uint startsOut[];
 };
 
-class BaseT1MergeConstants
+layout(std430, binding=3) restrict writeonly buffer buf_scramblersOut
 {
-public:
-	uint32_t	nthreads;
-	uint32_t	maxOutputPerThread;
+	uint64_t scramblersOut[];
 };
 
-class Ethernet100BaseT1Decoder : public EthernetProtocolDecoder
+layout(std430, binding=4) restrict writeonly buffer buf_npackets
 {
-public:
-	Ethernet100BaseT1Decoder(const std::string& color);
+	uint64_t npackets[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+layout(std430, push_constant) uniform constants
+{
+	uint nthreads;
+	uint maxOutputPerThread;
+};
 
-	static std::string GetProtocolName();
+#define X_SIZE 128
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseT1Decoder)
+layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
 
-	enum scrambler_t
+shared uint s_packetsFromThread[X_SIZE];
+
+void main()
+{
+	//We only run a single work group for now
+	uint nthread = gl_GlobalInvocationID.x;
+
+	//Output packet count
+	uint nouts = 0;
+
+	for(uint i=0; i<nthreads; i += X_SIZE)
 	{
-		SCRAMBLER_M_B13,
-		SCRAMBLER_S_B19
-	};
+		//Parallel read the size of each block and cache in shared memory
+		uint ireal = i + gl_LocalInvocationID.x;
+		uint outbase = ireal * maxOutputPerThread;
+		uint numEntries = startsIn[outbase];
 
-protected:
-	FilterParameter& m_scrambler;
+		//If we get bogus output, set size to zero
+		if(numEntries > maxOutputPerThread)
+			numEntries = 0;
 
-	FilterParameter& m_upperThresholdI;
-	FilterParameter& m_upperThresholdQ;
-	FilterParameter& m_lowerThresholdI;
-	FilterParameter& m_lowerThresholdQ;
+		s_packetsFromThread[gl_LocalInvocationID.x] = numEntries;
 
-	AcceleratorBuffer<int8_t> m_pointsI;
-	AcceleratorBuffer<int8_t> m_pointsQ;
+		//Add up the total number of packets before our start position so we know where to write
+		barrier();
+		for(uint j=0; j<gl_LocalInvocationID.x; j++)
+			nouts += s_packetsFromThread[j];
 
-	std::shared_ptr<ComputePipeline> m_pam3DecodeComputePipeline;
-	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
-	std::shared_ptr<ComputePipeline> m_decodeComputePipeline;
-	std::shared_ptr<ComputePipeline> m_mergePacketsPipeline;
-};
+		//Actually copy the outputs
+		for(uint j=0; j<numEntries; j++)
+		{
+			startsOut[nouts + j] 		= startsIn[outbase + j + 1];
+			scramblersOut[nouts + j]	= scramblersIn[outbase + j + 1];
+		}
 
-#endif
+		//Add our packet count, plus subsequent ones, so next block starts at the right spot
+		for(uint j=gl_LocalInvocationID.x; j<X_SIZE; j++)
+			nouts += s_packetsFromThread[j];
+
+		barrier();
+	}
+
+	if(gl_GlobalInvocationID.x == 0)
+		npackets[0] = nouts;
+}
