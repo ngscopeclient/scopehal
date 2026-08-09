@@ -238,10 +238,6 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	bool masterMode = (m_scrambler.GetIntVal() == SCRAMBLER_M_B13);
 
-	vector<uint8_t> bytes;
-	vector<uint64_t> starts;
-	vector<uint64_t> ends;
-
 	//Decode raw symbols to 3-level constellation coordinates
 	m_pointsI.resize(ilen);
 	m_pointsQ.resize(ilen);
@@ -473,8 +469,12 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			nvtx3::scoped_range nrange2("Final decode");
 		#endif
 
+		//Preallocate RAM for max sized standard packets
+		cap->m_offsets.reserve(npackets * 1500);
+		cap->m_durations.reserve(npackets * 1500);
+		cap->m_samples.reserve(npackets * 1500);
+
 		//Pull the data off the GPU and do final CPU-side decoding
-		//TODO: this can be made more efficient if we omit copying and make BytesToFrames work on the block as-is
 		for(size_t j=0; j<npackets; j++)
 		{
 			uint32_t base = j*maxPacketBytes;
@@ -489,20 +489,22 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				continue;
 			}
 
-			bytes.resize(length);
-			starts.resize(length);
-			ends.resize(length);
-
-			memcpy(&bytes[0], gpuBytes->GetCpuPointer() + base + 1, length * sizeof(uint8_t));
-			memcpy(&starts[0], gpuStarts->GetCpuPointer() + base + 1, length * sizeof(int64_t));
-			memcpy(&ends[0], gpuEnds->GetCpuPointer() + base + 1, length * sizeof(int64_t));
-
-			BytesToFrames(bytes, starts, ends, cap);
+			//TODO: are these actually supposed to be int64s in BytesToFrames?
+			BytesToFrames(
+				gpuBytes->GetCpuPointer() + base + 1,
+				reinterpret_cast<uint64_t*>(gpuStarts->GetCpuPointer() + base + 1),
+				reinterpret_cast<uint64_t*>(gpuEnds->GetCpuPointer() + base + 1),
+				length,
+				cap);
 		}
 	}
 
 	else
 	{
+		vector<uint8_t> bytes;
+		vector<uint64_t> starts;
+		vector<uint64_t> ends;
+
 		int64_t bytestart = 0;
 		uint16_t curNib = 0;
 		uint8_t nbits = 0;

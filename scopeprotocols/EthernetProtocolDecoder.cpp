@@ -65,9 +65,10 @@ vector<string> EthernetProtocolDecoder::GetHeaders()
 // Actual protocol decoding
 
 void EthernetProtocolDecoder::BytesToFrames(
-		vector<uint8_t>& bytes,
-		vector<uint64_t>& starts,
-		vector<uint64_t>& ends,
+		uint8_t* bytes,
+		uint64_t* starts,
+		uint64_t* ends,
+		size_t len,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS)
 {
@@ -75,16 +76,16 @@ void EthernetProtocolDecoder::BytesToFrames(
 	//jump to optimized special case implementation that doesn't have to idiv all the time
 	if(cap->m_timescale == 1)
 	{
-		BytesToFramesUnitTimescale(bytes, starts, ends, cap, suppressedPreambleAndFCS);
+		BytesToFramesUnitTimescale(bytes, starts, ends, len, cap, suppressedPreambleAndFCS);
 		return;
 	}
 
 	Packet* pack = new Packet;
+	pack->m_data.reserve(1500);
 
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
 	size_t start = 0;
-	size_t len = bytes.size();
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
@@ -269,7 +270,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
-						if( (i+1) < bytes.size() )
+						if( (i+1) < len )
 						{
 							if(bytes[i+1] == 0x42)
 							{
@@ -382,14 +383,14 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//If almost at end of packet, next 4 bytes are FCS
 				if(suppressedPreambleAndFCS)
 				{
-					if(i == bytes.size()-1)
+					if(i == len - 1)
 					{
 						pack->m_len = ends[i] - pack->m_offset;
 						m_packets.push_back(pack);
 						return;
 					}
 				}
-				else if(i == bytes.size() - 5)
+				else if(i == len - 5)
 				{
 					segment.m_data = 0;
 					nbytes = 0;
@@ -445,9 +446,10 @@ void EthernetProtocolDecoder::BytesToFrames(
 }
 
 void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
-		vector<uint8_t>& bytes,
-		vector<uint64_t>& starts,
-		vector<uint64_t>& ends,
+		uint8_t* bytes,
+		uint64_t* starts,
+		uint64_t* ends,
+		size_t len,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS)
 {
@@ -456,7 +458,6 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
 	size_t start = 0;
-	size_t len = bytes.size();
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
@@ -667,7 +668,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
-						if( (i+1) < bytes.size() )
+						if( (i+1) < len )
 						{
 							if(bytes[i+1] == 0x42)
 							{
@@ -778,14 +779,14 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//If almost at end of packet, next 4 bytes are FCS
 				if(suppressedPreambleAndFCS)
 				{
-					if(i == bytes.size()-1)
+					if(i == len - 1)
 					{
 						pack->m_len = ends[i] - pack->m_offset;
 						m_packets.push_back(pack);
 						return;
 					}
 				}
-				else if(i == bytes.size() - 5)
+				else if(i == len - 5)
 				{
 					segment.m_data = 0;
 					nbytes = 0;
