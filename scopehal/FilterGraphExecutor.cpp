@@ -363,7 +363,6 @@ bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
 	const uint32_t tailCallMask = (uint32_t)FlowGraphNode::ExecutionCapabilities::CommandBufferTailCall;
 
 	//Look for new filters that are eligible to run
-	bool needEnd = true;
 	for(auto f : m_incompleteNodes)
 	{
 		//If it's already running (this includes the pending queue, so no need to check it here)
@@ -378,15 +377,10 @@ bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
 		if( (fmask & nextHopMask) != nextHopMask)
 			continue;
 
-		//If it's not tail call capable, we can merge but only if we have nothing else already pending
-		bool stopAfterThis = false;
+		//If it's not tail call capable, stop.
+		//We will add append-only nodes in a separate pass at the very end if we found nothing else
 		if( (fmask & tailCallMask) != tailCallMask )
-		{
-			if(nodes.empty())
-				stopAfterThis = true;
-			else
-				continue;
-		}
+			continue;
 
 		//Not actively running.
 		//Is it blocked by anything earlier in the batch?
@@ -412,21 +406,73 @@ bool FilterGraphExecutor::FindNextHopNodes(SubmitBatch& batch)
 		{
 			LogTrace("Adding node %s\n", GetName(f).c_str());
 			nodes.emplace(f);
-			if(stopAfterThis)
-			{
-				needEnd = false;
-				break;
-			}
 		}
 	}
 
+	//If we found nodes in the first pass, append them to the batch and stop
 	if(!nodes.empty())
 	{
-		MakeBatchForNodes(batch, nodes, true, needEnd);
+		MakeBatchForNodes(batch, nodes, true, true);
 		return true;
 	}
 
-	return false;
+	//If nothing found, do a second pass but allow append-only nodes
+	//These have to run in their own concurrent batch because they have to be at the end of the SubmitBatch
+	else
+	{
+		for(auto f : m_incompleteNodes)
+		{
+			//If it's already running (this includes the pending queue, so no need to check it here)
+			//no point in starting it again, skip it
+			if(m_runningNodes.find(f) != m_runningNodes.end())
+				continue;
+
+			//If this node is not purely GPU based, stop.
+			//It might do CPU processing beforehand that depends on data we haven't generated yet!
+			//Also bail if it can't be appended to an open command buffer.
+			auto fmask = f->GetExecutionCapabilitiesMask();
+			if( (fmask & nextHopMask) != nextHopMask)
+				continue;
+
+			//If it's tail call capable, it was handled elsewhere, skip
+			if( (fmask & tailCallMask) == tailCallMask )
+				continue;
+
+			//Not actively running.
+			//Is it blocked by anything earlier in the batch?
+			bool ok = true;
+			for(size_t i=0; i<f->GetInputCount(); i++)
+			{
+				auto in = f->GetInput(i).m_channel;
+
+				//If the source of this input is already done, we're good
+				if(m_incompleteNodes.find(in) == m_incompleteNodes.end())
+					continue;
+
+				//If the source is not the current batch, we're blocked - stall
+				if(pending.find(in) == pending.end())
+				{
+					ok = false;
+					break;
+				}
+			}
+
+			//Not blocked, it's runnable. Add to the batch and stop
+			if(ok)
+			{
+				LogTrace("Adding append-only node %s\n", GetName(f).c_str());
+				nodes.emplace(f);
+				MakeBatchForNodes(batch, nodes, true, false);
+
+				//We cannot append anything else to this batch if we get here
+				return false;
+			}
+		}
+
+		//Nothing found on the second pass if we get here.
+		//We're truly out of available work.
+		return false;
+	}
 }
 
 /**
