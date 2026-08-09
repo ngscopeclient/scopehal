@@ -125,7 +125,7 @@ void main()
 		int64_t b32 = (scrambler >> 32) & 1;
 		int64_t b19 = (scrambler >> 19) & 1;
 		int64_t b12 = (scrambler >> 12) & 1;
-		if(masterMode == 1)
+		if(masterMode != 0)
 			scrambler = (scrambler << 1) | ( b32 ^ b12 );
 		else
 			scrambler = (scrambler << 1) | ( b32 ^ b19 );

@@ -51,7 +51,7 @@ public:
 	uint32_t	len;
 	uint32_t	samplesPerThread;
 	uint32_t	maxOutputPerThread;
-	uint8_t		masterMode;
+	uint32_t	masterMode;
 };
 
 class BaseT1DecodeConstants
