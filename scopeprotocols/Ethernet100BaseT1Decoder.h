@@ -88,6 +88,16 @@ public:
 	};
 
 protected:
+	void SymbolDecode(
+		vk::raii::CommandBuffer& cmdBuf,
+		size_t ilen,
+		float cutip,
+		float cutqp,
+		float cutin,
+		float cutqn,
+		SparseAnalogWaveform* din_i,
+		SparseAnalogWaveform* din_q);
+
 	FilterParameter& m_scrambler;
 
 	FilterParameter& m_upperThresholdI;

@@ -97,6 +97,77 @@ string Ethernet100BaseT1Decoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+void Ethernet100BaseT1Decoder::SymbolDecode(
+	vk::raii::CommandBuffer& cmdBuf,
+	size_t ilen,
+	float cutip,
+	float cutqp,
+	float cutin,
+	float cutqn,
+	SparseAnalogWaveform* din_i,
+	SparseAnalogWaveform* din_q
+	)
+{
+	NamedDebugRange debugRange(cmdBuf, "Symbol decode");
+
+	PAM3DecodeConstants cfgI;
+	cfgI.nsamples = ilen;
+	cfgI.cuthi = cutip;
+	cfgI.cutlo = cutin;
+
+	PAM3DecodeConstants cfgQ;
+	cfgQ.nsamples = ilen;
+	cfgQ.cuthi = cutqp;
+	cfgQ.cutlo = cutqn;
+
+	const uint32_t compute_block_count = GetComputeBlockCount(ilen, 64);
+
+	m_pam3DecodeComputePipeline->Bind(cmdBuf);
+
+	//Copy I channel timestamps to CPU since we still need those for software decoding for now
+	//If we have int64 support, we can do the whole decode on the GPU and skip this copy
+	if(!g_hasShaderInt64)
+	{
+		din_i->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
+		din_i->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
+	}
+
+	//Decode I channel
+	{
+		NamedDebugRange shaderRange(cmdBuf, "I channel");
+
+		m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
+		m_pam3DecodeComputePipeline->BindBufferNonblocking(1, m_pointsI, cmdBuf, true);
+		m_pam3DecodeComputePipeline->DispatchNoRebind(
+			cmdBuf,
+			cfgI,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+		m_pointsI.MarkModifiedFromGpu();
+	}
+
+	//Decode Q channel
+	{
+		NamedDebugRange shaderRange(cmdBuf, "Q channel");
+
+		m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_q->m_samples, cmdBuf);
+		m_pam3DecodeComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf, true);
+		m_pam3DecodeComputePipeline->DispatchNoRebind(
+			cmdBuf,
+			cfgQ,
+			min(compute_block_count, 32768u),
+			compute_block_count / 32768 + 1);
+		m_pointsQ.MarkModifiedFromGpu();
+	}
+
+	//Copy points to CPU if needed for software decoding
+	if(!g_hasShaderInt64)
+	{
+		m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
+		m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
+	}
+}
+
 void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
@@ -153,98 +224,33 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 	cap->PrepareForCpuAccess();
 	cap->Rename("Ethernet100BaseT1Decoder.data");
 
+	bool masterMode = (m_scrambler.GetIntVal() == SCRAMBLER_M_B13);
+
 	vector<uint8_t> bytes;
 	vector<uint64_t> starts;
 	vector<uint64_t> ends;
-
-	int64_t bytestart = 0;
-	uint16_t curNib = 0;
-	uint8_t nbits = 0;
-	bool scramblerLocked = false;
-
-	uint64_t scrambler = 0;
-	uint64_t idlesMatched = 0;
-
-	size_t scramblerErrors = 0;
-	size_t lastScramblerError = 0;
-
-	uint8_t prevNib = 0;
-	bool phaseLow = true;
-
-	bool masterMode = (m_scrambler.GetIntVal() == SCRAMBLER_M_B13);
 
 	//Decode raw symbols to 3-level constellation coordinates
 	m_pointsI.resize(ilen);
 	m_pointsQ.resize(ilen);
 	if(g_hasShaderInt8 && g_hasPushDescriptor)
 	{
-		PAM3DecodeConstants cfgI;
-		cfgI.nsamples = ilen;
-		cfgI.cuthi = cutip;
-		cfgI.cutlo = cutin;
-
-		PAM3DecodeConstants cfgQ;
-		cfgQ.nsamples = ilen;
-		cfgQ.cuthi = cutqp;
-		cfgQ.cutlo = cutqn;
-
-		const uint32_t compute_block_count = GetComputeBlockCount(ilen, 64);
-
-		#ifdef HAVE_NVTX
-			nvtx3::scoped_range nrange2("PAM3 decode");
-		#endif
-
-		cmdBuf.begin({});
+		if(g_hasShaderInt64)
 		{
-			NamedDebugRange debugRange(cmdBuf, "Symbol decode");
-
-			m_pam3DecodeComputePipeline->Bind(cmdBuf);
-
-			//Copy I channel timestamps to CPU since we still need those for software decoding for now
-			//If we have int64 support, we can do the whole decode on the GPU and skip this copy
-			if(!g_hasShaderInt64)
-			{
-				din_i->m_offsets.PrepareForCpuAccessNonblocking(cmdBuf);
-				din_i->m_durations.PrepareForCpuAccessNonblocking(cmdBuf);
-			}
-
-			//Decode I channel
-			{
-				NamedDebugRange shaderRange(cmdBuf, "I channel");
-
-				m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_i->m_samples, cmdBuf);
-				m_pam3DecodeComputePipeline->BindBufferNonblocking(1, m_pointsI, cmdBuf, true);
-				m_pam3DecodeComputePipeline->DispatchNoRebind(
-					cmdBuf,
-					cfgI,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
-				m_pointsI.MarkModifiedFromGpu();
-			}
-
-			//Decode Q channel
-			{
-				NamedDebugRange shaderRange(cmdBuf, "Q channel");
-
-				m_pam3DecodeComputePipeline->BindBufferNonblocking(0, din_q->m_samples, cmdBuf);
-				m_pam3DecodeComputePipeline->BindBufferNonblocking(1, m_pointsQ, cmdBuf, true);
-				m_pam3DecodeComputePipeline->DispatchNoRebind(
-					cmdBuf,
-					cfgQ,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
-				m_pointsQ.MarkModifiedFromGpu();
-			}
-
-			//Copy points to CPU if needed for software decoding
-			if(!g_hasShaderInt64)
-			{
-				m_pointsI.PrepareForCpuAccessNonblocking(cmdBuf);
-				m_pointsQ.PrepareForCpuAccessNonblocking(cmdBuf);
-			}
+			//Nothing, do it in the fast path along with the other shaders
 		}
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
+
+		else
+		{
+			#ifdef HAVE_NVTX
+				nvtx3::scoped_range nrange2("PAM3 decode");
+			#endif
+
+			cmdBuf.begin({});
+				SymbolDecode(cmdBuf, ilen, cutip, cutqp, cutin, cutqn, din_i, din_q);
+			cmdBuf.end();
+			queue->SubmitAndBlock(cmdBuf);
+		}
 	}
 	else
 	{
@@ -319,6 +325,10 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 			#ifdef HAVE_NVTX
 				nvtx3::scoped_range nrange2("Descramble");
 			#endif
+
+			//Do the symbol decoding here to avoid an extra dispatch
+			SymbolDecode(cmdBuf, ilen, cutip, cutqp, cutin, cutqn, din_i, din_q);
+			m_descrambleComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 
 			{
 				NamedDebugRange shaderRange(cmdBuf, "Descramble");
@@ -481,6 +491,20 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 
 	else
 	{
+		int64_t bytestart = 0;
+		uint16_t curNib = 0;
+		uint8_t nbits = 0;
+		bool scramblerLocked = false;
+
+		uint64_t scrambler = 0;
+		uint64_t idlesMatched = 0;
+
+		size_t scramblerErrors = 0;
+		size_t lastScramblerError = 0;
+
+		uint8_t prevNib = 0;
+		bool phaseLow = true;
+
 		size_t totalErrorsReported = 0;
 		for(size_t i=0; i<ilen; i++)
 		{
