@@ -72,9 +72,14 @@ layout(std430, binding=7) restrict writeonly buffer buf_qDurations
 	int64_t qDurations[];
 };
 
+layout(std430, binding=8) restrict readonly buffer buf_inAlign
+{
+	uint align[];
+};
+
 layout(std430, push_constant) uniform constants
 {
-	uint istart;
+	uint useBaseT1Alignment;
 	uint outlen;
 };
 
@@ -85,6 +90,16 @@ void main()
 	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 	if(i >= outlen)
 		return;
+
+	//Starting sample index
+	uint istart = 0;
+	if(useBaseT1Alignment != 0)
+	{
+		if(align[0] < align[1])
+			istart = 0;
+		else
+			istart = 1;
+	}
 
 	uint iin = i*2 + istart;
 	uint iout = i;

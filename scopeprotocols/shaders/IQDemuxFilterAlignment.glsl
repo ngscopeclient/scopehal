@@ -45,7 +45,7 @@ layout(std430, push_constant) uniform constants
 	uint len;
 };
 
-#define LOCAL_SIZE 64
+#define LOCAL_SIZE 256
 
 layout(local_size_x=LOCAL_SIZE, local_size_y=1, local_size_z=1) in;
 
