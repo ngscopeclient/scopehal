@@ -32,6 +32,8 @@
 
 using namespace std;
 
+static const char g_hex[] = "0123456789abcdef";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -86,6 +88,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
+	size_t nbytes = 0;
 
 	//If we are suppressing the preamble, jump straight into the data
 	if(suppressedPreambleAndFCS)
@@ -108,8 +111,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				{
 					start = starts[i];
 					segment.m_type = EthernetFrameSegment::TYPE_PREAMBLE;
-					segment.m_data.clear();
-					segment.m_data.push_back(0x55);
+					segment.m_data = 0x55;
 
 					//Start a new packet
 					pack->m_offset = starts[i];
@@ -131,20 +133,20 @@ void EthernetProtocolDecoder::BytesToFrames(
 					cap->m_offsets.push_back(start / cap->m_timescale);
 					cap->m_durations.push_back( (ends[i] - starts[i]) / cap->m_timescale);
 					segment.m_type = EthernetFrameSegment::TYPE_SFD;
-					segment.m_data.clear();
-					segment.m_data.push_back(0xd5);
+					segment.m_data = 0xd5;
 					cap->m_samples.push_back(segment);
 
 					//Set up for data
 					segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
-					segment.m_data.clear();
+					nbytes = 0;
+					segment.m_data = 0;
 
 					crcstart = i+1;
 				}
 
 				//No SFD, just add the preamble byte
 				else if(bytes[i] == 0x55)
-					segment.m_data.push_back(0x55);
+					segment.m_data = (segment.m_data << 8) |  0x55;
 
 				//Garbage (TODO: handle this better)
 				else
@@ -157,17 +159,18 @@ void EthernetProtocolDecoder::BytesToFrames(
 			case EthernetFrameSegment::TYPE_DST_MAC:
 
 				//Start of MAC? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 6)
+				if(nbytes == 6)
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale );
 					cap->m_samples.push_back(segment);
@@ -175,17 +178,18 @@ void EthernetProtocolDecoder::BytesToFrames(
 					//Format the content for display
 					char tmp[64];
 					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
-						segment.m_data[0],
-						segment.m_data[1],
-						segment.m_data[2],
-						segment.m_data[3],
-						segment.m_data[4],
-						segment.m_data[5]);
+						static_cast<uint32_t>((segment.m_data >> 40) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 32) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 24) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 16) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 8) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 0) & 0xff));
 					pack->m_headers["Dest MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
-					segment.m_data.clear();
+					nbytes = 0;
+					segment.m_data = 0;
 				}
 
 				break;
@@ -193,35 +197,37 @@ void EthernetProtocolDecoder::BytesToFrames(
 			case EthernetFrameSegment::TYPE_SRC_MAC:
 
 				//Start of MAC? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 6)
+				if(nbytes == 6)
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
 					//Format the content for display
 					char tmp[64];
-					snprintf(tmp, sizeof(tmp),"%02x:%02x:%02x:%02x:%02x:%02x",
-						segment.m_data[0],
-						segment.m_data[1],
-						segment.m_data[2],
-						segment.m_data[3],
-						segment.m_data[4],
-						segment.m_data[5]);
+					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
+						static_cast<uint32_t>((segment.m_data >> 40) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 32) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 24) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 16) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 8) & 0xff),
+						static_cast<uint32_t>((segment.m_data >> 0) & 0xff));
 					pack->m_headers["Src MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
-					segment.m_data.clear();
+					nbytes = 0;
+					segment.m_data = 0;
 				}
 
 				break;
@@ -229,17 +235,18 @@ void EthernetProtocolDecoder::BytesToFrames(
 			case EthernetFrameSegment::TYPE_ETHERTYPE:
 
 				//Start of Ethertype? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i] ;
 					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 2)
+				if(nbytes == 2)
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
@@ -253,7 +260,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 						#cab2d6
 						#6a3d9a
 					 */
-					uint16_t ethertype = (segment.m_data[0] << 8) | segment.m_data[1];
+					uint16_t ethertype = segment.m_data;
 					if(ethertype < 1500)
 					{
 						//Default to unknown LLC
@@ -309,9 +316,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 								break;
 
 							default:
-								snprintf(tmp, sizeof(tmp), "%02x%02x",
-								segment.m_data[0],
-								segment.m_data[1]);
+								snprintf(tmp, sizeof(tmp), "%04x", (uint32_t)segment.m_data);
 								pack->m_headers["Ethertype"] = tmp;
 								pack->m_displayBackgroundColor = "#fb9a99";
 								pack->m_displayForegroundColor = "#000000";
@@ -321,7 +326,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 
 					//It's an 802.1q tag, decode the VLAN header
 					if(ethertype == 0x8100)
@@ -333,31 +339,29 @@ void EthernetProtocolDecoder::BytesToFrames(
 			case EthernetFrameSegment::TYPE_VLAN_TAG:
 
 				//Start of tag? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 2)
+				if(nbytes == 2)
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
-					uint16_t tag = (segment.m_data[0] << 8) | segment.m_data[1];
-
 					//Reset for the internal ethertype
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 
 					//Format the content for display
-					char tmp[64];
-					snprintf(tmp, sizeof(tmp),"%d", tag & 0xfff);
-					pack->m_headers["VLAN"] = tmp;
+					pack->m_headers["VLAN"] = to_string(segment.m_data & 0xfff);
 				}
 
 				break;
@@ -370,8 +374,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				cap->m_offsets.push_back(start / cap->m_timescale);
 				cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 				segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-				segment.m_data.clear();
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = bytes[i];
 				cap->m_samples.push_back(segment);
 
 				pack->m_data.push_back(bytes[i]);
@@ -388,7 +391,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				}
 				else if(i == bytes.size() - 5)
 				{
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 					segment.m_type = EthernetFrameSegment::TYPE_FCS_GOOD;
 				}
 				break;
@@ -396,7 +400,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 			case EthernetFrameSegment::TYPE_FCS_GOOD:
 
 				//Start of FCS? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					crc_expected = CRC32(&bytes[0], crcstart, i-1);
 
@@ -405,11 +409,12 @@ void EthernetProtocolDecoder::BytesToFrames(
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 				crc_actual = (crc_actual << 8) | bytes[i];
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 4)
+				if(nbytes == 4)
 				{
 					//Validate CRC
 					if(crc_actual != crc_expected)
@@ -455,12 +460,11 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
+	size_t nbytes = 0;
 
 	//If we are suppressing the preamble, jump straight into the data
 	if(suppressedPreambleAndFCS)
 		segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
-
-	static const char hex[] = "0123456789abcdef";
 
 	for(size_t i=0; i<len; i++)
 	{
@@ -479,8 +483,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				{
 					start = starts[i];
 					segment.m_type = EthernetFrameSegment::TYPE_PREAMBLE;
-					segment.m_data.clear();
-					segment.m_data.push_back(0x55);
+					segment.m_data = 0x55;
 
 					//Start a new packet
 					pack->m_offset = starts[i];
@@ -502,20 +505,20 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					cap->m_offsets.push_back(start);
 					cap->m_durations.push_back(ends[i] - starts[i]);
 					segment.m_type = EthernetFrameSegment::TYPE_SFD;
-					segment.m_data.clear();
-					segment.m_data.push_back(0xd5);
+					segment.m_data = 0xd5;
 					cap->m_samples.push_back(segment);
 
 					//Set up for data
 					segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 
 					crcstart = i+1;
 				}
 
 				//No SFD, just add the preamble byte
 				else if(bytes[i] == 0x55)
-					segment.m_data.push_back(0x55);
+					segment.m_data = (segment.m_data << 8) |  0x55;
 
 				//Garbage (TODO: handle this better)
 				else
@@ -528,17 +531,18 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 			case EthernetFrameSegment::TYPE_DST_MAC:
 
 				//Start of MAC? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i];
 					cap->m_offsets.push_back(start);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 6)
+				if(nbytes == 6)
 				{
 					cap->m_durations.push_back(ends[i] - start);
 					cap->m_samples.push_back(segment);
@@ -546,30 +550,31 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					//Format the content for display
 					char tmp[] =
 					{
-						hex[ (segment.m_data[0] >> 4) & 0xf],
-						hex[ segment.m_data[0] & 0xf],
+						g_hex[ (segment.m_data >> 44) & 0xf],
+						g_hex[ (segment.m_data >> 40) & 0xf],
 						':',
-						hex[ (segment.m_data[1] >> 4) & 0xf],
-						hex[ segment.m_data[1] & 0xf],
+						g_hex[ (segment.m_data >> 36) & 0xf],
+						g_hex[ (segment.m_data >> 32) & 0xf],
 						':',
-						hex[ (segment.m_data[2] >> 4) & 0xf],
-						hex[ segment.m_data[2] & 0xf],
+						g_hex[ (segment.m_data >> 28) & 0xf],
+						g_hex[ (segment.m_data >> 24) & 0xf],
 						':',
-						hex[ (segment.m_data[3] >> 4) & 0xf],
-						hex[ segment.m_data[3] & 0xf],
+						g_hex[ (segment.m_data >> 20) & 0xf],
+						g_hex[ (segment.m_data >> 16) & 0xf],
 						':',
-						hex[ (segment.m_data[4] >> 4) & 0xf],
-						hex[ segment.m_data[4] & 0xf],
+						g_hex[ (segment.m_data >> 12) & 0xf],
+						g_hex[ (segment.m_data >> 8) & 0xf],
 						':',
-						hex[ (segment.m_data[5] >> 4) & 0xf],
-						hex[ segment.m_data[5] & 0xf],
+						g_hex[ (segment.m_data >> 4) & 0xf],
+						g_hex[ (segment.m_data >> 0) & 0xf],
 						'\0'
 					};
 					pack->m_headers["Dest MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 				}
 
 				break;
@@ -577,17 +582,18 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 			case EthernetFrameSegment::TYPE_SRC_MAC:
 
 				//Start of MAC? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i];
 					cap->m_offsets.push_back(start);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 6)
+				if(nbytes == 6)
 				{
 					cap->m_durations.push_back(ends[i] - start);
 					cap->m_samples.push_back(segment);
@@ -595,30 +601,31 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					//Format the content for display
 					char tmp[] =
 					{
-						hex[ (segment.m_data[0] >> 4) & 0xf],
-						hex[ segment.m_data[0] & 0xf],
+						g_hex[ (segment.m_data >> 44) & 0xf],
+						g_hex[ (segment.m_data >> 40) & 0xf],
 						':',
-						hex[ (segment.m_data[1] >> 4) & 0xf],
-						hex[ segment.m_data[1] & 0xf],
+						g_hex[ (segment.m_data >> 36) & 0xf],
+						g_hex[ (segment.m_data >> 32) & 0xf],
 						':',
-						hex[ (segment.m_data[2] >> 4) & 0xf],
-						hex[ segment.m_data[2] & 0xf],
+						g_hex[ (segment.m_data >> 28) & 0xf],
+						g_hex[ (segment.m_data >> 24) & 0xf],
 						':',
-						hex[ (segment.m_data[3] >> 4) & 0xf],
-						hex[ segment.m_data[3] & 0xf],
+						g_hex[ (segment.m_data >> 20) & 0xf],
+						g_hex[ (segment.m_data >> 16) & 0xf],
 						':',
-						hex[ (segment.m_data[4] >> 4) & 0xf],
-						hex[ segment.m_data[4] & 0xf],
+						g_hex[ (segment.m_data >> 12) & 0xf],
+						g_hex[ (segment.m_data >> 8) & 0xf],
 						':',
-						hex[ (segment.m_data[5] >> 4) & 0xf],
-						hex[ segment.m_data[5] & 0xf],
+						g_hex[ (segment.m_data >> 4) & 0xf],
+						g_hex[ (segment.m_data >> 0) & 0xf],
 						'\0'
 					};
 					pack->m_headers["Src MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 				}
 
 				break;
@@ -626,17 +633,18 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 			case EthernetFrameSegment::TYPE_ETHERTYPE:
 
 				//Start of Ethertype? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i] ;
 					cap->m_offsets.push_back(start);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 2)
+				if(nbytes == 2)
 				{
 					cap->m_durations.push_back(ends[i] - start);
 					cap->m_samples.push_back(segment);
@@ -650,7 +658,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 						#cab2d6
 						#6a3d9a
 					 */
-					uint16_t ethertype = (segment.m_data[0] << 8) | segment.m_data[1];
+					uint16_t ethertype = segment.m_data;
 					if(ethertype < 1500)
 					{
 						//Default to unknown LLC
@@ -671,7 +679,6 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					}
 					else
 					{
-						char tmp[64];
 						switch(ethertype)
 						{
 							case 0x0800:
@@ -706,10 +713,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 								break;
 
 							default:
-								snprintf(tmp, sizeof(tmp), "%02x%02x",
-								segment.m_data[0],
-								segment.m_data[1]);
-								pack->m_headers["Ethertype"] = tmp;
+								pack->m_headers["Ethertype"] = to_string_hex(segment.m_data);
 								pack->m_displayBackgroundColor = "#fb9a99";
 								pack->m_displayForegroundColor = "#000000";
 								break;
@@ -718,7 +722,8 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 
 					//It's an 802.1q tag, decode the VLAN header
 					if(ethertype == 0x8100)
@@ -730,29 +735,29 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 			case EthernetFrameSegment::TYPE_VLAN_TAG:
 
 				//Start of tag? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					start = starts[i];
 					cap->m_offsets.push_back(start);
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 2)
+				if(nbytes == 2)
 				{
 					cap->m_durations.push_back(ends[i] - start);
 					cap->m_samples.push_back(segment);
 
-					uint16_t tag = (segment.m_data[0] << 8) | segment.m_data[1];
-
 					//Reset for the internal ethertype
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 
 					//Format the content for display
-					pack->m_headers["VLAN"] = to_string(tag & 0xfff);
+					pack->m_headers["VLAN"] = to_string(segment.m_data & 0xfff);
 				}
 
 				break;
@@ -765,8 +770,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				cap->m_offsets.push_back(start);
 				cap->m_durations.push_back(ends[i] - start);
 				segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-				segment.m_data.clear();
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = bytes[i];
 				cap->m_samples.push_back(segment);
 
 				pack->m_data.push_back(bytes[i]);
@@ -783,7 +787,8 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				}
 				else if(i == bytes.size() - 5)
 				{
-					segment.m_data.clear();
+					segment.m_data = 0;
+					nbytes = 0;
 					segment.m_type = EthernetFrameSegment::TYPE_FCS_GOOD;
 				}
 				break;
@@ -791,7 +796,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 			case EthernetFrameSegment::TYPE_FCS_GOOD:
 
 				//Start of FCS? Record start time
-				if(segment.m_data.empty())
+				if(nbytes == 0)
 				{
 					crc_expected = CRC32(&bytes[0], crcstart, i-1);
 
@@ -800,11 +805,12 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				}
 
 				//Add the data
-				segment.m_data.push_back(bytes[i]);
+				segment.m_data = (segment.m_data << 8) | bytes[i];
+				nbytes ++;
 				crc_actual = (crc_actual << 8) | bytes[i];
 
 				//Are we done? Add it
-				if(segment.m_data.size() == 4)
+				if(nbytes == 4)
 				{
 					//Validate CRC
 					if(crc_actual != crc_expected)
@@ -834,7 +840,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	delete pack;
 }
 
-std::string EthernetWaveform::GetColor(size_t i)
+string EthernetWaveform::GetColor(size_t i)
 {
 	switch(m_samples[i].m_type)
 	{
@@ -939,37 +945,67 @@ string EthernetWaveform::GetText(size_t i)
 
 		case EthernetFrameSegment::TYPE_DST_MAC:
 			{
-				if(sample.m_data.size() != 6)
-					return "[invalid dest MAC length]";
-
-				snprintf(tmp, sizeof(tmp), "To %02x:%02x:%02x:%02x:%02x:%02x",
-					sample.m_data[0],
-					sample.m_data[1],
-					sample.m_data[2],
-					sample.m_data[3],
-					sample.m_data[4],
-					sample.m_data[5]);
-				return tmp;
+				char ret[] =
+				{
+					'T',
+					'o',
+					' ',
+					g_hex[ (sample.m_data >> 44) & 0xf],
+					g_hex[ (sample.m_data >> 40) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 36) & 0xf],
+					g_hex[ (sample.m_data >> 32) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 28) & 0xf],
+					g_hex[ (sample.m_data >> 24) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 20) & 0xf],
+					g_hex[ (sample.m_data >> 16) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 12) & 0xf],
+					g_hex[ (sample.m_data >> 8) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 4) & 0xf],
+					g_hex[ (sample.m_data >> 0) & 0xf],
+					'\0'
+				};
+				return string(ret);
 			}
 
 		case EthernetFrameSegment::TYPE_SRC_MAC:
 			{
-				if(sample.m_data.size() != 6)
-					return "[invalid src MAC length]";
-
-				snprintf(tmp, sizeof(tmp), "From %02x:%02x:%02x:%02x:%02x:%02x",
-					sample.m_data[0],
-					sample.m_data[1],
-					sample.m_data[2],
-					sample.m_data[3],
-					sample.m_data[4],
-					sample.m_data[5]);
-				return tmp;
+				char ret[] =
+				{
+					'F',
+					'r',
+					'o',
+					'm',
+					' ',
+					g_hex[ (sample.m_data >> 44) & 0xf],
+					g_hex[ (sample.m_data >> 40) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 36) & 0xf],
+					g_hex[ (sample.m_data >> 32) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 28) & 0xf],
+					g_hex[ (sample.m_data >> 24) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 20) & 0xf],
+					g_hex[ (sample.m_data >> 16) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 12) & 0xf],
+					g_hex[ (sample.m_data >> 8) & 0xf],
+					':',
+					g_hex[ (sample.m_data >> 4) & 0xf],
+					g_hex[ (sample.m_data >> 0) & 0xf],
+					'\0'
+				};
+				return string(ret);
 			}
 
 		case EthernetFrameSegment::TYPE_VLAN_TAG:
 			{
-				uint16_t tag = (sample.m_data[0] << 8) | sample.m_data[1];
+				uint16_t tag = sample.m_data;
 
 				snprintf(tmp, sizeof(tmp), "VLAN %d, PCP %d",
 					tag & 0xfff, tag >> 13);
@@ -983,12 +1019,9 @@ string EthernetWaveform::GetText(size_t i)
 
 		case EthernetFrameSegment::TYPE_ETHERTYPE:
 			{
-				if(sample.m_data.size() != 2)
-					return "[invalid Ethertype length]";
-
 				string type = "Type: ";
 
-				uint16_t ethertype = (sample.m_data[0] << 8) | sample.m_data[1];
+				uint16_t ethertype = sample.m_data;
 
 				//It's not actually an ethertype, it's a LLC frame.
 				if(ethertype < 1500)
@@ -997,7 +1030,7 @@ string EthernetWaveform::GetText(size_t i)
 					if((size_t)i+1 < m_samples.size())
 					{
 						auto& next = m_samples[i+1];
-						if(next.m_data[0] == 0x42)
+						if(next.m_data == 0x42)
 							type += "STP";
 						else
 							type += "LLC";
@@ -1045,19 +1078,11 @@ string EthernetWaveform::GetText(size_t i)
 			}
 
 		case EthernetFrameSegment::TYPE_PAYLOAD:
-			{
-				string ret;
-				for(auto b : sample.m_data)
-				{
-					snprintf(tmp, sizeof(tmp), "%02x ", b);
-					ret += tmp;
-				}
-				return ret;
-			}
+			return to_string_hex(sample.m_data, true, 2);
 
 		case EthernetFrameSegment::TYPE_INBAND_STATUS:
 			{
-				int status = sample.m_data[0];
+				int status = sample.m_data;
 
 				int up = status & 1;
 				int rawspeed = (status >> 1) & 3;
@@ -1080,14 +1105,7 @@ string EthernetWaveform::GetText(size_t i)
 		case EthernetFrameSegment::TYPE_FCS_GOOD:
 		case EthernetFrameSegment::TYPE_FCS_BAD:
 			{
-				if(sample.m_data.size() != 4)
-					return "[invalid FCS length]";
-
-				snprintf(tmp, sizeof(tmp), "CRC: %02x%02x%02x%02x",
-					sample.m_data[0],
-					sample.m_data[1],
-					sample.m_data[2],
-					sample.m_data[3]);
+				snprintf(tmp, sizeof(tmp), "CRC: %08x", static_cast<uint32_t>(sample.m_data));
 				return tmp;
 			}
 

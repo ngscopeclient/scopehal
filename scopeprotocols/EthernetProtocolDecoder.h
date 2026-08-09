@@ -63,14 +63,14 @@ public:
 		TYPE_TX_ERROR
 	} m_type;
 
-	std::vector<uint8_t> m_data;
+	uint64_t m_data;
 
 	EthernetFrameSegment()
 	{}
 
 	EthernetFrameSegment(SegmentType type, uint8_t value)
 		: m_type(type)
-	{ m_data.push_back(value); }
+	{ m_data = value; }
 
 	bool operator==(const EthernetFrameSegment& rhs) const
 	{

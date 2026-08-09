@@ -189,13 +189,18 @@ void PcapngExportFilter::ExportEthernet(EthernetWaveform* wfm)
 			//Frame data
 			case EthernetFrameSegment::TYPE_DST_MAC:
 			case EthernetFrameSegment::TYPE_SRC_MAC:
+				for(size_t j=0; j<6; j++)
+					bytes.push_back(samp.m_data >> ( (5-j) * 8) );
+				break;
+
 			case EthernetFrameSegment::TYPE_ETHERTYPE:
 			case EthernetFrameSegment::TYPE_VLAN_TAG:
+				for(size_t j=0; j<2; j++)
+					bytes.push_back(samp.m_data >> ( (1-j) * 8) );
+				break;
+
 			case EthernetFrameSegment::TYPE_PAYLOAD:
-				{
-					for(size_t j=0; j<samp.m_data.size(); j++)
-						bytes.push_back(samp.m_data[j]);
-				}
+				bytes.push_back(samp.m_data);
 				break;
 
 			//Good checksum, save the packet to the file
