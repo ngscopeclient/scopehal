@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "EthernetProtocolDecoder.h"
+#include <zlib.h>
 
 using namespace std;
 
@@ -403,7 +404,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of FCS? Record start time
 				if(nbytes == 0)
 				{
-					crc_expected = CRC32(&bytes[0], crcstart, i-1);
+					crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
 
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
@@ -824,7 +825,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Start of FCS? Record start time
 				if(nbytes == 0)
 				{
-					crc_expected = CRC32(&bytes[0], crcstart, i-1);
+					crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
 
 					start = starts[i];
 					cap->m_offsets.push_back(start);
