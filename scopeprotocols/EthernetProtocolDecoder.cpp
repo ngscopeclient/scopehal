@@ -462,6 +462,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
 	size_t nbytes = 0;
+	size_t ibase = 0;
 
 	//If we are suppressing the preamble, jump straight into the data
 	if(suppressedPreambleAndFCS)
@@ -729,6 +730,33 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					//It's an 802.1q tag, decode the VLAN header
 					if(ethertype == 0x8100)
 						segment.m_type = EthernetFrameSegment::TYPE_VLAN_TAG;
+					else
+					{
+						//We should have space for at least the FCS
+						if(i+4 < len)
+						{
+							//Bulk allocate and copy packet data
+							size_t nPayloadBytes = len - 5 - i;
+							pack->m_data.resize(nPayloadBytes);
+							memcpy(&pack->m_data[0], bytes + i + 1, nPayloadBytes);
+
+							//Bulk copy offsets
+							ibase = cap->m_offsets.size();
+							cap->m_offsets.resize(ibase + nPayloadBytes);
+							memcpy(&cap->m_offsets[ibase], starts + i + 1, nPayloadBytes * sizeof(int64_t));
+
+							//Allocate memory for durations
+							cap->m_durations.resize(ibase + nPayloadBytes);
+							cap->m_samples.resize(ibase + nPayloadBytes);
+						}
+
+						//Packet ended prematurely, stop
+						else
+						{
+							delete pack;
+							return;
+						}
+					}
 				}
 
 				break;
@@ -768,13 +796,10 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Add a data element
 				//For now, each byte is its own payload blob
 				start = starts[i];
-				cap->m_offsets.push_back(start);
-				cap->m_durations.push_back(ends[i] - start);
-				segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-				segment.m_data = bytes[i];
-				cap->m_samples.push_back(segment);
-
-				pack->m_data.push_back(bytes[i]);
+				cap->m_durations[ibase + nbytes] = ends[i] - start;
+				cap->m_samples[ibase + nbytes].m_data = bytes[i];
+				cap->m_samples[ibase + nbytes].m_type = EthernetFrameSegment::TYPE_PAYLOAD;
+				nbytes ++;
 
 				//If almost at end of packet, next 4 bytes are FCS
 				if(suppressedPreambleAndFCS)
