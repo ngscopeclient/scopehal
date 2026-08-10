@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2024 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "EthernetProtocolDecoder.h"
+#include <zlib.h>
 
 using namespace std;
 
@@ -65,9 +66,10 @@ vector<string> EthernetProtocolDecoder::GetHeaders()
 // Actual protocol decoding
 
 void EthernetProtocolDecoder::BytesToFrames(
-		vector<uint8_t>& bytes,
-		vector<uint64_t>& starts,
-		vector<uint64_t>& ends,
+		uint8_t* bytes,
+		uint64_t* starts,
+		uint64_t* ends,
+		size_t len,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS)
 {
@@ -75,16 +77,16 @@ void EthernetProtocolDecoder::BytesToFrames(
 	//jump to optimized special case implementation that doesn't have to idiv all the time
 	if(cap->m_timescale == 1)
 	{
-		BytesToFramesUnitTimescale(bytes, starts, ends, cap, suppressedPreambleAndFCS);
+		BytesToFramesUnitTimescale(bytes, starts, ends, len, cap, suppressedPreambleAndFCS);
 		return;
 	}
 
 	Packet* pack = new Packet;
+	pack->m_data.reserve(1500);
 
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
 	size_t start = 0;
-	size_t len = bytes.size();
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
@@ -269,7 +271,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
-						if( (i+1) < bytes.size() )
+						if( (i+1) < len )
 						{
 							if(bytes[i+1] == 0x42)
 							{
@@ -382,14 +384,14 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//If almost at end of packet, next 4 bytes are FCS
 				if(suppressedPreambleAndFCS)
 				{
-					if(i == bytes.size()-1)
+					if(i == len - 1)
 					{
 						pack->m_len = ends[i] - pack->m_offset;
 						m_packets.push_back(pack);
 						return;
 					}
 				}
-				else if(i == bytes.size() - 5)
+				else if(i == len - 5)
 				{
 					segment.m_data = 0;
 					nbytes = 0;
@@ -402,7 +404,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of FCS? Record start time
 				if(nbytes == 0)
 				{
-					crc_expected = CRC32(&bytes[0], crcstart, i-1);
+					crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
 
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
@@ -445,9 +447,10 @@ void EthernetProtocolDecoder::BytesToFrames(
 }
 
 void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
-		vector<uint8_t>& bytes,
-		vector<uint64_t>& starts,
-		vector<uint64_t>& ends,
+		uint8_t* bytes,
+		uint64_t* starts,
+		uint64_t* ends,
+		size_t len,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS)
 {
@@ -456,11 +459,11 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
 	size_t start = 0;
-	size_t len = bytes.size();
 	size_t crcstart = 0;
 	uint32_t crc_expected = 0;
 	uint32_t crc_actual = 0;
 	size_t nbytes = 0;
+	size_t ibase = 0;
 
 	//If we are suppressing the preamble, jump straight into the data
 	if(suppressedPreambleAndFCS)
@@ -667,7 +670,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
-						if( (i+1) < bytes.size() )
+						if( (i+1) < len )
 						{
 							if(bytes[i+1] == 0x42)
 							{
@@ -728,6 +731,33 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					//It's an 802.1q tag, decode the VLAN header
 					if(ethertype == 0x8100)
 						segment.m_type = EthernetFrameSegment::TYPE_VLAN_TAG;
+					else
+					{
+						//We should have space for at least the FCS
+						if(i+4 < len)
+						{
+							//Bulk allocate and copy packet data
+							size_t nPayloadBytes = len - 5 - i;
+							pack->m_data.resize(nPayloadBytes);
+							memcpy(&pack->m_data[0], bytes + i + 1, nPayloadBytes);
+
+							//Bulk copy offsets
+							ibase = cap->m_offsets.size();
+							cap->m_offsets.resize(ibase + nPayloadBytes);
+							memcpy(&cap->m_offsets[ibase], starts + i + 1, nPayloadBytes * sizeof(int64_t));
+
+							//Allocate memory for durations
+							cap->m_durations.resize(ibase + nPayloadBytes);
+							cap->m_samples.resize(ibase + nPayloadBytes);
+						}
+
+						//Packet ended prematurely, stop
+						else
+						{
+							delete pack;
+							return;
+						}
+					}
 				}
 
 				break;
@@ -767,25 +797,22 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Add a data element
 				//For now, each byte is its own payload blob
 				start = starts[i];
-				cap->m_offsets.push_back(start);
-				cap->m_durations.push_back(ends[i] - start);
-				segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-				segment.m_data = bytes[i];
-				cap->m_samples.push_back(segment);
-
-				pack->m_data.push_back(bytes[i]);
+				cap->m_durations[ibase + nbytes] = ends[i] - start;
+				cap->m_samples[ibase + nbytes].m_data = bytes[i];
+				cap->m_samples[ibase + nbytes].m_type = EthernetFrameSegment::TYPE_PAYLOAD;
+				nbytes ++;
 
 				//If almost at end of packet, next 4 bytes are FCS
 				if(suppressedPreambleAndFCS)
 				{
-					if(i == bytes.size()-1)
+					if(i == len - 1)
 					{
 						pack->m_len = ends[i] - pack->m_offset;
 						m_packets.push_back(pack);
 						return;
 					}
 				}
-				else if(i == bytes.size() - 5)
+				else if(i == len - 5)
 				{
 					segment.m_data = 0;
 					nbytes = 0;
@@ -798,7 +825,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Start of FCS? Record start time
 				if(nbytes == 0)
 				{
-					crc_expected = CRC32(&bytes[0], crcstart, i-1);
+					crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
 
 					start = starts[i];
 					cap->m_offsets.push_back(start);
