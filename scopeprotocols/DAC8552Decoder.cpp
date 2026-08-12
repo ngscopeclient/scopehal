@@ -51,8 +51,10 @@ string DAC8552Waveform::GetText(size_t i)
 	const DAC8552Symbol& s = m_samples[i];
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "Load %s %s, Bfr=%c, Value=%d",
-			s.loadA() ? "A" : "", s.loadB() ? "B" : "", s.bfrSelect() ? 'A' : 'B', s.m_value);
+	static const char* load_strs[] = {"No Load", "Load A", "Load B", "Load A&B"};
+	const char* load_str = load_strs[s.loadA() ? (s.loadB() ? 3 : 1) : (s.loadB() ? 2 : 0)];
+	snprintf(tmp, sizeof(tmp), "%s, Bfr=%c, Value=0x%04X",
+			load_str, s.bfrSelect() ? 'B' : 'A', s.m_value);
 	return string(tmp);
 }
 
