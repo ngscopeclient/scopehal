@@ -81,7 +81,7 @@ string SPIDecoder::GetProtocolName()
 
 // Sample the current data-bit.
 void SPIDecoder::sampleBit(SPIWaveform* cap, size_t timestamp, int endian, uint8_t& current_byte, uint8_t& bitcount, int64_t& bytestart,
-			bool cur_data, bool first)
+			bool& cur_data, bool& first)
 {
 	if(bitcount == 0)
 	{
