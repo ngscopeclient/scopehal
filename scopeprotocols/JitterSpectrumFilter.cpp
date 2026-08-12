@@ -158,6 +158,12 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 	return ui_width;
 }
 
+uint32_t JitterSpectrumFilter::GetExecutionCapabilitiesMask()
+{
+	//for now, not tail call capable since we do CPU side input preprocessing
+	return 0;
+}
+
 void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	#ifdef HAVE_NVTX
@@ -165,6 +171,7 @@ void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	#endif
 
 	//Make sure we've got valid inputs
+	ClearMessages();
 	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInput(0).GetData());
 	if(!din)
 	{
@@ -218,5 +225,17 @@ void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 
 	//and do the actual FFT processing
+
+	//FIXME: CPU side processing
+	cmdBuf.begin({});
+
 	DoRefresh(din, extended_samples, ui_width_final, npoints, nouts, false, cmdBuf, queue);
+
+	//FIXME: DoRefresh will leave cmdbuf open if not doing peak detection
+	//since we are hacky with CPU side input processing, run the submit here until we fix trhings
+	if(m_numpeaks.GetIntVal() == 0)
+	{
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+	}
 }
