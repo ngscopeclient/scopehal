@@ -41,7 +41,7 @@ using namespace std;
 JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 	: FFTFilter(color)
 {
-	m_xAxisUnit = Unit(Unit::UNIT_HZ);
+	m_xAxisUnit = Unit(Unit::UNIT_MICROHZ);
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 	m_category = CAT_ANALYSIS;
 
@@ -160,7 +160,20 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 
 uint32_t JitterSpectrumFilter::GetExecutionCapabilitiesMask()
 {
-	//for now, not tail call capable since we do CPU side input preprocessing
+	//for now, not append capable since we do CPU side input preprocessing
+	/*if(m_numpeaks.GetIntVal() > 0)
+	{
+		return
+			//(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}
+	else
+	{
+		return
+			//(uint32_t)ExecutionCapabilities::CommandBufferAppend |
+			(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
+			(uint32_t)ExecutionCapabilities::VulkanOnly;
+	}*/
 	return 0;
 }
 
@@ -196,45 +209,44 @@ void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Q
 	//Loop over the input and copy samples.
 	//If we have runs of identical bits, extend the same jitter value.
 	//TODO: interpolate?
-	AcceleratorBuffer<float> extended_samples;
-	extended_samples.reserve(inlen);
+	ScratchBuffer_float32_t extended_samples(ScratchBufferManager::F32_GPU_WAVEFORM);
+	extended_samples->PrepareForCpuAccess();
+	extended_samples->resize(0);
+	extended_samples->reserve(inlen);
 	for(size_t i=0; i<inlen; i++)
 	{
 		int64_t nui = round(1.0 * din->m_durations[i] / ui_width);
 		for(int64_t j=0; j<nui; j++)
-			extended_samples.push_back(din->m_samples[i]);
+			extended_samples->push_back(din->m_samples[i]);
 	}
+	extended_samples->MarkModifiedFromCpu();
 
 	//Refine our estimate of the final UI width.
 	//This needs to be fairly precise as the timebase for converting FFT bins to frequency is derived from it.
 	size_t capture_duration = din->m_offsets[inlen-1] + din->m_durations[inlen-1];
-	size_t num_uis = extended_samples.size();
+	size_t num_uis = extended_samples->size();
 	double ui_width_final = static_cast<double>(capture_duration) / num_uis;
 	LogTrace("Capture is %zu UIs, %s\n", num_uis, Unit(Unit::UNIT_FS).PrettyPrint(capture_duration).c_str());
 	LogTrace("Final UI width estimate: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_width_final).c_str());
 
-	//Round size up to next power of two
-	const size_t npoints_raw = extended_samples.size();
-	const size_t npoints = next_pow2(npoints_raw);
-	LogTrace("JitterSpectrumFilter: processing %zu raw points\n", npoints_raw);
-	LogTrace("Rounded to %zu\n", npoints);
-
 	//Reallocate buffers if size has changed
-	const size_t nouts = npoints/2 + 1;
-	if(m_cachedNumPoints != npoints_raw)
-		ReallocateBuffers(npoints_raw, npoints, nouts);
+	const size_t nouts = num_uis/2 + 1;
+	if(m_cachedNumPoints != num_uis)
+		ReallocateBuffers(num_uis, num_uis, nouts);
 
 	//and do the actual FFT processing
 
-	//FIXME: CPU side processing
+	//FIXME: CPU side processing, so we need to open the command buffer ourself after doing the setup
 	cmdBuf.begin({});
 
-	DoRefresh(din, extended_samples, ui_width_final, npoints, nouts, false, cmdBuf, queue);
+	DoRefresh(din, *extended_samples, ui_width_final, num_uis, nouts, false, cmdBuf, queue);
 
-	//FIXME: DoRefresh will leave cmdbuf open if not doing peak detection
-	//since we are hacky with CPU side input processing, run the submit here until we fix trhings
+	//force a submit if not doing peak detection
 	if(m_numpeaks.GetIntVal() == 0)
 	{
+		//Mark the scratch buffer as in use until the command buffer finishes
+		queue->MarkScratchBufferUsed(extended_samples);
+
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
 	}
