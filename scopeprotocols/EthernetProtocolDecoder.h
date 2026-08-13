@@ -63,14 +63,14 @@ public:
 		TYPE_TX_ERROR
 	} m_type;
 
-	std::vector<uint8_t> m_data;
+	uint64_t m_data;
 
 	EthernetFrameSegment()
 	{}
 
 	EthernetFrameSegment(SegmentType type, uint8_t value)
 		: m_type(type)
-	{ m_data.push_back(value); }
+	{ m_data = value; }
 
 	bool operator==(const EthernetFrameSegment& rhs) const
 	{
@@ -104,12 +104,24 @@ protected:
 		std::vector<uint64_t>& starts,
 		std::vector<uint64_t>& ends,
 		EthernetWaveform* cap,
+		bool suppressedPreambleAndFCS = false)
+	{
+		BytesToFrames(&bytes[0], &starts[0], &ends[0], bytes.size(), cap, suppressedPreambleAndFCS);
+	}
+
+	void BytesToFrames(
+		uint8_t* bytes,
+		uint64_t* starts,
+		uint64_t* ends,
+		size_t len,
+		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS = false);
 
 	void BytesToFramesUnitTimescale(
-		std::vector<uint8_t>& bytes,
-		std::vector<uint64_t>& starts,
-		std::vector<uint64_t>& ends,
+		uint8_t* bytes,
+		uint64_t* starts,
+		uint64_t* ends,
+		size_t len,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS = false);
 };

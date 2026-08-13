@@ -119,14 +119,12 @@ void IPv4Decoder::Refresh(
 			case 3:
 				if(s.m_type == EthernetFrameSegment::TYPE_ETHERTYPE)
 				{
-					uint16_t ethertype = (s.m_data[0] << 8) | s.m_data[1];
-
 					//802.1q tag
-					if(ethertype == 0x8100)
+					if(s.m_data == 0x8100)
 						state = 4;
 
 					//IPv4
-					else if(ethertype == 0x0800)
+					else if(s.m_data == 0x0800)
 						state = 5;
 
 					//Something else, discard the packet as uninteresting
@@ -150,10 +148,8 @@ void IPv4Decoder::Refresh(
 			case 5:
 				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
 				{
-					uint8_t data = s.m_data[0];
-
 					//Expect 0x4-something for IP version
-					if( (data >> 4) == 4)
+					if( (s.m_data >> 4) == 4)
 					{
 						cap->m_offsets.push_back(din->m_offsets[i]);
 						cap->m_durations.push_back(halfdur);
@@ -166,7 +162,7 @@ void IPv4Decoder::Refresh(
 					}
 
 					//Header length
-					header_len = data & 0xf;
+					header_len = s.m_data & 0xf;
 
 					cap->m_offsets.push_back(din->m_offsets[i] + halfdur);
 					cap->m_durations.push_back(halfdur);
@@ -185,7 +181,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DIFFSERV, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DIFFSERV, s.m_data));
 					state = 7;
 				}
 				else
@@ -198,7 +194,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_LENGTH, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_LENGTH, s.m_data));
 					state = 8;
 				}
 				else
@@ -210,7 +206,7 @@ void IPv4Decoder::Refresh(
 					//Append to the previous sample
 					size_t n = cap->m_offsets.size() - 1;
 					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
-					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					cap->m_samples[n].m_data.push_back(s.m_data);
 					state = 9;
 				}
 				else
@@ -223,7 +219,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_ID, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_ID, s.m_data));
 					state = 10;
 				}
 				else
@@ -235,7 +231,7 @@ void IPv4Decoder::Refresh(
 					//Append to the previous sample
 					size_t n = cap->m_offsets.size() - 1;
 					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
-					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					cap->m_samples[n].m_data.push_back(s.m_data);
 					state = 11;
 				}
 				else
@@ -249,12 +245,12 @@ void IPv4Decoder::Refresh(
 					//Flags
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(halfdur);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_FLAGS, s.m_data[0] >> 5));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_FLAGS, s.m_data >> 5));
 
 					//Frag offset, high 5 bits
 					cap->m_offsets.push_back(din->m_offsets[i] + halfdur);
 					cap->m_durations.push_back(halfdur);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_FRAG_OFFSET, s.m_data[0] & 0x1f));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_FRAG_OFFSET, s.m_data & 0x1f));
 					state = 12;
 				}
 				else
@@ -266,7 +262,7 @@ void IPv4Decoder::Refresh(
 					//Append to the previous sample
 					size_t n = cap->m_offsets.size() - 1;
 					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
-					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					cap->m_samples[n].m_data.push_back(s.m_data);
 					state = 13;
 				}
 				else
@@ -279,7 +275,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_TTL, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_TTL, s.m_data));
 					state = 14;
 				}
 				else
@@ -292,7 +288,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_PROTOCOL, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_PROTOCOL, s.m_data));
 					state = 15;
 				}
 				else
@@ -305,7 +301,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_HEADER_CHECKSUM, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_HEADER_CHECKSUM, s.m_data));
 					state = 16;
 				}
 				else
@@ -317,7 +313,7 @@ void IPv4Decoder::Refresh(
 					//Append to the previous sample
 					size_t n = cap->m_offsets.size() - 1;
 					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
-					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					cap->m_samples[n].m_data.push_back(s.m_data);
 					state = 17;
 				}
 				else
@@ -330,7 +326,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_SOURCE_IP, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_SOURCE_IP, s.m_data));
 					state = 18;
 				}
 				else
@@ -344,7 +340,7 @@ void IPv4Decoder::Refresh(
 					//Append to the previous sample
 					size_t n = cap->m_offsets.size() - 1;
 					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
-					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					cap->m_samples[n].m_data.push_back(s.m_data);
 					state++;
 				}
 				else
@@ -357,7 +353,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DEST_IP, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DEST_IP, s.m_data));
 					state = 22;
 				}
 				else
@@ -371,7 +367,7 @@ void IPv4Decoder::Refresh(
 					//Append to the previous sample
 					size_t n = cap->m_offsets.size() - 1;
 					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
-					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					cap->m_samples[n].m_data.push_back(s.m_data);
 					state++;
 				}
 				else
@@ -384,7 +380,7 @@ void IPv4Decoder::Refresh(
 				{
 					cap->m_offsets.push_back(din->m_offsets[i]);
 					cap->m_durations.push_back(din->m_durations[i]);
-					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DATA, s.m_data[0]));
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DATA, s.m_data));
 				}
 
 				//terminate the packet on FCS or error

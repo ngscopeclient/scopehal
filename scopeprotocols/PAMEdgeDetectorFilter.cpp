@@ -203,9 +203,10 @@ void PAMEdgeDetectorFilter::Refresh(
 		edgeStates->resize(len);
 		edgeRising->resize(len);
 
-		uint64_t numThreads = 8192;
+		uint64_t numThreads = 4096;
 		uint64_t blockSize = 64;
 		uint64_t numBlocks = numThreads / blockSize;
+		uint64_t numBlocksEdgeSearch = numThreads;
 
 		{
 			NamedDebugRange debugRange(cmdBuf, "PAMEdgeDetector edge search");
@@ -225,7 +226,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				m_firstPassComputePipeline->BindBufferNonblocking(2, m_edgeIndexesScratch, cmdBuf, true);
 				m_firstPassComputePipeline->BindBufferNonblocking(3, m_edgeStatesScratch, cmdBuf, true);
 				m_firstPassComputePipeline->BindBufferNonblocking(4, *edgeRisingScratch, cmdBuf, true);
-				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, numBlocks);
+				m_firstPassComputePipeline->Dispatch(cmdBuf, cfg, 1, numBlocksEdgeSearch);
 				m_firstPassComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 			}
 
@@ -270,6 +271,7 @@ void PAMEdgeDetectorFilter::Refresh(
 		numThreads = 4096;
 		blockSize = 64;
 		numBlocks = numThreads / blockSize;
+		uint32_t numBlocksFirstPass = numThreads;
 
 		cmdBuf.begin({});
 		{
@@ -299,7 +301,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				m_initialMergeComputePipeline->BindBufferNonblocking(3, din->m_samples, cmdBuf);
 				m_initialMergeComputePipeline->BindBufferNonblocking(4, m_levels, cmdBuf);
 				m_initialMergeComputePipeline->BindBufferNonblocking(5, *edgeOffsetsScratch, cmdBuf, true);
-				m_initialMergeComputePipeline->Dispatch(cmdBuf, mergecfg, numBlocks);
+				m_initialMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, numBlocksFirstPass);
 				m_initialMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 			}
 
@@ -318,7 +320,7 @@ void PAMEdgeDetectorFilter::Refresh(
 				m_finalMergeComputePipeline->BindBufferNonblocking(3, cap->m_samples, cmdBuf, true);
 				m_finalMergeComputePipeline->BindBufferNonblocking(4, m_edgeCount, cmdBuf, true);
 
-				m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, /*numBlocks*/numThreads);
+				m_finalMergeComputePipeline->Dispatch(cmdBuf, mergecfg, 1, numThreads);
 				m_finalMergeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
 			}
 

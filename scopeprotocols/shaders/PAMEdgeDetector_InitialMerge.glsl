@@ -32,7 +32,7 @@
 
 #extension GL_EXT_shader_8bit_storage : require
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_debug_printf: enable
 
 layout(std430, binding=0) restrict readonly buffer buf_indexes
 {
@@ -76,9 +76,14 @@ layout(std430, push_constant) uniform constants
 	uint order;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define X_SIZE 64
+layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
 
 #include "../../scopehal/shaders/InterpolateTime.h.glsl"
+
+shared bool s_hit[X_SIZE];
+shared bool s_merging[X_SIZE];
+shared int64_t s_tlerp[X_SIZE];
 
 /**
 	@brief Merge the level crossings into symbol crossings (e.g. 0-1 and 1-2 in a short time frame become a 0-2)
@@ -88,23 +93,25 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//Find our block of inputs
-	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	uint instart = gl_GlobalInvocationID.x * inputPerThread;
+	uint numThreads = gl_NumWorkGroups.y * gl_WorkGroupSize.y;
+	uint instart = gl_GlobalInvocationID.y * inputPerThread;
 	uint inend = instart + inputPerThread;
 	if(inend > numIndexes)
 		inend = numIndexes;
 
 	//Block of outputs
-	uint outbase = gl_GlobalInvocationID.x * outputPerThread;
+	uint outbase = gl_GlobalInvocationID.y * outputPerThread;
 
 	uint nouts = 0;
-	if(gl_GlobalInvocationID.x == 0)
+	if(gl_GlobalInvocationID.y == 0)
 	{
 		//Skip the first sample of the waveform if we have an edge there, since we can't interpolate
 		if(indexes[0] == 0)
 			instart ++;
 	}
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	/*
 	//Loop over edges and determine which groups of edges are actually a single level crossing
 	int64_t tlast = 0;
 	for(uint i=instart; i < inend; i++)
@@ -189,4 +196,124 @@ void main()
 
 	//Write final output count
 	offsets[outbase] = int64_t(nouts);
+	*/
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	//Loop over edges and determine which groups of edges are actually a single level crossing
+	int64_t tlast = 0;
+	for(uint i=instart; i < inend; i += X_SIZE)
+	{
+		//Need to bounds check within the loop since we can run up to X_SIZE off the end in the last iteration
+		uint ireal = i + gl_LocalInvocationID.x;
+		int64_t tlerp = 0;
+		s_hit[gl_LocalInvocationID.x] = false;
+		if(ireal < inend)
+		{
+			uint istart = indexes[ireal] - 1;
+			uint iend = indexes[ireal] + 1;
+			if(iend < numSamples)
+			{
+				uint symstart;
+				uint symend = uint(states[ireal]);
+
+				uint isRising = uint(rising[ireal]);
+				if(isRising != 0)
+					symstart = symend - 1;
+				else
+					symstart = symend + 1;
+
+				//If the previous edge is close to this one (< 0.5 UI)
+				//and they're both rising or falling, merge them
+				bool merging = false;
+				for(uint lookback = 1; lookback < order-1; lookback ++)
+				{
+					if(ireal <= lookback)
+						break;
+
+					int64_t delta = int64_t(indexes[ireal] - indexes[ireal-lookback]) * timescale;
+					if( (uint(rising[ireal-lookback]) == isRising) && (delta < halfui) )
+					{
+						merging = true;
+						istart = indexes[ireal-lookback]-1;
+
+						if(isRising != 0)
+							symstart = symend - (lookback+1);
+						else
+							symstart = symend + (lookback+1);
+					}
+					else
+						break;
+				}
+
+				//Find the midpoint (for now, fixed threshold still)
+				float target = (levels[symstart] + levels[symend]) / 2;
+				for(uint j=istart; j<iend; j++)
+				{
+					if(j == 0)
+						continue;
+
+					float prev = samples[j-1];
+					float cur = samples[j];
+
+					if(	( (prev <= target) && (cur > target) ) ||
+						( (prev >= target) && (cur < target) ) )
+					{
+						float delta = InterpolateTime(samples[j-1], samples[j], target) * float(timescale);
+						tlerp = int64_t(j-1)*timescale + int64_t(delta);
+						tlerp += triggerPhase;
+						break;
+					}
+				}
+
+				//Drop samples if interpolation failed
+				//otherwise save it
+				if(tlerp != 0)
+				{
+					s_hit[gl_LocalInvocationID.x] = true;
+					s_merging[gl_LocalInvocationID.x] = merging;
+					s_tlerp[gl_LocalInvocationID.x] = tlerp;
+				}
+			}
+		}
+
+		//Sync and write back
+		barrier();
+
+		//TODO: parallel write back somehow can be even faster?
+		if(gl_LocalInvocationID.x == 0)
+		{
+			for(uint j=0; j<gl_WorkGroupSize.x; j++)
+			{
+				if(s_hit[j])
+				{
+					//Drop samples if interpolation failed
+					int64_t lerp = s_tlerp[j];
+					if(tlast == lerp)
+						continue;
+
+					//Overwrite previous sample with new edge timestamp
+					if(s_merging[j] && (nouts > 0) )
+					{
+						tlast = lerp;
+						offsets[outbase + nouts] = lerp;
+					}
+
+					//Create a new edge
+					else
+					{
+						tlast = lerp;
+						offsets[outbase + nouts + 1] = lerp;
+						nouts ++;
+					}
+				}
+			}
+		}
+
+		barrier();
+	}
+
+	//Write final output count
+	if(gl_LocalInvocationID.x == 0)
+		offsets[outbase] = int64_t(nouts);
 }

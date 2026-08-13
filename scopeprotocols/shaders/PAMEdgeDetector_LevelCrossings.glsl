@@ -65,7 +65,11 @@ layout(std430, push_constant) uniform constants
 	uint outputPerThread;
 };
 
-layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+#define X_SIZE 64
+
+shared bool s_hit[X_SIZE];
+
+layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
 
 /**
 	@brief First-pass zero crossing detection
@@ -76,8 +80,8 @@ layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 void main()
 {
 	//Find our block of inputs
-	uint numThreads = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
-	uint instart = gl_GlobalInvocationID.x * inputPerThread;
+	uint numThreads = gl_NumWorkGroups.y * gl_WorkGroupSize.y;
+	uint instart = gl_GlobalInvocationID.y * inputPerThread;
 	uint inend = instart + inputPerThread;
 
 	//Block of outputs
@@ -94,48 +98,78 @@ void main()
 	//If we start after the end of the array, stop
 	if(instart >= len)
 	{
-		idx[gl_GlobalInvocationID.x] = 0;
+		if(gl_LocalInvocationID.x == 0)
+			idx[gl_GlobalInvocationID.y] = 0;
 		return;
 	}
 
 	uint numThresholds = order-1;
 	uint maxOuts = outputPerThread - 1;
 
-	for(uint i = instart; (i < inend) && (nouts < maxOuts); i ++)
+	uint cur_rising = 0;
+	uint cur_state = 0;
+
+	for(uint i = instart; (i < inend) && (nouts < maxOuts); i += X_SIZE)
 	{
-		//Check against each threshold for both rising and falling edges
-		float prev = samples[i-1];
-		float cur = samples[i];
-
-		//Prepare to make a new edge
-		for(uint j=0; j<numThresholds; j++)
+		//Need to bounds check within the loop since we can run up to X_SIZE off the end in the last iteration
+		uint ireal = i + gl_LocalInvocationID.x;
+		s_hit[gl_LocalInvocationID.x] = false;
+		if(ireal < inend)
 		{
-			float t = thresholds[j];
-			uint iout = (nouts + 1) * numThreads + gl_GlobalInvocationID.x;
-
-			//Check for rising edge
-			if( (prev <= t) && (cur > t) )
+			//Check against each threshold for both rising and falling edges
+			float prev = samples[ireal-1];
+			float cur = samples[ireal];
+			for(uint j=0; j<numThresholds; j++)
 			{
-				idx[iout] = i;
-				rising[iout] = uint8_t(1);
-				states[iout] = uint8_t(j+1);
-				nouts ++;
-				break;
-			}
+				float t = thresholds[j];
 
-			//Check for falling edge
-			else if( (prev >= t) && (cur < t) )
-			{
-				idx[iout] = i;
-				rising[iout] = uint8_t(0);
-				states[iout] = uint8_t(j);
-				nouts ++;
-				break;
+				//Check for rising edge
+				if( (prev <= t) && (cur > t) )
+				{
+					s_hit[gl_LocalInvocationID.x] = true;
+					cur_rising = 1;
+					cur_state = j+1;
+					break;
+				}
+
+				//Check for falling edge
+				else if( (prev >= t) && (cur < t) )
+				{
+					s_hit[gl_LocalInvocationID.x] = true;
+					cur_rising = 0;
+					cur_state = j;
+					break;
+				}
 			}
-			//else not a level crossing
 		}
+
+		//Sync and write back
+		barrier();
+		for(uint j=0; j<gl_WorkGroupSize.x; j++)
+		{
+			if(s_hit[j])
+			{
+				if(j == gl_LocalInvocationID.x)
+				{
+					uint iout = (nouts + 1) * numThreads + gl_GlobalInvocationID.y;
+
+					idx[iout] = i + j;
+
+					//TODO: can we merge these into less 32-bit writes?
+					rising[iout] = uint8_t(cur_rising);
+					states[iout] = uint8_t(cur_state);
+				}
+
+				nouts ++;
+
+				if(nouts >= maxOuts)
+					break;
+			}
+		}
+		barrier();
 	}
 
 	//Save number of outputs we found
-	idx[gl_GlobalInvocationID.x] = nouts;
+	if(gl_LocalInvocationID.x == 0)
+		idx[gl_GlobalInvocationID.y] = nouts;
 }

@@ -110,12 +110,12 @@ void main()
 	uint ioutBase = nthread * maxPacketBytes;
 	uint iout = 1;
 
+	//Default to zero output bytes (erroneous or truncated packet)
+	starts[ioutBase] = 0;
+
 	//make sure we have a full symbol worth of data for the preamble, discard if not
 	if(i < 2)
-	{
-		starts[ioutBase] = 0;
 		return;
-	}
 
 	int64_t tnow = offsetsIn[i];
 	int64_t tlen = durationsIn[i];
@@ -289,7 +289,7 @@ void main()
 
 				//invalid, don't try to decode
 				else
-					starts[ioutBase] = 0;
+				{}
 
 				//Done with the packet
 				return;

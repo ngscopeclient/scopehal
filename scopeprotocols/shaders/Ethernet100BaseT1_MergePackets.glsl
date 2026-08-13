@@ -27,48 +27,89 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of IQDemuxFilter
- */
-#ifndef IQDemuxFilter_h
-#define IQDemuxFilter_h
+#version 460
+#pragma shader_stage(compute)
 
-class IQDemuxConstants
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_ARB_gpu_shader_int64 : require
+
+layout(std430, binding=0) restrict readonly buffer buf_startsIn
 {
-public:
-	uint32_t useBaseT1Alignment;
-	uint32_t outlen;
+	uint startsIn[];
 };
 
-class IQDemuxFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_scramblersIn
 {
-public:
-	IQDemuxFilter(const std::string& color);
+	uint64_t scramblersIn[];
+};
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual uint32_t GetExecutionCapabilitiesMask() override;
+layout(std430, binding=2) restrict writeonly buffer buf_startsOut
+{
+	uint startsOut[];
+};
 
-	static std::string GetProtocolName();
+layout(std430, binding=3) restrict writeonly buffer buf_scramblersOut
+{
+	uint64_t scramblersOut[];
+};
 
-	enum AlignmentType
+layout(std430, binding=4) restrict writeonly buffer buf_npackets
+{
+	uint64_t npackets[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint nthreads;
+	uint maxOutputPerThread;
+};
+
+#define X_SIZE 128
+
+layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
+
+shared uint s_packetsFromThread[X_SIZE];
+
+void main()
+{
+	//We only run a single work group for now
+	uint nthread = gl_GlobalInvocationID.x;
+
+	//Output packet count
+	uint nouts = 0;
+
+	for(uint i=0; i<nthreads; i += X_SIZE)
 	{
-		ALIGN_NONE,
-		ALIGN_100BASET1
-	};
+		//Parallel read the size of each block and cache in shared memory
+		uint ireal = i + gl_LocalInvocationID.x;
+		uint outbase = ireal * maxOutputPerThread;
+		uint numEntries = startsIn[outbase];
 
-	PROTOCOL_DECODER_INITPROC(IQDemuxFilter)
+		//If we get bogus output, set size to zero
+		if(numEntries > maxOutputPerThread)
+			numEntries = 0;
 
-protected:
-	void DispatchAlign(vk::raii::CommandBuffer& cmdBuf, SparseAnalogWaveform* din, size_t len);
+		s_packetsFromThread[gl_LocalInvocationID.x] = numEntries;
 
-	FilterParameter& m_alignment;
+		//Add up the total number of packets before our start position so we know where to write
+		barrier();
+		for(uint j=0; j<gl_LocalInvocationID.x; j++)
+			nouts += s_packetsFromThread[j];
 
-	std::shared_ptr<ComputePipeline> m_demuxComputePipeline;
-	std::shared_ptr<ComputePipeline> m_alignComputePipeline;
+		//Actually copy the outputs
+		for(uint j=0; j<numEntries; j++)
+		{
+			startsOut[nouts + j] 		= startsIn[outbase + j + 1];
+			scramblersOut[nouts + j]	= scramblersIn[outbase + j + 1];
+		}
 
-	AcceleratorBuffer<uint32_t> m_alignOut;
-};
+		//Add our packet count, plus subsequent ones, so next block starts at the right spot
+		for(uint j=gl_LocalInvocationID.x; j<X_SIZE; j++)
+			nouts += s_packetsFromThread[j];
 
-#endif
+		barrier();
+	}
+
+	if(gl_GlobalInvocationID.x == 0)
+		npackets[0] = nouts;
+}

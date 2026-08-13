@@ -505,8 +505,12 @@ bool ConstellationFilter::PerformAction(const string& id)
 
 		auto din_i = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
 		auto din_q = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(1));
+
 		if(din_i && din_q)
 		{
+			din_i->PrepareForCpuAccess();
+			din_q->PrepareForCpuAccess();
+
 			//Calculate range of input
 			float halfrange = GetVoltageRange(0)/2;
 			float mid = GetOffset(0);

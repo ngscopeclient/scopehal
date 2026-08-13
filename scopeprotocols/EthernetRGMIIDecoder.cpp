@@ -123,7 +123,7 @@ void EthernetRGMIIDecoder::Refresh(
 			{
 				auto& sample = cap->m_samples[last];
 				if( (sample.m_type == EthernetFrameSegment::TYPE_INBAND_STATUS) &&
-					(sample.m_data[0] == status) )
+					(sample.m_data == status) )
 				{
 					extend = true;
 				}

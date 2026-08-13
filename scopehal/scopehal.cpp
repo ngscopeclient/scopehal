@@ -1093,7 +1093,7 @@ void CreateDirectory(const string& path)
 #endif
 
 /**
-	@brief Calculates a CRC32 checksum using the standard Ethernet polynomial
+	@brief Calculates a CRC32 checksum in network byte order using the standard Ethernet polynomial
  */
 uint32_t CRC32(const uint8_t* bytes, size_t start, size_t end)
 {

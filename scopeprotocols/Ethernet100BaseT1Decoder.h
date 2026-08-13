@@ -51,7 +51,7 @@ public:
 	uint32_t	len;
 	uint32_t	samplesPerThread;
 	uint32_t	maxOutputPerThread;
-	uint8_t		masterMode;
+	uint32_t	masterMode;
 };
 
 class BaseT1DecodeConstants
@@ -63,12 +63,20 @@ public:
 	uint32_t	masterMode;
 };
 
+class BaseT1MergeConstants
+{
+public:
+	uint32_t	nthreads;
+	uint32_t	maxOutputPerThread;
+};
+
 class Ethernet100BaseT1Decoder : public EthernetProtocolDecoder
 {
 public:
 	Ethernet100BaseT1Decoder(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual uint32_t GetExecutionCapabilitiesMask() override;
 
 	static std::string GetProtocolName();
 
@@ -81,6 +89,16 @@ public:
 	};
 
 protected:
+	void SymbolDecode(
+		vk::raii::CommandBuffer& cmdBuf,
+		size_t ilen,
+		float cutip,
+		float cutqp,
+		float cutin,
+		float cutqn,
+		SparseAnalogWaveform* din_i,
+		SparseAnalogWaveform* din_q);
+
 	FilterParameter& m_scrambler;
 
 	FilterParameter& m_upperThresholdI;
@@ -94,6 +112,7 @@ protected:
 	std::shared_ptr<ComputePipeline> m_pam3DecodeComputePipeline;
 	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
 	std::shared_ptr<ComputePipeline> m_decodeComputePipeline;
+	std::shared_ptr<ComputePipeline> m_mergePacketsPipeline;
 };
 
 #endif
