@@ -276,6 +276,9 @@ void LeCroyOscilloscope::IdentifyHardware()
 	{
 		if(m_model.find("HD") != string::npos)
 			m_modelid = MODEL_WAVEPRO_HD;
+
+		if(m_model.find("WP7") != string::npos)
+			m_modelid = MODEL_WAVEPRO_7K;
 	}
 	else if(m_model.find("WAVERUNNER9") == 0)
 	{
@@ -397,14 +400,26 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Ignoring";
 			}
 
-			//Extra sample rate and memory for WaveRunner 8000
+			
 			else if(o == "-M")
 			{
-				m_hasFastSampleRate = true;
-				m_memoryDepthOption = 128;
-				type = "Hardware";
-				desc = "Extra sample rate and memory";
-				action = "Enabled";
+				if(m_modelid == MODEL_WAVEPRO_7K)
+				{
+					m_memoryDepthOption = 8;
+					type = "Hardware";
+					desc = "Extra memory - 4Mpts/4ch 8Mpts/2Ch";
+					action = "Enabled";
+				}
+				else
+				{
+					//Extra sample rate and memory for WaveRunner 8000
+					m_hasFastSampleRate = true;
+					m_memoryDepthOption = 128;
+					type = "Hardware";
+					desc = "Extra sample rate and memory";
+					action = "Enabled";
+				}
+
 			}
 
 			//Extra memory depth for WaveRunner 8000HD and WavePro HD
@@ -454,6 +469,7 @@ void LeCroyOscilloscope::DetectOptions()
 			//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family (seems like 7Zi has this too)
 			else if(o == "-S")
 			{
+				
 				type = "Hardware";
 				desc = "Small (32M point) memory";
 				m_memoryDepthOption = 32;
@@ -461,6 +477,7 @@ void LeCroyOscilloscope::DetectOptions()
 			}
 			else if(o == "-M")
 			{
+				// FIXME - is this reachable? there is another identical condition above
 				type = "Hardware";
 				desc = "Medium (64M point) memory";
 				m_memoryDepthOption = 64;
@@ -468,10 +485,21 @@ void LeCroyOscilloscope::DetectOptions()
 			}
 			else if(o == "-L")
 			{
-				type = "Hardware";
-				desc = "Large (128M point) memory";
-				m_memoryDepthOption = 128;
-				action = "Enabled";
+				if(m_modelid == MODEL_WAVEPRO_7K)
+				{
+					type = "Hardware";
+					desc = "Extra memory - 8Mpts/4ch 16Mpts/2Ch";
+					m_memoryDepthOption = 16;
+					action = "Enabled";
+				}else
+				{
+					//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family (seems like 7Zi has this too)
+					type = "Hardware";
+					desc = "Large (128M point) memory";
+					m_memoryDepthOption = 128;
+					action = "Enabled";
+				}
+
 			}
 			else if(o == "-V")
 			{
@@ -481,7 +509,16 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
-			//Memory capacity options for DDA 5000 family
+			else if(o == "-VL")
+			{
+				// Wavepro 7K 
+				type = "Hardware";
+				desc = "Extra memory - 16Mpts/4ch 32Mpts/2Ch";
+				m_memoryDepthOption = 32;
+				action = "Enabled";
+			}
+
+			//Memory capacity options for DDA 5000 family, Wavepro 7K
 			else if(o == "-XL")
 			{
 				type = "Hardware";
@@ -936,6 +973,7 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
 		case MODEL_SDA_6K:
+		case MODEL_WAVEPRO_7K:
 			nchans = 4;
 			break;
 
@@ -1324,6 +1362,7 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_WAVEMASTER_8ZI_A:
 		case MODEL_WAVEMASTER_8ZI_B:
 		case MODEL_WAVEPRO_HD:
+		case MODEL_WAVEPRO_7K:
 		case MODEL_WAVERUNNER_9K:
 			return (i == 1) || (i == 2) || (i > m_analogChannelCount);
 
@@ -1408,7 +1447,9 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	auto name = GetProbeName(i);
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_probeIsActive[i] = (name != "");
+		// some LeCroy scopes (WK7K is one) report passive
+		// probes with an indicating pin with the name "Ringx10"
+		m_probeIsActive[i] = (name != "") && (name.find("Ringx") != 0);
 	}
 
 	if(reply == "A1M")
@@ -1742,14 +1783,34 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 	if(i >= m_analogChannelCount)
 		return "";
 
-	//Step 1: Determine which input is active.
-	//There's always a mux selector in software, even if only one is present on the physical acquisition board
-	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
-	auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 
-	//Step 2: Identify the probe connected to this mux channel
-	auto name = Trim(m_transport->SendCommandQueuedWithReply(
-		string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'"));
+
+	string name;
+		
+	if(m_modelid == MODEL_WAVEPRO_7K)
+	{
+		// Does not have the mux selector. 
+		// path is app.Acquisition.C1.ProbeName
+		string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
+	
+		//Step 2: Identify the probe connected to this mux channel
+		name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = ") + prefix + ".ProbeName'"));
+
+	}else
+	{
+		//Step 1: Determine which input is active.
+		//There's always a mux selector in software, even if only one is present on the physical acquisition board
+		string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
+		auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
+
+		//Step 2: Identify the probe connected to this mux channel
+		name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'"));
+
+	}
+	
+
 
 	//API requires empty string if no probe
 	if(name == "None")
@@ -3250,6 +3311,12 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		if(m_modelid == MODEL_WAVERUNNER_8K)
 			ret.push_back(1000);
 
+		if(m_modelid == MODEL_WAVEPRO_7K)
+		{
+			ret.push_back(500);
+			ret.push_back(1000);
+		}
+
 		bool wm7 =
 			(m_modelid == MODEL_SDA_7ZI) ||
 			(m_modelid == MODEL_SDA_7ZI_A);
@@ -3430,6 +3497,15 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 				ret.push_back(10 * g);
 				if(m_hasFastSampleRate)
 					ret.push_back(20 * g);
+				break;
+
+			case MODEL_WAVEPRO_7K:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1250 * m);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
 				break;
 
 			default:
@@ -3642,6 +3718,38 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 					ret.push_back(64 * m);
 				}
 				break;
+			
+			case MODEL_WAVEPRO_7K:
+				// some of these are a bit speculative based on the brochure
+				if(m_memoryDepthOption == 2)
+				{
+					// 1M samples non-interleaved
+					ret.pop_back();
+					ret.pop_back();
+				}
+				else if(m_memoryDepthOption == 8)
+				{
+					ret.push_back(4 * m);
+				}
+				else if(m_memoryDepthOption == 16)
+				{
+					ret.push_back(5 * m);
+					ret.push_back(8 * m);
+				}
+				else if(m_memoryDepthOption == 32)
+				{
+					ret.push_back(5 * m);
+					ret.push_back(10 * m);
+					ret.push_back(16 * m);
+				}
+				else if(m_memoryDepthOption == 48)
+				{
+					ret.push_back(5 * m);
+					ret.push_back(10 * m);
+					ret.push_back(24 * m);
+				}
+
+				break;
 
 			//TODO: add more models here
 			default:
@@ -3654,6 +3762,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 {
+	const int64_t k = 1000;
+	const int64_t m = k*k;
 	vector<uint64_t> base = GetSampleDepthsNonInterleaved();
 
 	//Default to doubling the non-interleaved depths
@@ -3684,6 +3794,44 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		case MODEL_WAVEMASTER_8ZI:
 		case MODEL_WAVEMASTER_8ZI_A:
 		//SDA/wavemaster 8Zi-B can interleave
+
+		case MODEL_WAVEPRO_7K:
+			// some of these are a bit speculative based on the brochure
+			if(m_memoryDepthOption == 2)
+			{
+				// 1M samples non-interleaved
+				ret.pop_back();
+				ret.pop_back();
+				ret.push_back(2 * m);
+
+			}
+			else if(m_memoryDepthOption == 8)
+			{
+				ret.push_back(4 * m);
+				ret.push_back(8 * m);
+			}
+			else if(m_memoryDepthOption == 16)
+			{
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(16 * m);
+			}
+			else if(m_memoryDepthOption == 32)
+			{
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(25 * m);
+				ret.push_back(32 * m);
+			}
+			else if(m_memoryDepthOption == 48)
+			{
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(25 * m);
+				ret.push_back(48 * m);
+			}
+
+			break;
 
 		//TODO: add more models here
 		default:
@@ -4727,7 +4875,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 
 	//Level
 	string tmp;
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.TrigLevel'");
 	else
 		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
@@ -4736,7 +4884,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	//TODO: OptimizeForHF (changes hysteresis for fast signals)
 
 	//Slope
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 	{
 		//Get trigger source
 		auto src = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Source'"));
@@ -5484,7 +5632,7 @@ void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 {
 	//Level
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 		PushFloat("app.Acquisition.Trigger.TrigLevel", GetTriggerLevelWithInversion(trig));
 	else
 		PushFloat(tree + ".Level", GetTriggerLevelWithInversion(trig));
@@ -5510,7 +5658,7 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 			return;
 	}
 
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 	{
 		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
 		m_transport->SendCommandQueued(
