@@ -918,9 +918,20 @@ void Oscilloscope::ChannelsDownloadStarted()
 		if (chan == nullptr)
 			continue;
 
-		chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_WAITING;
-		chan->m_downloadProgress = 0.0;
-		chan->m_downloadStartTime = GetTime();
+		if(chan->IsEnabled())
+		{
+			chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_WAITING;
+			chan->m_downloadProgress = 0.0;
+			chan->m_downloadStartTime = GetTime();
+		}
+		else
+		{
+			chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_NONE;
+			chan->m_downloadProgress = 0.0;
+			// Do not update the downloadStartTime if the channel is not enabled
+		}
+		
+
 	}
 }
 
