@@ -194,7 +194,6 @@ bool SCPITransport::FlushCommandQueue()
 	if(tmp.size())
 		LogTrace("%zu commands being flushed\n", tmp.size());
 
-	//lock_guard<recursive_mutex> lock(m_netMutex);
 	for(auto& str : tmp)
 	{
 		if(m_rateLimitingEnabled)
