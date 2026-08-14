@@ -87,6 +87,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_highDefinition(false)
 {
 	//standard initialization
+	if(!transport->SetTimeouts(5*10000000,5*1000000)) LogWarning("Could not set timeouts\n");
 	FlushConfigCache();
 	IdentifyHardware();
 	DetectAnalogChannels();
@@ -2362,8 +2363,10 @@ bool LeCroyOscilloscope::IsTriggerArmed()
 
 Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 {
+	
 	//Read the Internal State Change Register
 	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
+	LogDebug("Sent INR?\n");
 	int inr = atoi(sinr.c_str());
 
 	//See if we got a waveform
@@ -2453,6 +2456,11 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 		return false;
 	size_t offset = tmp.find("D");
 
+	if(offset == string::npos)
+	{
+		return false;
+	} 
+
 	//Copy the rest of the block
 	data = tmp.substr(offset + 16);
 
@@ -2534,6 +2542,9 @@ bool LeCroyOscilloscope::ReadWavedescs(
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
+	
+	m_transport->FlushRXBuffer();
+
 	//(Note: with VICP framing we cannot use semicolons to separate commands)
 	BulkCheckChannelEnableState();
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -2553,16 +2564,20 @@ bool LeCroyOscilloscope::ReadWavedescs(
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
 			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":WF? DESC");
+			//LogDebug("Sent WF Desc\n");
 		}
 	}
 
 	m_transport->FlushCommandQueue();
+	LogDebug("Queue Flushed\n");
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i] || (!any_enabled && i==0))
 		{
 			if(!ReadWaveformBlock(wavedescs[i]))
 				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
+			else 
+				LogDebug("Got WF Desc\n");
 		}
 	}
 
