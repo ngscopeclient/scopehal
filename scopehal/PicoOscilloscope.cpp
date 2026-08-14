@@ -730,7 +730,7 @@ void PicoOscilloscope::BackgroundProcessing()
 }
 
 /**
-	@brief Wait for waveform conversion to finish, then push it to the pending waveforms buffer
+	@brief Wait up to 1ms for waveform conversion to finish, then push it to the pending waveforms buffer if it's done
  */
 void PicoOscilloscope::PushPendingWaveformsIfReady()
 {
@@ -887,7 +887,7 @@ bool PicoOscilloscope::DoAcquireData(bool keep)
 
 			//Clear out any previously pending waveforms before we queue up this one
 			if(i == 0)
-				PushPendingWaveformsIfReady();
+				FlushAllPendingWaveforms();
 
 			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
 

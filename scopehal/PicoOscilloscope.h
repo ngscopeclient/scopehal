@@ -201,6 +201,12 @@ protected:
 
 	void PushPendingWaveformsIfReady();
 
+	void FlushAllPendingWaveforms()
+	{
+		while(!m_wipWaveforms.empty())
+			PushPendingWaveformsIfReady();
+	}
+
 	//Helpers for determining legal configurations
 	bool Is10BitModeAvailable();
 	bool Is12BitModeAvailable();
