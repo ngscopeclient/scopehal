@@ -161,7 +161,10 @@ public:
 		CommandBufferTailCall	= 2,
 
 		//Node has essentially zero CPU-side compute, refresh just enqueues stuff
-		VulkanOnly				= 4
+		VulkanOnly				= 4,
+
+		//Node supports dynamic shader generation
+		DynamicShader			= 8
 	};
 
 	///@brief Returns a bitmask of ExecutionCapabilities fields
