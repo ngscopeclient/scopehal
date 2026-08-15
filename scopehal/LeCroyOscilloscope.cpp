@@ -2479,7 +2479,6 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 	
 	//Read the Internal State Change Register
 	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
-	LogDebug("Sent INR?\n");
 	int inr = atoi(sinr.c_str());
 
 	//See if we got a waveform
@@ -2677,7 +2676,6 @@ bool LeCroyOscilloscope::ReadWavedescs(
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
 			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":WF? DESC");
-			//LogDebug("Sent WF Desc\n");
 		}
 	}
 
@@ -2689,8 +2687,6 @@ bool LeCroyOscilloscope::ReadWavedescs(
 		{
 			if(!ReadWaveformBlock(wavedescs[i]))
 				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
-			else 
-				LogDebug("Got WF Desc\n");
 		}
 	}
 
