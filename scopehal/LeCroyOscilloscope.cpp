@@ -1472,78 +1472,142 @@ vector<OscilloscopeChannel::CouplingType> LeCroyOscilloscope::GetAvailableCoupli
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
 {
-	if(i >= m_analogChannelCount)
+	if(i >= m_analogChannelCount && i != m_extTrigChannel->GetIndex())
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 
-	string reply;
+	if(i != m_extTrigChannel->GetIndex())
 	{
-		reply = Trim(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING?"));
-		reply.resize(3);
-	}
+		// This is an analog channel, proceed as per usual
+		string reply;
+		{
+			reply = Trim(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING?"));
+			reply.resize(3);
+		}
 
-	//Check if we have an active probe connected
-	auto name = GetProbeName(i);
+		//Check if we have an active probe connected
+		auto name = GetProbeName(i);
+		{
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			// some LeCroy scopes (WK7K is one) report passive
+			// probes with an indicating pin with the name "Ringx10"
+			m_probeIsActive[i] = (name != "") && (name.find("Ringx") != 0);
+		}
+
+		if(reply == "A1M")
+			return OscilloscopeChannel::COUPLE_AC_1M;
+		else if(reply == "D1M")
+			return OscilloscopeChannel::COUPLE_DC_1M;
+		else if(reply == "D50")
+			return OscilloscopeChannel::COUPLE_DC_50;
+		else if(reply == "GND")
+			return OscilloscopeChannel::COUPLE_GND;
+		else if( (reply == "DC") || (reply == "DC1") )
+			return OscilloscopeChannel::COUPLE_DC_50;
+
+		//invalid
+		LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+	}
+	else
 	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		// some LeCroy scopes (WK7K is one) report passive
-		// probes with an indicating pin with the name "Ringx10"
-		m_probeIsActive[i] = (name != "") && (name.find("Ringx") != 0);
+		// This is the external trigger channel.
+		string reply;
+		{
+			reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Ext.Coupling'"));
+		}
+
+		{
+			lock_guard<recursive_mutex> lock_cache(m_cacheMutex);
+			m_probeIsActive[i] = false;
+		}
+
+		if(reply == "A1M" || reply == "AC1M")
+			return OscilloscopeChannel::COUPLE_AC_1M;
+		else if(reply == "D1M" || reply == "DC1M")
+			return OscilloscopeChannel::COUPLE_DC_1M;
+		else if(reply == "D50" || reply == "DC50")
+			return OscilloscopeChannel::COUPLE_DC_50;
+		else if(reply == "GND" || reply == "Gnd")
+			return OscilloscopeChannel::COUPLE_GND;
+		else if( (reply == "DC") || (reply == "DC1") )
+			return OscilloscopeChannel::COUPLE_DC_50;
+
+		//invalid
+		LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 	}
+	
 
-	if(reply == "A1M")
-		return OscilloscopeChannel::COUPLE_AC_1M;
-	else if(reply == "D1M")
-		return OscilloscopeChannel::COUPLE_DC_1M;
-	else if(reply == "D50")
-		return OscilloscopeChannel::COUPLE_DC_50;
-	else if(reply == "GND")
-		return OscilloscopeChannel::COUPLE_GND;
-	else if( (reply == "DC") || (reply == "DC1") )
-		return OscilloscopeChannel::COUPLE_DC_50;
-
-	//invalid
-	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
-	return OscilloscopeChannel::COUPLE_SYNTHETIC;
+	
 }
 
 void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
-	if(i >= m_analogChannelCount)
+	if(i >= m_analogChannelCount && i != m_extTrigChannel->GetIndex())
 		return;
 
-	//Get the old coupling value first.
-	//This ensures that m_probeIsActive[i] is valid
-	GetChannelCoupling(i);
-
-	//If we have an active probe, don't touch the hardware config
-	if(m_probeIsActive[i])
-		return;
-
-	switch(type)
+	if(i != m_extTrigChannel->GetIndex())
 	{
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING A1M");
-			break;
+		// This is an analog channel
 
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D1M");
-			break;
+		//Get the old coupling value first.
+		//This ensures that m_probeIsActive[i] is valid
+		GetChannelCoupling(i);
 
-		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D50");
-			break;
+		//If we have an active probe, don't touch the hardware config
+		if(m_probeIsActive[i])
+			return;
 
-		//treat unrecognized as ground
-		case OscilloscopeChannel::COUPLE_GND:
-		default:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING GND");
-			break;
+		switch(type)
+		{
+			case OscilloscopeChannel::COUPLE_AC_1M:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING A1M");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_1M:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D1M");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_50:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D50");
+				break;
+
+			//treat unrecognized as ground
+			case OscilloscopeChannel::COUPLE_GND:
+			default:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING GND");
+				break;
+		}
+	}
+	else
+	{
+		// This is the trigger channel
+		switch(type)
+		{
+			case OscilloscopeChannel::COUPLE_AC_1M:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling = \"AC1M\"'");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_1M:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling = \"DC1M\"'");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_50:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling =\"DC50\"'");
+				break;
+
+			//treat unrecognized as ground
+			case OscilloscopeChannel::COUPLE_GND:
+			default:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling = \"Gnd\"'");
+				break;
+		}
 	}
 }
 
 double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 1;
 
 	//TODO: support ext/10
@@ -1578,9 +1642,18 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_transport->SendCommandQueued(cmd);
 }
 
-vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
+vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t i)
 {
+
 	vector<unsigned int> ret;
+
+	if(i >= m_analogChannelCount)
+	{
+		// External trigger (AUX in)
+		ret.clear();
+		return ret;
+	}
+
 
 	//"no limit"
 	ret.push_back(0);
@@ -1712,7 +1785,7 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 
 unsigned int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 0;
 
 	auto reply = m_transport->SendCommandQueuedWithReply("BANDWIDTH_LIMIT?");
@@ -1756,6 +1829,9 @@ unsigned int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	if(i >= m_analogChannelCount)
+		return;
+	
 	char cmd[128];
 	if(limit_mhz == 0)
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", GetOscilloscopeChannel(i)->GetHwname().c_str());
