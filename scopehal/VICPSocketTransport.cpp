@@ -65,6 +65,7 @@ VICPSocketTransport::VICPSocketTransport(const string& args)
 		m_port = port;
 	}
 
+
 	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
 
 	if(!m_socket.Connect(m_hostname, m_port))
@@ -290,4 +291,19 @@ void VICPSocketTransport::FlushRXBuffer(void)
 bool VICPSocketTransport::IsCommandBatchingSupported()
 {
 	return true;
+}
+
+/**
+	@brief Sets timeouts for the connection
+
+	@return true if RX and TX timeouts successfully set
+
+	@param txUs		Send timeout, in microseconds
+	@param rxUs		Receive timeout, in microseconds
+	*/
+bool VICPSocketTransport::SetTimeouts(unsigned int txUs, unsigned int rxUs)
+{
+	bool success = m_socket.SetTxTimeout(txUs);
+	success = success & m_socket.SetRxTimeout(rxUs);
+	return success;
 }
