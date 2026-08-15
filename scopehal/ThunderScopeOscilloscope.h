@@ -113,6 +113,15 @@ protected:
 
 	void PushPendingWaveformsIfReady();
 
+	/**
+		@brief Ensure all pending waveforms have been processed
+	 */
+	void FlushAllPendingWaveforms()
+	{
+		while(!m_wipWaveforms.empty())
+			PushPendingWaveformsIfReady();
+	}
+
 	std::string GetChannelColor(size_t i);
 
 	///@brief Number of analog channels (always 4 at the moment)
