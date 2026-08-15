@@ -346,6 +346,9 @@ protected:
 	bool m_hasFunctionGen;
 	bool m_hasFastSampleRate;	//-M models
 	int m_memoryDepthOption;	//0 = base, after that number is max sample count in millions
+	bool m_hasSlewRateTrigger;
+	bool m_hasRuntTrigger;
+	bool m_hasWindowTrigger;
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;

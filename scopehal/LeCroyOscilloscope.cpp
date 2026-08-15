@@ -66,6 +66,9 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasFunctionGen(false)
 	, m_hasFastSampleRate(false)
 	, m_memoryDepthOption(0)
+	, m_hasSlewRateTrigger(true)
+	, m_hasRuntTrigger(true)
+	, m_hasWindowTrigger(true)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
@@ -279,7 +282,12 @@ void LeCroyOscilloscope::IdentifyHardware()
 			m_modelid = MODEL_WAVEPRO_HD;
 
 		if(m_model.find("WP7") != string::npos)
+		{
 			m_modelid = MODEL_WAVEPRO_7K;
+			m_hasSlewRateTrigger = false;
+			m_hasRuntTrigger = false;
+			m_hasWindowTrigger = false;
+		}
 	}
 	else if(m_model.find("WAVERUNNER9") == 0)
 	{
@@ -532,27 +540,56 @@ void LeCroyOscilloscope::DetectOptions()
 			//Note that many of these options don't have _TD in the base (non-TDME) option code!
 			else if(o.find("I2C") == 0)
 			{
-				m_hasI2cTrigger = true;
+
 				desc = "I2C";	//seems like UTF-8 characters mess up printf width specifiers
-				action = "Enabling trigger";
+	
+				// TODO does the option "I2C" have a trigger on newer scopes?
+				// or is the option always called I2C_TD?
+				if(m_modelid != MODEL_WAVEPRO_7K)	
+				{
+					m_hasI2cTrigger = true;
+					action = "Enabling trigger";
+					
+				}else
+				{
+					// I2C option on this does not have any trigger
+					action = "Ignoring (Decode, not trigger capable)";
+				}
 
 				if(o == "I2C")
 					type = "Trig/decode";
 			}
 			else if(o.find("SPI") == 0)
 			{
-				m_hasSpiTrigger = true;
-				desc = "SPI";
-				action = "Enabling trigger";
-
+				if(m_modelid != MODEL_WAVEPRO_7K)	
+				{
+					m_hasSpiTrigger = true;
+					action = "Enabling trigger";
+					
+				}else
+				{
+					// SPI option on this does not have any trigger
+					action = "Ignoring (Decode, not trigger capable)";
+				}
 				if(o == "SPI")
 					type = "Trig/decode";
 			}
 			else if(o.find("UART") == 0)
 			{
-				m_hasUartTrigger = true;
+				
 				desc = "UART";
-				action = "Enabling trigger";
+				
+				if(m_modelid != MODEL_WAVEPRO_7K)	
+				{
+					m_hasUartTrigger = true;
+					action = "Enabling trigger";
+					
+				}else
+				{
+					// UART option on this does not have any trigger
+					action = "Ignoring (Decode, not trigger capable)";
+				}
+				
 
 				if(o == "UART")
 					type = "Trig/decode";
@@ -3086,6 +3123,11 @@ bool LeCroyOscilloscope::AcquireData()
 					memcpy(scratch->GetCpuPointer(), &tmp[16], buflen);
 					scratch->MarkModifiedFromCpu();
 				}
+				else
+				{
+					// Mark the DownloadState as DOWNLOAD_NONE for any inactive channel
+					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 0.0);
+				}
 			}
 		}
 
@@ -3517,7 +3559,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			case MODEL_WAVEPRO_7K:
 				ret.push_back(250 * m);
 				ret.push_back(500 * m);
-				ret.push_back(1250 * m);
+				ret.push_back(1000 * m);
 				ret.push_back(2500 * m);
 				ret.push_back(5 * g);
 				ret.push_back(10 * g);
@@ -3957,6 +3999,10 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 	m_sampleRate = rate;
 	m_sampleRateValid = true;
 	m_triggerOffsetValid = false;
+
+	
+	// The memory depth may change as a result of changing the sample rate.
+	m_memoryDepthValid = false;
 }
 
 bool LeCroyOscilloscope::CanAverage(size_t i)
@@ -4847,28 +4893,56 @@ void LeCroyOscilloscope::PullDropoutTrigger()
 		m_trigger = new DropoutTrigger(this);
 	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 
-	//Level
-	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
-	dt->SetLevel(stof(tmp));
 
-	//Dropout time
-	Unit fs(Unit::UNIT_FS);
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
-	dt->SetDropoutTime(fs.ParseString(tmp));
+	if(m_modelid == MODEL_WAVEPRO_7K)
+	{
+		//Level
+		auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.TrigLevel'");
+		dt->SetLevel(stof(tmp));
 
-	//Edge type
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
-	if(Trim(tmp) == "Positive")
-		dt->SetType(DropoutTrigger::EDGE_RISING);
-	else
-		dt->SetType(DropoutTrigger::EDGE_FALLING);
+		//Dropout time
+		Unit fs(Unit::UNIT_FS);
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.DropoutTime'");
+		dt->SetDropoutTime(fs.ParseString(tmp));
 
-	//Reset type
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
-	if(Trim(tmp) == "0")
-		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
-	else
+		//Edge type
+		auto src = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Source'"));
+
+		tmp = m_transport->SendCommandQueuedWithReply(string("VBS? 'return = app.Acquisition.Trigger." + src + ".Slope'"));
+		if(Trim(tmp) == "Positive")
+			dt->SetType(DropoutTrigger::EDGE_RISING);
+		else
+			dt->SetType(DropoutTrigger::EDGE_FALLING);
+
 		dt->SetResetType(DropoutTrigger::RESET_NONE);
+	}
+	else
+	{
+		//Level
+		auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
+		dt->SetLevel(stof(tmp));
+
+		//Dropout time
+		Unit fs(Unit::UNIT_FS);
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
+		dt->SetDropoutTime(fs.ParseString(tmp));
+
+		//Edge type
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
+		if(Trim(tmp) == "Positive")
+			dt->SetType(DropoutTrigger::EDGE_RISING);
+		else
+			dt->SetType(DropoutTrigger::EDGE_FALLING);
+
+		//Reset type
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
+		if(Trim(tmp) == "0")
+			dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+		else
+			dt->SetResetType(DropoutTrigger::RESET_NONE);
+	}
+
+
 }
 
 /**
@@ -5627,18 +5701,36 @@ float LeCroyOscilloscope::GetTriggerLevelWithInversion(Trigger* trig)
  */
 void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
-	PushFloat("app.Acquisition.Trigger.Dropout.Level", GetTriggerLevelWithInversion(trig));
-	PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
+	if(m_modelid == MODEL_WAVEPRO_7K)
+	{
+		// TODO This is probably the same for MODEL_DDA_5K and MODEL_SDA_6K
+		PushFloat("app.Acquisition.Trigger.TrigLevel", GetTriggerLevelWithInversion(trig));
+		PushFloat("app.Acquisition.Trigger.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
 
-	if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
-	else
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
+		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
 
-	if(trig->GetType() == DropoutTrigger::EDGE_RISING)
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
-	else
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
+		if(trig->GetType() == DropoutTrigger::EDGE_RISING)
+			m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger." + src +".Slope = \"Positive\"'"));
+		else
+			m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger." + src +".Slope = \"Negative\"'"));
+
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"'");
+	}else
+	{
+		PushFloat("app.Acquisition.Trigger.Dropout.Level", GetTriggerLevelWithInversion(trig));
+		PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
+
+		if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
+		else
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
+
+		if(trig->GetType() == DropoutTrigger::EDGE_RISING)
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
+		else
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
+	}
+
 }
 
 /**
@@ -5942,15 +6034,18 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(GlitchTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
-	ret.push_back(RuntTrigger::GetTriggerName());
-	ret.push_back(SlewRateTrigger::GetTriggerName());
+	if(m_hasRuntTrigger)
+		ret.push_back(RuntTrigger::GetTriggerName());
+	if(m_hasSlewRateTrigger)
+		ret.push_back(SlewRateTrigger::GetTriggerName());
 	if(m_hasUartTrigger)
 		ret.push_back(UartTrigger::GetTriggerName());
 	if(m_has8b10bTrigger)
 		ret.push_back(CDR8B10BTrigger::GetTriggerName());
 	if(m_hasNrzTrigger)
 		ret.push_back(CDRNRZPatternTrigger::GetTriggerName());
-	ret.push_back(WindowTrigger::GetTriggerName());
+	if(m_hasWindowTrigger)
+		ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
 	return ret;
