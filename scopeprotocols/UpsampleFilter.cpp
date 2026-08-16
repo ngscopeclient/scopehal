@@ -177,7 +177,6 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] s
 
 		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
 		m_computePipeline.Dispatch(cmdBuf, args,
-			upsample_factor,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
 	}

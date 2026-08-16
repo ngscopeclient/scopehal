@@ -52,30 +52,32 @@ layout(std430, push_constant) uniform constants
 	uint kernel;
 };
 
-layout(local_size_x=1, local_size_y=64, local_size_z=1) in;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	uint i = (gl_GlobalInvocationID.z * gl_NumWorkGroups.y * gl_WorkGroupSize.y) + gl_GlobalInvocationID.y;
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 
 	if(i >= imax)
-		return;
-	if(gl_GlobalInvocationID.x >= upsample_factor)
 		return;
 
 	uint offset = i*upsample_factor;
 
-	uint start = 0;
-	uint sstart = 0;
-	if(gl_GlobalInvocationID.x > 0)
+	for(uint j = 0; j < upsample_factor; j++)
 	{
-		sstart = 1;
-		start = upsample_factor - gl_GlobalInvocationID.x;
+		uint start = 0;
+		uint sstart = 0;
+
+		if(j > 0)
+		{
+			sstart = 1;
+			start = upsample_factor - j;
+		}
+
+		float f = 0;
+		for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
+			f += fkernel[k] * din[i + sstart];
+
+		dout[offset + j] = f;
 	}
-
-	float f = 0;
-	for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
-		f += fkernel[k] * din[i + sstart];
-
-	dout[offset + gl_GlobalInvocationID.x] = f;
 }
