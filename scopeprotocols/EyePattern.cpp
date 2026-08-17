@@ -113,6 +113,10 @@ EyePattern::EyePattern(const string& color)
 
 	if(g_hasShaderInt64 && g_hasShaderAtomicInt64)
 	{
+		m_scratchZeroComputePipeline =
+			make_shared<ComputePipeline>("shaders/ZeroFillUint32.spv", 1, sizeof(uint32_t));
+		m_eyeIntegrateComputePipeline =
+			make_shared<ComputePipeline>("shaders/IntegrateUint32ToUint64.spv", 2, sizeof(uint32_t));
 		m_eyeComputePipeline =
 			make_shared<ComputePipeline>("shaders/EyePattern.spv", 4, sizeof(EyeFilterConstants));
 		m_eyeNormalizeReduceComputePipeline =
@@ -1096,6 +1100,8 @@ void EyePattern::DensePackedInnerLoopGPU(
 	float yoff
 	)
 {
+	ScratchBuffer_uint32_t scratch(ScratchBufferManager::U32_GPU_WAVEFORM);
+
 	cmdBuf.begin({});
 	{
 		NamedDebugRange debugRange(cmdBuf, "EyePattern::DensePackedInnerLoopGPU");
@@ -1138,19 +1144,43 @@ void EyePattern::DensePackedInnerLoopGPU(
 			m_eyeIndexSearchPipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
 			m_eyeIndexSearchPipeline->BindBufferNonblocking(1, m_indexBuffer, cmdBuf);
 			m_eyeIndexSearchPipeline->Dispatch(cmdBuf, indexCfg, GetComputeBlockCount(numThreads, threadsPerBlock));
-			m_eyeIndexSearchPipeline->AddComputeMemoryBarrier(cmdBuf);
 			m_indexBuffer.MarkModifiedFromGpu();
 		}
 
-		//Run the main integration kernel
+		//In parallel with the index search, zeroize our scratch buffer
+		uint32_t npix = m_width * m_height;
+		{
+			NamedDebugRange shaderRange(cmdBuf, "Clear scratch");
+
+			scratch->resize(npix);
+
+			m_scratchZeroComputePipeline->BindBufferNonblocking(0, *scratch, cmdBuf, true);
+			m_scratchZeroComputePipeline->Dispatch(cmdBuf, npix, GetComputeBlockCount(npix, 64));
+			scratch->MarkModifiedFromGpu();
+		}
+
+		//Run the main integration kernel with a barrier before it starts
 		{
 			NamedDebugRange shaderRange(cmdBuf, "Eye");
 
+			m_eyeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+
 			m_eyeComputePipeline->BindBufferNonblocking(0, *m_clockEdgesMuxed, cmdBuf);
 			m_eyeComputePipeline->BindBufferNonblocking(1, waveform->m_samples, cmdBuf);
-			m_eyeComputePipeline->BindBufferNonblocking(2, data, cmdBuf);
+			m_eyeComputePipeline->BindBufferNonblocking(2, /*data*/*scratch, cmdBuf);
 			m_eyeComputePipeline->BindBufferNonblocking(3, m_indexBuffer, cmdBuf);
 			m_eyeComputePipeline->Dispatch(cmdBuf, cfg, GetComputeBlockCount(numThreads, threadsPerBlock));
+
+			m_eyeComputePipeline->AddComputeMemoryBarrier(cmdBuf);
+		}
+
+		//Final integration
+		{
+			NamedDebugRange shaderRange(cmdBuf, "Final integration");
+
+			m_eyeIntegrateComputePipeline->BindBufferNonblocking(0, *scratch, cmdBuf);
+			m_eyeIntegrateComputePipeline->BindBufferNonblocking(1, data, cmdBuf);
+			m_eyeIntegrateComputePipeline->Dispatch(cmdBuf, npix, GetComputeBlockCount(npix, 64));
 		}
 	}
 

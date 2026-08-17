@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,50 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#version 460
+#version 430
 #pragma shader_stage(compute)
-
 #extension GL_ARB_gpu_shader_int64 : require
 
-layout(std430, binding=0) restrict buffer buf_accumData
+layout(std430, binding=0) restrict readonly buffer buf_newData
 {
-	int64_t accumData[];
+	uint newData[];
 };
 
-layout(std430, binding=1) buffer buf_reduceData
+layout(std430, binding=1) buffer buf_accum
 {
-	int64_t nmax;
-};
-
-layout(std430, binding=2) buffer buf_outData
-{
-	float outData[];
+	uint64_t accum[];
 };
 
 layout(std430, push_constant) uniform constants
 {
-	uint	width;
-	uint	height;
-	float	satLevel;
+	uint size;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
 void main()
 {
-	//thread X coordinate is actually our Y position, weird but that's how it worked out lol
-	if(gl_GlobalInvocationID.x >= height)
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= size)
 		return;
 
-	//Calculate scaling factor for normalization
-	int64_t imax = nmax;
-	if(imax == 0)
-		imax = 1;
-	float norm = 2.0 * satLevel / float(imax);
-
-	//Normalize the output
-	uint base = gl_GlobalInvocationID.x * width;
-	for(uint x=0; x<width; x++)
-		outData[base + x] = min(1.0, float(accumData[base + x])*norm);
+	accum[i] += uint64_t(newData[i]);
 }
-
