@@ -133,6 +133,12 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] s
 		SetData(nullptr, 0);
 		return;
 	}
+	if(kernel > 128)
+	{
+		AddErrorMessage("Invalid configuration", "Calculated filter kernel size is too large, try upsampling by a smaller amount");
+		SetData(nullptr, 0);
+		return;
+	}
 
 	//Create the interpolation filter
 	//If upsampling factor and window size have not changed, keep the same filter coefficients
