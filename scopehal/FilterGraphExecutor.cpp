@@ -36,6 +36,8 @@
 
 #include "scopehal.h"
 #include <shared_mutex>
+#include "FusibleShader.h"
+#include "ShaderBaker.h"
 
 using namespace std;
 
@@ -120,6 +122,26 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 	//Nothing to do if we have no nodes to run
 	if(nodes.empty())
 		return;
+
+	////////////////////////////////////////////////
+
+	/*
+	//TEST: try to dynamically generate the shader
+	auto es = make_shared<FusibleShader>("EmphasisFilter.glsl", "EmphasisFilter");
+	auto us = make_shared<FusibleShader>("UpsampleFilter.glsl", "EmphasisFilter");
+
+	auto stage1 = make_shared<BakedShaderStage>(es);
+	auto stage2 = make_shared<BakedShaderStage>(us);
+
+	ShaderBaker baker;
+	baker.AddStage(stage1);
+	baker.AddStage(stage2);
+
+	auto str = baker.Bake();
+	LogDebug("BAKED SHADER\n%s\n", str.c_str());
+	*/
+
+	//////////////////////////////////////////
 
 	LogTrace("Start graph refresh\n");
 	LogIndenter li;

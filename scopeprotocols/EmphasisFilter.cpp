@@ -74,7 +74,8 @@ uint32_t EmphasisFilter::GetExecutionCapabilitiesMask()
  	return
 		(uint32_t)ExecutionCapabilities::CommandBufferAppend |
 		(uint32_t)ExecutionCapabilities::CommandBufferTailCall |
-		(uint32_t)ExecutionCapabilities::VulkanOnly;
+		(uint32_t)ExecutionCapabilities::VulkanOnly |
+		(uint32_t)ExecutionCapabilities::DynamicShader;
 }
 
 void EmphasisFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] shared_ptr<QueueHandle> queue)

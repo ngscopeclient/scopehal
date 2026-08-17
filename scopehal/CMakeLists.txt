@@ -237,6 +237,7 @@ set(SCOPEHAL_SOURCES
 	ComputePipeline.cpp
 	FilterGraphExecutor.cpp
 	PipelineCacheManager.cpp
+	ShaderBaker.cpp
 	VulkanFFTPlan.cpp
 	QueueManager.cpp
 	QueueHandle.cpp
