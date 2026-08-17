@@ -31,6 +31,7 @@
 #pragma shader_stage(compute)
 
 #extension GL_EXT_shader_8bit_storage : require
+#extension GL_EXT_debug_printf: enable
 
 layout(std430, binding=0) restrict readonly buffer buf_pin
 {
@@ -62,7 +63,6 @@ layout(std430, push_constant) uniform constants
 	uint len;
 	uint order;
 	uint inputPerThread;
-	uint outputPerThread;
 };
 
 #define X_SIZE 64
@@ -74,8 +74,8 @@ layout(local_size_x=X_SIZE, local_size_y=1, local_size_z=1) in;
 /**
 	@brief First-pass zero crossing detection
 
-	Each thread independently processes a block of inputPerThread samples and outputs a variable-length block, from
-	0 to outputPerThread-1 in size, of samples
+	Each thread group independently processes a block of inputPerThread samples and outputs a variable-length block,
+	from 0 to inputPerThread-1 in size, of samples
  */
 void main()
 {
@@ -104,7 +104,7 @@ void main()
 	}
 
 	uint numThresholds = order-1;
-	uint maxOuts = outputPerThread - 1;
+	uint maxOuts = inputPerThread - 1;
 
 	uint cur_rising = 0;
 	uint cur_state = 0;
