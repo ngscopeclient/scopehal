@@ -111,7 +111,11 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 	std::map<QueuePoolID, std::vector<std::shared_ptr<QueueInfo>> > eligiblePools;
 	auto renderFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer;
 	auto computeFlags = vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
-	auto transferFlags = vk::QueueFlagBits::eTransfer;
+
+	//For now, require transfer queue to also have compute capability
+	//because we need to enqueue events into it (otherwise we have problems on nvidia)
+	auto transferFlags = vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
+
 	for(auto pq : m_queues)
 	{
 		//Render pool needs graphics, compute, transfer
