@@ -230,6 +230,8 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 		LogTrace("%s:\n", m_poolNames[QUEUE_POOL_FILTER].c_str());
 		LogIndenter li3;
 
+		auto firstQueue = m_pools[QUEUE_POOL_FILTER][0];
+
 		//Look for an unallocated queue and assign it
 		for(auto pq : queues)
 		{
@@ -237,13 +239,22 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 			if(m_pools[QUEUE_POOL_FILTER].size() >= 4)
 				break;
 
-			if(allocatedQueues.find(pq) == allocatedQueues.end())
+			if(allocatedQueues.find(pq) != allocatedQueues.end())
+				continue;
+
+			//All filter queues must be the same type since we aren't tightly binding one queue to one filter
+			//and command buffers get shared
+			if(pq->Family != firstQueue->Family)
 			{
-				m_pools[QUEUE_POOL_FILTER].push_back(pq);
-				allocatedQueues.emplace(pq);
-				LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
-				lastAllocatedQueue = pq;
+				LogTrace("Skipping family=%zu Index=%zu Flags=%08x because different family\n",
+					pq->Family, pq->Index, (uint32_t)pq->Flags);
+				continue;
 			}
+
+			m_pools[QUEUE_POOL_FILTER].push_back(pq);
+			allocatedQueues.emplace(pq);
+			LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+			lastAllocatedQueue = pq;
 		}
 	}
 
