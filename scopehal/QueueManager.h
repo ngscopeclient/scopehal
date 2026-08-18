@@ -121,10 +121,6 @@ public:
 		QUEUE_POOL_MISC
 	};
 
-	/// Get a handle to a queue that has the given flag bits set, allocating the queue if necessary,
-	/// and set or append name to the queue name for debug
-	std::shared_ptr<QueueHandle> GetQueueWithFlags(vk::QueueFlags flags, std::string name);
-
 	std::shared_ptr<QueueHandle> GetQueueFromPool(QueuePoolID id, std::string name);
 
 public:
