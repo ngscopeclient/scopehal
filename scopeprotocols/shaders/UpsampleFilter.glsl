@@ -58,15 +58,15 @@ shared float s_kernel[128];
 
 void main()
 {
-	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
-
-	if(i >= imax)
-		return;
-
 	//Fetch the filter kernel into shared memory at the start of the shader to save memory bandwidth performance
 	for(uint j=gl_LocalInvocationID.x; j < kernel; j += gl_WorkGroupSize.x)
 		s_kernel[j] = fkernel[j];
 	barrier();
+
+	//Output bounds check only after shared memory cache is hot
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
+	if(i >= imax)
+		return;
 
 	uint offset = i*upsample_factor;
 
