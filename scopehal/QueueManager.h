@@ -75,6 +75,15 @@ protected:
 	std::shared_ptr<QueueHandle> m_handle;
 };
 
+struct QueueInfo
+{
+	size_t Family;
+	size_t Index;
+	vk::QueueFlags Flags;
+	std::shared_ptr<QueueWrapper> Handle;
+};
+
+bool operator<(const QueueInfo& a, const QueueInfo& b);
 
 /**
  @brief Allocates and hands out std::shared_ptr<QueueHandle> instances for thread-safe access to Vulkan Queues.
@@ -112,23 +121,11 @@ public:
 		QUEUE_POOL_MISC
 	};
 
-	/// Get a handle to a compute queue
-	std::shared_ptr<QueueHandle> GetComputeQueue(const std::string& name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
-
-	/// Get a handle to a render queue
-	/// @note Currently this requires Graphics and Transfer capabilities to simplify texture transfer code in WaveformArea.
-	std::shared_ptr<QueueHandle> GetRenderQueue(const std::string& name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer, name); }
-
-	/// Get a handle to a transfer queue
-	/// @note This currently requires Compute capabilities so we can barrier on compute operations
-	std::shared_ptr<QueueHandle> GetTransferQueue(const std::string& name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
-
 	/// Get a handle to a queue that has the given flag bits set, allocating the queue if necessary,
 	/// and set or append name to the queue name for debug
 	std::shared_ptr<QueueHandle> GetQueueWithFlags(vk::QueueFlags flags, std::string name);
+
+	std::shared_ptr<QueueHandle> GetQueueFromPool(QueuePoolID id, std::string name);
 
 public:
 	//non-copyable
@@ -142,19 +139,11 @@ protected:
 	/// Mutex to guard allocations
 	std::mutex m_mutex;
 
-	struct QueueInfo
-	{
-		size_t Family;
-		size_t Index;
-		vk::QueueFlags Flags;
-		std::shared_ptr<QueueWrapper> Handle;
-	};
-
 	///@brief All queues available on the device
-	std::vector<QueueInfo> m_queues;
+	std::vector< std::shared_ptr<QueueInfo> > m_queues;
 
 	///@brief Queue pools used for allocation
-	std::map<QueuePoolID, std::vector<QueueInfo> > m_pools;
+	std::map<QueuePoolID, std::vector< std::shared_ptr<QueueInfo> > > m_pools;
 
 	//Names of pools
 	std::map<QueuePoolID, std::string> m_poolNames;

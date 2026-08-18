@@ -106,7 +106,7 @@ protected:
 class FilterGraphExecutor
 {
 public:
-	FilterGraphExecutor(size_t numThreads = 8);
+	FilterGraphExecutor(size_t numThreads = 4);
 	~FilterGraphExecutor();
 
 	void RunBlocking(const std::set<FlowGraphNode*>& nodes);

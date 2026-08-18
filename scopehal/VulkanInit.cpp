@@ -1040,7 +1040,9 @@ void VulkanCreateDevice(
 	g_vkQueueManager = make_unique<QueueManager>(g_vkComputePhysicalDevice, g_vkComputeDevice);
 
 	//Make a Queue for memory transfers that we can use implicitly during buffer management
-	g_vkTransferQueue = g_vkQueueManager->GetTransferQueue("g_vkTransferQueue");
+	//Use the miscellaneous queue here for now because some barrier code tries to use it for that
+	//but i don't think that is actually necessary...
+	g_vkTransferQueue = g_vkQueueManager->GetQueueFromPool(QueueManager::QUEUE_POOL_TRANSFER, "g_vkTransferQueue");
 
 	//Make a CommandPool for transfers
 	vk::CommandPoolCreateInfo poolInfo(

@@ -39,6 +39,18 @@
 using namespace std;
 extern bool g_hasDebugUtils;
 
+bool operator<(const QueueInfo& a, const QueueInfo& b)
+{
+	if(a.Family < b.Family)
+		return true;
+	if(a.Family > b.Family)
+		return false;
+
+	if(a.Index < b.Index)
+		return true;
+	return false;
+}
+
 QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::raii::Device> device)
 : m_phys(phys)
 , m_device(device)
@@ -50,37 +62,37 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 	{
 		for(size_t idx=0; idx<families[family].queueCount; idx++)
 		{
-			m_queues.push_back(
-				QueueInfo
-				{
-					family,
-					idx,
-					families[family].queueFlags,
-					make_shared<QueueWrapper>(device, family, idx)
-				});
+			QueueInfo q =
+			{
+				family,
+				idx,
+				families[family].queueFlags,
+				make_shared<QueueWrapper>(device, family, idx)
+			};
+			m_queues.push_back(make_shared<QueueInfo>(q));
 		}
 	}
 	//Sort the queues in ascending order of feature flag count
 	//FIXME-CXX20 Use std::popcount() for sorting when we move to C++20
 	static_assert(sizeof(vk::QueueFlags::MaskType) == sizeof(uint32_t));
 	sort(m_queues.begin(), m_queues.end(),
-		[](QueueInfo const& a, QueueInfo const& b) -> bool
+		[](shared_ptr<QueueInfo> const& a, shared_ptr<QueueInfo> const& b) -> bool
 		{
 			size_t flag_count_a = 0;
 			size_t flag_count_b = 0;
 			for(size_t i=0; i<sizeof(vk::QueueFlags::MaskType)*8; i++)
 			{
-				if(static_cast<uint32_t>(a.Flags) & (1<<i))
+				if(static_cast<uint32_t>(a->Flags) & (1<<i))
 					flag_count_a++;
-				if(static_cast<uint32_t>(b.Flags) & (1<<i))
+				if(static_cast<uint32_t>(b->Flags) & (1<<i))
 					flag_count_b++;
 			}
 			return flag_count_a < flag_count_b;
 		});
 	LogDebug("Sorted queues:\n");
 	LogIndenter li;
-	for(QueueInfo const& qi : m_queues)
-		LogDebug("Family=%zu Index=%zu Flags=%08x\n", qi.Family, qi.Index, (uint32_t)qi.Flags);
+	for(auto& pq : m_queues)
+		LogDebug("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
 
 	//Names for pools
 	m_poolNames[QUEUE_POOL_RENDER] = "Render";
@@ -96,27 +108,27 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 
 		This does not guarantee that the queue will actually be placed in the pool.
 	 */
-	std::map<QueuePoolID, std::vector<QueueInfo> > eligiblePools;
+	std::map<QueuePoolID, std::vector<std::shared_ptr<QueueInfo>> > eligiblePools;
 	auto renderFlags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer;
 	auto computeFlags = vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
 	auto transferFlags = vk::QueueFlagBits::eTransfer;
-	for(auto& q : m_queues)
+	for(auto pq : m_queues)
 	{
 		//Render pool needs graphics, compute, transfer
-		if( (q.Flags & renderFlags) == renderFlags)
-			eligiblePools[QUEUE_POOL_RENDER].push_back(q);
+		if( (pq->Flags & renderFlags) == renderFlags)
+			eligiblePools[QUEUE_POOL_RENDER].push_back(pq);
 
 		//Transfer pool just needs transfer
-		if( (q.Flags & transferFlags) == transferFlags)
-			eligiblePools[QUEUE_POOL_TRANSFER].push_back(q);
+		if( (pq->Flags & transferFlags) == transferFlags)
+			eligiblePools[QUEUE_POOL_TRANSFER].push_back(pq);
 
 		//All other pools need compute + transfer
-		if( (q.Flags & computeFlags) == computeFlags)
+		if( (pq->Flags & computeFlags) == computeFlags)
 		{
-			eligiblePools[QUEUE_POOL_RASTERIZE].push_back(q);
-			eligiblePools[QUEUE_POOL_DRIVER].push_back(q);
-			eligiblePools[QUEUE_POOL_FILTER].push_back(q);
-			eligiblePools[QUEUE_POOL_MISC].push_back(q);
+			eligiblePools[QUEUE_POOL_RASTERIZE].push_back(pq);
+			eligiblePools[QUEUE_POOL_DRIVER].push_back(pq);
+			eligiblePools[QUEUE_POOL_FILTER].push_back(pq);
+			eligiblePools[QUEUE_POOL_MISC].push_back(pq);
 		}
 	}
 
@@ -127,18 +139,150 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 		LogIndenter li2;
 		auto& queues = eligiblePools[it.first];
 		LogTrace("%s:\n", it.second.c_str());
-		for(auto& q : queues)
+		for(auto& pq : queues)
 		{
 			LogIndenter li3;
-			LogTrace("Family=%zu Index=%zu Flags=%08x\n", q.Family, q.Index, (uint32_t)q.Flags);
+			LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
 		}
 	}
 
-	//Initialize the queue pools
+	shared_ptr<QueueInfo> lastAllocatedQueue = nullptr;
 
-	//This follows a few basic strategies:
-	//If we have only one queue: it goes in every pool
-	//If we are on an NVIDIA platform and have a lot of queues
+	//If there is only one queue eligible to go in a pool, put it there. That's easy.
+	set<shared_ptr<QueueInfo>> allocatedQueues;
+	LogTrace("Queue allocation, pass 1: single choice\n");
+	for(auto it : m_poolNames)
+	{
+		LogIndenter li2;
+		auto& queues = eligiblePools[it.first];
+		LogTrace("%s:\n", it.second.c_str());
+		LogIndenter li3;
+
+		//NO eligible queues! We can't proceed, something is wrong
+		if(queues.size() == 0)
+			LogFatal("No eligible %s queues found\n", it.second.c_str());
+
+		//One queue found? Use it
+		if(queues.size() == 1)
+		{
+			auto pq = queues[0];
+			m_pools[it.first].push_back(pq);
+			allocatedQueues.emplace(pq);
+			LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+			lastAllocatedQueue = pq;
+		}
+	}
+
+	//Allocate one queue to each pool, if we have enough
+	LogTrace("Queue allocation, pass 2: one queue per pool\n");
+	for(auto it : m_poolNames)
+	{
+		//If there's already a queue in this pool, don't add another yet
+		if(!m_pools[it.first].empty())
+			continue;
+
+		LogIndenter li2;
+		auto& queues = eligiblePools[it.first];
+		LogTrace("%s:\n", it.second.c_str());
+		LogIndenter li3;
+
+		//Look for an unallocated queue and assign it
+		for(auto pq : queues)
+		{
+			if(allocatedQueues.find(pq) == allocatedQueues.end())
+			{
+				m_pools[it.first].push_back(pq);
+				allocatedQueues.emplace(pq);
+				LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+				lastAllocatedQueue = pq;
+				break;
+			}
+		}
+	}
+
+	//If we still have some pools with no queues, we don't have enough to go around.
+	//Need to oversubscribe.
+	//For now, re-issue the last queue (stuff earlier in the list prefers to have dedicated queues)
+	LogTrace("Queue allocation, pass 3: oversubscription\n");
+	for(auto it : m_poolNames)
+	{
+		//If there's already a queue in this pool, don't add any others
+		if(!m_pools[it.first].empty())
+			continue;
+
+		LogIndenter li2;
+		LogTrace("%s:\n", it.second.c_str());
+		LogIndenter li3;
+
+		//There are no unallocated queues! We need to oversubscribe.
+		//Use the last allocated queue again
+		auto pq = lastAllocatedQueue;
+		m_pools[it.first].push_back(pq);
+		LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+	}
+
+	//TODO: If we are on an NVIDIA platform and have a lot of queues, allocate extras to the filter and driver pools
+
+	//Print out the final queue assignments
+	LogTrace("Final queue assignments:\n");
+	for(auto it : m_poolNames)
+	{
+		LogIndenter li2;
+		auto& queues = m_pools[it.first];
+		LogTrace("%s:\n", it.second.c_str());
+		for(auto& pq : queues)
+		{
+			LogIndenter li3;
+			LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+		}
+	}
+}
+
+/**
+	@brief Get a queue handle for a specific pool, preferring one that has less contention
+ */
+shared_ptr<QueueHandle> QueueManager::GetQueueFromPool(QueuePoolID id, std::string name)
+{
+	const lock_guard<mutex> lock(m_mutex);
+
+	//This will choose the first queue in the target pool that is not yet used.
+	//If all queues in the pool are used, the queue with the fewest existing handles is chosen.
+	ssize_t chosenIdx = -1;
+	auto& pool = m_pools[id];
+	for(size_t i=0; i<pool.size(); i++)
+	{
+		//If handle is unallocated, use it right away
+		if(pool[i]->Handle.use_count() <= 1)
+		{
+			LogTrace("Creating family=%zu index=%zu name=%s\n",
+				pool[i]->Family, pool[i]->Index, name.c_str());
+
+			return make_shared<QueueHandle>(pool[i]->Handle, name);
+		}
+
+		//If we did not have a queue at all, this one will work. Use it until/unless we find something better
+		if(chosenIdx == -1)
+			chosenIdx = i;
+
+		//If the new queue has less handles, prefer it
+		else if(pool[i]->Handle.use_count() < m_queues[chosenIdx]->Handle.use_count())
+		{
+			//If the new queue has more flags, don't prefer it.
+			//This prevents e.g. blocking the graphics queue when allocating compute queues
+			if(m_queues[chosenIdx]->Flags < pool[i]->Flags )
+				continue;
+
+			chosenIdx = i;
+		}
+	}
+
+	LogTrace("Reusing handle idx=%zu name=%s rc=%ld for name=%s\n",
+		chosenIdx,
+		pool[chosenIdx]->Handle->GetName().c_str(),
+		pool[chosenIdx]->Handle.use_count(),
+		name.c_str());
+
+	return make_shared<QueueHandle>(pool[chosenIdx]->Handle, name);
 }
 
 shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, std::string name)
@@ -156,16 +300,16 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	for(size_t i=0; i<m_queues.size(); i++)
 	{
 		//Skip if flags don't match
-		if((m_queues[i].Flags & flags) != flags)
+		if((m_queues[i]->Flags & flags) != flags)
 			continue;
 
 		//If handle is unallocated, use it right away
-		if(m_queues[i].Handle.use_count() <= 1)
+		if(m_queues[i]->Handle.use_count() <= 1)
 		{
 			LogTrace("Creating family=%zu index=%zu name=%s\n",
-				m_queues[i].Family, m_queues[i].Index, name.c_str());
+				m_queues[i]->Family, m_queues[i]->Index, name.c_str());
 
-			return make_shared<QueueHandle>(m_queues[i].Handle, name);
+			return make_shared<QueueHandle>(m_queues[i]->Handle, name);
 		}
 
 		//If we did not have a queue at all, this one will work. Use it until/unless we find something better
@@ -173,11 +317,11 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 			chosenIdx = i;
 
 		//If the new queue has less handles, prefer it
-		else if(m_queues[i].Handle.use_count() < m_queues[chosenIdx].Handle.use_count())
+		else if(m_queues[i]->Handle.use_count() < m_queues[chosenIdx]->Handle.use_count())
 		{
 			//If the new queue has more flags, don't prefer it.
 			//This prevents e.g. blocking the graphics queue when allocating compute queues
-			if(m_queues[chosenIdx].Flags < m_queues[i].Flags )
+			if(m_queues[chosenIdx]->Flags < m_queues[i]->Flags )
 				continue;
 
 			chosenIdx = i;
@@ -189,9 +333,9 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 
 	LogTrace("Reusing handle idx=%zu name=%s rc=%ld for name=%s\n",
 		chosenIdx,
-		m_queues[chosenIdx].Handle->GetName().c_str(),
-		m_queues[chosenIdx].Handle.use_count(),
+		m_queues[chosenIdx]->Handle->GetName().c_str(),
+		m_queues[chosenIdx]->Handle.use_count(),
 		name.c_str());
 
-	return make_shared<QueueHandle>(m_queues[chosenIdx].Handle, name);
+	return make_shared<QueueHandle>(m_queues[chosenIdx]->Handle, name);
 }

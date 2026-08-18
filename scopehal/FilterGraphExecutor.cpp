@@ -567,7 +567,10 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 	#endif
 
 	//Create a queue and command buffer for this thread's accelerated processing
-	std::shared_ptr<QueueHandle> queue(g_vkQueueManager->GetComputeQueue("FilterGraphExecutor[" + to_string(i) + "].queue"));
+	std::shared_ptr<QueueHandle> queue(
+		g_vkQueueManager->GetQueueFromPool(
+			QueueManager::QUEUE_POOL_FILTER,
+			"FilterGraphExecutor[" + to_string(i) + "].queue"));
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 		queue->GetQueue()->m_family );

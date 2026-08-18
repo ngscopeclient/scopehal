@@ -86,7 +86,7 @@ Oscilloscope::~Oscilloscope()
 void Oscilloscope::InitVulkanQueue(const char* debugName)
 {
 	string name = string(debugName) + ".queue";
-	m_queue = g_vkQueueManager->GetComputeQueue(name);
+	m_queue = g_vkQueueManager->GetQueueFromPool(QueueManager::QUEUE_POOL_DRIVER, name);
 
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -930,7 +930,7 @@ void Oscilloscope::ChannelsDownloadStarted()
 			chan->m_downloadProgress = 0.0;
 			// Do not update the downloadStartTime if the channel is not enabled
 		}
-		
+
 
 	}
 }
