@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2025 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2026 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -80,7 +80,7 @@ void main()
 			alpha0 -
 			alpha1 * cos(num) +
 			alpha2 * cos(2*num) -
-			alpha3 * cos(6*num);
+			alpha3 * cos(3*num);
 
 		dout[i + offsetOut] = w * din[i + offsetIn];
 	}
