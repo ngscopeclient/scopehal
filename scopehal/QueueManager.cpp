@@ -221,7 +221,52 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 		LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
 	}
 
-	//TODO: If we are on an NVIDIA platform and have a lot of queues, allocate extras to the filter and driver pools
+	//If we have a lot of queues, see how much we have left over
+	//For now, put up to 3 more in the filter pool
+	LogTrace("Queue allocation, pass 4: leftovers for filter graph\n");
+	{
+		LogIndenter li2;
+		auto& queues = eligiblePools[QUEUE_POOL_FILTER];
+		LogTrace("%s:\n", m_poolNames[QUEUE_POOL_FILTER].c_str());
+		LogIndenter li3;
+
+		//Look for an unallocated queue and assign it
+		for(auto pq : queues)
+		{
+			//If we have 4 already, stop
+			if(m_pools[QUEUE_POOL_FILTER].size() >= 4)
+				break;
+
+			if(allocatedQueues.find(pq) == allocatedQueues.end())
+			{
+				m_pools[QUEUE_POOL_FILTER].push_back(pq);
+				allocatedQueues.emplace(pq);
+				LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+				lastAllocatedQueue = pq;
+			}
+		}
+	}
+
+	//If we have anything left over, give it to drivers
+	LogTrace("Queue allocation, pass 5: leftovers for drivers\n");
+	{
+		LogIndenter li2;
+		auto& queues = eligiblePools[QUEUE_POOL_DRIVER];
+		LogTrace("%s:\n", m_poolNames[QUEUE_POOL_DRIVER].c_str());
+		LogIndenter li3;
+
+		//Look for an unallocated queue and assign it
+		for(auto pq : queues)
+		{
+			if(allocatedQueues.find(pq) == allocatedQueues.end())
+			{
+				m_pools[QUEUE_POOL_DRIVER].push_back(pq);
+				allocatedQueues.emplace(pq);
+				LogTrace("Family=%zu Index=%zu Flags=%08x\n", pq->Family, pq->Index, (uint32_t)pq->Flags);
+				lastAllocatedQueue = pq;
+			}
+		}
+	}
 
 	//Print out the final queue assignments
 	LogTrace("Final queue assignments:\n");
