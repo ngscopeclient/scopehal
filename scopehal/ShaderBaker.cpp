@@ -65,7 +65,7 @@ string ShaderBaker::Bake()
 		for(auto ext : stage->m_shader->m_extensions)
 			combinedExtensions.emplace(ext);
 	}
-	for(auto ext : combinedExtensions)
+	for(auto& ext : combinedExtensions)
 		ret += string("#extension ") + ext + " : require\n";
 
 	//SSBO inputs
