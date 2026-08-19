@@ -62,7 +62,7 @@ string ShaderBaker::Bake()
 	set<string> combinedExtensions;
 	for(auto stage : m_stages)
 	{
-		for(auto ext : stage->m_shader->m_extensions)
+		for(auto& ext : stage->m_shader->m_extensions)
 			combinedExtensions.emplace(ext);
 	}
 	for(auto& ext : combinedExtensions)
