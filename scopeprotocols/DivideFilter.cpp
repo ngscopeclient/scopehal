@@ -100,22 +100,32 @@ void DivideFilter::DoRefreshScalarScalar()
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
 	SetData(nullptr, 0);
 
+	//Get input values
+	float fa = GetInput(0).GetScalarValue();
+	float fb = GetInput(1).GetScalarValue();
+
+	//If either unit is logarithmic, convert back to linear space
+	if(GetInput(0).GetYAxisUnits() == Unit::UNIT_DBM)
+		fa = pow(10, fa / 20);
+	if(GetInput(1).GetYAxisUnits() == Unit::UNIT_DBM)
+		fb = pow(10, fb / 20);
+
 	//Different output formats possible besides just a direct division
 	switch(m_format.GetEnumVal<OutputFormat>())
 	{
 		case FORMAT_RATIO:
 			SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);
-			m_streams[0].m_value = GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue();
+			m_streams[0].m_value = fa / fb;
 			break;
 
 		case FORMAT_PERCENT:
 			SetYAxisUnits(Unit(Unit::UNIT_PERCENT), 0);
-			m_streams[0].m_value = GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue();
+			m_streams[0].m_value = fa / fb;
 			break;
 
 		case FORMAT_DB:
 			SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
-			m_streams[0].m_value = 20 * log10(GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue());
+			m_streams[0].m_value = 20 * log10(fa / fb);
 			break;
 
 		default:
@@ -278,6 +288,10 @@ void DivideFilter::DoRefreshVectorVector()
 		return;
 	}
 
+	//If either unit is logarithmic, convert back to linear space
+	bool aIsLog = (GetInput(0).GetYAxisUnits() == Unit::UNIT_DBM);
+	bool bIsLog = (GetInput(1).GetYAxisUnits() == Unit::UNIT_DBM);
+
 	//Do the actual filter operation
 	size_t i=0;
 	switch(m_format.GetEnumVal<OutputFormat>())
@@ -297,8 +311,24 @@ void DivideFilter::DoRefreshVectorVector()
 		case FORMAT_DB:
 			SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
 
-			for(i=0; i<len; i++)
-				fdst[i] = 20 * log10(fa[i] / fb[i]);
+			//If both are logarithmic, subtract
+			if(aIsLog && bIsLog)
+			{
+				for(i=0; i<len; i++)
+					fdst[i] = fa[i] - fb[i];
+			}
+
+			else
+			{
+				//TODO: handle one log and other not
+				//fa = pow(10, fa / 20);
+				//fb = pow(10, fb / 20);
+
+				//If neither are log, divide
+				for(i=0; i<len; i++)
+					fdst[i] = 20 * log10(fa[i] / fb[i]);
+			}
+
 			break;
 
 		default:
