@@ -808,6 +808,11 @@ string GetDirOfCurrentExecutable()
 
 void InitializeSearchPaths()
 {
+	static bool initialized = false;
+	if(initialized)
+		return;
+	initialized = true;
+
 	std::filesystem::path binRootDir;
 	//Search in the directory of the glscopeclient binary first
 #ifdef _WIN32
