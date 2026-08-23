@@ -75,8 +75,8 @@ void ScalarPulseDelayFilter::Refresh(
 		m_lastUpdate = GetTime();
 	}
 
-	//Check for timneout
-	double target = m_lastUpdate + m_interval.GetFloatVal()*SECONDS_PER_FS;;
+	//Check for timeout
+	double target = m_lastUpdate + m_interval.GetFloatVal()*SECONDS_PER_FS;
 	if(m_active && (GetTime() > target) )
 	{
 		m_active = false;

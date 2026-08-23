@@ -38,7 +38,11 @@ PointSampleFilter::PointSampleFilter(const string& color)
 	, m_off(m_parameters["Sample Point"])
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "sample", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	CreateInput<InputConstraintStreamType>("in", Stream::STREAM_TYPE_ANALOG);
+
+	//TODO: Constrain Y axis unit is input's X axis unit?
+	CreateInput<InputConstraintStreamType>("position", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	m_off = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_off.SetIntVal(0);
@@ -70,6 +74,18 @@ void PointSampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		return;
 	}
 
+	//If we have a filter graph input this takes precedence
+	auto off = m_off.GetIntVal();
+	auto gin = GetInput(1);
+	if(gin)
+	{
+		off = gin.GetScalarValue();
+
+		//Special case: if units dont line up, scale the value
+		if( (gin.GetYAxisUnits() == Unit::UNIT_HZ) && (din.GetXAxisUnits() == Unit::UNIT_MICROHZ) )
+			off *= 1e6;
+	}
+
 	//Grab the input to the CPU
 	//TODO: only grab a single sample of interest
 	cmdBuf.begin({});
@@ -82,7 +98,6 @@ void PointSampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	m_off.SetUnit(din.GetXAxisUnits());
 
 	//Sample the input
-	auto off = m_off.GetIntVal();
 	optional<float> sample = GetValueAtTime(data, off, false);
 	if(!sample)
 		m_streams[0].m_value = std::numeric_limits<float>::quiet_NaN();
