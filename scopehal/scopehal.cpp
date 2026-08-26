@@ -300,6 +300,7 @@ void DriverStaticInit()
 	AddBERTDriverClass(MultiLaneBERT);
 
 	AddDriverClass(AgilentOscilloscope);
+	Oscilloscope::DoAddDriverClass("keysight", &AgilentOscilloscope::CreateInstance);	//alias
 	AddDriverClass(AntikernelLabsILA);
 	AddDriverClass(AntikernelLabsSerdesILA8b10b);
 	AddDriverClass(DemoOscilloscope);
