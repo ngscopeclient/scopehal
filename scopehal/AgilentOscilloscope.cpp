@@ -54,9 +54,13 @@ using namespace std;
 AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	: SCPIDevice(transport, true, 30000000) //Some models (DSOX2024A at least) take ~10 seconds to respond after network connection
 	, SCPIInstrument(transport)
+	, m_isSimulator(false)
 {
-	//Last digit of the model number is the number of channels
-	std::string model_number = m_model;
+	//Default to ancient firmware
+	m_ftype = FIRMWARE_OLD;
+
+	//For old scopes, last digit of the model number is the number of channels
+	string model_number = m_model;
 	model_number.erase(
 		std::remove_if(
 			model_number.begin(),
@@ -65,7 +69,35 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		),
 		model_number.end()
 	);
-	int nchans = std::stoi(model_number) % 10;
+	int nchans = stoi(model_number) % 10;
+
+	//If this is a Keysight scope look at the firmware version
+	if(strtolower(m_vendor).find("keysight") == 0)
+	{
+		LogTrace("Keysight scope not older Agilent, checking infiniium version\n");
+
+		int firmwareMajor = 0;
+		sscanf(m_fwVersion.c_str(), "%d.", &firmwareMajor);
+		LogTrace("Firmware major version is %d\n", firmwareMajor);
+		if(firmwareMajor >= 10)
+			m_ftype = FIRMWARE_INFINIIUM_10;
+
+		//If the model name is N8900A it's a simulator
+		if(m_model == "N8900A")
+		{
+			LogNotice("Infiniium offline N8900A detected, disabling trigger and some frontend controls\n");
+			m_isSimulator = true;
+		}
+	}
+
+	//:SYST:CAP:CHAN? COUNT available starting in version 10.x infiniium software
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		auto schans = Trim(m_transport->SendCommandQueuedWithReply(":SYST:CAP:CHAN? COUNT"));
+		schans = str_replace("\"", "", schans);
+		nchans = stoi(schans);
+		LogTrace("Found %d analog channels\n", nchans);
+	}
 
 	for(int i=0; i<nchans; i++)
 	{
@@ -73,25 +105,67 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		string chname = string("CHAN1");
 		chname[4] += i;
 
-		//Color the channels based on Agilent's standard color sequence (yellow-green-violet-pink)
+		//Keysight color scheme up to 8 channels
 		string color = "#ffffff";
-		switch(i)
+		if(m_ftype >= FIRMWARE_INFINIIUM_10)
 		{
-			case 0:
-				color = "#ffff00";
-				break;
+			switch(i)
+			{
+				case 0:
+					color = "#f9ff00";
+					break;
 
-			case 1:
-				color = "#32ff00";
-				break;
+				case 1:
+					color = "#30fb00";
+					break;
 
-			case 2:
-				color = "#5578ff";
-				break;
+				case 2:
+					color = "#25a0fb";
+					break;
 
-			case 3:
-				color = "#ff0084";
-				break;
+				case 3:
+					color = "#ff005b";
+					break;
+
+				case 4:
+					color = "#00fcfc";
+					break;
+
+				case 5:
+					color = "#ff00e5";
+					break;
+
+				case 6:
+					color = "#ad6aff";
+					break;
+
+				case 7:
+					color = "#ff9000";
+					break;
+			}
+		}
+
+		//Color the channels based on Agilent's standard color sequence (yellow-green-violet-pink)
+		else
+		{
+			switch(i)
+			{
+				case 0:
+					color = "#ffff00";
+					break;
+
+				case 1:
+					color = "#32ff00";
+					break;
+
+				case 2:
+					color = "#5578ff";
+					break;
+
+				case 3:
+					color = "#ff0084";
+					break;
+			}
 		}
 
 		//Create the channel
@@ -121,8 +195,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	m_extTrigChannel->SetDefaultDisplayName();
 
 	//See what options we have
-	m_transport->SendCommand("*OPT?");
-	string reply = m_transport->ReadReply();
+	string reply = m_transport->SendCommandQueuedWithReply("*OPT?");
 
 	set<string> options;
 
@@ -195,13 +268,13 @@ void AgilentOscilloscope::ConfigureWaveform(const string& channel)
 {
 	//Select the channel to apply settings to
 	//NOTE: this also enables the channel
-	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommandQueued(":WAV:SOUR " + channel);
 
 	//Configure transport format to raw 8-bit int
-	m_transport->SendCommand(":WAV:FORM BYTE");
+	m_transport->SendCommandQueued(":WAV:FORM BYTE");
 
 	//Request all points when we download
-	m_transport->SendCommand(":WAV:POIN:MODE RAW");
+	m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,12 +366,7 @@ bool AgilentOscilloscope::IsChannelEnabled(size_t i)
 			return m_channelsEnabled[i];
 	}
 
-	string reply;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP?");
-		reply = m_transport->ReadReply();
-	}
+	auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":DISP?");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if(reply == "0")
@@ -315,10 +383,7 @@ bool AgilentOscilloscope::IsChannelEnabled(size_t i)
 
 void AgilentOscilloscope::EnableChannel(size_t i)
 {
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP ON");
-	}
+	m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":DISP ON");
 
 	if (IsAnalogChannel(i))
 		ConfigureWaveform(GetOscilloscopeChannel(i)->GetHwname());
@@ -331,11 +396,7 @@ void AgilentOscilloscope::EnableChannel(size_t i)
 
 void AgilentOscilloscope::DisableChannel(size_t i)
 {
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP OFF");
-	}
-
+	m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":DISP OFF");
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = false;
@@ -362,24 +423,36 @@ OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t
 			return m_channelCouplings[i];
 	}
 
-	string coup_reply, imp_reply;
+	//We can batch query input config here
+	OscilloscopeChannel::CouplingType coupling;
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP?");
-		coup_reply = m_transport->ReadReply();
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP?");
-		imp_reply = m_transport->ReadReply();
+		auto cimp_reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":INP?");
+
+		if(cimp_reply == "DC")
+			coupling = OscilloscopeChannel::COUPLE_DC_1M;
+		else if(cimp_reply == "DC50")
+			coupling = OscilloscopeChannel::COUPLE_DC_50;
+		else if(cimp_reply == "AC")
+			coupling = OscilloscopeChannel::COUPLE_AC_1M;
+		else	//probably LFR1 or LFR2
+			coupling = OscilloscopeChannel::COUPLE_AC_1M;
 	}
 
-	OscilloscopeChannel::CouplingType coupling;
-	if(coup_reply == "AC")
-		coupling = OscilloscopeChannel::COUPLE_AC_1M;
-	else /*if(coup_reply == "DC")*/
+	else
 	{
-		if(imp_reply == "ONEM")
-			coupling = OscilloscopeChannel::COUPLE_DC_1M;
-		else /*if(imp_reply == "FIFT")*/
-			coupling = OscilloscopeChannel::COUPLE_DC_50;
+		auto coup_reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUP?");
+		auto imp_reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":IMP?");
+
+		if(coup_reply == "AC")
+			coupling = OscilloscopeChannel::COUPLE_AC_1M;
+		else /*if(coup_reply == "DC")*/
+		{
+			if(imp_reply == "ONEM")
+				coupling = OscilloscopeChannel::COUPLE_DC_1M;
+			else /*if(imp_reply == "FIFT")*/
+				coupling = OscilloscopeChannel::COUPLE_DC_50;
+		}
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -394,23 +467,46 @@ void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coup
 	if (m_probeTypes[i] == SmartProbe)
 		return;
 
+	//new Infiniium
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(type)
 		{
 			case OscilloscopeChannel::COUPLE_DC_50:
-				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
-				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP FIFT");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":INP DC50");
 				break;
 
 			case OscilloscopeChannel::COUPLE_AC_1M:
-				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
-				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP AC");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":INP AC");
 				break;
 
 			case OscilloscopeChannel::COUPLE_DC_1M:
-				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
-				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":INP DC");
+				break;
+
+			default:
+				LogError("Invalid coupling for channel\n");
+		}
+	}
+
+	//old Agilent
+	else
+	{
+		switch(type)
+		{
+			case OscilloscopeChannel::COUPLE_DC_50:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":IMP FIFT");
+				break;
+
+			case OscilloscopeChannel::COUPLE_AC_1M:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP AC");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_1M:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
 				break;
 
 			default:
@@ -433,17 +529,27 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 			return m_channelAttenuations[i];
 	}
 
-	string reply;
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
-		reply = m_transport->ReadReply();
-	}
+		//auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
 
-	double atten = stod(reply);
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelAttenuations[i] = atten;
-	return atten;
+		LogWarning("AgilentOscilloscope::GetChannelAttenuation unimplemented for infiniium\n");
+
+		//TODO: implement this, seems complicated
+		//can be CHANx:PROB:EXT:GAIN? but also other things
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = 1;
+		return 1;
+	}
+	else
+	{
+		auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
+
+		double atten = stod(reply);
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = atten;
+		return atten;
+	}
 }
 
 void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
@@ -453,18 +559,27 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	if (m_probeTypes[i] != None)
 		return;
 
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		PushFloat(GetOscilloscopeChannel(i)->GetHwname() + ":PROB", atten);
+		LogWarning("AgilentOscilloscope::SetChannelAttenuation unimplemented for infiniium\n");
 	}
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelAttenuations[i] = atten;
+	else
+	{
+		m_transport->SendCommandQueued(
+			GetOscilloscopeChannel(i)->GetHwname() + ":PROB" + " " + to_string_sci(atten));
+
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = atten;
+	}
 }
 
 unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if (i >= m_analogChannelCount)
+		return 0;
+
+	if(m_isSimulator)
 		return 0;
 
 	{
@@ -473,13 +588,7 @@ unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 			return m_channelBandwidthLimits[i];
 	}
 
-
-	string reply;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
-		reply = m_transport->ReadReply();
-	}
+	string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
 
 	unsigned int bwl;
 	if(reply == "1")
@@ -494,7 +603,7 @@ unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
 {
-	//FIXME
+	LogWarning("AgilentOscilloscope::SetChannelBandwidthLimit unimplemented\n");
 }
 
 float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
@@ -508,14 +617,7 @@ float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 			return m_channelVoltageRanges[i];
 	}
 
-	string reply;
-
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":RANGE?");
-
-		reply = m_transport->ReadReply();
-	}
+	string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":RANGE?");
 
 	float range = stof(reply);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -530,16 +632,15 @@ void AgilentOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, fl
 		m_channelVoltageRanges[i] = range;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:RANGE %.4f", GetOscilloscopeChannel(i)->GetHwname().c_str(), range);
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 OscilloscopeChannel* AgilentOscilloscope::GetExternalTrigger()
 {
 	//FIXME
-	return NULL;
+	return nullptr;
 }
 
 float AgilentOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
@@ -554,12 +655,7 @@ float AgilentOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 			return m_channelOffsets[i];
 	}
 
-	string reply;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS?");
-		reply = m_transport->ReadReply();
-	}
+	auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS?");
 
 	float offset = stof(reply);
 	offset = -offset;
@@ -576,10 +672,9 @@ void AgilentOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float of
 		m_channelOffsets[i] = offset;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:OFFS %.4f", GetOscilloscopeChannel(i)->GetHwname().c_str(), -offset);
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
@@ -587,20 +682,28 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 	if (!m_triggerArmed)
 		return TRIGGER_MODE_STOP;
 
-	// Based on example from 6000 Series Programmer's Guide
-	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":OPER:COND?");
-	string ter = m_transport->ReadReply();
-	int cond = atoi(ter.c_str());
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		//FIXME
+		return TRIGGER_MODE_STOP;
+	}
 
-	// Check bit 3 ('Run' bit)
-	if((cond & (1 << 3)) != 0)
-		return TRIGGER_MODE_RUN;
+	//Old agilent
 	else
 	{
-		m_triggerArmed = false;
-		return TRIGGER_MODE_TRIGGERED;
+		// Based on example from 6000 Series Programmer's Guide
+		// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
+		auto ter = m_transport->SendCommandQueuedWithReply(":OPER:COND?");
+		int cond = atoi(ter.c_str());
+
+		// Check bit 3 ('Run' bit)
+		if((cond & (1 << 3)) != 0)
+			return TRIGGER_MODE_RUN;
+		else
+		{
+			m_triggerArmed = false;
+			return TRIGGER_MODE_TRIGGERED;
+		}
 	}
 }
 
@@ -613,9 +716,11 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
  */
 vector<uint8_t> AgilentOscilloscope::GetWaveformData(const string& channel)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":WAV:SOUR " + channel);
-	m_transport->SendCommand(":WAV:DATA?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	m_transport->SendCommandQueued(":WAV:SOUR " + channel);
+	m_transport->SendCommandQueued(":WAV:DATA?");
+	m_transport->FlushCommandQueue();
 
 	// Read the length header size
 	char tmp[16] = {0};
@@ -648,15 +753,11 @@ AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(c
 	WaveformPreamble ret;
 	string reply;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommandQueued(":WAV:SOUR " + channel);
 	// The DSO-X 2022A sometimes only replies '+0' which isn't documented in the Programmer's Guide. Retrying once seems
 	// to solve it reliably. 19 is the shortest representable string length that conforms to the sscanf format
 	for (int i = 0; i < 2 && reply.length() < 19; i++)
-	{
-		m_transport->SendCommand(":WAV:PRE?");
-		reply = m_transport->ReadReply();
-	}
+		reply = m_transport->SendCommandQueuedWithReply(":WAV:PRE?");
 	sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
 			&ret.format, &ret.type, &ret.length, &ret.average_count,
 			&ret.xincrement, &ret.xorigin, &ret.xreference,
@@ -684,7 +785,7 @@ void AgilentOscilloscope::ProcessDigitalWaveforms(
 		auto channel = m_digitalChannelBase + chan_start + i;
 		if (IsChannelEnabled(channel))
 		{
-			auto cap = new SparseDigitalWaveform;
+			auto cap = AllocateDigitalWaveform(m_nickname + "." + GetChannel(m_digitalChannelBase + i)->GetHwname());
 			int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
 			cap->m_timescale = fs_per_sample;
 			cap->m_startFemtoseconds = 0;
@@ -743,7 +844,7 @@ void AgilentOscilloscope::ProcessDigitalWaveforms(
 
 bool AgilentOscilloscope::AcquireData()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	LogIndenter li;
 
 	map<int, vector<WaveformBase*> > pending_waveforms;
@@ -760,7 +861,7 @@ bool AgilentOscilloscope::AcquireData()
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data available on Agilent scopes?)
-		auto cap = new UniformAnalogWaveform;
+		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		double t = GetTime();
@@ -783,7 +884,6 @@ bool AgilentOscilloscope::AcquireData()
 
 	if(m_digitalChannelCount > 0)
 	{
-
 		// Fetch waveform data for each pod containing enabled channels
 		map<string, vector<uint8_t>> raw_waveforms;
 		for(unsigned int i = 0; i < 8 && i < m_digitalChannelCount; i++)
@@ -828,7 +928,7 @@ bool AgilentOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		m_transport->SendCommand(":SING");
+		m_transport->SendCommandQueued(":SING");
 		m_triggerArmed = true;
 	}
 
@@ -837,33 +937,29 @@ bool AgilentOscilloscope::AcquireData()
 
 void AgilentOscilloscope::Start()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("SING");
+	m_transport->SendCommandQueued("SING");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
 
 void AgilentOscilloscope::StartSingleTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("SING");
+	m_transport->SendCommandQueued("SING");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
 
 void AgilentOscilloscope::Stop()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("STOP");
+	m_transport->SendCommandQueued("STOP");
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
 
 void AgilentOscilloscope::ForceTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":SING");
-	m_transport->SendCommand(":TRIG:FORC");
+	m_transport->SendCommandQueued(":SING");
+	m_transport->SendCommandQueued(":TRIG:FORC");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -952,9 +1048,7 @@ uint64_t AgilentOscilloscope::GetSampleRate()
 	if (m_sampleRateValid)
 		return m_sampleRate;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("ACQUIRE:SRATE?");
-	uint64_t rate = stof(m_transport->ReadReply());
+	uint64_t rate = stof(m_transport->SendCommandQueuedWithReply("ACQUIRE:SRATE?"));
 	m_sampleRate = rate;
 	m_sampleRateValid = true;
 	return rate;
@@ -965,9 +1059,7 @@ uint64_t AgilentOscilloscope::GetSampleDepth()
 	if (m_sampleDepthValid)
 		return m_sampleDepth;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("ACQUIRE:POINTS?");
-	uint64_t depth = stof(m_transport->ReadReply());
+	uint64_t depth = stof(m_transport->SendCommandQueuedWithReply("ACQUIRE:POINTS?"));
 	m_sampleDepth = depth;
 	m_sampleDepthValid = true;
 	return depth;
@@ -993,7 +1085,6 @@ void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 	// Clamp the duration to make sure we achieve at least the requested sample rate
 	duration = min(duration, max_duration);
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	PushFloat("TIMEBASE:RANGE", duration);
 	for (auto chan : m_channels)
 	{
@@ -1002,10 +1093,10 @@ void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 			continue;
 		if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
 		{
-			m_transport->SendCommand(":WAV:SOUR " + chan->GetHwname());
+			m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
 
 			// This will downsample the capture in case we ended up with a sample rate much higher than requested
-			m_transport->SendCommand(":WAV:POINTS " + to_string(depth));
+			m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
 		}
 	}
 }
@@ -1049,11 +1140,8 @@ bool AgilentOscilloscope::SetInterleaving(bool /*combine*/)
 
 void AgilentOscilloscope::PullTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Figure out what kind of trigger is active.
-	m_transport->SendCommand("TRIG:MODE?");
-	string reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply("TRIG:MODE?");
 	if (reply == "EDGE")
 		PullEdgeTrigger();
 	else if (reply == "GLIT")
@@ -1076,35 +1164,29 @@ void AgilentOscilloscope::PullTrigger()
 void AgilentOscilloscope::PullEdgeTrigger()
 {
 	//Clear out any triggers of the wrong type
-	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	if( (m_trigger != nullptr) && (dynamic_cast<EdgeTrigger*>(m_trigger) != nullptr) )
 	{
 		delete m_trigger;
-		m_trigger = NULL;
+		m_trigger = nullptr;
 	}
 
 	//Create a new trigger if necessary
-	if(m_trigger == NULL)
+	if(m_trigger == nullptr)
 		m_trigger = new EdgeTrigger(this);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Source
-	m_transport->SendCommand("TRIG:SOUR?");
-	string reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply("TRIG:SOUR?");
 	auto chan = GetOscilloscopeChannelByHwName(reply);
 	et->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());
 
 	//Level
-	m_transport->SendCommand("TRIG:LEV?");
-	reply = m_transport->ReadReply();
-	et->SetLevel(stof(reply));
+	et->SetLevel(stof(m_transport->SendCommandQueuedWithReply("TRIG:LEV?")));
 
 	//Edge slope
-	m_transport->SendCommand("TRIG:SLOPE?");
-	GetTriggerSlope(et, m_transport->ReadReply());
+	GetTriggerSlope(et, m_transport->SendCommandQueuedWithReply("TRIG:SLOPE?"));
 }
 
 /**
@@ -1113,42 +1195,35 @@ void AgilentOscilloscope::PullEdgeTrigger()
 void AgilentOscilloscope::PullNthEdgeBurstTrigger()
 {
 	//Clear out any triggers of the wrong type
-	if( (m_trigger != NULL) && (dynamic_cast<NthEdgeBurstTrigger*>(m_trigger) != NULL) )
+	if( (m_trigger != nullptr) && (dynamic_cast<NthEdgeBurstTrigger*>(m_trigger) != nullptr) )
 	{
 		delete m_trigger;
-		m_trigger = NULL;
+		m_trigger = nullptr;
 	}
 
 	//Create a new trigger if necessary
-	if(m_trigger == NULL)
+	if(m_trigger == nullptr)
 		m_trigger = new NthEdgeBurstTrigger(this);
 	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Source
-	m_transport->SendCommand("TRIG:EDGE:SOUR?");
-	string reply = m_transport->ReadReply();
+	string reply = m_transport->SendCommandQueuedWithReply("TRIG:EDGE:SOUR?");
 	auto chan = GetOscilloscopeChannelByHwName(reply);
 	bt->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());
 
 	//Level
-	m_transport->SendCommand("TRIG:EDGE:LEV?");
-	bt->SetLevel(stof(m_transport->ReadReply()));
+	bt->SetLevel(stof(m_transport->SendCommandQueuedWithReply("TRIG:EDGE:LEV?")));
 
 	//Slope
-	m_transport->SendCommand("TRIG:EBUR:SLOP?");
-	GetTriggerSlope(bt, m_transport->ReadReply());
+	GetTriggerSlope(bt, m_transport->SendCommandQueuedWithReply("TRIG:EBUR:SLOP?"));
 
 	//Idle time
-	m_transport->SendCommand("TRIG:EBUR:IDLE?");
-	bt->SetIdleTime(stof(m_transport->ReadReply()) * FS_PER_SECOND);
+	bt->SetIdleTime(stof(m_transport->SendCommandQueuedWithReply("TRIG:EBUR:IDLE?")) * FS_PER_SECOND);
 
 	//Edge number
-	m_transport->SendCommand("TRIG:EBUR:COUN?");
-	bt->SetEdgeNumber(stoi(m_transport->ReadReply()));
+	bt->SetEdgeNumber(stoi(m_transport->SendCommandQueuedWithReply("TRIG:EBUR:COUN?")));
 }
 
 /**
@@ -1157,38 +1232,32 @@ void AgilentOscilloscope::PullNthEdgeBurstTrigger()
 void AgilentOscilloscope::PullPulseWidthTrigger()
 {
 	//Clear out any triggers of the wrong type
-	if( (m_trigger != NULL) && (dynamic_cast<PulseWidthTrigger*>(m_trigger) != NULL) )
+	if( (m_trigger != nullptr) && (dynamic_cast<PulseWidthTrigger*>(m_trigger) != nullptr) )
 	{
 		delete m_trigger;
-		m_trigger = NULL;
+		m_trigger = nullptr;
 	}
 
 	//Create a new trigger if necessary
-	if(m_trigger == NULL)
+	if(m_trigger == nullptr)
 		m_trigger = new PulseWidthTrigger(this);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Source
-	m_transport->SendCommand("TRIG:GLIT:SOUR?");
-	string reply = m_transport->ReadReply();
+	string reply = m_transport->SendCommandQueuedWithReply("TRIG:GLIT:SOUR?");
 	auto chan = GetOscilloscopeChannelByHwName(reply);
 	pt->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());
 
 	//Level
-	m_transport->SendCommand("TRIG:GLIT:LEV?");
-	pt->SetLevel(stof(m_transport->ReadReply()));
+	pt->SetLevel(stof(m_transport->SendCommandQueuedWithReply("TRIG:GLIT:LEV?")));
 
 	//Condition
-	m_transport->SendCommand("TRIG:GLIT:QUAL?");
-	pt->SetCondition(GetCondition(m_transport->ReadReply()));
+	pt->SetCondition(GetCondition(m_transport->SendCommandQueuedWithReply("TRIG:GLIT:QUAL?")));
 
 	//Slope
-	m_transport->SendCommand("TRIG:GLIT:POL?");
-	GetTriggerSlope(pt, m_transport->ReadReply());
+	GetTriggerSlope(pt, m_transport->SendCommandQueuedWithReply("TRIG:GLIT:POL?"));
 
 	// Bounds
 	//
@@ -1196,8 +1265,7 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 	// on the scope so check & set the correct one.
 	if(pt->GetCondition() == Trigger::CONDITION_BETWEEN)
 	{
-		m_transport->SendCommand("TRIG:GLIT:RANG?");
-		reply = m_transport->ReadReply();
+		reply = m_transport->SendCommandQueuedWithReply("TRIG:GLIT:RANG?");
 		stringstream ss(reply);
 		string upper_bound, lower_bound;
 
@@ -1213,12 +1281,10 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 	else
 	{
 		//Lower bound
-		m_transport->SendCommand("TRIG:GLIT:GRE?");
-		pt->SetLowerBound(stof(m_transport->ReadReply()) * FS_PER_SECOND);
+		pt->SetLowerBound(stof(m_transport->SendCommandQueuedWithReply("TRIG:GLIT:GRE?")) * FS_PER_SECOND);
 
 		//Upper bound
-		m_transport->SendCommand("TRIG:GLIT:LESS?");
-		pt->SetUpperBound(stof(m_transport->ReadReply()) * FS_PER_SECOND);
+		pt->SetUpperBound(stof(m_transport->SendCommandQueuedWithReply("TRIG:GLIT:LESS?")) * FS_PER_SECOND);
 	}
 }
 
@@ -1291,12 +1357,7 @@ void AgilentOscilloscope::GetProbeType(size_t i)
 			return;
 	}
 
-	string reply;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":PROBE:ID?");
-		reply = m_transport->ReadReply();
-	}
+	auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROBE:ID?");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if (reply == "AutoProbe")
@@ -1331,13 +1392,11 @@ void AgilentOscilloscope::PushTrigger()
  */
 void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Mode
-	m_transport->SendCommand("TRIG:MODE EDGE");
+	m_transport->SendCommandQueued("TRIG:MODE EDGE");
 
 	//Source
-	m_transport->SendCommand(string("TRIG:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
+	m_transport->SendCommandQueued(string("TRIG:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
 
 	//Level
 	PushFloat("TRIG:LEV", trig->GetLevel());
@@ -1353,15 +1412,13 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
  */
 void AgilentOscilloscope::PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:MODE EBUR");
-	m_transport->SendCommand("TRIG:EDGE:SOURCE " +
+	m_transport->SendCommandQueued("TRIG:MODE EBUR");
+	m_transport->SendCommandQueued("TRIG:EDGE:SOURCE " +
 		trig->GetInput(0).m_channel->GetHwname());
 	PushFloat("TRIG:EDGE:LEV", trig->GetLevel());
 	PushSlope("TRIG:EBUR:SLOP", trig->GetSlope());
 	PushFloat("TRIG:EBUR:IDLE", trig->GetIdleTime() * SECONDS_PER_FS);
-	m_transport->SendCommand("TRIG:EBUR:COUNT " + to_string(trig->GetEdgeNumber()));
+	m_transport->SendCommandQueued("TRIG:EBUR:COUNT " + to_string(trig->GetEdgeNumber()));
 }
 
 /**
@@ -1371,17 +1428,15 @@ void AgilentOscilloscope::PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig)
  */
 void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:MODE GLIT");
-	m_transport->SendCommand("TRIG:GLIT:SOURCE " +
+	m_transport->SendCommandQueued("TRIG:MODE GLIT");
+	m_transport->SendCommandQueued("TRIG:GLIT:SOURCE " +
 		trig->GetInput(0).m_channel->GetHwname());
 	PushSlope("TRIG:GLIT:POL", trig->GetType());
 	PushCondition("TRIG:GLIT:QUAL", trig->GetCondition());
 	PushFloat("TRIG:GLIT:LEV", trig->GetLevel());
 	if(trig->GetCondition() == Trigger::CONDITION_BETWEEN)
 	{
-		m_transport->SendCommand("TRIG:GLIT:RANG " +
+		m_transport->SendCommandQueued("TRIG:GLIT:RANG " +
 			to_string_sci(trig->GetUpperBound() * SECONDS_PER_FS) +
 			"," +
 			to_string_sci(trig->GetLowerBound() * SECONDS_PER_FS));
@@ -1416,7 +1471,7 @@ void AgilentOscilloscope::PushCondition(const string& path, Trigger::Condition c
 		default:
 			return;
 	}
-	m_transport->SendCommand(path + " " + cond_str);
+	m_transport->SendCommandQueued(path + " " + cond_str);
 }
 
 /**
@@ -1427,7 +1482,7 @@ void AgilentOscilloscope::PushCondition(const string& path, Trigger::Condition c
  */
 void AgilentOscilloscope::PushFloat(const string& path, float f)
 {
-	m_transport->SendCommand(path + " " + to_string_sci(f));
+	m_transport->SendCommandQueued(path + " " + to_string_sci(f));
 }
 
 /**
@@ -1456,7 +1511,7 @@ void AgilentOscilloscope::PushSlope(const string& path, EdgeTrigger::EdgeType sl
 		default:
 			return;
 	}
-	m_transport->SendCommand(path + " " + slope_str);
+	m_transport->SendCommandQueued(path + " " + slope_str);
 }
 
 /**
@@ -1479,7 +1534,7 @@ void AgilentOscilloscope::PushSlope(const string& path, NthEdgeBurstTrigger::Edg
 		default:
 			return;
 	}
-	m_transport->SendCommand(path + " " + slope_str);
+	m_transport->SendCommandQueued(path + " " + slope_str);
 }
 
 vector<string> AgilentOscilloscope::GetTriggerTypes()

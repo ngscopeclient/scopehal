@@ -214,6 +214,18 @@ private:
 		size_t chan_start);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
+	enum FirmwareType
+	{
+		//Agilent or very old Keysight
+		FIRMWARE_OLD,
+
+		//keysight scope with infiniium 10.x or later
+		FIRMWARE_INFINIIUM_10
+	} m_ftype;
+
+	//If true, this is a simulator and a bunch of commands related to triggering and frontend config are unavailable
+	bool m_isSimulator;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(AgilentOscilloscope)
