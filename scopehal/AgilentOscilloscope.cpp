@@ -253,6 +253,18 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	m_sampleRate = 0;
 	m_sampleDepthValid = false;
 	m_sampleDepth = 0;
+
+	//Do some initial configuration
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		m_transport->SendCommandQueued("ACQ:POIN:AUTO OFF");
+		m_transport->SendCommandQueued("ACQ:SRATE:AUTO OFF");
+
+		m_transport->SendCommandQueued("WAV:FORM WORD");
+
+		//TODO: ACQ:SRATE:TESTLIMITS? for min/max sample rate
+		//TODO: ACQ:POINTS:TESTLIMITS? for min/max memory depth
+	}
 }
 
 AgilentOscilloscope::~AgilentOscilloscope()
@@ -270,11 +282,14 @@ void AgilentOscilloscope::ConfigureWaveform(const string& channel)
 	//NOTE: this also enables the channel
 	m_transport->SendCommandQueued(":WAV:SOUR " + channel);
 
-	//Configure transport format to raw 8-bit int
-	m_transport->SendCommandQueued(":WAV:FORM BYTE");
+	if(m_ftype == FIRMWARE_OLD)
+	{
+		//Configure transport format to raw 8-bit int
+		m_transport->SendCommandQueued(":WAV:FORM BYTE");
 
-	//Request all points when we download
-	m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
+		//Request all points when we download
+		m_transport->SendCommandQueued(":WAV:POIN:MODE RAW");
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -684,8 +699,23 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 
 	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		//FIXME
-		return TRIGGER_MODE_STOP;
+		//If we are a simulator and the trigger is armed, report a hit so we download the waveform it has loaded
+		if(m_isSimulator)
+		{
+			if(m_triggerArmed)
+			{
+				m_triggerArmed = false;
+				return TRIGGER_MODE_TRIGGERED;
+			}
+			else
+				return TRIGGER_MODE_STOP;
+		}
+
+		//Check if the acquisition is done
+		auto done = m_transport->SendCommandQueuedWithReply(":ADER?");
+		if(done.find("1") != string::npos)
+			return TRIGGER_MODE_TRIGGERED;
+		return TRIGGER_MODE_RUN;
 	}
 
 	//Old agilent
@@ -868,14 +898,23 @@ bool AgilentOscilloscope::AcquireData()
 		cap->m_startTimestamp = floor(t);
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
-		// Format the capture
-		auto buf = GetWaveformData(chname);
-		if(preamble.length != buf.size())
-			LogError("Waveform preamble length (%zu) does not match data length (%zu)", preamble.length, buf.size());
-		cap->Resize(buf.size());
-		float gain = preamble.yincrement;
-		float offset = (gain * preamble.yreference) - preamble.yorigin;
-		ConvertUnsigned8BitSamples(cap->m_samples.GetCpuPointer(), buf.data(), gain, offset, buf.size());
+		//Modern format
+		if(m_ftype >= FIRMWARE_INFINIIUM_10)
+		{
+			cap->Resize(preamble.length);
+		}
+
+		else
+		{
+			// Format the capture
+			auto buf = GetWaveformData(chname);
+			if(preamble.length != buf.size())
+				LogError("Waveform preamble length (%zu) does not match data length (%zu)", preamble.length, buf.size());
+			cap->Resize(buf.size());
+			float gain = preamble.yincrement;
+			float offset = (gain * preamble.yreference) - preamble.yorigin;
+			ConvertUnsigned8BitSamples(cap->m_samples.GetCpuPointer(), buf.data(), gain, offset, buf.size());
+		}
 
 		//Done, update the data
 		cap->MarkSamplesModifiedFromCpu();
@@ -928,7 +967,8 @@ bool AgilentOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		m_transport->SendCommandQueued(":SING");
+		if(!m_isSimulator)
+			m_transport->SendCommandQueued(":SING");
 		m_triggerArmed = true;
 	}
 
@@ -937,29 +977,39 @@ bool AgilentOscilloscope::AcquireData()
 
 void AgilentOscilloscope::Start()
 {
-	m_transport->SendCommandQueued("SING");
+	if(!m_isSimulator)
+		m_transport->SendCommandQueued("SING");
+
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
 
 void AgilentOscilloscope::StartSingleTrigger()
 {
-	m_transport->SendCommandQueued("SING");
+	if(!m_isSimulator)
+		m_transport->SendCommandQueued("SING");
+
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
 
 void AgilentOscilloscope::Stop()
 {
-	m_transport->SendCommandQueued("STOP");
+	if(!m_isSimulator)
+		m_transport->SendCommandQueued("STOP");
+
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
 
 void AgilentOscilloscope::ForceTrigger()
 {
-	m_transport->SendCommandQueued(":SING");
-	m_transport->SendCommandQueued(":TRIG:FORC");
+	if(!m_isSimulator)
+	{
+		m_transport->SendCommandQueued(":SING");
+		m_transport->SendCommandQueued(":TRIG:FORC");
+	}
+
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -994,8 +1044,32 @@ static std::map<uint64_t, double> sampleRateToDuration
 vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
-	for (auto x: sampleRateToDuration)
-		ret.push_back(x.first);
+
+	const int64_t k = 1000;
+	const int64_t m = k*k;
+	const int64_t g = k*m;
+
+	//Modern scopes
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		//Powers of two up to 256 Msps
+		for(int64_t i=1; i<=256; i *= 2)
+			ret.push_back(i * m);
+
+		ret.push_back(500 * m);	//not 512
+
+		//Powers of two up to 256 Gsps
+		//TODO: stop lower on lower end scopes
+		for(int64_t i=1; i<=256; i *= 2)
+			ret.push_back(i * g);
+	}
+
+	//legacy stuff
+	else
+	{
+		for (auto x: sampleRateToDuration)
+			ret.push_back(x.first);
+	}
 
 	return ret;
 }
@@ -1016,24 +1090,46 @@ set<Oscilloscope::InterleaveConflict> AgilentOscilloscope::GetInterleaveConflict
 
 vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	return {
-		100,
-		250,
-		500,
-		1000,
-		2000,
-		5000,
-		10000,
-		20000,
-		50000,
-		100000,
-		200000,
-		500000,
-		1000000,
-		2000000,
-		4000000,
-		8000000,
-	};
+	//Modern scopes
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		vector<uint64_t> ret;
+
+		const int64_t k = 1024;
+		const int64_t m = k*k;
+		//const int64_t g = k*m;
+
+		for(int64_t i=1; i < 1024; i *= 2)
+			ret.push_back(i * k);
+
+		for(int64_t i=1; i < 2048; i *= 2)
+			ret.push_back(i * m);
+
+		return ret;
+	}
+
+	else
+	{
+		return
+		{
+			100,
+			250,
+			500,
+			1000,
+			2000,
+			5000,
+			10000,
+			20000,
+			50000,
+			100000,
+			200000,
+			500000,
+			1000000,
+			2000000,
+			4000000,
+			8000000,
+		};
+	}
 }
 
 vector<uint64_t> AgilentOscilloscope::GetSampleDepthsInterleaved()
@@ -1175,18 +1271,37 @@ void AgilentOscilloscope::PullEdgeTrigger()
 		m_trigger = new EdgeTrigger(this);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
-	//Source
-	auto reply = m_transport->SendCommandQueuedWithReply("TRIG:SOUR?");
-	auto chan = GetOscilloscopeChannelByHwName(reply);
-	et->SetInput(0, StreamDescriptor(chan, 0), true);
-	if(!chan)
-		LogWarning("Unknown trigger source %s\n", reply.c_str());
+	//modern
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		auto reply = m_transport->SendCommandQueuedWithReply("TRIG:EDGE:SOUR?");
+		auto chan = GetOscilloscopeChannelByHwName(reply);
+		et->SetInput(0, StreamDescriptor(chan, 0), true);
+		if(!chan)
+			LogWarning("Unknown trigger source %s\n", reply.c_str());
 
-	//Level
-	et->SetLevel(stof(m_transport->SendCommandQueuedWithReply("TRIG:LEV?")));
+		//Edge slope
+		GetTriggerSlope(et, m_transport->SendCommandQueuedWithReply("TRIG:EDGE:SLOPE?"));
 
-	//Edge slope
-	GetTriggerSlope(et, m_transport->SendCommandQueuedWithReply("TRIG:SLOPE?"));
+		et->SetLevel(stof(m_transport->SendCommandQueuedWithReply(string("TRIG:LEV? ") + reply)));
+	}
+
+	//old Agilent
+	else
+	{
+		//Source
+		auto reply = m_transport->SendCommandQueuedWithReply("TRIG:SOUR?");
+		auto chan = GetOscilloscopeChannelByHwName(reply);
+		et->SetInput(0, StreamDescriptor(chan, 0), true);
+		if(!chan)
+			LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+		//Edge slope
+		GetTriggerSlope(et, m_transport->SendCommandQueuedWithReply("TRIG:SLOPE?"));
+
+		//Level
+		et->SetLevel(stof(m_transport->SendCommandQueuedWithReply("TRIG:LEV?")));
+	}
 }
 
 /**
