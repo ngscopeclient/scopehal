@@ -909,6 +909,13 @@ bool AgilentOscilloscope::AcquireData()
 		cap->m_startTimestamp = floor(t);
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
+		//If we are a simulator, update the memory config
+		if(m_isSimulator)
+		{
+			m_sampleDepth = preamble.length;
+			m_sampleRate = FS_PER_SECOND / fs_per_sample;
+		}
+
 		float gain = preamble.yincrement;
 		float offset = (gain * preamble.yreference) - preamble.yorigin;
 
@@ -935,28 +942,31 @@ bool AgilentOscilloscope::AcquireData()
 			m_transport->ReadRawData(1, &tmp[0]);
 
 			//Waveform conversion
-			m_cmdBuf->begin({});
+			if(preamble.length > 0)
 			{
-				NamedDebugRange shaderRange(*m_cmdBuf, "Convert16BitSamples");
-				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
-				m_conversion16BitPipeline->BindBufferNonblocking(1, m_rawSampleData, *m_cmdBuf);
+				m_cmdBuf->begin({});
+				{
+					NamedDebugRange shaderRange(*m_cmdBuf, "Convert16BitSamples");
+					m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+					m_conversion16BitPipeline->BindBufferNonblocking(1, m_rawSampleData, *m_cmdBuf);
 
-				ConvertRawSamplesShaderArgs args;
-				args.size = cap->size();
-				args.gain = gain;
-				args.offset = offset;
+					ConvertRawSamplesShaderArgs args;
+					args.size = cap->size();
+					args.gain = gain;
+					args.offset = offset;
 
-				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
-				m_conversion16BitPipeline->Dispatch(
-					*m_cmdBuf, args,
-					min(compute_block_count, 32768u),
-					compute_block_count / 32768 + 1);
+					const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
+					m_conversion16BitPipeline->Dispatch(
+						*m_cmdBuf, args,
+						min(compute_block_count, 32768u),
+						compute_block_count / 32768 + 1);
 
-				cap->MarkModifiedFromGpu();
+					cap->MarkModifiedFromGpu();
+				}
+
+				m_cmdBuf->end();
+				m_queue->SubmitAndBlock(*m_cmdBuf);
 			}
-
-			m_cmdBuf->end();
-			m_queue->SubmitAndBlock(*m_cmdBuf);
 		}
 
 		else
@@ -1118,6 +1128,9 @@ vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()
 		//TODO: stop lower on lower end scopes
 		for(int64_t i=1; i<=256; i *= 2)
 			ret.push_back(i * g);
+
+		if(m_isSimulator)
+			ret.push_back(m_sampleRate);
 	}
 
 	//legacy stuff
@@ -1160,6 +1173,9 @@ vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 
 		for(int64_t i=1; i < 2048; i *= 2)
 			ret.push_back(i * m);
+
+		if(m_isSimulator)
+			ret.push_back(m_sampleDepth);
 
 		return ret;
 	}
