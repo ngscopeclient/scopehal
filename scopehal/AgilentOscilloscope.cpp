@@ -261,6 +261,8 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		m_transport->SendCommandQueued("ACQ:SRATE:AUTO OFF");
 
 		m_transport->SendCommandQueued("WAV:FORM WORD");
+		m_transport->SendCommandQueued("WAV:STR ON");
+		m_transport->SendCommandQueued("WAV:BYT LSBF");
 
 		//TODO: ACQ:SRATE:TESTLIMITS? for min/max sample rate
 		//TODO: ACQ:POINTS:TESTLIMITS? for min/max memory depth
@@ -898,26 +900,52 @@ bool AgilentOscilloscope::AcquireData()
 		cap->m_startTimestamp = floor(t);
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
+		float gain = preamble.yincrement;
+		float offset = (gain * preamble.yreference) - preamble.yorigin;
+
 		//Modern format
 		if(m_ftype >= FIRMWARE_INFINIIUM_10)
 		{
 			cap->Resize(preamble.length);
+
+			//Ask for the data
+			m_transport->SendCommandQueued("WAV:DATA?");
+			m_transport->FlushCommandQueue();
+
+			//Read and discard two bytes of header before actual sample data
+			uint8_t tmp[2];
+			m_transport->ReadRawData(2, &tmp[0]);
+
+			//Allocate scratch buffer and read data
+			vector<int16_t> scratch;
+			scratch.resize(preamble.length);
+			m_transport->ReadRawData(preamble.length * 2, reinterpret_cast<uint8_t*>(&scratch[0]));
+
+			//Read and discard newline at end of block
+			m_transport->ReadRawData(1, &tmp[0]);
+
+			//Simple unoptimized waveform conversion
+			cap->PrepareForCpuAccess();
+			for(size_t j=0; j<preamble.length; j++)
+				cap->m_samples[j] = scratch[j] * gain - offset;
+			cap->MarkModifiedFromCpu();
 		}
 
 		else
 		{
+			cap->PrepareForCpuAccess();
+
 			// Format the capture
 			auto buf = GetWaveformData(chname);
 			if(preamble.length != buf.size())
 				LogError("Waveform preamble length (%zu) does not match data length (%zu)", preamble.length, buf.size());
 			cap->Resize(buf.size());
-			float gain = preamble.yincrement;
-			float offset = (gain * preamble.yreference) - preamble.yorigin;
 			ConvertUnsigned8BitSamples(cap->m_samples.GetCpuPointer(), buf.data(), gain, offset, buf.size());
+
+			cap->MarkSamplesModifiedFromCpu();
 		}
 
 		//Done, update the data
-		cap->MarkSamplesModifiedFromCpu();
 		pending_waveforms[i].push_back(cap);
 	}
 
