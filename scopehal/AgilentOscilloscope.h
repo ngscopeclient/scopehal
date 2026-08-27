@@ -226,6 +226,12 @@ private:
 	//If true, this is a simulator and a bunch of commands related to triggering and frontend config are unavailable
 	bool m_isSimulator;
 
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
+
+	///@brief Scratch buffer for raw ADC samples
+	AcceleratorBuffer<uint8_t> m_rawSampleData;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(AgilentOscilloscope)

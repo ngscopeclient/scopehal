@@ -267,6 +267,15 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		//TODO: ACQ:SRATE:TESTLIMITS? for min/max sample rate
 		//TODO: ACQ:POINTS:TESTLIMITS? for min/max memory depth
 	}
+
+	//Create Vulkan objects for the waveform conversion
+	InitVulkanQueue("AgilentOscilloscope");
+
+	m_conversion16BitPipeline = make_unique<ComputePipeline>(
+		"shaders/Convert16BitSamplesDual.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
+
+	m_rawSampleData.SetCpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_LIKELY);
+	m_rawSampleData.SetGpuAccessHint(AcceleratorBuffer<uint8_t>::HINT_UNLIKELY);
 }
 
 AgilentOscilloscope::~AgilentOscilloscope()
@@ -917,18 +926,37 @@ bool AgilentOscilloscope::AcquireData()
 			m_transport->ReadRawData(2, &tmp[0]);
 
 			//Allocate scratch buffer and read data
-			vector<int16_t> scratch;
-			scratch.resize(preamble.length);
-			m_transport->ReadRawData(preamble.length * 2, reinterpret_cast<uint8_t*>(&scratch[0]));
+			m_rawSampleData.PrepareForCpuAccess();
+			m_rawSampleData.resize(preamble.length * 2);
+			m_transport->ReadRawData(preamble.length * 2, m_rawSampleData.GetCpuPointer());
+			m_rawSampleData.MarkModifiedFromCpu();
 
 			//Read and discard newline at end of block
 			m_transport->ReadRawData(1, &tmp[0]);
 
-			//Simple unoptimized waveform conversion
-			cap->PrepareForCpuAccess();
-			for(size_t j=0; j<preamble.length; j++)
-				cap->m_samples[j] = scratch[j] * gain - offset;
-			cap->MarkModifiedFromCpu();
+			//Waveform conversion
+			m_cmdBuf->begin({});
+			{
+				NamedDebugRange shaderRange(*m_cmdBuf, "Convert16BitSamples");
+				m_conversion16BitPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+				m_conversion16BitPipeline->BindBufferNonblocking(1, m_rawSampleData, *m_cmdBuf);
+
+				ConvertRawSamplesShaderArgs args;
+				args.size = cap->size();
+				args.gain = gain;
+				args.offset = offset;
+
+				const uint32_t compute_block_count = GetComputeBlockCount(cap->size(), 64*2); //2 samples per thread
+				m_conversion16BitPipeline->Dispatch(
+					*m_cmdBuf, args,
+					min(compute_block_count, 32768u),
+					compute_block_count / 32768 + 1);
+
+				cap->MarkModifiedFromGpu();
+			}
+
+			m_cmdBuf->end();
+			m_queue->SubmitAndBlock(*m_cmdBuf);
 		}
 
 		else
