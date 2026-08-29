@@ -35,11 +35,10 @@
 #ifndef ScalarStairstepFilter_h
 #define ScalarStairstepFilter_h
 
-#include "../scopehal/ActionProvider.h"
+#include "../scopehal/PausableFilter.h"
 
 class ScalarStairstepFilter
-	: public Filter
-	, public ActionProvider
+	: public PausableFilter
 {
 public:
 	ScalarStairstepFilter(const std::string& color);
@@ -52,6 +51,9 @@ public:
 
 	virtual std::vector<std::string> EnumActions() override;
 	virtual bool PerformAction(const std::string& id) override;
+
+	virtual void Run() override;
+	virtual void Single() override;
 
 	PROTOCOL_DECODER_INITPROC(ScalarStairstepFilter)
 

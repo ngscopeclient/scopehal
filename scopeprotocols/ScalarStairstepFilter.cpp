@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
-	: Filter(color, CAT_GENERATION)
+	: PausableFilter(color, CAT_GENERATION)
 	, m_start(m_parameters["Begin"])
 	, m_end(m_parameters["End"])
 	, m_interval(m_parameters["Step interval"])
@@ -76,7 +76,7 @@ string ScalarStairstepFilter::GetProtocolName()
 
 vector<string> ScalarStairstepFilter::EnumActions()
 {
-	vector<string> ret;
+	vector<string> ret = PausableFilter::EnumActions();
 	ret.push_back("Restart");
 	return ret;
 }
@@ -89,9 +89,11 @@ bool ScalarStairstepFilter::PerformAction(const string& id)
 		m_lastUpdate = GetTime();
 		m_streams[1].m_value = 1;
 		m_streams[0].m_value = m_start.GetFloatVal();
+		return true;
 	}
 
-	return true;
+	else
+		return PausableFilter::PerformAction(id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,10 +125,26 @@ void ScalarStairstepFilter::LoadParameters(const YAML::Node& node, IDTable& tabl
 	Filter::LoadParameters(node, table);
 }
 
+void ScalarStairstepFilter::Run()
+{
+	PausableFilter::Run();
+	m_lastUpdate = GetTime();
+}
+
+void ScalarStairstepFilter::Single()
+{
+	PausableFilter::Single();
+	m_lastUpdate = GetTime();
+}
+
 void ScalarStairstepFilter::Refresh(
 	[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
 	[[maybe_unused]] shared_ptr<QueueHandle> queue)
 {
+	//don't do anything if not running
+	if(!ShouldRefresh())
+		return;
+
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range nrange("ScalarStairstepFilter::Refresh");
 	#endif
@@ -138,6 +156,7 @@ void ScalarStairstepFilter::Refresh(
 	double now = GetTime();
 	double dt = m_interval.GetFloatVal()*SECONDS_PER_FS;
 	double timeOfNextUpdate = m_lastUpdate + dt;
+
 	if(timeOfNextUpdate > now)
 	{
 		m_streams[1].m_value = 0;
