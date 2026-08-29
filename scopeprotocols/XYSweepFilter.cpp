@@ -50,7 +50,7 @@ XYSweepFilter::XYSweepFilter(const string& color)
 
 	CreateInput<InputConstraintStreamType>("x", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput<InputConstraintStreamType>("y", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput<InputConstraintStreamType>("gate", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	CreateInput<InputConstraintStreamType>("gate", Stream::STREAM_TYPE_DIGITAL_SCALAR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,8 +95,8 @@ void XYSweepFilter::Refresh(
 	auto gate = GetInput(2);
 	if(gate)
 	{
-		auto gateval = gate.GetScalarValue();
-		if(gateval < 0.1)
+		auto gateval = gate.GetDigitalScalarValue();
+		if(gateval == 0)
 			return;
 	}
 

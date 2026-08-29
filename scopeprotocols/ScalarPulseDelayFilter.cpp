@@ -41,11 +41,13 @@ ScalarPulseDelayFilter::ScalarPulseDelayFilter(const string& color)
 	, m_lastUpdate(GetTime())
 	, m_active(false)
 {
-	AddStream(Unit(Unit::UNIT_COUNTS), "pulseout", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	CreateInput<InputConstraintStreamType>("pulsein", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_COUNTS), "pulseout", Stream::STREAM_TYPE_DIGITAL_SCALAR);
+	CreateInput<InputConstraintStreamType>("pulsein", Stream::STREAM_TYPE_DIGITAL_SCALAR);
 
 	m_interval = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_interval.SetFloatVal(FS_PER_SECOND / 2);
+
+	m_streams[0].m_digitalValueWidth = 1;
 
 	SetData(nullptr, 0);
 }
@@ -69,7 +71,7 @@ void ScalarPulseDelayFilter::Refresh(
 	auto din = GetInput(0);
 	if(!din)
 		return;
-	if(din.GetScalarValue())
+	if(din.GetDigitalScalarValue())
 	{
 		m_active = true;
 		m_lastUpdate = GetTime();
@@ -80,8 +82,8 @@ void ScalarPulseDelayFilter::Refresh(
 	if(m_active && (GetTime() > target) )
 	{
 		m_active = false;
-		m_streams[0].m_value = 1;
+		m_streams[0].m_digitalValue = 1;
 	}
 	else
-		m_streams[0].m_value = 0;
+		m_streams[0].m_digitalValue = 0;
 }

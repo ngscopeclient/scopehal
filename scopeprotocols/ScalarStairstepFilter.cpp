@@ -45,7 +45,8 @@ ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
 	, m_lastUpdate(GetTime())
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	AddStream(Unit(Unit::UNIT_COUNTS), "updated", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_COUNTS), "updated", Stream::STREAM_TYPE_DIGITAL_SCALAR);
+	m_streams[1].m_digitalValueWidth = 1;
 
 	m_start = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_start.SetFloatVal(0);
@@ -159,10 +160,10 @@ void ScalarStairstepFilter::Refresh(
 
 	if(timeOfNextUpdate > now)
 	{
-		m_streams[1].m_value = 0;
+		m_streams[1].m_digitalValue = 0;
 		return;
 	}
-	m_streams[1].m_value = 1;
+	m_streams[1].m_digitalValue = 1;
 
 	//Time to update!
 	//Backdate our nominal update time to the exact interval
