@@ -227,6 +227,7 @@ void GetTimestampOfFile(const std::string& path, time_t& timestamp, int64_t& fs)
 
 std::string to_string_sci(double d);
 std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
+extern const char g_hex[17];
 
 void TransportStaticInit();
 void DriverStaticInit();
