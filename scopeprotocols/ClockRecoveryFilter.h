@@ -142,6 +142,9 @@ protected:
 	 */
 	AcceleratorBuffer<int64_t> m_secondPassState;
 
+	///@brief Output buffer for CPU edge detection
+	AcceleratorBuffer<int64_t> m_vedges;
+
 	///@brief Number of edges found last PLL iteration
 	size_t m_lastIterationOutputCount;
 };

@@ -165,7 +165,6 @@ void ClockRecoveryFilter::Refresh(
 
 	//Timestamps of the edges
 	size_t nedges = 0;
-	AcceleratorBuffer<int64_t> vedges;
 	float threshold = m_threshold.GetFloatVal();
 	if(extraEdges)
 		nedges = extraEdges->size();
@@ -186,7 +185,7 @@ void ClockRecoveryFilter::Refresh(
 		nedges = edges.size();
 
 		//Inefficient but this is a less frequently used code path
-		vedges.CopyFrom(edges);
+		m_vedges.CopyFrom(edges);
 	}
 	if(nedges == 0)
 	{
@@ -200,7 +199,7 @@ void ClockRecoveryFilter::Refresh(
 	if(extraEdges)
 		pedges = &extraEdges->m_offsets;
 	else if(!uadin)
-		pedges = &vedges;
+		pedges = &m_vedges;
 	auto& edges = *pedges;
 
 	//Create the output waveform and copy our timescales
