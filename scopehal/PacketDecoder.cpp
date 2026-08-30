@@ -124,5 +124,5 @@ bool PacketDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*
  */
 Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
 {
-	return NULL;
+	return nullptr;
 }

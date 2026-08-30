@@ -124,6 +124,8 @@ protected:
 		size_t len,
 		EthernetWaveform* cap,
 		bool suppressedPreambleAndFCS = false);
+
+	std::vector<std::string> m_headers;
 };
 
 #endif

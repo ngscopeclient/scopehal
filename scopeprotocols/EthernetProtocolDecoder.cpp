@@ -43,6 +43,11 @@ EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 {
 	//Set up channels
 	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
+
+	m_headers.push_back("Dest MAC");
+	m_headers.push_back("Src MAC");
+	m_headers.push_back("VLAN");
+	m_headers.push_back("Ethertype");
 }
 
 EthernetProtocolDecoder::~EthernetProtocolDecoder()
@@ -54,12 +59,7 @@ EthernetProtocolDecoder::~EthernetProtocolDecoder()
 
 vector<string> EthernetProtocolDecoder::GetHeaders()
 {
-	vector<string> ret;
-	ret.push_back("Dest MAC");
-	ret.push_back("Src MAC");
-	ret.push_back("VLAN");
-	ret.push_back("Ethertype");
-	return ret;
+	return m_headers;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
