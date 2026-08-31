@@ -311,6 +311,7 @@ void CreateDirectory(const std::string& path);
 //Checksum helpers
 uint32_t CRC32(const uint8_t* bytes, size_t start, size_t end);
 uint32_t CRC32(const std::vector<uint8_t>& bytes);
+extern const uint32_t g_crc32Table[256];
 
 uint32_t ColorFromString(const std::string& str, unsigned int alpha = 255);
 

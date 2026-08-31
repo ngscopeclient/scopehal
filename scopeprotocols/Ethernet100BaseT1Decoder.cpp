@@ -69,6 +69,8 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 		m_pointsI.SetGpuAccessHint(AcceleratorBuffer<int8_t>::HINT_LIKELY);
 		m_pointsQ.SetGpuAccessHint(AcceleratorBuffer<int8_t>::HINT_LIKELY);
 
+		m_crcs.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+
 		m_pam3DecodeComputePipeline =
 			make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_PAM3Decoder.spv", 2, sizeof(PAM3DecodeConstants));
 
@@ -78,7 +80,7 @@ Ethernet100BaseT1Decoder::Ethernet100BaseT1Decoder(const string& color)
 				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Descrambler.spv", 4, sizeof(BaseT1DescrambleConstants));
 
 			m_decodeComputePipeline =
-				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Decoder.spv", 9, sizeof(BaseT1DecodeConstants));
+				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_Decoder.spv", 11, sizeof(BaseT1DecodeConstants));
 
 			m_mergePacketsPipeline =
 				make_shared<ComputePipeline>("shaders/Ethernet100BaseT1_MergePackets.spv", 5, sizeof(BaseT1MergeConstants));
@@ -416,13 +418,14 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				nvtx3::scoped_range nrange2("Decode");
 			#endif
 
-			//Next shader: make the full list of bytes in each packet
+			//Next shader: make the full list of bytes in each packet and offload the CRC calculation
 			//Buffer format to start: each thread gets a 2048 entry buffer of (bytes, starts, ends)
 			//Make them consecutive, so we can decode in a batch
 			size_t bufsize = maxPacketBytes * npackets;
 			gpuStarts->resize(bufsize);
 			gpuEnds->resize(bufsize);
 			gpuBytes->resize(bufsize);
+			m_crcs.resize(npackets);
 
 			cmdBuf.begin({});
 
@@ -444,6 +447,8 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				m_decodeComputePipeline->BindBufferNonblocking(6, *gpuEnds, cmdBuf, true);
 				m_decodeComputePipeline->BindBufferNonblocking(7, din_i->m_offsets, cmdBuf);
 				m_decodeComputePipeline->BindBufferNonblocking(8, din_i->m_durations, cmdBuf);
+				m_decodeComputePipeline->BindBufferNonblocking(9, m_crcTable, cmdBuf);
+				m_decodeComputePipeline->BindBufferNonblocking(10, m_crcs, cmdBuf, true);
 
 				auto decodeBlockCount = GetComputeBlockCount(npackets, 32);
 				m_decodeComputePipeline->Dispatch(
@@ -455,10 +460,12 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				gpuStarts->MarkModifiedFromGpu();
 				gpuEnds->MarkModifiedFromGpu();
 				gpuBytes->MarkModifiedFromGpu();
+				m_crcs.MarkModifiedFromGpu();
 
 				gpuStarts->PrepareForCpuAccessNonblocking(cmdBuf);
 				gpuEnds->PrepareForCpuAccessNonblocking(cmdBuf, true);
 				gpuBytes->PrepareForCpuAccessNonblocking(cmdBuf, true);
+				m_crcs.PrepareForCpuAccessNonblocking(cmdBuf, true);
 			}
 
 			cmdBuf.end();
@@ -495,7 +502,9 @@ void Ethernet100BaseT1Decoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 				reinterpret_cast<uint64_t*>(gpuStarts->GetCpuPointer() + base + 1),
 				reinterpret_cast<uint64_t*>(gpuEnds->GetCpuPointer() + base + 1),
 				length,
-				cap);
+				cap,
+				false,
+				__builtin_bswap32(m_crcs[j]));
 		}
 	}
 

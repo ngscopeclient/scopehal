@@ -38,6 +38,7 @@ using namespace std;
 
 EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
+	, m_crcTable("EthernetProtocolDecoder::m_crcTable")
 {
 	//Set up channels
 	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
@@ -46,6 +47,14 @@ EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 	m_headers.push_back("Src MAC");
 	m_headers.push_back("VLAN");
 	m_headers.push_back("Ethertype");
+
+	m_crcTable.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+	m_crcTable.resize(256);
+
+	m_crcTable.PrepareForCpuAccess();
+	for(size_t i=0; i<256; i++)
+		m_crcTable[i] = g_crc32Table[i];
+	m_crcTable.MarkModifiedFromCpu();
 }
 
 EthernetProtocolDecoder::~EthernetProtocolDecoder()
@@ -69,13 +78,14 @@ void EthernetProtocolDecoder::BytesToFrames(
 		uint64_t* ends,
 		size_t len,
 		EthernetWaveform* cap,
-		bool suppressedPreambleAndFCS)
+		bool suppressedPreambleAndFCS,
+		optional<uint32_t> offloadCRC)
 {
 	//If the timescale is 1 (usually the case)
 	//jump to optimized special case implementation that doesn't have to idiv all the time
 	if(cap->m_timescale == 1)
 	{
-		BytesToFramesUnitTimescale(bytes, starts, ends, len, cap, suppressedPreambleAndFCS);
+		BytesToFramesUnitTimescale(bytes, starts, ends, len, cap, suppressedPreambleAndFCS, offloadCRC);
 		return;
 	}
 
@@ -450,7 +460,8 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 		uint64_t* ends,
 		size_t len,
 		EthernetWaveform* cap,
-		bool suppressedPreambleAndFCS)
+		bool suppressedPreambleAndFCS,
+		optional<uint32_t> offloadCRC)
 {
 	Packet* pack = new Packet;
 
@@ -823,7 +834,11 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Start of FCS? Record start time
 				if(nbytes == 0)
 				{
-					crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
+					//if GPU offload CRC was provided don't do a software CRC here
+					if(offloadCRC.has_value())
+						crc_expected = offloadCRC.value();
+					else
+						crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
 
 					start = starts[i];
 					cap->m_offsets.push_back(start);
