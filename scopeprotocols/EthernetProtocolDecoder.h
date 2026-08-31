@@ -98,6 +98,8 @@ public:
 
 	virtual std::vector<std::string> GetHeaders() override;
 
+	virtual std::string GetDecodedField(Packet* pack, size_t i) override;
+
 protected:
 	void BytesToFrames(
 		std::vector<uint8_t>& bytes,
