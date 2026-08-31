@@ -183,7 +183,6 @@ void SCPITransport::RateLimitingWait()
 bool SCPITransport::FlushCommandQueue()
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
-
 	//Grab the queue, then immediately release the mutex so we can do more queued sends
 	list<string> tmp;
 	{

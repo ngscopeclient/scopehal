@@ -66,6 +66,9 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasFunctionGen(false)
 	, m_hasFastSampleRate(false)
 	, m_memoryDepthOption(0)
+	, m_hasSlewRateTrigger(true)
+	, m_hasRuntTrigger(true)
+	, m_hasWindowTrigger(true)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
@@ -87,6 +90,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_highDefinition(false)
 {
 	//standard initialization
+	if(!transport->SetTimeouts(5*10000000,5*1000000)) LogWarning("Could not set timeouts\n");
 	FlushConfigCache();
 	IdentifyHardware();
 	DetectAnalogChannels();
@@ -276,6 +280,14 @@ void LeCroyOscilloscope::IdentifyHardware()
 	{
 		if(m_model.find("HD") != string::npos)
 			m_modelid = MODEL_WAVEPRO_HD;
+
+		if(m_model.find("WP7") != string::npos)
+		{
+			m_modelid = MODEL_WAVEPRO_7K;
+			m_hasSlewRateTrigger = false;
+			m_hasRuntTrigger = false;
+			m_hasWindowTrigger = false;
+		}
 	}
 	else if(m_model.find("WAVERUNNER9") == 0)
 	{
@@ -397,14 +409,26 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Ignoring";
 			}
 
-			//Extra sample rate and memory for WaveRunner 8000
+			
 			else if(o == "-M")
 			{
-				m_hasFastSampleRate = true;
-				m_memoryDepthOption = 128;
-				type = "Hardware";
-				desc = "Extra sample rate and memory";
-				action = "Enabled";
+				if(m_modelid == MODEL_WAVEPRO_7K)
+				{
+					m_memoryDepthOption = 8;
+					type = "Hardware";
+					desc = "Extra memory - 4Mpts/4ch 8Mpts/2Ch";
+					action = "Enabled";
+				}
+				else
+				{
+					//Extra sample rate and memory for WaveRunner 8000
+					m_hasFastSampleRate = true;
+					m_memoryDepthOption = 128;
+					type = "Hardware";
+					desc = "Extra sample rate and memory";
+					action = "Enabled";
+				}
+
 			}
 
 			//Extra memory depth for WaveRunner 8000HD and WavePro HD
@@ -454,6 +478,7 @@ void LeCroyOscilloscope::DetectOptions()
 			//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family (seems like 7Zi has this too)
 			else if(o == "-S")
 			{
+				
 				type = "Hardware";
 				desc = "Small (32M point) memory";
 				m_memoryDepthOption = 32;
@@ -461,6 +486,7 @@ void LeCroyOscilloscope::DetectOptions()
 			}
 			else if(o == "-M")
 			{
+				// FIXME - is this reachable? there is another identical condition above
 				type = "Hardware";
 				desc = "Medium (64M point) memory";
 				m_memoryDepthOption = 64;
@@ -468,10 +494,21 @@ void LeCroyOscilloscope::DetectOptions()
 			}
 			else if(o == "-L")
 			{
-				type = "Hardware";
-				desc = "Large (128M point) memory";
-				m_memoryDepthOption = 128;
-				action = "Enabled";
+				if(m_modelid == MODEL_WAVEPRO_7K)
+				{
+					type = "Hardware";
+					desc = "Extra memory - 8Mpts/4ch 16Mpts/2Ch";
+					m_memoryDepthOption = 16;
+					action = "Enabled";
+				}else
+				{
+					//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family (seems like 7Zi has this too)
+					type = "Hardware";
+					desc = "Large (128M point) memory";
+					m_memoryDepthOption = 128;
+					action = "Enabled";
+				}
+
 			}
 			else if(o == "-V")
 			{
@@ -481,7 +518,16 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
-			//Memory capacity options for DDA 5000 family
+			else if(o == "-VL")
+			{
+				// Wavepro 7K 
+				type = "Hardware";
+				desc = "Extra memory - 16Mpts/4ch 32Mpts/2Ch";
+				m_memoryDepthOption = 32;
+				action = "Enabled";
+			}
+
+			//Memory capacity options for DDA 5000 family, Wavepro 7K
 			else if(o == "-XL")
 			{
 				type = "Hardware";
@@ -494,27 +540,56 @@ void LeCroyOscilloscope::DetectOptions()
 			//Note that many of these options don't have _TD in the base (non-TDME) option code!
 			else if(o.find("I2C") == 0)
 			{
-				m_hasI2cTrigger = true;
+
 				desc = "I2C";	//seems like UTF-8 characters mess up printf width specifiers
-				action = "Enabling trigger";
+	
+				// TODO does the option "I2C" have a trigger on newer scopes?
+				// or is the option always called I2C_TD?
+				if(m_modelid != MODEL_WAVEPRO_7K)	
+				{
+					m_hasI2cTrigger = true;
+					action = "Enabling trigger";
+					
+				}else
+				{
+					// I2C option on this does not have any trigger
+					action = "Ignoring (Decode, not trigger capable)";
+				}
 
 				if(o == "I2C")
 					type = "Trig/decode";
 			}
 			else if(o.find("SPI") == 0)
 			{
-				m_hasSpiTrigger = true;
-				desc = "SPI";
-				action = "Enabling trigger";
-
+				if(m_modelid != MODEL_WAVEPRO_7K)	
+				{
+					m_hasSpiTrigger = true;
+					action = "Enabling trigger";
+					
+				}else
+				{
+					// SPI option on this does not have any trigger
+					action = "Ignoring (Decode, not trigger capable)";
+				}
 				if(o == "SPI")
 					type = "Trig/decode";
 			}
 			else if(o.find("UART") == 0)
 			{
-				m_hasUartTrigger = true;
+				
 				desc = "UART";
-				action = "Enabling trigger";
+				
+				if(m_modelid != MODEL_WAVEPRO_7K)	
+				{
+					m_hasUartTrigger = true;
+					action = "Enabling trigger";
+					
+				}else
+				{
+					// UART option on this does not have any trigger
+					action = "Ignoring (Decode, not trigger capable)";
+				}
+				
 
 				if(o == "UART")
 					type = "Trig/decode";
@@ -936,6 +1011,7 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
 		case MODEL_SDA_6K:
+		case MODEL_WAVEPRO_7K:
 			nchans = 4;
 			break;
 
@@ -1324,6 +1400,7 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_WAVEMASTER_8ZI_A:
 		case MODEL_WAVEMASTER_8ZI_B:
 		case MODEL_WAVEPRO_HD:
+		case MODEL_WAVEPRO_7K:
 		case MODEL_WAVERUNNER_9K:
 			return (i == 1) || (i == 2) || (i > m_analogChannelCount);
 
@@ -1395,76 +1472,142 @@ vector<OscilloscopeChannel::CouplingType> LeCroyOscilloscope::GetAvailableCoupli
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
 {
-	if(i >= m_analogChannelCount)
+	if(i >= m_analogChannelCount && i != m_extTrigChannel->GetIndex())
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 
-	string reply;
+	if(i != m_extTrigChannel->GetIndex())
 	{
-		reply = Trim(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING?"));
-		reply.resize(3);
-	}
+		// This is an analog channel, proceed as per usual
+		string reply;
+		{
+			reply = Trim(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING?"));
+			reply.resize(3);
+		}
 
-	//Check if we have an active probe connected
-	auto name = GetProbeName(i);
+		//Check if we have an active probe connected
+		auto name = GetProbeName(i);
+		{
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			// some LeCroy scopes (WK7K is one) report passive
+			// probes with an indicating pin with the name "Ringx10"
+			m_probeIsActive[i] = (name != "") && (name.find("Ringx") != 0);
+		}
+
+		if(reply == "A1M")
+			return OscilloscopeChannel::COUPLE_AC_1M;
+		else if(reply == "D1M")
+			return OscilloscopeChannel::COUPLE_DC_1M;
+		else if(reply == "D50")
+			return OscilloscopeChannel::COUPLE_DC_50;
+		else if(reply == "GND")
+			return OscilloscopeChannel::COUPLE_GND;
+		else if( (reply == "DC") || (reply == "DC1") )
+			return OscilloscopeChannel::COUPLE_DC_50;
+
+		//invalid
+		LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+	}
+	else
 	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_probeIsActive[i] = (name != "");
+		// This is the external trigger channel.
+		string reply;
+		{
+			reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Ext.Coupling'"));
+		}
+
+		{
+			lock_guard<recursive_mutex> lock_cache(m_cacheMutex);
+			m_probeIsActive[i] = false;
+		}
+
+		if(reply == "A1M" || reply == "AC1M")
+			return OscilloscopeChannel::COUPLE_AC_1M;
+		else if(reply == "D1M" || reply == "DC1M")
+			return OscilloscopeChannel::COUPLE_DC_1M;
+		else if(reply == "D50" || reply == "DC50")
+			return OscilloscopeChannel::COUPLE_DC_50;
+		else if(reply == "GND" || reply == "Gnd")
+			return OscilloscopeChannel::COUPLE_GND;
+		else if( (reply == "DC") || (reply == "DC1") )
+			return OscilloscopeChannel::COUPLE_DC_50;
+
+		//invalid
+		LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 	}
+	
 
-	if(reply == "A1M")
-		return OscilloscopeChannel::COUPLE_AC_1M;
-	else if(reply == "D1M")
-		return OscilloscopeChannel::COUPLE_DC_1M;
-	else if(reply == "D50")
-		return OscilloscopeChannel::COUPLE_DC_50;
-	else if(reply == "GND")
-		return OscilloscopeChannel::COUPLE_GND;
-	else if( (reply == "DC") || (reply == "DC1") )
-		return OscilloscopeChannel::COUPLE_DC_50;
-
-	//invalid
-	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
-	return OscilloscopeChannel::COUPLE_SYNTHETIC;
+	
 }
 
 void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
-	if(i >= m_analogChannelCount)
+	if(i >= m_analogChannelCount && i != m_extTrigChannel->GetIndex())
 		return;
 
-	//Get the old coupling value first.
-	//This ensures that m_probeIsActive[i] is valid
-	GetChannelCoupling(i);
-
-	//If we have an active probe, don't touch the hardware config
-	if(m_probeIsActive[i])
-		return;
-
-	switch(type)
+	if(i != m_extTrigChannel->GetIndex())
 	{
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING A1M");
-			break;
+		// This is an analog channel
 
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D1M");
-			break;
+		//Get the old coupling value first.
+		//This ensures that m_probeIsActive[i] is valid
+		GetChannelCoupling(i);
 
-		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D50");
-			break;
+		//If we have an active probe, don't touch the hardware config
+		if(m_probeIsActive[i])
+			return;
 
-		//treat unrecognized as ground
-		case OscilloscopeChannel::COUPLE_GND:
-		default:
-			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING GND");
-			break;
+		switch(type)
+		{
+			case OscilloscopeChannel::COUPLE_AC_1M:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING A1M");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_1M:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D1M");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_50:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D50");
+				break;
+
+			//treat unrecognized as ground
+			case OscilloscopeChannel::COUPLE_GND:
+			default:
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING GND");
+				break;
+		}
+	}
+	else
+	{
+		// This is the trigger channel
+		switch(type)
+		{
+			case OscilloscopeChannel::COUPLE_AC_1M:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling = \"AC1M\"'");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_1M:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling = \"DC1M\"'");
+				break;
+
+			case OscilloscopeChannel::COUPLE_DC_50:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling =\"DC50\"'");
+				break;
+
+			//treat unrecognized as ground
+			case OscilloscopeChannel::COUPLE_GND:
+			default:
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Ext.Coupling = \"Gnd\"'");
+				break;
+		}
 	}
 }
 
 double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 1;
 
 	//TODO: support ext/10
@@ -1499,9 +1642,18 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_transport->SendCommandQueued(cmd);
 }
 
-vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
+vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t i)
 {
+
 	vector<unsigned int> ret;
+
+	if(i >= m_analogChannelCount)
+	{
+		// External trigger (AUX in)
+		ret.clear();
+		return ret;
+	}
+
 
 	//"no limit"
 	ret.push_back(0);
@@ -1633,7 +1785,7 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 
 unsigned int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return 0;
 
 	auto reply = m_transport->SendCommandQueuedWithReply("BANDWIDTH_LIMIT?");
@@ -1677,6 +1829,9 @@ unsigned int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	if(i >= m_analogChannelCount)
+		return;
+	
 	char cmd[128];
 	if(limit_mhz == 0)
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", GetOscilloscopeChannel(i)->GetHwname().c_str());
@@ -1742,14 +1897,34 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 	if(i >= m_analogChannelCount)
 		return "";
 
-	//Step 1: Determine which input is active.
-	//There's always a mux selector in software, even if only one is present on the physical acquisition board
-	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
-	auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 
-	//Step 2: Identify the probe connected to this mux channel
-	auto name = Trim(m_transport->SendCommandQueuedWithReply(
-		string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'"));
+
+	string name;
+		
+	if(m_modelid == MODEL_WAVEPRO_7K)
+	{
+		// Does not have the mux selector. 
+		// path is app.Acquisition.C1.ProbeName
+		string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
+	
+		//Step 2: Identify the probe connected to this mux channel
+		name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = ") + prefix + ".ProbeName'"));
+
+	}else
+	{
+		//Step 1: Determine which input is active.
+		//There's always a mux selector in software, even if only one is present on the physical acquisition board
+		string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
+		auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
+
+		//Step 2: Identify the probe connected to this mux channel
+		name = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'"));
+
+	}
+	
+
 
 	//API requires empty string if no probe
 	if(name == "None")
@@ -2301,6 +2476,7 @@ bool LeCroyOscilloscope::IsTriggerArmed()
 
 Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 {
+	
 	//Read the Internal State Change Register
 	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
 	int inr = atoi(sinr.c_str());
@@ -2392,6 +2568,11 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 		return false;
 	size_t offset = tmp.find("D");
 
+	if(offset == string::npos)
+	{
+		return false;
+	} 
+
 	//Copy the rest of the block
 	data = tmp.substr(offset + 16);
 
@@ -2473,6 +2654,9 @@ bool LeCroyOscilloscope::ReadWavedescs(
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
+	
+	m_transport->FlushRXBuffer();
+
 	//(Note: with VICP framing we cannot use semicolons to separate commands)
 	BulkCheckChannelEnableState();
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -2496,6 +2680,7 @@ bool LeCroyOscilloscope::ReadWavedescs(
 	}
 
 	m_transport->FlushCommandQueue();
+	LogDebug("Queue Flushed\n");
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i] || (!any_enabled && i==0))
@@ -3010,6 +3195,11 @@ bool LeCroyOscilloscope::AcquireData()
 					memcpy(scratch->GetCpuPointer(), &tmp[16], buflen);
 					scratch->MarkModifiedFromCpu();
 				}
+				else
+				{
+					// Mark the DownloadState as DOWNLOAD_NONE for any inactive channel
+					ChannelsDownloadStatusUpdate(i, InstrumentChannel::DownloadState::DOWNLOAD_NONE, 0.0);
+				}
 			}
 		}
 
@@ -3250,6 +3440,12 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		if(m_modelid == MODEL_WAVERUNNER_8K)
 			ret.push_back(1000);
 
+		if(m_modelid == MODEL_WAVEPRO_7K)
+		{
+			ret.push_back(500);
+			ret.push_back(1000);
+		}
+
 		bool wm7 =
 			(m_modelid == MODEL_SDA_7ZI) ||
 			(m_modelid == MODEL_SDA_7ZI_A);
@@ -3430,6 +3626,15 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 				ret.push_back(10 * g);
 				if(m_hasFastSampleRate)
 					ret.push_back(20 * g);
+				break;
+
+			case MODEL_WAVEPRO_7K:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1000 * m);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
 				break;
 
 			default:
@@ -3642,6 +3847,38 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 					ret.push_back(64 * m);
 				}
 				break;
+			
+			case MODEL_WAVEPRO_7K:
+				// some of these are a bit speculative based on the brochure
+				if(m_memoryDepthOption == 2)
+				{
+					// 1M samples non-interleaved
+					ret.pop_back();
+					ret.pop_back();
+				}
+				else if(m_memoryDepthOption == 8)
+				{
+					ret.push_back(4 * m);
+				}
+				else if(m_memoryDepthOption == 16)
+				{
+					ret.push_back(5 * m);
+					ret.push_back(8 * m);
+				}
+				else if(m_memoryDepthOption == 32)
+				{
+					ret.push_back(5 * m);
+					ret.push_back(10 * m);
+					ret.push_back(16 * m);
+				}
+				else if(m_memoryDepthOption == 48)
+				{
+					ret.push_back(5 * m);
+					ret.push_back(10 * m);
+					ret.push_back(24 * m);
+				}
+
+				break;
 
 			//TODO: add more models here
 			default:
@@ -3654,6 +3891,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 {
+	const int64_t k = 1000;
+	const int64_t m = k*k;
 	vector<uint64_t> base = GetSampleDepthsNonInterleaved();
 
 	//Default to doubling the non-interleaved depths
@@ -3684,6 +3923,44 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		case MODEL_WAVEMASTER_8ZI:
 		case MODEL_WAVEMASTER_8ZI_A:
 		//SDA/wavemaster 8Zi-B can interleave
+
+		case MODEL_WAVEPRO_7K:
+			// some of these are a bit speculative based on the brochure
+			if(m_memoryDepthOption == 2)
+			{
+				// 1M samples non-interleaved
+				ret.pop_back();
+				ret.pop_back();
+				ret.push_back(2 * m);
+
+			}
+			else if(m_memoryDepthOption == 8)
+			{
+				ret.push_back(4 * m);
+				ret.push_back(8 * m);
+			}
+			else if(m_memoryDepthOption == 16)
+			{
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(16 * m);
+			}
+			else if(m_memoryDepthOption == 32)
+			{
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(25 * m);
+				ret.push_back(32 * m);
+			}
+			else if(m_memoryDepthOption == 48)
+			{
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(25 * m);
+				ret.push_back(48 * m);
+			}
+
+			break;
 
 		//TODO: add more models here
 		default:
@@ -3794,6 +4071,10 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 	m_sampleRate = rate;
 	m_sampleRateValid = true;
 	m_triggerOffsetValid = false;
+
+	
+	// The memory depth may change as a result of changing the sample rate.
+	m_memoryDepthValid = false;
 }
 
 bool LeCroyOscilloscope::CanAverage(size_t i)
@@ -4684,28 +4965,56 @@ void LeCroyOscilloscope::PullDropoutTrigger()
 		m_trigger = new DropoutTrigger(this);
 	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 
-	//Level
-	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
-	dt->SetLevel(stof(tmp));
 
-	//Dropout time
-	Unit fs(Unit::UNIT_FS);
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
-	dt->SetDropoutTime(fs.ParseString(tmp));
+	if(m_modelid == MODEL_WAVEPRO_7K)
+	{
+		//Level
+		auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.TrigLevel'");
+		dt->SetLevel(stof(tmp));
 
-	//Edge type
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
-	if(Trim(tmp) == "Positive")
-		dt->SetType(DropoutTrigger::EDGE_RISING);
-	else
-		dt->SetType(DropoutTrigger::EDGE_FALLING);
+		//Dropout time
+		Unit fs(Unit::UNIT_FS);
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.DropoutTime'");
+		dt->SetDropoutTime(fs.ParseString(tmp));
 
-	//Reset type
-	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
-	if(Trim(tmp) == "0")
-		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
-	else
+		//Edge type
+		auto src = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Source'"));
+
+		tmp = m_transport->SendCommandQueuedWithReply(string("VBS? 'return = app.Acquisition.Trigger." + src + ".Slope'"));
+		if(Trim(tmp) == "Positive")
+			dt->SetType(DropoutTrigger::EDGE_RISING);
+		else
+			dt->SetType(DropoutTrigger::EDGE_FALLING);
+
 		dt->SetResetType(DropoutTrigger::RESET_NONE);
+	}
+	else
+	{
+		//Level
+		auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
+		dt->SetLevel(stof(tmp));
+
+		//Dropout time
+		Unit fs(Unit::UNIT_FS);
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
+		dt->SetDropoutTime(fs.ParseString(tmp));
+
+		//Edge type
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
+		if(Trim(tmp) == "Positive")
+			dt->SetType(DropoutTrigger::EDGE_RISING);
+		else
+			dt->SetType(DropoutTrigger::EDGE_FALLING);
+
+		//Reset type
+		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
+		if(Trim(tmp) == "0")
+			dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+		else
+			dt->SetResetType(DropoutTrigger::RESET_NONE);
+	}
+
+
 }
 
 /**
@@ -4727,7 +5036,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 
 	//Level
 	string tmp;
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.TrigLevel'");
 	else
 		tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
@@ -4736,7 +5045,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	//TODO: OptimizeForHF (changes hysteresis for fast signals)
 
 	//Slope
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 	{
 		//Get trigger source
 		auto src = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Source'"));
@@ -5464,18 +5773,36 @@ float LeCroyOscilloscope::GetTriggerLevelWithInversion(Trigger* trig)
  */
 void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
-	PushFloat("app.Acquisition.Trigger.Dropout.Level", GetTriggerLevelWithInversion(trig));
-	PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
+	if(m_modelid == MODEL_WAVEPRO_7K)
+	{
+		// TODO This is probably the same for MODEL_DDA_5K and MODEL_SDA_6K
+		PushFloat("app.Acquisition.Trigger.TrigLevel", GetTriggerLevelWithInversion(trig));
+		PushFloat("app.Acquisition.Trigger.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
 
-	if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
-	else
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
+		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
 
-	if(trig->GetType() == DropoutTrigger::EDGE_RISING)
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
-	else
-		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
+		if(trig->GetType() == DropoutTrigger::EDGE_RISING)
+			m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger." + src +".Slope = \"Positive\"'"));
+		else
+			m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger." + src +".Slope = \"Negative\"'"));
+
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"'");
+	}else
+	{
+		PushFloat("app.Acquisition.Trigger.Dropout.Level", GetTriggerLevelWithInversion(trig));
+		PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
+
+		if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
+		else
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
+
+		if(trig->GetType() == DropoutTrigger::EDGE_RISING)
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
+		else
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
+	}
+
 }
 
 /**
@@ -5484,7 +5811,7 @@ void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 {
 	//Level
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 		PushFloat("app.Acquisition.Trigger.TrigLevel", GetTriggerLevelWithInversion(trig));
 	else
 		PushFloat(tree + ".Level", GetTriggerLevelWithInversion(trig));
@@ -5510,7 +5837,7 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 			return;
 	}
 
-	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) )
+	if( (m_modelid == MODEL_DDA_5K) || (m_modelid == MODEL_SDA_6K) || (m_modelid == MODEL_WAVEPRO_7K))
 	{
 		auto src = m_trigger->GetInput(0).m_channel->GetHwname();
 		m_transport->SendCommandQueued(
@@ -5779,15 +6106,18 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(GlitchTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
-	ret.push_back(RuntTrigger::GetTriggerName());
-	ret.push_back(SlewRateTrigger::GetTriggerName());
+	if(m_hasRuntTrigger)
+		ret.push_back(RuntTrigger::GetTriggerName());
+	if(m_hasSlewRateTrigger)
+		ret.push_back(SlewRateTrigger::GetTriggerName());
 	if(m_hasUartTrigger)
 		ret.push_back(UartTrigger::GetTriggerName());
 	if(m_has8b10bTrigger)
 		ret.push_back(CDR8B10BTrigger::GetTriggerName());
 	if(m_hasNrzTrigger)
 		ret.push_back(CDRNRZPatternTrigger::GetTriggerName());
-	ret.push_back(WindowTrigger::GetTriggerName());
+	if(m_hasWindowTrigger)
+		ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
 	return ret;
