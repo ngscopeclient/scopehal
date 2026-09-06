@@ -173,6 +173,16 @@ bool Oscilloscope::WaitForTrigger(int timeout)
 	return false;
 }
 
+bool Oscilloscope::HasAutoTrigger()
+{
+	return false;
+}
+
+void Oscilloscope::StartAutoTrigger()
+{
+	//nothing here
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sequenced capture
 

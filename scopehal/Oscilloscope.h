@@ -509,6 +509,23 @@ public:
 	virtual void StartSingleTrigger() =0;
 
 	/**
+		@brief Returns true if the driver supports an "auto trigger" feature natively
+
+		If this function return false, no native auto trigger primitive is available and StartAutoTrigger() is a no-op.
+
+		In this case, auto trigger can be emulated (e.g. by the ngscopeclient TriggerGroup class) with a single-shot
+		trigger followed by a timeout if no trigger occurs within a particular time
+	 */
+	virtual bool HasAutoTrigger();
+
+	/**
+		@brief Arms the trigger in auto mode (if an auto trigger feature is available)
+
+		If HasAutoTrigger() returns false this function is a no-op.
+	 */
+	virtual void StartAutoTrigger();
+
+	/**
 		@brief Stops triggering
 	 */
 	virtual void Stop() =0;
