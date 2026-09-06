@@ -435,7 +435,14 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	uint8_t chnum;
 	uint8_t dataType;
 	uint64_t memdepth;
-	float config[3];
+	uint8_t channelHeader[9];
+
+	uint8_t analogHeader[14];
+	float 	scale;
+	float 	offset;
+	float 	trigphase;
+	bool	clipping;
+
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
@@ -449,7 +456,6 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	for(size_t i=0; i<numChannels; i++)
 	{
-		uint8_t channelHeader[9];
 		if(!m_transport->ReadRawData(sizeof(channelHeader), channelHeader))
 			return false;
 
@@ -473,22 +479,26 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		{
 			auto buf = abuf->GetCpuPointer();
 
-			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
-				return false;
+			/*
+				Read channel headers in one block to make less syscalls
+				Scale and offset are sent in the header since they might have changed since the capture began
 
-			float scale = config[0];
-			float offset = config[1];
-			float trigphase = config[2];
+				float32	scale
+				float32	offset
+				float32	trigphase
+				bool	clipping
+				uint	dataType
+			 */
+			if(!m_transport->ReadRawData(sizeof(analogHeader), analogHeader))
+				return false;
+			memcpy(&scale, &analogHeader[0], 4);
+			memcpy(&offset, &analogHeader[4], 4);
+			memcpy(&trigphase, &analogHeader[8], 4);
+			memcpy(&clipping, &analogHeader[12], 1);
+			memcpy(&dataType, &analogHeader[13], 1);
+
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
-
-			bool clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
-				return false;
-
-			if(!m_transport->ReadRawData(sizeof(dataType), reinterpret_cast<uint8_t*>(&dataType)))
-				return false;
 
 			//TODO: stream timestamp from the server
 			uint32_t depth = memdepth * sizeof(int8_t);
