@@ -69,7 +69,14 @@ SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify, unsigned int ide
 				if(3 == sscanf(reply.c_str(), "%127[^,],%127[^,],,%127s", vendor, model, version))
 				{
 					LogWarning("SCPI *IDN? response \"%s\" has no serial number. Old ThunderScope?\n", reply.c_str());
-					m_serial = "Unspecified";
+					m_serial = "NO_SERIAL";
+
+					m_vendor = vendor;
+					m_model = model;
+					m_fwVersion = version;
+					succeeded = true;
+					m_transport->FlushRXBuffer(); // In case our *IDNs got queued behind each other (Tek...)
+					break;
 				}
 
 				else
