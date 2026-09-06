@@ -65,9 +65,19 @@ SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify, unsigned int ide
 			char version[128] = "";
 			if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
 			{
-				LogWarning("Bad IDN response %s\n", reply.c_str());
-				m_transport->FlushRXBuffer();
-				continue; // retry
+				//Allow serial number to be blank because some older dev edition thunderscopes don't have it flashed
+				if(3 == sscanf(reply.c_str(), "%127[^,],%127[^,],,%127s", vendor, model, version))
+				{
+					LogWarning("SCPI *IDN? response \"%s\" has no serial number. Old ThunderScope?\n", reply.c_str());
+					m_serial = "Unspecified";
+				}
+
+				else
+				{
+					LogWarning("Bad IDN response %s\n", reply.c_str());
+					m_transport->FlushRXBuffer();
+					continue; // retry
+				}
 			}
 			m_vendor = vendor;
 			m_model = model;
