@@ -105,8 +105,8 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	if(!csock)
 		LogFatal("ThunderScopeOscilloscope expects a SCPITwinLanTransport\n");
 
-	//Request entry to credit-based flow control mode rather than lock-step mode
-	const uint8_t r = 'C';
+	//Request entry to credit-based flow control mode rather than lock-step mode, using tags
+	const uint8_t r = 'T';
 	m_transport->SendRawData(1, &r);
 
 	//set initial bandwidth on all channels to full
@@ -357,6 +357,27 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	#ifdef HAVE_NVTX
 		nvtx3::scoped_range range("ThunderScopeOscilloscope::DoAcquireData");
 	#endif
+
+	//Read the tag (expect DATA then length as a uint32)
+	uint32_t taglen[2];
+	if(!m_transport->ReadRawData(sizeof(taglen), reinterpret_cast<uint8_t*>(&taglen)))
+		return false;
+
+	//Expect 0x41544144 "DATA"
+	uint32_t tag = taglen[0];
+	uint32_t datalen = taglen[1];
+	if(tag != 0x41544144)
+	{
+		LogDebug("Discarding %u bytes of data with unrecognized tag %u\n", datalen, tag);
+
+		//It's something else. Discard the payload
+		uint8_t* garbage = new uint8_t[datalen];
+		if(!m_transport->ReadRawData(datalen, garbage))
+			return false;
+		LogDebug("got garbage\n");
+		delete[] garbage;
+		return false;
+	}
 
 	//Read Version No.
 	uint8_t version;
