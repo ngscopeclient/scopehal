@@ -379,41 +379,44 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		return false;
 	}
 
-	//Read Version No.
-	uint8_t version;
-	if(!m_transport->ReadRawData(sizeof(version), reinterpret_cast<uint8_t*>(&version)))
+	/*
+		Read waveform headers in one block to make less syscalls
+
+		uint8		version
+		uint32		seq
+		uint16		numChannels
+		uint64		fs_per_sample
+		int64		trigger_fs
+		float64		wfm_per_sec
+	 */
+	uint8_t headers[31];
+	if(!m_transport->ReadRawData(sizeof(headers), headers))
 		return false;
 
-	//Read the sequence number of the current waveform
-	if(!m_transport->ReadRawData(sizeof(m_lastSeq), reinterpret_cast<uint8_t*>(&m_lastSeq)))
-		return false;
-	//LogTrace("Got waveform with sequence %u\n", m_lastSeq);
+	//Unpack it
+	uint8_t version;
+	uint16_t numChannels;
+	uint64_t fs_per_sample;	//Normally equal to m_srate.
+							//Mut may be different if a sample rate change is in flight and hasn't committed
+							//at the scope side yet
+	int64_t trigger_fs;
+	double wfms_s;
+	memcpy(&version, &headers[0], 1);
+	memcpy(&m_lastSeq, &headers[1], 4);
+	memcpy(&numChannels, &headers[5], 2);
+	memcpy(&fs_per_sample, &headers[7], 8);
+	memcpy(&trigger_fs, &headers[15], 8);
+	memcpy(&wfms_s, &headers[23], 8);
 
 	//Acknowledge receipt of this waveform
+	//LogTrace("Got waveform with sequence %u\n", m_lastSeq);
 	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
-
 	if(!keep)
 		LogTrace("Dropping waveform %u\n",m_lastSeq);
 	else
 	{
 		//LogTrace("Keeping waveform %u\n",m_lastSeq);
 	}
-
-	//Read the number of channels in the current waveform
-	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
-		return false;
-
-	//Get the sample interval.
-	//May be different from m_srate if we changed the rate after the trigger was armed
-	uint64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
-		return false;
-
-	//Get the de-facto trigger position.
-	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
-		return false;
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
@@ -424,11 +427,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		}
 	}
 
-	//Get the de-facto hardware capture rate.
-	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
-		return false;
-
+	//Update capture rate performance counters
 	if(keep)
 		m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
 
@@ -450,11 +449,13 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	for(size_t i=0; i<numChannels; i++)
 	{
+		uint8_t channelHeader[9];
+		if(!m_transport->ReadRawData(sizeof(channelHeader), channelHeader))
+			return false;
+
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
-			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
-			return false;
+		memcpy(&chnum, &channelHeader[0], 1);
+		memcpy(&memdepth, &channelHeader[1], 8);
 
 		//Grab the next free buffer
 		auto& abuf = m_analogRawWaveformBuffers[m_nextWaveformWriteBuffer];
