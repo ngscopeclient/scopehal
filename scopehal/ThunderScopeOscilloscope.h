@@ -86,6 +86,8 @@ public:
 	virtual void StartSingleTrigger() override;
 	virtual void Stop() override;
 	virtual void ForceTrigger() override;
+	virtual bool HasAutoTrigger() override;
+	virtual void StartAutoTrigger() override;
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;

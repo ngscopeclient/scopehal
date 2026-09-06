@@ -632,8 +632,6 @@ void ThunderScopeOscilloscope::PushPendingWaveformsIfReady()
 
 void ThunderScopeOscilloscope::Start()
 {
-	m_triggerArmed = true; //FIXME
-
 	m_transport->SendCommandQueued("NORMAL");
 	m_transport->SendCommandQueued("RUN");
 
@@ -663,6 +661,22 @@ void ThunderScopeOscilloscope::Stop()
 void ThunderScopeOscilloscope::StartSingleTrigger()
 {
 	RemoteBridgeOscilloscope::StartSingleTrigger();
+	ResetPerCaptureDiagnostics();
+}
+
+bool ThunderScopeOscilloscope::HasAutoTrigger()
+{
+	return true;
+}
+
+void ThunderScopeOscilloscope::StartAutoTrigger()
+{
+	m_transport->SendCommandQueued("AUTO");
+	m_transport->SendCommandQueued("RUN");
+
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+
 	ResetPerCaptureDiagnostics();
 }
 
