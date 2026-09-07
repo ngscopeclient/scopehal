@@ -68,6 +68,7 @@ public:
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
 	virtual bool CanEnableChannel(size_t i) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
 
 	//Triggering
 	virtual void BackgroundProcessing() override;
