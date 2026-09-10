@@ -109,21 +109,49 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	const uint8_t r = 'T';
 	m_transport->SendRawData(1, &r);
 
-	//set initial bandwidth on all channels to full
+	//Load initial configuration from TS.NET
 	m_bandwidthLimits.resize(4);
 	for(size_t i=0; i<4; i++)
-		SetChannelBandwidthLimit(i, 0);
+	{
+		//Get initial bandwidth limiters
+		auto reply = m_transport->SendCommandQueuedWithReply(string(":") + m_channels[i]->GetHwname() + ":BAND?");
+		if(reply == "FULL")
+			m_bandwidthLimits[i] = 0;
+		else
+		{
+			uint32_t mhz;
+			sscanf(reply.c_str(), "%uM", &mhz);
+			m_bandwidthLimits[i] = mhz;
+		}
 
-	//Set all channels off by default
-	for(size_t i=0; i<4; i++)
-		DisableChannel(i);
+		//Get channel state
+		reply = m_transport->SendCommandQueuedWithReply(string(":") + m_channels[i]->GetHwname() + ":STATE?");
+		if(reply == "ON")
+			m_channelsEnabled[i] = true;
+		else
+			m_channelsEnabled[i] = false;
 
-	//Set initial memory configuration: 1M point depth @ 1 Gsps
+		//TODO: coupling
+
+		//TODO: termination
+
+		//TODO: offset
+
+		//TODO: range
+	}
+	RefreshSampleRate();
+
+	//Load timebase config
 	//This must happen before the trigger is configured, since trigger validation depends on knowing memory depth
-	SetSampleRate(1000000000L);
-	SetSampleDepth(1000000);
+	auto reply = m_transport->SendCommandQueuedWithReply("ACQ:DEPTH?");
+	m_mdepth = stoi(reply);
+
+	//TODO: ADC mode
+
+	//TODO: refclk mode
 
 	//Configure the trigger
+	//TODO: load from scope
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
