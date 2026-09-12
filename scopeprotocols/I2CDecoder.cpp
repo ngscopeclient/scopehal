@@ -45,9 +45,15 @@ using namespace std;
 
 I2CDecoder::I2CDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
+	, m_addrFormat(m_parameters["Address Format"])
 {
 	CreateInput<InputConstraintStreamType>("sda", Stream::STREAM_TYPE_DIGITAL);
 	CreateInput<InputConstraintStreamType>("scl", Stream::STREAM_TYPE_DIGITAL);
+
+	m_addrFormat = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_addrFormat.AddEnumValue("Right Justified", RIGHT);
+	m_addrFormat.AddEnumValue("Left Justified", LEFT);
+	m_addrFormat.SetIntVal(RIGHT);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,7 +209,7 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 
 						if(pack)
 						{
-							pack->m_headers["Address"] = to_string_hex(current_byte & 0xfe);
+							pack->m_headers["Address"] = to_string_hex((LEFT == m_addrFormat.GetIntVal()) ? (current_byte & 0xfe) : (current_byte >> 1));
 							if(current_byte & 1)
 							{
 								pack->m_headers["Op"] = "Read";
@@ -312,6 +318,7 @@ void I2CDecoder::Refresh(
 	auto cap = SetupEmptyWaveform<I2CWaveform>(sda, 0);
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
+	cap->m_addrFormat = m_addrFormat.GetIntVal();
 	cap->PrepareForCpuAccess();
 
 	if(usda && uscl)
@@ -378,9 +385,9 @@ string I2CWaveform::GetText(size_t i)
 			break;
 		case I2CSymbol::TYPE_ADDRESS:
 			if(s.m_data & 1)
-				snprintf(tmp, sizeof(tmp), "R:%02x", s.m_data & 0xfe);
+				snprintf(tmp, sizeof(tmp), "R:%02x", (I2CDecoder::LEFT == m_addrFormat) ? (s.m_data & 0xfe) : (s.m_data >> 1));
 			else
-				snprintf(tmp, sizeof(tmp), "W:%02x", s.m_data & 0xfe);
+				snprintf(tmp, sizeof(tmp), "W:%02x", (I2CDecoder::LEFT == m_addrFormat) ? (s.m_data & 0xfe) : (s.m_data >> 1));
 			break;
 		case I2CSymbol::TYPE_DATA:
 			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
