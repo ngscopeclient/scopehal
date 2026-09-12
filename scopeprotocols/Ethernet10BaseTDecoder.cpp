@@ -93,6 +93,8 @@ void Ethernet10BaseTDecoder::Refresh(
 
 	const int64_t eye_start = ui_halfwidth - jitter_tol;
 	const int64_t eye_end = ui_halfwidth + jitter_tol;
+	const int64_t eye_wide_start = ui_width - jitter_tol;
+	const int64_t eye_wide_end = ui_width + jitter_tol;
 
 	size_t i = 0;
 	bool done = false;
@@ -150,7 +152,11 @@ void Ethernet10BaseTDecoder::Refresh(
 				i++;
 				break;
 			}
-			if( (delta < eye_start) || (delta > eye_end) )
+			// Normal eye for first bit in RX frame (from the network)
+			bool in_normal_eye = (delta >= eye_start) && (delta <= eye_end);
+			// Wide eye for first bit in TX frame (from the NIC)
+			bool in_wide_eye = (delta >= eye_wide_start) && (delta <= eye_wide_end);
+			if(!in_normal_eye && !in_wide_eye)
 			{
 				LogTrace("Edge was in the wrong place, skipping it and attempting resync\n");
 				i++;
