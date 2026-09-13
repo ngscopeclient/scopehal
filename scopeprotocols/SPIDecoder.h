@@ -85,6 +85,11 @@ public:
 
 protected:
 	FilterParameter& m_cpol;
+	FilterParameter& m_cpha;
+	// Bit endianess
+	FilterParameter& m_bendian;
+	void sampleBit(SPIWaveform*, size_t timestamp, int endian, uint8_t& current_byte, uint8_t& bitcount, int64_t& bytestart,
+			bool& cur_data, bool& first);
 };
 
 #endif
