@@ -1,3 +1,4 @@
+
 /***********************************************************************************************************************
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
@@ -27,69 +28,120 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SPIDecoder
- */
+#include "../scopehal/scopehal.h"
+#include "DAC8552Decoder.h"
+#include "SPIDecoder.h"
 
-#ifndef SPIDecoder_h
-#define SPIDecoder_h
+using namespace std;
 
-class SPISymbol
+DAC8552Decoder::DAC8552Decoder(const string& color)
+	: Filter(color, CAT_MISC)
 {
-public:
-	enum stype
+	AddProtocolStream("data");
+	CreateInput<InputConstraintWaveformType<SPIWaveform>>("spi");
+}
+
+string DAC8552Waveform::GetColor(size_t)
+{
+	return m_color;
+}
+
+string DAC8552Waveform::GetText(size_t i)
+{
+	const DAC8552Symbol& s = m_samples[i];
+
+	char tmp[128];
+	static const char* load_strs[] = {"No Load", "Load A", "Load B", "Load A&B"};
+	const char* load_str = load_strs[s.loadA() ? (s.loadB() ? 3 : 1) : (s.loadB() ? 2 : 0)];
+	snprintf(tmp, sizeof(tmp), "%s, Bfr=%c, Value=0x%04X",
+			load_str, s.bfrSelect() ? 'B' : 'A', s.m_value);
+	return string(tmp);
+}
+
+string DAC8552Decoder::GetProtocolName()
+{
+	return "DAC8552";
+}
+
+void DAC8552Decoder::Refresh(
+		[[maybe_unused]] vk::raii::CommandBuffer& cmdBuf,
+		[[maybe_unused]] shared_ptr<QueueHandle> queue)
+{
+	ClearMessages();
+
+	if(!VerifyAllInputsOK())
 	{
-		TYPE_SELECT,
-		TYPE_DATA,
-		TYPE_DESELECT,
-		TYPE_ERROR
-	};
-
-	SPISymbol()
-	{}
-
-	SPISymbol(stype t,uint8_t d)
-	 : m_stype(t)
-	 , m_data(d)
-	{}
-
-	stype m_stype;
-	uint8_t m_data;
-
-	bool operator== (const SPISymbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
+		if(!GetInput(0))
+			AddErrorMessage("Missing inputs", "No signal input connected");
+		else if(!GetInputWaveform(0))
+			AddErrorMessage("Missing inputs", "No waveform available at input");
+		SetData(nullptr, 0);
+		return;
 	}
-};
 
-class SPIWaveform : public SparseWaveform<SPISymbol>
-{
-public:
-	SPIWaveform () : SparseWaveform<SPISymbol>() {};
-	virtual std::string GetText(size_t) override;
-	virtual std::string GetColor(size_t) override;
-};
+	auto din = dynamic_cast<SPIWaveform*>(GetInputWaveform(0));
+	if(!din)
+	{
+		AddErrorMessage("Missing inputs", "Invalid input connected");
+		SetData(nullptr, 0);
+		return;
+	}
+	size_t len = din->m_samples.size();
 
-class SPIDecoder : public Filter
-{
-public:
-	SPIDecoder(const std::string& color);
+	auto cap = new DAC8552Waveform(m_displaycolor);
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
+	din->PrepareForCpuAccess();
+	DAC8552Symbol samp;
+	int state = 0;
+	int64_t offset = 0;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	for(size_t i=0; i<len; i++) {
+		auto s = din->m_samples[i];
 
-	static std::string GetProtocolName();
-
-	PROTOCOL_DECODER_INITPROC(SPIDecoder)
-
-protected:
-	FilterParameter& m_cpol;
-	FilterParameter& m_cpha;
-	// Bit endianess
-	FilterParameter& m_bendian;
-	void sampleBit(SPIWaveform*, size_t timestamp, int endian, uint8_t& current_byte, uint8_t& bitcount, int64_t& bytestart,
-			bool& cur_data, bool& first);
-};
-
-#endif
+		switch(state)
+		{
+			case 0:
+				if(s.m_stype == SPISymbol::TYPE_SELECT)
+					state = 1;
+				break;
+			case 1:
+				if(s.m_stype == SPISymbol::TYPE_DATA)
+				{
+					offset = din->m_offsets[i];
+					samp.m_flags = s.m_data & (DAC8552Symbol::MASK_LOAD_A | DAC8552Symbol::MASK_LOAD_B | DAC8552Symbol::MASK_BFR_SEL);
+					state = 2;
+				} else
+					state = 0;
+				break;
+			case 2:
+				if(s.m_stype == SPISymbol::TYPE_DATA)
+				{
+					samp.m_value = static_cast<uint16_t>(s.m_data) << 8;
+					state = 3;
+				} else
+					state = 0;
+				break;
+			case 3:
+				if(s.m_stype == SPISymbol::TYPE_DATA)
+				{
+					samp.m_value |= s.m_data;
+					cap->m_offsets.push_back(offset);
+					cap->m_durations.push_back(din->m_offsets[i] + din->m_durations[i] - offset);
+					cap->m_samples.push_back(samp);
+					state = 4;
+				} else
+					state = 0;
+				break;
+			case 4:
+				if(s.m_stype == SPISymbol::TYPE_DESELECT)
+					state = 0;
+				break;
+		}
+	}
+	cap->MarkSamplesModifiedFromCpu();
+	cap->MarkTimestampsModifiedFromCpu();
+	SetData(cap, 0);
+}

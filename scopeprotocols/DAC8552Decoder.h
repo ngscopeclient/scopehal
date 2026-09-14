@@ -1,3 +1,4 @@
+
 /***********************************************************************************************************************
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
@@ -28,68 +29,57 @@
 ***********************************************************************************************************************/
 
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SPIDecoder
- */
+ 	@file
+	@author Daniel Bauer
+	@brief Declaration of DAC8552Decoder
+*/
+#ifndef DAC8522Decoder_h
+#define DAC8522Decoder_h
 
-#ifndef SPIDecoder_h
-#define SPIDecoder_h
-
-class SPISymbol
+class DAC8552Symbol
 {
 public:
-	enum stype
+	DAC8552Symbol(uint8_t flags = 0, uint16_t value=0xDEAD)
+		: m_flags(flags)
+		, m_value(value)
+		 {}
+	// Rather store all the flags in 1 byte instead of making the struct 5 bytes large and then get funky padding
+	// This will most likely get padded to a nice handy integer
+	static constexpr uint8_t MASK_LOAD_A = 0x10;
+	static constexpr uint8_t MASK_LOAD_B = 0x20;
+	static constexpr uint8_t MASK_BFR_SEL = 0x04;
+	uint8_t m_flags;
+	uint16_t m_value;
+
+	bool operator==(const DAC8552Symbol& s) const
 	{
-		TYPE_SELECT,
-		TYPE_DATA,
-		TYPE_DESELECT,
-		TYPE_ERROR
-	};
-
-	SPISymbol()
-	{}
-
-	SPISymbol(stype t,uint8_t d)
-	 : m_stype(t)
-	 , m_data(d)
-	{}
-
-	stype m_stype;
-	uint8_t m_data;
-
-	bool operator== (const SPISymbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
+		return (m_flags == s.m_flags) && (m_value == s.m_value);
 	}
+	bool loadA() const { return m_flags & MASK_LOAD_A ? true : false; }
+	bool loadB() const { return m_flags & MASK_LOAD_B ? true : false; }
+	bool bfrSelect() const { return m_flags & MASK_BFR_SEL ? true : false; }
 };
 
-class SPIWaveform : public SparseWaveform<SPISymbol>
+class DAC8552Waveform : public SparseWaveform<DAC8552Symbol>
 {
 public:
-	SPIWaveform () : SparseWaveform<SPISymbol>() {};
-	virtual std::string GetText(size_t) override;
-	virtual std::string GetColor(size_t) override;
+	DAC8552Waveform (const std::string& color) : SparseWaveform<DAC8552Symbol>(), m_color(color) {};
+	virtual std::string GetText(size_t override);
+	virtual std::string GetColor(size_t override);
+
+private:
+	const std::string& m_color;
 };
 
-class SPIDecoder : public Filter
+class DAC8552Decoder : public Filter
 {
 public:
-	SPIDecoder(const std::string& color);
+	DAC8552Decoder(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
 	static std::string GetProtocolName();
 
-	PROTOCOL_DECODER_INITPROC(SPIDecoder)
-
-protected:
-	FilterParameter& m_cpol;
-	FilterParameter& m_cpha;
-	// Bit endianess
-	FilterParameter& m_bendian;
-	void sampleBit(SPIWaveform*, size_t timestamp, int endian, uint8_t& current_byte, uint8_t& bitcount, int64_t& bytestart,
-			bool& cur_data, bool& first);
+	PROTOCOL_DECODER_INITPROC(DAC8552Decoder)
 };
 
 #endif
