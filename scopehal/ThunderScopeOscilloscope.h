@@ -80,6 +80,7 @@ public:
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
 	virtual bool AcquireData() override;
 	virtual void PushEdgeTrigger(EdgeTrigger* trig) override;
+	virtual bool PeekTriggerArmed() override;
 
 	// Captures
 	virtual void Start() override;

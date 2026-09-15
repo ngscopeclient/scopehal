@@ -751,6 +751,12 @@ void ThunderScopeOscilloscope::ForceTrigger()
 	ResetPerCaptureDiagnostics();
 }
 
+bool ThunderScopeOscilloscope::PeekTriggerArmed()
+{
+	//TODO: round trip sync?
+	return m_triggerArmed;
+}
+
 void ThunderScopeOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
 	//Type
