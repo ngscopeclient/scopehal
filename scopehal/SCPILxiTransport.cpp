@@ -158,7 +158,6 @@ bool SCPILxiTransport::SendCommand(const string& cmd)
 #ifdef HAS_VISA
 	ViUInt32 written = 0;
 	ViStatus status = viWrite(m_device, (ViBuf)cmd.data(), (ViUInt32)cmd.length(), &written);
-	int result = (status >= VI_SUCCESS) ? 0 : -1;
 #else
 	//Need the cast when using liblxi versions prior to 63ea109 because they don't have "const" on the argument.
 	//It doesn't actually change the inputs, so safe to cast.
