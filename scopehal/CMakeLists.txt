@@ -4,6 +4,26 @@
 
 # Libraries specific to scopehal library not provided by root CMakeLists
 
+if(WIN32)
+        # Native Windows LXI/VXI-11 support via VISA
+        find_path(VISA_INCLUDE_DIR
+                NAMES visa.h
+                PATHS "C:/Program Files/IVI Foundation/VISA/Win64/Include"
+                NO_DEFAULT_PATH)
+
+        find_library(VISA_LIBRARY
+                NAMES visa64
+                PATHS "C:/Program Files/IVI Foundation/VISA/Win64/Lib_x64/msc"
+                NO_DEFAULT_PATH)
+
+        if(VISA_INCLUDE_DIR AND VISA_LIBRARY)
+                message("-- Found VISA: ${VISA_LIBRARY}")
+                set(VISA_FOUND TRUE)
+        else()
+                message("-- VISA not found, LXI/VXI-11 instrument support will not be available.")
+        endif()
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	pkg_check_modules(LXI liblxi QUIET IMPORTED_TARGET)
 	#WORKAROUND LXI on Debian Bullseye lacks a pkgconfig file
@@ -287,6 +307,16 @@ if(LXI_FOUND)
 	)
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
 endif()
+if(VISA_FOUND)
+        target_link_libraries(scopehal
+                ${VISA_LIBRARY}
+        )
+        target_include_directories(scopehal PRIVATE
+                ${VISA_INCLUDE_DIR}
+        )
+        target_compile_definitions(scopehal PUBLIC HAS_LXI HAS_VISA)
+endif()
+
 
 target_include_directories(scopehal
 PRIVATE
