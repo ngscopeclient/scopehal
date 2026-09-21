@@ -6,15 +6,22 @@
 
 if(WIN32)
         # Native Windows LXI/VXI-11 support via VISA
+        set(VISA_SEARCH_ROOTS "C:/Program Files/IVI Foundation/VISA")
+
+        if(DEFINED ENV{VXIPNPPATH64})
+                file(TO_CMAKE_PATH "$ENV{VXIPNPPATH64}" VISA_ENV_ROOT)
+                list(PREPEND VISA_SEARCH_ROOTS "${VISA_ENV_ROOT}")
+        endif()
+
         find_path(VISA_INCLUDE_DIR
                 NAMES visa.h
-                PATHS "C:/Program Files/IVI Foundation/VISA/Win64/Include"
-                NO_DEFAULT_PATH)
+                PATHS ${VISA_SEARCH_ROOTS}
+                PATH_SUFFIXES Win64/Include)
 
         find_library(VISA_LIBRARY
                 NAMES visa64
-                PATHS "C:/Program Files/IVI Foundation/VISA/Win64/Lib_x64/msc"
-                NO_DEFAULT_PATH)
+                PATHS ${VISA_SEARCH_ROOTS}
+                PATH_SUFFIXES Win64/Lib_x64/msc)
 
         if(VISA_INCLUDE_DIR AND VISA_LIBRARY)
                 message("-- Found VISA: ${VISA_LIBRARY}")
