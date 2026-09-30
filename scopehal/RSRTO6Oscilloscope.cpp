@@ -731,8 +731,8 @@ template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, const str
 	int64_t fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
 	LogDebug("%" PRId64 " fs/sample\n", fs_per_sample);
 
+	/*
 	size_t reported_srate = (FS_PER_SECOND / fs_per_sample);
-
 	if (reported_srate != m_sampleRate)
 	{
 		LogWarning("Reported sample rate %zu != expected sample rate %" PRIu64 "; using what it said\n", reported_srate, m_sampleRate);
@@ -742,7 +742,7 @@ template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, const str
 	{
 		LogWarning("Reported depth %zu != expected depth %" PRIu64 "; using what I think is correct\n", length, m_sampleDepth);
 		length = m_sampleDepth;
-	}
+	}*/
 
 	//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
 
