@@ -57,9 +57,9 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 	, m_triggerOffsetValid(false)
 {
 	LogDebug("m_model: %s\n", m_model.c_str());
-	if (m_model != "RTO6")
+	if( (m_model != "RTO6") && (m_model != "RTP") )
 	{
-		LogFatal("rs.rto6 driver only appropriate for RTO6");
+		LogFatal("rs.rto6 driver only appropriate for RTO6 and RTP");
 	}
 
 	//TODO: better error handling here this shouldn't abort
@@ -125,7 +125,8 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 	string reply = m_transport->SendCommandQueuedWithReply("*OPT?", false);
 	vector<string> opts;
 	stringstream s_stream(reply);
-	while(s_stream.good()) {
+	while(s_stream.good())
+	{
 		string substr;
 		getline(s_stream, substr, ',');
 		opts.push_back(substr);
@@ -177,9 +178,9 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 		m_transport->SendCommandQueued("WGEN1:SOURCE FUNCGEN"); //Don't currently support modulation or other modes
 		m_transport->SendCommandQueued("WGEN2:SOURCE FUNCGEN");
 
+		m_firstAFGIndex = m_channels.size();
 		for (int i = 0; i < 2; i++)
 		{
-			m_firstAFGIndex = m_channels.size();
 			auto ch = new FunctionGeneratorChannel(this, "WGEN" + to_string(i + 1), "#808080", m_channels.size());
 			m_channels.push_back(ch);
 		}
@@ -254,6 +255,10 @@ OscilloscopeChannel* RSRTO6Oscilloscope::GetExternalTrigger()
 bool RSRTO6Oscilloscope::IsChannelEnabled(size_t i)
 {
 	if(i == m_extTrigChannel->GetIndex())
+		return false;
+
+	//TODO: AWG enable
+	if(i >= m_firstAFGIndex)
 		return false;
 
 	{
@@ -1038,63 +1043,13 @@ bool RSRTO6Oscilloscope::IsTriggerArmed()
 
 vector<uint64_t> RSRTO6Oscilloscope::GetSampleRatesNonInterleaved()
 {
-	LogWarning("RSRTO6Oscilloscope::GetSampleRatesNonInterleaved unimplemented\n");
-
-	// FIXME -- Arbitrarily copied from Tek
 	vector<uint64_t> ret;
 
 	const int64_t k = 1000;
 	const int64_t m = k*k;
 	const int64_t g = k*m;
 
-	uint64_t bases[] = { 1000, 1250, 2500, 3125, 5000, 6250 };
-	vector<uint64_t> scales = {1, 10, 100, 1*k};
-
-	for(auto b : bases)
-		ret.push_back(b / 10);
-
-	for(auto scale : scales)
-	{
-		for(auto b : bases)
-			ret.push_back(b * scale);
-	}
-
-	// // MSO6 also supports these, or at least had them available in the picker before.
-	// // TODO: Are these actually supported?
-
-	// if (m_family == FAMILY_MSO6) {
-	// 	for(auto b : bases) {
-	// 		ret.push_back(b * 10 * k);
-	// 	}
-	// }
-
-	// We break with the pattern on the upper end of the frequency range
-	ret.push_back(12500 * k);
-	ret.push_back(25 * m);
-	ret.push_back(31250 * k);
-	ret.push_back(62500 * k);
-	ret.push_back(125 * m);
-	ret.push_back(250 * m);
-	ret.push_back(312500 * k);
-	ret.push_back(625 * m);
-	ret.push_back(1250 * m);
-	ret.push_back(1562500 * k);
-	ret.push_back(3125 * m);
-	ret.push_back(6250 * m);
-	ret.push_back(12500 * m);
-
-	// Below are interpolated. 8 bits, not 12.
-	//TODO: we can save bandwidth by using 8 bit waveform download for these
-
-	ret.push_back(25 * g);
-
-	// MSO5 supports these, TODO: Does MSO6?
-	ret.push_back(25000 * m);
-	ret.push_back(62500 * m);
-	ret.push_back(125000 * m);
-	ret.push_back(250000 * m);
-	ret.push_back(500000 * m);
-
+	ret.push_back(40 * g);
 	return ret;
 }
 
@@ -1105,8 +1060,6 @@ vector<uint64_t> RSRTO6Oscilloscope::GetSampleRatesInterleaved()
 
 set<Oscilloscope::InterleaveConflict> RSRTO6Oscilloscope::GetInterleaveConflicts()
 {
-	LogWarning("RSRTO6Oscilloscope::GetInterleaveConflicts unimplemented\n");
-
 	//FIXME
 	set<Oscilloscope::InterleaveConflict> ret;
 	return ret;
@@ -1157,14 +1110,13 @@ uint64_t RSRTO6Oscilloscope::GetSampleRate()
 {
 	if(m_sampleRateValid)
 	{
-		LogDebug("GetSampleRate() queried and returned cached value %" PRIu64 "\n", m_sampleRate);
 		return m_sampleRate;
 	}
 
 	m_sampleRate = stod(m_transport->SendCommandQueuedWithReply("ACQUIRE:SRATE?"));
 	m_sampleRateValid = true;
 
-	LogDebug("GetSampleRate() queried and got new value %" PRIu64 "\n", m_sampleRate);
+	LogTrace("GetSampleRate() queried and got new value %" PRIu64 "\n", m_sampleRate);
 
 	return 1;
 }
@@ -1172,17 +1124,14 @@ uint64_t RSRTO6Oscilloscope::GetSampleRate()
 uint64_t RSRTO6Oscilloscope::GetSampleDepth()
 {
 	if(m_sampleDepthValid)
-	{
-		LogDebug("GetSampleDepth() queried and returned cached value %" PRIu64 "\n", m_sampleDepth);
 		return m_sampleDepth;
-	}
 
 	GetSampleRate();
 
 	m_sampleDepth = stod(m_transport->SendCommandQueuedWithReply("TIMEBASE:RANGE?")) * (double)m_sampleRate;
 	m_sampleDepthValid = true;
 
-	LogDebug("GetSampleDepth() queried and got new value %" PRIu64 "\n", m_sampleDepth);
+	LogTrace("GetSampleDepth() queried and got new value %" PRIu64 "\n", m_sampleDepth);
 
 	return 1;
 }
