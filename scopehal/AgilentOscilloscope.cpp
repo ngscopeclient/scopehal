@@ -567,15 +567,23 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 
 	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		//auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
+		double atten = 1;
 
-		LogWarning("AgilentOscilloscope::GetChannelAttenuation unimplemented for infiniium\n");
+		//External probe attenuation has to be turned on, if not enabled imply 1
+		auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB:EXT?");
+		if(reply == "0")
+			atten = 1;
 
-		//TODO: implement this, seems complicated
-		//can be CHANx:PROB:EXT:GAIN? but also other things
+		//read actual attenuation
+		else
+		{
+			reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB:EXT:GAIN?");
+			atten = 1.0 / stof(reply);
+		}
+
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelAttenuations[i] = 1;
-		return 1;
+		m_channelAttenuations[i] = atten;
+		return atten;
 	}
 	else
 	{
