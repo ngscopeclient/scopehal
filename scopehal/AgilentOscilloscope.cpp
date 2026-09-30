@@ -618,6 +618,20 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 }
 
+vector<unsigned int> AgilentOscilloscope::GetChannelBandwidthLimiters([[maybe_unused]]size_t i)
+{
+	vector<unsigned int> ret;
+	ret.push_back(0);
+
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		ret.push_back(20);
+		ret.push_back(200);
+	}
+
+	return ret;
+}
+
 unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if (i >= m_analogChannelCount)
@@ -632,22 +646,44 @@ unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 			return m_channelBandwidthLimits[i];
 	}
 
-	string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
+		unsigned int bwl = stoi(reply) / 1e6;
 
-	unsigned int bwl;
-	if(reply == "1")
-		bwl = 25;
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = bwl;
+		return bwl;
+	}
+
 	else
-		bwl = 0;
+	{
+		string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelBandwidthLimits[i] = bwl;
-	return bwl;
+		unsigned int bwl;
+		if(reply == "1")
+			bwl = 25;
+		else
+			bwl = 0;
+
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = bwl;
+		return bwl;
+	}
 }
 
-void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+void AgilentOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	LogWarning("AgilentOscilloscope::SetChannelBandwidthLimit unimplemented\n");
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":BWL " + to_string(limit_mhz * 1e6));
+
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = limit_mhz;
+	}
+
+	else
+		LogWarning("AgilentOscilloscope::SetChannelBandwidthLimit unimplemented\n");
 }
 
 float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)

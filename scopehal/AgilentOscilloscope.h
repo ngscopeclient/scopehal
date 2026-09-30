@@ -73,6 +73,7 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten) override;
 	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
 	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
 	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
