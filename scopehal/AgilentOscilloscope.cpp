@@ -264,9 +264,19 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		m_transport->SendCommandQueued("WAV:STR ON");
 		m_transport->SendCommandQueued("WAV:BYT LSBF");
 
-		//TODO: ACQ:SRATE:TESTLIMITS? for min/max sample rate
-		//TODO: ACQ:POINTS:TESTLIMITS? for min/max memory depth
+		char tmp[64];
+		float flimits;
+
+		auto slimits = m_transport->SendCommandQueuedWithReply("ACQ:SRATE:TESTLIMITS?");
+		sscanf(slimits.c_str(), "%63[^:]:%f", tmp, &flimits);
+		m_maxSampleRate = flimits;
+
+		slimits = m_transport->SendCommandQueuedWithReply("ACQ:POINTS:TESTLIMITS?");
+		sscanf(slimits.c_str(), "%63[^:]:%f", tmp, &flimits);
+		m_maxMemoryDepth = flimits;
 	}
+	else
+		m_maxSampleRate = 0;
 
 	//Create Vulkan objects for the waveform conversion
 	InitVulkanQueue("AgilentOscilloscope");
@@ -1111,23 +1121,27 @@ vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	const int64_t k = 1000;
-	const int64_t m = k*k;
-	const int64_t g = k*m;
+	const uint64_t k = 1000;
+	const uint64_t m = k*k;
+	const uint64_t g = k*m;
 
 	//Modern scopes
 	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
 		//Powers of two up to 256 Msps
-		for(int64_t i=1; i<=256; i *= 2)
+		for(uint64_t i=1; i<=256; i *= 2)
 			ret.push_back(i * m);
 
 		ret.push_back(500 * m);	//not 512
 
 		//Powers of two up to 256 Gsps
-		//TODO: stop lower on lower end scopes
-		for(int64_t i=1; i<=256; i *= 2)
-			ret.push_back(i * g);
+		for(uint64_t i=1; i<=256; i *= 2)
+		{
+			auto rate = i * g;
+			if(rate > m_maxSampleRate)
+				break;
+			ret.push_back(rate);
+		}
 
 		if(m_isSimulator)
 			ret.push_back(m_sampleRate);
@@ -1164,15 +1178,20 @@ vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 	{
 		vector<uint64_t> ret;
 
-		const int64_t k = 1024;
-		const int64_t m = k*k;
+		const uint64_t k = 1024;
+		const uint64_t m = k*k;
 		//const int64_t g = k*m;
 
-		for(int64_t i=1; i < 1024; i *= 2)
+		for(uint64_t i=1; i < 1024; i *= 2)
 			ret.push_back(i * k);
 
-		for(int64_t i=1; i < 2048; i *= 2)
-			ret.push_back(i * m);
+		for(uint64_t i=1; i < 2048; i *= 2)
+		{
+			auto depth = i * m;
+			if(depth > m_maxMemoryDepth)
+				break;
+			ret.push_back(depth);
+		}
 
 		if(m_isSimulator)
 			ret.push_back(m_sampleDepth);

@@ -229,6 +229,12 @@ private:
 	///@brief Scratch buffer for raw ADC samples
 	AcceleratorBuffer<uint8_t> m_rawSampleData;
 
+	///@brief Max sample rate advertised by the scope
+	uint64_t m_maxSampleRate;
+
+	///@brief Max memory depth advertised by the scope
+	uint64_t m_maxMemoryDepth;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(AgilentOscilloscope)
