@@ -184,9 +184,6 @@ protected:
 
 private:
 
-	///@brief Map of sample rates to maximum on-screen record length
-	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
-
 	///@brief Preamble of a waveform
 	struct WaveformPreamble
 	{

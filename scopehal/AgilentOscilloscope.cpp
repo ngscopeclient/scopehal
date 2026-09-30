@@ -1241,30 +1241,61 @@ uint64_t AgilentOscilloscope::GetSampleDepth()
  */
 void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 {
-	// Look up the maximum capture duration for the requested sample rate
-	auto d = sampleRateToDuration.find(rate);
-	if (d == sampleRateToDuration.end())
-		return;
-	auto max_duration = d->second;
-
-	// Calculate the duration of the requested capture in seconds
-	auto duration = (double)depth / (double)rate;
-
-	// Clamp the duration to make sure we achieve at least the requested sample rate
-	duration = min(duration, max_duration);
-
-	PushFloat("TIMEBASE:RANGE", duration);
-	for (auto chan : m_channels)
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
-		if(!ochan)
-			continue;
-		if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
-		{
-			m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
+		// Calculate the duration of the requested capture in seconds
+		auto duration = (double)depth / (double)rate;
 
-			// This will downsample the capture in case we ended up with a sample rate much higher than requested
-			m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
+		PushFloat("TIMEBASE:RANGE", duration);
+		m_transport->SendCommandQueued(string("ACQ:POINTS:ANALOG ") + to_string(depth));
+
+		/*
+		for (auto chan : m_channels)
+		{
+			auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
+			if(!ochan)
+				continue;
+			if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
+			{
+				m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
+
+				// This will downsample the capture in case we ended up with a sample rate much higher than requested
+				m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
+			}
+		}
+		*/
+	}
+
+	else
+	{
+		// Look up the maximum capture duration for the requested sample rate
+		auto d = sampleRateToDuration.find(rate);
+		if (d == sampleRateToDuration.end())
+		{
+			LogWarning("Sample rate not found\n");
+			return;
+		}
+		auto max_duration = d->second;
+
+		// Calculate the duration of the requested capture in seconds
+		auto duration = (double)depth / (double)rate;
+
+		// Clamp the duration to make sure we achieve at least the requested sample rate
+		duration = min(duration, max_duration);
+
+		PushFloat("TIMEBASE:RANGE", duration);
+		for (auto chan : m_channels)
+		{
+			auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
+			if(!ochan)
+				continue;
+			if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
+			{
+				m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
+
+				// This will downsample the capture in case we ended up with a sample rate much higher than requested
+				m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
+			}
 		}
 	}
 }
