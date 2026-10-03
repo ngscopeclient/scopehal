@@ -605,9 +605,9 @@ void PicoOscilloscope::EnableChannel(size_t i)
 
 	RemoteBridgeOscilloscope::EnableChannel(i);
 
-	//Memory configuration might have changed. Update availabe sample rates and memory depths.
-	GetSampleRatesNonInterleaved();
-	GetSampleDepthsNonInterleaved();
+	//Memory configuration might have changed. Update available sample rates and memory depths.
+	m_sampleRatesCached.clear();
+	m_memoryDepthsCached.clear();
 }
 
 void PicoOscilloscope::DisableChannel(size_t i)
@@ -628,8 +628,8 @@ void PicoOscilloscope::DisableChannel(size_t i)
 	RemoteBridgeOscilloscope::DisableChannel(i);
 
 	//Memory configuration might have changed. Update availabe sample rates and memory depths.
-	GetSampleRatesNonInterleaved();
-	GetSampleDepthsNonInterleaved();
+	m_sampleRatesCached.clear();
+	m_memoryDepthsCached.clear();
 }
 
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
@@ -1033,28 +1033,29 @@ bool PicoOscilloscope::CanInterleave()
 
 vector<uint64_t> PicoOscilloscope::GetSampleRatesNonInterleaved()
 {
-	vector<uint64_t> ret;
-
-	string rates = m_transport->SendCommandQueuedWithReply("RATES?");
-
-	size_t i=0;
-	while(true)
+	if(m_sampleRatesCached.empty())
 	{
-		size_t istart = i;
-		i = rates.find(',', i+1);
-		if(i == string::npos)
-			break;
+		string rates = m_transport->SendCommandQueuedWithReply("RATES?");
 
-		auto block = rates.substr(istart, i-istart);
-		uint64_t fs = stoull(block);
-		auto hz = FS_PER_SECOND / fs;
-		ret.push_back(hz);
+		size_t i=0;
+		while(true)
+		{
+			size_t istart = i;
+			i = rates.find(',', i+1);
+			if(i == string::npos)
+				break;
 
-		//skip the comma
-		i++;
+			auto block = rates.substr(istart, i-istart);
+			uint64_t fs = stoull(block);
+			auto hz = FS_PER_SECOND / fs;
+			m_sampleRatesCached.push_back(hz);
+
+			//skip the comma
+			i++;
+		}
 	}
 
-	return ret;
+	return m_sampleRatesCached;
 }
 
 vector<uint64_t> PicoOscilloscope::GetSampleRatesInterleaved()
@@ -1073,26 +1074,27 @@ set<Oscilloscope::InterleaveConflict> PicoOscilloscope::GetInterleaveConflicts()
 
 vector<uint64_t> PicoOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	vector<uint64_t> ret;
-
-	string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
-
-	size_t i=0;
-	while(true)
+	if(m_memoryDepthsCached.empty())
 	{
-		size_t istart = i;
-		i = depths.find(',', i+1);
-		if(i == string::npos)
-			break;
+		string depths = m_transport->SendCommandQueuedWithReply("DEPTHS?");
 
-		uint64_t sampleDepth = stoull(depths.substr(istart, i-istart));
-		ret.push_back(sampleDepth);
+		size_t i=0;
+		while(true)
+		{
+			size_t istart = i;
+			i = depths.find(',', i+1);
+			if(i == string::npos)
+				break;
 
-		//skip the comma
-		i++;
+			uint64_t sampleDepth = stoull(depths.substr(istart, i-istart));
+			m_memoryDepthsCached.push_back(sampleDepth);
+
+			//skip the comma
+			i++;
+		}
 	}
 
-	return ret;
+	return m_memoryDepthsCached;
 }
 
 vector<uint64_t> PicoOscilloscope::GetSampleDepthsInterleaved()
