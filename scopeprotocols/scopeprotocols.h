@@ -113,6 +113,7 @@
 #include "Ethernet100BaseT1LinkTrainingDecoder.h"
 #include "Ethernet100BaseTXDecoder.h"
 #include "Ethernet1000BaseXDecoder.h"
+#include "Ethernet1000BaseXRawDecoder.h"
 #include "Ethernet10GBaseRDecoder.h"
 #include "Ethernet64b66bDecoder.h"
 #include "ExponentialMovingAverageFilter.h"
