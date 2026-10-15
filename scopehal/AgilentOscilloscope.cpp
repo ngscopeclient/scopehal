@@ -264,9 +264,19 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		m_transport->SendCommandQueued("WAV:STR ON");
 		m_transport->SendCommandQueued("WAV:BYT LSBF");
 
-		//TODO: ACQ:SRATE:TESTLIMITS? for min/max sample rate
-		//TODO: ACQ:POINTS:TESTLIMITS? for min/max memory depth
+		char tmp[64];
+		float flimits;
+
+		auto slimits = m_transport->SendCommandQueuedWithReply("ACQ:SRATE:TESTLIMITS?");
+		sscanf(slimits.c_str(), "%63[^:]:%f", tmp, &flimits);
+		m_maxSampleRate = flimits;
+
+		slimits = m_transport->SendCommandQueuedWithReply("ACQ:POINTS:TESTLIMITS?");
+		sscanf(slimits.c_str(), "%63[^:]:%f", tmp, &flimits);
+		m_maxMemoryDepth = flimits;
 	}
+	else
+		m_maxSampleRate = 0;
 
 	//Create Vulkan objects for the waveform conversion
 	InitVulkanQueue("AgilentOscilloscope");
@@ -557,15 +567,23 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 
 	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		//auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
+		double atten = 1;
 
-		LogWarning("AgilentOscilloscope::GetChannelAttenuation unimplemented for infiniium\n");
+		//External probe attenuation has to be turned on, if not enabled imply 1
+		auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB:EXT?");
+		if(reply == "0")
+			atten = 1;
 
-		//TODO: implement this, seems complicated
-		//can be CHANx:PROB:EXT:GAIN? but also other things
+		//read actual attenuation
+		else
+		{
+			reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROB:EXT:GAIN?");
+			atten = 1.0 / stof(reply);
+		}
+
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelAttenuations[i] = 1;
-		return 1;
+		m_channelAttenuations[i] = atten;
+		return atten;
 	}
 	else
 	{
@@ -600,6 +618,20 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 }
 
+vector<unsigned int> AgilentOscilloscope::GetChannelBandwidthLimiters([[maybe_unused]]size_t i)
+{
+	vector<unsigned int> ret;
+	ret.push_back(0);
+
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		ret.push_back(20);
+		ret.push_back(200);
+	}
+
+	return ret;
+}
+
 unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if (i >= m_analogChannelCount)
@@ -614,22 +646,44 @@ unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 			return m_channelBandwidthLimits[i];
 	}
 
-	string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
+		unsigned int bwl = stoi(reply) / 1e6;
 
-	unsigned int bwl;
-	if(reply == "1")
-		bwl = 25;
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = bwl;
+		return bwl;
+	}
+
 	else
-		bwl = 0;
+	{
+		string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelBandwidthLimits[i] = bwl;
-	return bwl;
+		unsigned int bwl;
+		if(reply == "1")
+			bwl = 25;
+		else
+			bwl = 0;
+
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = bwl;
+		return bwl;
+	}
 }
 
-void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+void AgilentOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	LogWarning("AgilentOscilloscope::SetChannelBandwidthLimit unimplemented\n");
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
+	{
+		m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":BWL " + to_string(limit_mhz * 1e6));
+
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = limit_mhz;
+	}
+
+	else
+		LogWarning("AgilentOscilloscope::SetChannelBandwidthLimit unimplemented\n");
 }
 
 float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
@@ -1111,23 +1165,27 @@ vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	const int64_t k = 1000;
-	const int64_t m = k*k;
-	const int64_t g = k*m;
+	const uint64_t k = 1000;
+	const uint64_t m = k*k;
+	const uint64_t g = k*m;
 
 	//Modern scopes
 	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
 		//Powers of two up to 256 Msps
-		for(int64_t i=1; i<=256; i *= 2)
+		for(uint64_t i=1; i<=256; i *= 2)
 			ret.push_back(i * m);
 
 		ret.push_back(500 * m);	//not 512
 
 		//Powers of two up to 256 Gsps
-		//TODO: stop lower on lower end scopes
-		for(int64_t i=1; i<=256; i *= 2)
-			ret.push_back(i * g);
+		for(uint64_t i=1; i<=256; i *= 2)
+		{
+			auto rate = i * g;
+			if(rate > m_maxSampleRate)
+				break;
+			ret.push_back(rate);
+		}
 
 		if(m_isSimulator)
 			ret.push_back(m_sampleRate);
@@ -1164,15 +1222,20 @@ vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 	{
 		vector<uint64_t> ret;
 
-		const int64_t k = 1024;
-		const int64_t m = k*k;
+		const uint64_t k = 1024;
+		const uint64_t m = k*k;
 		//const int64_t g = k*m;
 
-		for(int64_t i=1; i < 1024; i *= 2)
+		for(uint64_t i=1; i < 1024; i *= 2)
 			ret.push_back(i * k);
 
-		for(int64_t i=1; i < 2048; i *= 2)
-			ret.push_back(i * m);
+		for(uint64_t i=1; i < 2048; i *= 2)
+		{
+			auto depth = i * m;
+			if(depth > m_maxMemoryDepth)
+				break;
+			ret.push_back(depth);
+		}
 
 		if(m_isSimulator)
 			ret.push_back(m_sampleDepth);
@@ -1241,30 +1304,61 @@ uint64_t AgilentOscilloscope::GetSampleDepth()
  */
 void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 {
-	// Look up the maximum capture duration for the requested sample rate
-	auto d = sampleRateToDuration.find(rate);
-	if (d == sampleRateToDuration.end())
-		return;
-	auto max_duration = d->second;
-
-	// Calculate the duration of the requested capture in seconds
-	auto duration = (double)depth / (double)rate;
-
-	// Clamp the duration to make sure we achieve at least the requested sample rate
-	duration = min(duration, max_duration);
-
-	PushFloat("TIMEBASE:RANGE", duration);
-	for (auto chan : m_channels)
+	if(m_ftype >= FIRMWARE_INFINIIUM_10)
 	{
-		auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
-		if(!ochan)
-			continue;
-		if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
-		{
-			m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
+		// Calculate the duration of the requested capture in seconds
+		auto duration = (double)depth / (double)rate;
 
-			// This will downsample the capture in case we ended up with a sample rate much higher than requested
-			m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
+		PushFloat("TIMEBASE:RANGE", duration);
+		m_transport->SendCommandQueued(string("ACQ:POINTS:ANALOG ") + to_string(depth));
+
+		/*
+		for (auto chan : m_channels)
+		{
+			auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
+			if(!ochan)
+				continue;
+			if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
+			{
+				m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
+
+				// This will downsample the capture in case we ended up with a sample rate much higher than requested
+				m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
+			}
+		}
+		*/
+	}
+
+	else
+	{
+		// Look up the maximum capture duration for the requested sample rate
+		auto d = sampleRateToDuration.find(rate);
+		if (d == sampleRateToDuration.end())
+		{
+			LogWarning("Sample rate not found\n");
+			return;
+		}
+		auto max_duration = d->second;
+
+		// Calculate the duration of the requested capture in seconds
+		auto duration = (double)depth / (double)rate;
+
+		// Clamp the duration to make sure we achieve at least the requested sample rate
+		duration = min(duration, max_duration);
+
+		PushFloat("TIMEBASE:RANGE", duration);
+		for (auto chan : m_channels)
+		{
+			auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
+			if(!ochan)
+				continue;
+			if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
+			{
+				m_transport->SendCommandQueued(":WAV:SOUR " + chan->GetHwname());
+
+				// This will downsample the capture in case we ended up with a sample rate much higher than requested
+				m_transport->SendCommandQueued(":WAV:POINTS " + to_string(depth));
+			}
 		}
 	}
 }

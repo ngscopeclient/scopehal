@@ -262,6 +262,12 @@ protected:
 	std::map<int, float> m_digitalThresholds;
 	std::map<int, float> m_digitalHysteresis;
 
+	///@brief Saved memory depths
+	std::vector<uint64_t> m_memoryDepthsCached;
+
+	///@brief Saved sample rates
+	std::vector<uint64_t> m_sampleRatesCached;
+
 	//Function generator state
 	bool m_awgEnabled;
 	float m_awgDutyCycle;

@@ -73,6 +73,7 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten) override;
 	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
 	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
 	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
@@ -184,9 +185,6 @@ protected:
 
 private:
 
-	///@brief Map of sample rates to maximum on-screen record length
-	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
-
 	///@brief Preamble of a waveform
 	struct WaveformPreamble
 	{
@@ -231,6 +229,12 @@ private:
 
 	///@brief Scratch buffer for raw ADC samples
 	AcceleratorBuffer<uint8_t> m_rawSampleData;
+
+	///@brief Max sample rate advertised by the scope
+	uint64_t m_maxSampleRate;
+
+	///@brief Max memory depth advertised by the scope
+	uint64_t m_maxMemoryDepth;
 
 public:
 	static std::string GetDriverNameInternal();
