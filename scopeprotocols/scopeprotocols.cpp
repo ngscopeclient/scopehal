@@ -69,6 +69,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(CSVImportFilter);
 	AddDecoderClass(CTLEFilter);
 	AddDecoderClass(CurrentShuntFilter);
+	AddDecoderClass(DAC8552Decoder);
 	AddDecoderClass(DCDMeasurement);
 	AddDecoderClass(DDJMeasurement);
 	AddDecoderClass(DDR1Decoder);
