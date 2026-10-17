@@ -286,6 +286,7 @@ void DetectCPUFeatures()
 
 void ScopehalStaticCleanup()
 {
+	ScratchBufferManager::clear();
 	VulkanCleanup();
 }
 
