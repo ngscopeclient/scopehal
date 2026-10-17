@@ -69,7 +69,8 @@ void FlowGraphNode::DetachInputs()
 	for(auto& c : m_inputs)
 	{
 		auto& sourceChan = c->m_sourceStream.m_channel;
-		sourceChan->RemoveSink(c->m_sourceStream.m_stream, this);
+		if(sourceChan)
+			sourceChan->RemoveSink(c->m_sourceStream.m_stream, this);
 		sourceChan = nullptr;
 	}
 }
