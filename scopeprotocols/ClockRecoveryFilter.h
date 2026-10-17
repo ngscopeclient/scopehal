@@ -67,8 +67,11 @@ public:
 	AcceleratorBuffer<int64_t>& GetZeroCrossings()
 	{ return m_detector.GetResults(); }
 
-	float GetThreshold()
-	{ return m_threshold.GetFloatVal(); }
+	FilterParameter& GetThreshold()
+	{ return m_threshold; }
+
+	FilterParameter& GetBaudRate()
+	{ return m_baudRate; }
 
 protected:
 	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
