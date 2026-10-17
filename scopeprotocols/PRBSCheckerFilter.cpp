@@ -244,6 +244,13 @@ void PRBSCheckerFilter::Refresh(
 		blockcfg.count = len;
 		blockcfg.samplesPerThread = GetComputeBlockCount(len, numBlockThreads);
 
+		//If not enough samples per thread, increase the number of samples and use less threads
+		if(blockcfg.samplesPerThread < 32)
+		{
+			blockcfg.samplesPerThread = 32;
+			numBlockThreads = GetComputeBlockCount(len, blockcfg.samplesPerThread);
+		}
+
 		//Figure out the shader and thread block count to use
 		uint32_t numThreads = 0;
 		shared_ptr<ComputePipeline> pipe;
