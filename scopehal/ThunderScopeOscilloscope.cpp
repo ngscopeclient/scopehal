@@ -638,7 +638,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	{
 		m_triggerArmed = false;
 
-		//Ask the server what the last waveform it sent was
+		//Ask the server what the last waveform it captured was
 		m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
 		LogTrace("Trigger stopped after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
 			(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
@@ -758,7 +758,7 @@ void ThunderScopeOscilloscope::StartAutoTrigger()
 
 void ThunderScopeOscilloscope::ForceTrigger()
 {
-	//Ask the server what the last waveform it sent was
+	//Ask the server what the last waveform it captured was
 	m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
 	LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
 		(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
