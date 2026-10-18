@@ -763,11 +763,19 @@ void ThunderScopeOscilloscope::ForceTrigger()
 	LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
 		(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
 
-	m_transport->SendCommandQueued("SINGLE");
-	m_transport->SendCommandQueued("FORCE");
+	//If the trigger is currently armed, don't change the current trigger mode and just force it
+	if(m_triggerArmed)
+		m_transport->SendCommandQueued("FORCE");
 
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
+	//Otherwise, do a forced single shot trigger
+	else
+	{
+		m_transport->SendCommandQueued("SINGLE");
+		m_transport->SendCommandQueued("FORCE");
+
+		m_triggerArmed = true;
+		m_triggerOneShot = true;
+	}
 
 	ResetPerCaptureDiagnostics();
 }
