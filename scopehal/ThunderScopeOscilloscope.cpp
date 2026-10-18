@@ -359,7 +359,7 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 		#endif
 
 		//Do we have old stale waveforms to drop still in the socket buffer? Throw it out
-		if(m_dropUntilSeq > m_lastSeq)
+		if( (m_dropUntilSeq > m_lastSeq) && (m_lastSeq != 0) )
 		{
 			LogTrace("Dropping until sequence %u, last received sequence was %u. Need to drop this waveform\n",
 				(unsigned int)m_dropUntilSeq, (unsigned int)m_lastSeq);
