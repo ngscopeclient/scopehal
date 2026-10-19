@@ -71,6 +71,8 @@ public:
 
 	virtual void FlushRXBuffer() override;
 
+	bool SetTimeouts(unsigned int txUs, unsigned int rxUs) override;
+
 	///@brief VICP header opcode values
 	enum HEADER_OPS
 	{
