@@ -42,34 +42,12 @@ class StreamDescriptor;
 class InputDescriptor;
 class InputConstraint;
 
+#include "LogMessage.h"
 #include "FilterParameter.h"
 #include "Waveform.h"
 #include "Stream.h"
 #include "SerializableObject.h"
 #include "log.h"
-
-
-/**
-	@brief A Message to the user from a node in the signal flow graph
-	@ingroup core
-
-	A basic message containing a severity and content
-**/
-class FlowGraphNodeMessage
-{
-public:
-	FlowGraphNodeMessage(Severity severity, const std::string& title, const std::string& msg)
-	: m_severity(severity), m_title(title), m_message(msg) {}
-	Severity GetSeverity() const { return m_severity; }
-	const std::string& GetTitle() const {return m_title; }
-	const std::string& GetMessage() const {return m_message; }
-private:
-	Severity m_severity;
-	///@brief Short name to be shown in tooltips etc.
-	std::string m_title;
-	///@brief Elaborate explanation of the message
-	std::string m_message;
-};
 
 /**
 	@brief Abstract base class for a node in the signal flow graph.
@@ -185,10 +163,10 @@ public:
 	{ return not m_messages.empty(); }
 
 	///@brief Walking through any messages
-	const std::vector<FlowGraphNodeMessage>& GetMessages() const
+	const std::vector<LogMessage>& GetMessages() const
 	{ return m_messages; }
 
-	const FlowGraphNodeMessage* GetMostSevereMessage() const;
+	const LogMessage* GetMostSevereMessage() const;
 
 	//Input handling helpers
 protected:
@@ -271,12 +249,12 @@ protected:
 	{ m_messages.clear(); }
 
 	///@brief Attach a new message to the node
-	void AddMessage(const FlowGraphNodeMessage& msg)
+	void AddMessage(const LogMessage& msg)
 	{ m_messages.push_back(msg); }
 
 	///@brief Attach a new message to the node
 	void AddMessage(Severity severity, const std::string& title, const std::string& message)
-	{ AddMessage(FlowGraphNodeMessage(severity, title, message)); }
+	{ AddMessage(LogMessage(severity, title, message)); }
 
 	///@brief Add a new error message
 	void AddErrorMessage(const std::string& err)
@@ -297,7 +275,7 @@ protected:
 	sigc::signal<void()> m_inputsChangedSignal;
 
 	//@brief All the messages the Node accumulates
-	std::vector<FlowGraphNodeMessage> m_messages;
+	std::vector<LogMessage> m_messages;
 };
 
 #endif

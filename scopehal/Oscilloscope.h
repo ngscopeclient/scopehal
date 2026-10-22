@@ -928,7 +928,16 @@ protected:
 	HzClock m_downloadClock;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Error Reporting
+protected:
+
+public:
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Diagnostics Access
+
+	//NOTE: These messages are meant to be internal debug messages, NOT end user error reporting.
+	//More specifically, things like self-test failures should be reported elsewhere
 protected:
 	std::deque<std::string> m_diagnosticLogMessages;
 	std::map<std::string, FilterParameter*> m_diagnosticValues;

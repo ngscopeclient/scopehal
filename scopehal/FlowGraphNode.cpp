@@ -412,18 +412,16 @@ void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
 	}
 }
 
-const FlowGraphNodeMessage* FlowGraphNode::GetMostSevereMessage() const
+const LogMessage* FlowGraphNode::GetMostSevereMessage() const
 {
 	if(!HasMessages())
 		return nullptr;
 
-	const FlowGraphNodeMessage* most_severe = &GetMessages().front();
-	for(const FlowGraphNodeMessage& msg : GetMessages())
+	auto most_severe = &GetMessages().front();
+	for(const auto& msg : GetMessages())
 	{
 		if(msg.GetSeverity() < most_severe->GetSeverity())
-		{
 			most_severe = &msg;
-		}
 	}
 	return most_severe;
 }
