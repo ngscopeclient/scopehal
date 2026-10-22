@@ -43,6 +43,7 @@ class InputDescriptor;
 class InputConstraint;
 
 #include "LogMessage.h"
+#include "LogMessageProvider.h"
 #include "FilterParameter.h"
 #include "Waveform.h"
 #include "Stream.h"
@@ -55,7 +56,9 @@ class InputConstraint;
 
 	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters.
  */
-class FlowGraphNode : public SerializableObject
+class FlowGraphNode
+	: public SerializableObject
+	, public LogMessageProvider
 {
 public:
 	FlowGraphNode();
@@ -154,20 +157,6 @@ public:
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) =0;
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Error detection and reporting
-public:
-
-	///@brief Checks if this graph has any messages
-	bool HasMessages() const
-	{ return not m_messages.empty(); }
-
-	///@brief Walking through any messages
-	const std::vector<LogMessage>& GetMessages() const
-	{ return m_messages; }
-
-	const LogMessage* GetMostSevereMessage() const;
-
 	//Input handling helpers
 protected:
 
@@ -244,38 +233,11 @@ public:
 
 protected:
 
-	///@brief Remove any messages left over from the last graph refresh
-	void ClearMessages()
-	{ m_messages.clear(); }
-
-	///@brief Attach a new message to the node
-	void AddMessage(const LogMessage& msg)
-	{ m_messages.push_back(msg); }
-
-	///@brief Attach a new message to the node
-	void AddMessage(Severity severity, const std::string& title, const std::string& message)
-	{ AddMessage(LogMessage(severity, title, message)); }
-
-	///@brief Add a new error message
-	void AddErrorMessage(const std::string& err)
-	{ AddErrorMessage("Unknown", std::string("• ") + err); }
-
-	/**
-		@brief Add a new error message with a title
-
-		The title replaces any previous title, if set
-	 */
-	void AddErrorMessage(const std::string& title, const std::string& err)
-	{ AddMessage(Severity::ERROR, title, err); }
-
 	///@brief Signal emitted when the set of parameters changes
 	sigc::signal<void()> m_parametersChangedSignal;
 
 	///@brief Signal emitted when the set of inputs changes
 	sigc::signal<void()> m_inputsChangedSignal;
-
-	//@brief All the messages the Node accumulates
-	std::vector<LogMessage> m_messages;
 };
 
 #endif

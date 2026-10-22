@@ -89,6 +89,7 @@ set(SCOPEHAL_SOURCES
 	TouchstoneParser.cpp
 
 	FlowGraphNode.cpp
+	LogMessageProvider.cpp
 	InputConstraint.cpp
 	SinkNode.cpp
 	Trigger.cpp

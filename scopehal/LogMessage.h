@@ -37,7 +37,7 @@
 #define LogMessage_h
 
 /**
-	@brief A Message to the user from a filter or driver
+	@brief A message to the user from a filter or driver
 	@ingroup core
 
 	A basic message containing a severity and content
