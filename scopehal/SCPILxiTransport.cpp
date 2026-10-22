@@ -36,10 +36,14 @@
 
 #ifdef HAS_LXI
 
+#ifdef HAS_VISA
+#include <visa.h>
+#else
 extern "C"
 {
 #include <lxi.h>
 }
+#endif
 
 #include "scopehal.h"
 
@@ -52,11 +56,14 @@ bool SCPILxiTransport::m_lxi_initialized = false;
 
 SCPILxiTransport::SCPILxiTransport(const string& args)
 {
+	m_staging_buf = nullptr;
+#ifndef HAS_VISA
 	if (!m_lxi_initialized)
 	{
 		lxi_init();
 		m_lxi_initialized = true;
 	}
+#endif
 
 	char hostname[128];
 	unsigned int port = 0;
@@ -76,6 +83,14 @@ SCPILxiTransport::SCPILxiTransport(const string& args)
 
 	LogDebug("Connecting to SCPI device over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
 
+#ifdef HAS_VISA
+	m_resourceManager = VI_NULL; m_device = VI_NULL;
+	ViStatus status = viOpenDefaultRM(&m_resourceManager);
+	if(status < VI_SUCCESS) { LogError("Could not open VISA resource manager\n"); return; }
+	string resource = "TCPIP0::" + m_hostname + "::inst0::INSTR";
+	status = viOpen(m_resourceManager, (ViRsrc)resource.c_str(), VI_NULL, 5000, &m_device);
+	if(status < VI_SUCCESS) { LogError("Could not open VXI-11 device through VISA\n"); viClose(m_resourceManager); m_resourceManager = VI_NULL; return; }
+#else
 	string instname = "inst0";
 	m_device = lxi_connect(&m_hostname[0], m_port, &instname[0], m_timeout, VXI11);
 
@@ -84,6 +99,7 @@ SCPILxiTransport::SCPILxiTransport(const string& args)
 		LogError("Couldn't connect to VXI-11 device\n");
 		return;
 	}
+#endif
 
 	// When you issue a lxi_receive request, you need to specify the size of the receiving buffer.
 	// However, when the data received is larger than this buffer, liblxi simply discards this data.
@@ -104,12 +120,20 @@ SCPILxiTransport::SCPILxiTransport(const string& args)
 
 SCPILxiTransport::~SCPILxiTransport()
 {
+#ifdef HAS_VISA
+	if (m_device != VI_NULL) viClose(m_device);
+	if (m_resourceManager != VI_NULL) viClose(m_resourceManager);
+#endif
 	delete[] m_staging_buf;
 }
 
 bool SCPILxiTransport::IsConnected()
 {
+#ifdef HAS_VISA
+	return (m_device != VI_NULL);
+#else
 	return (m_device != LXI_ERROR);
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,15 +155,24 @@ bool SCPILxiTransport::SendCommand(const string& cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 
+#ifdef HAS_VISA
+	ViUInt32 written = 0;
+	ViStatus status = viWrite(m_device, (ViBuf)cmd.data(), (ViUInt32)cmd.length(), &written);
+#else
 	//Need the cast when using liblxi versions prior to 63ea109 because they don't have "const" on the argument.
 	//It doesn't actually change the inputs, so safe to cast.
 	int result = lxi_send(m_device, const_cast<char*>(&cmd[0]), cmd.length(), m_timeout);
 
+#endif
 	m_data_in_staging_buf = 0;
 	m_data_offset = 0;
 	m_data_depleted = false;
 
+#ifdef HAS_VISA
+	return (status >= VI_SUCCESS) && (written == cmd.length());
+#else
 	return (result != LXI_ERROR);
+#endif
 }
 
 string SCPILxiTransport::ReadReply(bool endOnSemicolon, [[maybe_unused]] function<void(float)> progress)
@@ -169,9 +202,14 @@ void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	// XXX: Should this reset m_data_depleted just like SendCommmand?
 
+#ifdef HAS_VISA
+	ViUInt32 written = 0;
+	viWrite(m_device, (ViBuf)buf, (ViUInt32)len, &written);
+#else
 	//Need the cast when using liblxi versions prior to 63ea109 because they don't have "const" on the argument.
 	//It doesn't actually change the inputs, so safe to cast.
 	lxi_send(m_device, const_cast<char*>(reinterpret_cast<const char*>(buf)), len, m_timeout);
+#endif
 }
 
 size_t SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf, std::function<void(float)> /*progress*/)
@@ -188,9 +226,15 @@ size_t SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf, std::functi
 	{
 		if (m_data_in_staging_buf == 0)
 		{
+#ifdef HAS_VISA
+	ViUInt32 received = 0;
+	ViStatus status = viRead(m_device, (ViBuf)m_staging_buf, (ViUInt32)m_staging_buf_size, &received);
+	m_data_in_staging_buf = (status >= VI_SUCCESS) ? received : 0;
+#else
 			m_data_in_staging_buf = lxi_receive(m_device, (char *)m_staging_buf, m_staging_buf_size, m_timeout);
 			if (m_data_in_staging_buf == LXI_ERROR)
 				m_data_in_staging_buf = 0;
+#endif
 			m_data_offset = 0;
 		}
 
