@@ -640,8 +640,11 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 		//Ask the server what the last waveform it captured was
 		m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
-		LogTrace("Trigger stopped after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
-			(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+		if(m_lastSeq != 0)
+		{
+			LogTrace("Trigger stopped after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
+				(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+		}
 	}
 
 	return true;
@@ -758,10 +761,25 @@ void ThunderScopeOscilloscope::StartAutoTrigger()
 
 void ThunderScopeOscilloscope::ForceTrigger()
 {
-	//Ask the server what the last waveform it captured was
-	m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
-	LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
-		(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+	if(!m_triggerArmed)
+	{
+		//Ask the server what the last waveform it captured was
+		m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
+		if( (m_dropUntilSeq > m_lastSeq) && (m_lastSeq != 0) )
+		{
+			LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
+				(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+
+			//Actually drop them here
+			while(m_dropUntilSeq > m_lastSeq)
+				DoAcquireData(false);
+		}
+		else
+		{
+			LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. No action needed.\n",
+				(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq);
+		}
+	}
 
 	//If the trigger is currently armed, don't change the current trigger mode and just force it
 	if(m_triggerArmed)
