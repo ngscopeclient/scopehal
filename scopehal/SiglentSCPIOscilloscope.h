@@ -53,8 +53,8 @@ class WindowTrigger;
 
 // These SDS2000/SDS5000 scopes will actually sample 200MPoints, but the maximum it can transfer in one
 // chunk is 10MPoints
-// TODO(dannas): Can the Siglent SDS1104x-e really transfer 14MPoints? Update comment and constant
-#define WAVEFORM_SIZE (14 * 1000 * 1000)
+// Up to 17.5MPoints can be transferred in one chunk from SDS1x00X-E series scopes
+#define WAVEFORM_SIZE (17500 * 1000)
 
 #define c_digiChannelsPerBus 8
 
@@ -73,6 +73,13 @@ private:
 	std::string converse(const char* fmt, ...);
 	void sendOnly(const char* fmt, ...);
 	void flush();
+
+	//SDS1000X-E: settings must not overlap, see FlushSettingsQueue()
+	void FlushSettingsQueue();
+	std::mutex m_settingsQueueMutex;
+	std::list<std::string> m_settingsQueue;
+	bool m_settingPending;		//a setting was sent and its completion was not confirmed by *OPC? yet
+
 	void flushWaveformData();
 	void protocolError(std::string message = "");
 
@@ -366,6 +373,7 @@ protected:
 	unsigned int m_maxBandwidth;
 
 	bool m_triggerForced;
+	bool m_forceInrCleared;
 
 	// Pagination state
 	bool m_paginated;
