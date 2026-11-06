@@ -272,7 +272,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 					}
 					else
 					{
-						char tmp[64];
 						switch(ethertype)
 						{
 							//IPv4
