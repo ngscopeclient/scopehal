@@ -77,7 +77,12 @@ protected:
 	std::string m_hostname;
 	unsigned short m_port;
 
+#ifdef HAS_VISA
+	unsigned long m_resourceManager;
+	unsigned long m_device;
+#else
 	int m_device;
+#endif
 	int m_timeout;
 
 	int m_staging_buf_size;

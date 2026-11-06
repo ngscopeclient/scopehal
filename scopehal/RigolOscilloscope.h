@@ -163,6 +163,7 @@ public:
 		}},
 		{"Rigol DHO1000", {
 			{ SCPITransportType::TRANSPORT_LAN, "<ip_address>:5555" },
+			{ SCPITransportType::TRANSPORT_LXI, "<ip_address>" },
 			{ SCPITransportType::TRANSPORT_USBTMC, "/dev/usbtmc<x>" },
 		}},
 		{"Rigol DHO4000", {
