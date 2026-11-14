@@ -163,6 +163,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] s
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_timescale = din->m_timescale / upsample_factor;
 	cap->Rename("UpsampleFilter.data");
+	cap->m_triggerPhase = din->m_triggerPhase + ( (window * din->m_timescale) / 2 );
 	size_t len = din->size();
 	size_t imax = len - window;
 	size_t outlen = imax*upsample_factor;
