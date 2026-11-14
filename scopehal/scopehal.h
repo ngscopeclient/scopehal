@@ -56,6 +56,7 @@
 #include <set>
 #include <float.h>
 #include <shared_mutex>
+#include <random>
 
 #include <sigc++/sigc++.h>
 
@@ -314,6 +315,8 @@ uint32_t CRC32(const std::vector<uint8_t>& bytes);
 extern const uint32_t g_crc32Table[256];
 
 uint32_t ColorFromString(const std::string& str, unsigned int alpha = 255);
+
+void FillRandomWaveform(UniformAnalogWaveform* wfm, std::minstd_rand& rng, size_t size, float fmin=-1, float fmax=1);
 
 const char* ScopehalGetVersion();
 

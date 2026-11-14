@@ -119,6 +119,9 @@
 #include "RSRTB2kVideoTrigger.h"
 #include "RSRTB2kWidthTrigger.h"
 
+#include <ShaderLang.h>
+#include <glslang/Public/ResourceLimits.h>
+
 #ifndef _WIN32
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -286,6 +289,8 @@ void DetectCPUFeatures()
 
 void ScopehalStaticCleanup()
 {
+	ShFinalize();
+	glslang::FinalizeProcess();
 	ScratchBufferManager::clear();
 	VulkanCleanup();
 }
@@ -298,6 +303,12 @@ void DriverStaticInit()
 	InitializeSearchPaths();
 	DetectCPUFeatures();
 	Unit::InitializeLocales();
+
+	glslang::InitializeProcess();
+	ShInitialize();
+	*GetResources() = *GetDefaultResources();
+	LogDebug("ESSL version string: %s\n", glslang::GetEsslVersionString());
+	LogDebug("GLSL version string: %s\n", glslang::GetGlslVersionString());
 
 	AddBERTDriverClass(AntikernelLabsTriggerCrossbar);
 	AddBERTDriverClass(MultiLaneBERT);
@@ -1156,4 +1167,24 @@ bool OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type, size_t
 	}
 
 	return moreFreed;
+}
+
+/**
+	@brief Fills a waveform with random content, uniformly distributed from fmin to fmax (mostly used for testing)
+ */
+void FillRandomWaveform(UniformAnalogWaveform* wfm, minstd_rand& rng, size_t size, float fmin, float fmax)
+{
+	auto rdist = uniform_real_distribution<float>(fmin, fmax);
+
+	wfm->PrepareForCpuAccess();
+	wfm->Resize(size);
+
+	for(size_t i=0; i<size; i++)
+		wfm->m_samples[i] = rdist(rng);
+
+	wfm->MarkModifiedFromCpu();
+
+	wfm->m_revision ++;
+	if(wfm->m_timescale == 0)
+		wfm->m_timescale = 1000;
 }

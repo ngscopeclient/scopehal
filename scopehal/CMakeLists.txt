@@ -271,6 +271,7 @@ target_link_libraries(scopehal
 	Vulkan::Loader
 	Vulkan::Headers
 	glslang::glslang
+	glslang-default-resource-limits
 	glfw
 	${WIN_LIBS}
 	)
@@ -292,6 +293,7 @@ endif()
 target_include_directories(scopehal
 PRIVATE
 	${glslang_INCLUDE_DIR}/glslang/Include
+	${glslang_INCLUDE_DIR}/glslang/Public
 PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
