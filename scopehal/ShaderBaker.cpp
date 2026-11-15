@@ -42,6 +42,8 @@ using namespace std;
 // Construction / destruction
 
 ShaderBaker::ShaderBaker()
+	: m_templateTopLevel(ReadDataFile("shaderfusion/Template_TopLevel.glsl"))
+	, m_templateSSBO(ReadDataFile("shaderfusion/Template_SSBO.glsl"))
 {
 }
 
@@ -51,7 +53,12 @@ ShaderBaker::ShaderBaker()
 string ShaderBaker::Bake()
 {
 	//Generate the output shader
-	string ret;
+	string ret = m_templateTopLevel;
+
+	//For now, we assume that all shaders are n:1 and do not support multiple output streams from any shader being fused
+	//Adding support for multiple streams from a sink would be relatively straightforward.
+
+	/*
 	ret += "//Baked shader\n";
 	ret += "#version 460\n";
 	ret += "#pragma shader_stage(compute)\n";
@@ -83,6 +90,7 @@ string ShaderBaker::Bake()
 		ret += string("//END SHADER BLOCK ") + to_string(i) + "\n";
 		ret += "\n\n";
 	}
+	*/
 
 	return ret;
 }

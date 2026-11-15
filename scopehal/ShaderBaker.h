@@ -63,8 +63,16 @@ public:
 	void AddStage(std::shared_ptr<BakedShaderStage> stage)
 	{ m_stages.push_back(stage); }
 
+	void SetOutputStage(std::shared_ptr<BakedShaderStage> outStage)
+	{ m_outputStage = outStage; }
+
 protected:
 	std::vector< std::shared_ptr<BakedShaderStage> > m_stages;
+
+	std::shared_ptr<BakedShaderStage> m_outputStage;
+
+	std::string m_templateTopLevel;
+	std::string m_templateSSBO;
 };
 
 #endif
