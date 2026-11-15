@@ -291,9 +291,6 @@ if(LXI_FOUND)
 endif()
 
 target_include_directories(scopehal
-PRIVATE
-	${glslang_INCLUDE_DIR}/glslang/Include
-	${glslang_INCLUDE_DIR}/glslang/Public
 PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
@@ -302,6 +299,8 @@ PUBLIC
 target_include_directories(scopehal
 SYSTEM PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
+	${glslang_INCLUDE_DIR}/glslang/Include
+	${glslang_INCLUDE_DIR}/glslang/Public
 )
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
