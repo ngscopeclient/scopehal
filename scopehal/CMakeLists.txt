@@ -271,7 +271,7 @@ target_link_libraries(scopehal
 	Vulkan::Loader
 	Vulkan::Headers
 	glslang::glslang
-	glslang-default-resource-limits
+	glslang::glslang-default-resource-limits
 	glfw
 	${WIN_LIBS}
 	)
