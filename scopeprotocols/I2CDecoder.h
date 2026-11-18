@@ -76,11 +76,19 @@ public:
 	I2CWaveform () : SparseWaveform<I2CSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual std::string GetColor(size_t) override;
+
+	uint8_t m_addrFormat = 0;
 };
 
 class I2CDecoder : public PacketDecoder
 {
 public:
+	enum AddressJustification
+	{
+		RIGHT,
+		LEFT
+	};
+
 	I2CDecoder(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
@@ -92,6 +100,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(I2CDecoder)
 
 protected:
+	FilterParameter& m_addrFormat;
 	template<class T, class U> void InnerLoop(T* sda, U* scl, I2CWaveform* cap);
 };
 

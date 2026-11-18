@@ -49,7 +49,7 @@ I2CRegisterDecoder::I2CRegisterDecoder(const string& color)
 	m_addrbytes.SetIntVal(1);
 
 	m_baseaddr = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HEXNUM));
-	m_baseaddr.SetIntVal(0x90);
+	m_baseaddr.SetIntVal(0x48);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,6 +99,15 @@ void I2CRegisterDecoder::Refresh(
 	}
 
 	din->PrepareForCpuAccess();
+
+	//The bus address is entered in the same format displayed by the upstream I2C decoder:
+	//either right (no R/W bit) or left justified (with the R/W bit in bit 0).
+	//The raw bus byte from the I2C decoder is left justified, so extract the address bits
+	//from it and compare against the address exactly as entered.
+	auto GetAddressBits = [&] (uint8_t data)
+	{
+		return (I2CDecoder::LEFT == din->m_addrFormat) ? (data & 0xfe) : (data >> 1);
+	};
 
 	//Pull out our settings
 	uint8_t base_addr = m_baseaddr.GetIntVal();
@@ -153,7 +162,7 @@ void I2CRegisterDecoder::Refresh(
 				if(s.m_stype == I2CSymbol::TYPE_ADDRESS)
 				{
 					//If address bits don't match, discard it
-					if( (s.m_data & 0xfe) != base_addr)
+					if( GetAddressBits(s.m_data) != base_addr)
 					{
 						state = 0;
 						continue;
