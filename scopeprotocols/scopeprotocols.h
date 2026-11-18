@@ -68,6 +68,7 @@
 #include "CSVImportFilter.h"
 #include "CTLEFilter.h"
 #include "CurrentShuntFilter.h"
+#include "DAC8552Decoder.h"
 #include "DCDMeasurement.h"
 #include "DDJMeasurement.h"
 #include "DDR1Decoder.h"
