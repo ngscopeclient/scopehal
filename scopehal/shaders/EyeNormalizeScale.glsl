@@ -31,7 +31,6 @@
 #pragma shader_stage(compute)
 
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_shader_atomic_int64 : require
 
 layout(std430, binding=0) restrict buffer buf_accumData
 {

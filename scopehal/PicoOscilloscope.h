@@ -201,6 +201,12 @@ protected:
 
 	void PushPendingWaveformsIfReady();
 
+	void FlushAllPendingWaveforms()
+	{
+		while(!m_wipWaveforms.empty())
+			PushPendingWaveformsIfReady();
+	}
+
 	//Helpers for determining legal configurations
 	bool Is10BitModeAvailable();
 	bool Is12BitModeAvailable();
@@ -255,6 +261,12 @@ protected:
 	std::map<int, bool> m_digitalBankPresent;
 	std::map<int, float> m_digitalThresholds;
 	std::map<int, float> m_digitalHysteresis;
+
+	///@brief Saved memory depths
+	std::vector<uint64_t> m_memoryDepthsCached;
+
+	///@brief Saved sample rates
+	std::vector<uint64_t> m_sampleRatesCached;
 
 	//Function generator state
 	bool m_awgEnabled;

@@ -33,16 +33,28 @@
 
 using namespace std;
 
-static const char g_hex[] = "0123456789abcdef";
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
+	, m_crcTable("EthernetProtocolDecoder::m_crcTable")
 {
 	//Set up channels
 	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
+
+	m_headers.push_back("Dest MAC");
+	m_headers.push_back("Src MAC");
+	m_headers.push_back("VLAN");
+	m_headers.push_back("Ethertype");
+
+	m_crcTable.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+	m_crcTable.resize(256);
+
+	m_crcTable.PrepareForCpuAccess();
+	for(size_t i=0; i<256; i++)
+		m_crcTable[i] = g_crc32Table[i];
+	m_crcTable.MarkModifiedFromCpu();
 }
 
 EthernetProtocolDecoder::~EthernetProtocolDecoder()
@@ -54,12 +66,7 @@ EthernetProtocolDecoder::~EthernetProtocolDecoder()
 
 vector<string> EthernetProtocolDecoder::GetHeaders()
 {
-	vector<string> ret;
-	ret.push_back("Dest MAC");
-	ret.push_back("Src MAC");
-	ret.push_back("VLAN");
-	ret.push_back("Ethertype");
-	return ret;
+	return m_headers;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,18 +78,20 @@ void EthernetProtocolDecoder::BytesToFrames(
 		uint64_t* ends,
 		size_t len,
 		EthernetWaveform* cap,
-		bool suppressedPreambleAndFCS)
+		bool suppressedPreambleAndFCS,
+		optional<uint32_t> offloadCRC)
 {
 	//If the timescale is 1 (usually the case)
 	//jump to optimized special case implementation that doesn't have to idiv all the time
 	if(cap->m_timescale == 1)
 	{
-		BytesToFramesUnitTimescale(bytes, starts, ends, len, cap, suppressedPreambleAndFCS);
+		BytesToFramesUnitTimescale(bytes, starts, ends, len, cap, suppressedPreambleAndFCS, offloadCRC);
 		return;
 	}
 
 	Packet* pack = new Packet;
 	pack->m_data.reserve(1500);
+	pack->m_headerdata.resize(16);
 
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
@@ -96,6 +105,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 	if(suppressedPreambleAndFCS)
 		segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
 
+	size_t headerstart = 0;
 	for(size_t i=0; i<len; i++)
 	{
 		switch(segment.m_type)
@@ -163,6 +173,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of MAC? Record start time
 				if(nbytes == 0)
 				{
+					headerstart = i;
+
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
@@ -176,17 +188,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale );
 					cap->m_samples.push_back(segment);
-
-					//Format the content for display
-					char tmp[64];
-					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
-						static_cast<uint32_t>((segment.m_data >> 40) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 32) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 24) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 16) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 8) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 0) & 0xff));
-					pack->m_headers["Dest MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
@@ -214,17 +215,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
-
-					//Format the content for display
-					char tmp[64];
-					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
-						static_cast<uint32_t>((segment.m_data >> 40) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 32) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 24) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 16) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 8) & 0xff),
-						static_cast<uint32_t>((segment.m_data >> 0) & 0xff));
-					pack->m_headers["Src MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
@@ -266,16 +256,15 @@ void EthernetProtocolDecoder::BytesToFrames(
 					if(ethertype < 1500)
 					{
 						//Default to unknown LLC
-						pack->m_headers["Ethertype"] = "LLC";
 						pack->m_displayBackgroundColor = "#33a02c";
 						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
 						if( (i+1) < len )
 						{
+							//STP
 							if(bytes[i+1] == 0x42)
 							{
-								pack->m_headers["Ethertype"] = "STP";
 								pack->m_displayBackgroundColor = "#fdbf6f";
 								pack->m_displayForegroundColor = "#000000";
 							}
@@ -283,43 +272,41 @@ void EthernetProtocolDecoder::BytesToFrames(
 					}
 					else
 					{
-						char tmp[64];
 						switch(ethertype)
 						{
+							//IPv4
 							case 0x0800:
-								pack->m_headers["Ethertype"] = "IPv4";
 								pack->m_displayBackgroundColor = "#a6cee3";
 								pack->m_displayForegroundColor = "#000000";
 								break;
 
+							//ARP
 							case 0x0806:
-								pack->m_headers["Ethertype"] = "ARP";
 								pack->m_displayBackgroundColor = "#ffff99";
 								pack->m_displayForegroundColor = "#000000";
 								break;
 
+							//802.1q
 							//TODO: decoder inner ethertype too?
 							case 0x8100:
-								pack->m_headers["Ethertype"] = "802.1q";
 								pack->m_displayBackgroundColor = "#b2df8a";
 								pack->m_displayForegroundColor = "#000000";
 								break;
 
+							//IPv6
 							case 0x86DD:
-								pack->m_headers["Ethertype"] = "IPv6";
 								pack->m_displayBackgroundColor = "#1f78b4";
 								pack->m_displayForegroundColor = "#ffffff";
 								break;
 
+							//LLDP
 							case 0x88cc:
-								pack->m_headers["Ethertype"] = "LLDP";
 								pack->m_displayBackgroundColor = "#5e4fa2";
 								pack->m_displayForegroundColor = "#ffffff";
 								break;
 
+							//Unknown
 							default:
-								snprintf(tmp, sizeof(tmp), "%04x", (uint32_t)segment.m_data);
-								pack->m_headers["Ethertype"] = tmp;
 								pack->m_displayBackgroundColor = "#fb9a99";
 								pack->m_displayForegroundColor = "#000000";
 								break;
@@ -361,14 +348,15 @@ void EthernetProtocolDecoder::BytesToFrames(
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
 					segment.m_data = 0;
 					nbytes = 0;
-
-					//Format the content for display
-					pack->m_headers["VLAN"] = to_string(segment.m_data & 0xfff);
 				}
 
 				break;
 
 			case EthernetFrameSegment::TYPE_PAYLOAD:
+
+				//If this is the first byte, add the headers
+				if(pack->m_data.size() == 0)
+					memcpy(&pack->m_headerdata[0], &bytes[headerstart], pack->m_headerdata.size());
 
 				//Add a data element
 				//For now, each byte is its own payload blob
@@ -446,15 +434,124 @@ void EthernetProtocolDecoder::BytesToFrames(
 	delete pack;
 }
 
+string EthernetProtocolDecoder::GetDecodedField(Packet* pack, size_t i)
+{
+	switch(i)
+	{
+		//Dest MAC address
+		case 0:
+			{
+				char tmp[] =
+				{
+					g_hex[ (pack->m_headerdata[0] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[0] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[1] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[1] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[2] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[2] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[3] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[3] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[4] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[4] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[5] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[5] >> 0) & 0xf],
+					'\0'
+				};
+				return tmp;
+			}
+
+		//Source MAC address
+		case 1:
+			{
+				char tmp[] =
+				{
+					g_hex[ (pack->m_headerdata[6] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[6] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[7] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[7] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[8] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[8] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[9] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[9] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[10] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[10] >> 0) & 0xf],
+					':',
+					g_hex[ (pack->m_headerdata[11] >> 4) & 0xf],
+					g_hex[ (pack->m_headerdata[11] >> 0) & 0xf],
+					'\0'
+				};
+				return tmp;
+			}
+
+		//VLAN tag (if any)
+		case 2:
+			{
+				uint16_t ethertype = (pack->m_headerdata[12] << 8) | pack->m_headerdata[13];
+				if(ethertype == 0x8100)
+				{
+					uint16_t tag = (pack->m_headerdata[13] << 8) | pack->m_headerdata[14];
+					return to_string(tag & 0xfff);
+				}
+				else
+					return "";
+			}
+
+		//Ethertype
+		case 3:
+			{
+				//Get outer ethertype
+				uint16_t ethertype = (pack->m_headerdata[12] << 8) | pack->m_headerdata[13];
+
+				//If vlan tag return the inner type
+				if(ethertype == 0x8100)
+					ethertype = (pack->m_headerdata[15] << 8) | pack->m_headerdata[16];
+
+				if(ethertype < 1500)
+				{
+					//Look up the LLC LSAP address to see what it is
+					if( (pack->m_data.size() > 0) && (pack->m_data[0] == 0x42) )
+						return "STP";
+					else
+						return "LLC";
+				}
+
+				switch(ethertype)
+				{
+					case 0x0800:	return "IPv4";
+					case 0x0806:	return "ARP";
+					case 0x8100:	return "802.1q";	//TODO inner ethertype
+					case 0x86DD:	return "IPv6";
+					case 0x88cc:	return "LLDP";
+
+					default:		return to_string_hex(ethertype, true, 4);
+				}
+			}
+
+		default:
+			return "";
+	}
+}
+
 void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 		uint8_t* bytes,
 		uint64_t* starts,
 		uint64_t* ends,
 		size_t len,
 		EthernetWaveform* cap,
-		bool suppressedPreambleAndFCS)
+		bool suppressedPreambleAndFCS,
+		optional<uint32_t> offloadCRC)
 {
 	Packet* pack = new Packet;
+	pack->m_headerdata.resize(16);
 
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
@@ -469,6 +566,7 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 	if(suppressedPreambleAndFCS)
 		segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
 
+	size_t headerstart = 0;
 	for(size_t i=0; i<len; i++)
 	{
 		switch(segment.m_type)
@@ -536,6 +634,8 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Start of MAC? Record start time
 				if(nbytes == 0)
 				{
+					headerstart = i;
+
 					start = starts[i];
 					cap->m_offsets.push_back(start);
 				}
@@ -549,30 +649,6 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				{
 					cap->m_durations.push_back(ends[i] - start);
 					cap->m_samples.push_back(segment);
-
-					//Format the content for display
-					char tmp[] =
-					{
-						g_hex[ (segment.m_data >> 44) & 0xf],
-						g_hex[ (segment.m_data >> 40) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 36) & 0xf],
-						g_hex[ (segment.m_data >> 32) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 28) & 0xf],
-						g_hex[ (segment.m_data >> 24) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 20) & 0xf],
-						g_hex[ (segment.m_data >> 16) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 12) & 0xf],
-						g_hex[ (segment.m_data >> 8) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 4) & 0xf],
-						g_hex[ (segment.m_data >> 0) & 0xf],
-						'\0'
-					};
-					pack->m_headers["Dest MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
@@ -600,30 +676,6 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				{
 					cap->m_durations.push_back(ends[i] - start);
 					cap->m_samples.push_back(segment);
-
-					//Format the content for display
-					char tmp[] =
-					{
-						g_hex[ (segment.m_data >> 44) & 0xf],
-						g_hex[ (segment.m_data >> 40) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 36) & 0xf],
-						g_hex[ (segment.m_data >> 32) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 28) & 0xf],
-						g_hex[ (segment.m_data >> 24) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 20) & 0xf],
-						g_hex[ (segment.m_data >> 16) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 12) & 0xf],
-						g_hex[ (segment.m_data >> 8) & 0xf],
-						':',
-						g_hex[ (segment.m_data >> 4) & 0xf],
-						g_hex[ (segment.m_data >> 0) & 0xf],
-						'\0'
-					};
-					pack->m_headers["Src MAC"] = tmp;
 
 					//Reset for next block of the frame
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
@@ -665,16 +717,15 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					if(ethertype < 1500)
 					{
 						//Default to unknown LLC
-						pack->m_headers["Ethertype"] = "LLC";
 						pack->m_displayBackgroundColor = "#33a02c";
 						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
 						if( (i+1) < len )
 						{
+							//STP
 							if(bytes[i+1] == 0x42)
 							{
-								pack->m_headers["Ethertype"] = "STP";
 								pack->m_displayBackgroundColor = "#fdbf6f";
 								pack->m_displayForegroundColor = "#000000";
 							}
@@ -684,39 +735,39 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					{
 						switch(ethertype)
 						{
+							//IPv4
 							case 0x0800:
-								pack->m_headers["Ethertype"] = "IPv4";
 								pack->m_displayBackgroundColor = "#a6cee3";
 								pack->m_displayForegroundColor = "#000000";
 								break;
 
+							//ARP
 							case 0x0806:
-								pack->m_headers["Ethertype"] = "ARP";
 								pack->m_displayBackgroundColor = "#ffff99";
 								pack->m_displayForegroundColor = "#000000";
 								break;
 
+							//802.1q
 							//TODO: decoder inner ethertype too?
 							case 0x8100:
-								pack->m_headers["Ethertype"] = "802.1q";
 								pack->m_displayBackgroundColor = "#b2df8a";
 								pack->m_displayForegroundColor = "#000000";
 								break;
 
+							//IPv6
 							case 0x86DD:
-								pack->m_headers["Ethertype"] = "IPv6";
 								pack->m_displayBackgroundColor = "#1f78b4";
 								pack->m_displayForegroundColor = "#ffffff";
 								break;
 
+							//LLDP
 							case 0x88cc:
-								pack->m_headers["Ethertype"] = "LLDP";
 								pack->m_displayBackgroundColor = "#5e4fa2";
 								pack->m_displayForegroundColor = "#ffffff";
 								break;
 
+							//Unknown
 							default:
-								pack->m_headers["Ethertype"] = to_string_hex(segment.m_data);
 								pack->m_displayBackgroundColor = "#fb9a99";
 								pack->m_displayForegroundColor = "#000000";
 								break;
@@ -785,14 +836,15 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
 					segment.m_data = 0;
 					nbytes = 0;
-
-					//Format the content for display
-					pack->m_headers["VLAN"] = to_string(segment.m_data & 0xfff);
 				}
 
 				break;
 
 			case EthernetFrameSegment::TYPE_PAYLOAD:
+
+				//If this is the first byte, add the headers
+				if(nbytes == 0)
+					memcpy(&pack->m_headerdata[0], &bytes[headerstart], pack->m_headerdata.size());
 
 				//Add a data element
 				//For now, each byte is its own payload blob
@@ -825,7 +877,11 @@ void EthernetProtocolDecoder::BytesToFramesUnitTimescale(
 				//Start of FCS? Record start time
 				if(nbytes == 0)
 				{
-					crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
+					//if GPU offload CRC was provided don't do a software CRC here
+					if(offloadCRC.has_value())
+						crc_expected = offloadCRC.value();
+					else
+						crc_expected = __builtin_bswap32(crc32(0, &bytes[crcstart], i - crcstart));
 
 					start = starts[i];
 					cap->m_offsets.push_back(start);

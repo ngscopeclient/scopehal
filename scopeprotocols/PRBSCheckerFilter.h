@@ -60,6 +60,9 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(PRBSCheckerFilter)
 
+	FilterParameter& GetPolynomial()
+	{ return m_poly; }
+
 protected:
 	FilterParameter& m_poly;
 

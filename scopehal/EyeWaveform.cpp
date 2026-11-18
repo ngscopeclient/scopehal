@@ -136,19 +136,27 @@ void EyeWaveform::Normalize(
 	cfg.satLevel = m_saturationLevel;
 
 	//First pass: find maximum and copy right half to left half
-	normalizeReducePipe->BindBufferNonblocking(0, m_accumdata, cmdBuf);
-	normalizeReducePipe->BindBufferNonblocking(1, nmaxBuf, cmdBuf);
-	normalizeReducePipe->Dispatch(cmdBuf, cfg, GetComputeBlockCount(m_height, threadsPerBlock));
-	normalizeReducePipe->AddComputeMemoryBarrier(cmdBuf);
+	{
+		NamedDebugRange shaderRange(cmdBuf, "Normalize reduce");
+
+		normalizeReducePipe->BindBufferNonblocking(0, m_accumdata, cmdBuf);
+		normalizeReducePipe->BindBufferNonblocking(1, nmaxBuf, cmdBuf);
+		normalizeReducePipe->Dispatch(cmdBuf, cfg, GetComputeBlockCount(m_height, threadsPerBlock));
+		normalizeReducePipe->AddComputeMemoryBarrier(cmdBuf);
+	}
 
 	nmaxBuf.MarkModifiedFromGpu();
 	m_accumdata.MarkModifiedFromGpu();
 
 	//Second pass: actually normalize
-	normalizeScalePipe->BindBufferNonblocking(0, m_accumdata, cmdBuf);
-	normalizeScalePipe->BindBufferNonblocking(1, nmaxBuf, cmdBuf);
-	normalizeScalePipe->BindBufferNonblocking(2, m_outdata, cmdBuf);
-	normalizeScalePipe->Dispatch(cmdBuf, cfg, GetComputeBlockCount(m_height, threadsPerBlock));
+	{
+		NamedDebugRange shaderRange(cmdBuf, "Normalize scale");
+
+		normalizeScalePipe->BindBufferNonblocking(0, m_accumdata, cmdBuf);
+		normalizeScalePipe->BindBufferNonblocking(1, nmaxBuf, cmdBuf);
+		normalizeScalePipe->BindBufferNonblocking(2, m_outdata, cmdBuf);
+		normalizeScalePipe->Dispatch(cmdBuf, cfg, GetComputeBlockCount(m_height, threadsPerBlock));
+	}
 
 	m_outdata.MarkModifiedFromGpu();
 

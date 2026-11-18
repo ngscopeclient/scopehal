@@ -67,6 +67,8 @@ UpsampleFilter::UpsampleFilter(const string& color)
 	, m_factor(m_parameters["Upsample factor"])
 	, m_filter("UpsampleFilter.m_filter")
 	, m_computePipeline("shaders/UpsampleFilter.spv", 3, sizeof(UpsampleFilterArgs))
+	, m_lastKernel(0)
+	, m_lastUpsampleFactor(0)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_ANALOG);
@@ -74,7 +76,7 @@ UpsampleFilter::UpsampleFilter(const string& color)
 	m_factor = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_factor.SetIntVal(10);
 
-	//Use pinned memory for filter kernel
+	//Use mirrored memory for filter kernel
 	m_filter.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_filter.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
@@ -131,24 +133,37 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] s
 		SetData(nullptr, 0);
 		return;
 	}
+	if(kernel > 128)
+	{
+		AddErrorMessage("Invalid configuration", "Calculated filter kernel size is too large, try upsampling by a smaller amount");
+		SetData(nullptr, 0);
+		return;
+	}
 
 	//Create the interpolation filter
-	//TODO: if upsampling factor and window size have not changed, keep the same filter coefficients
+	//If upsampling factor and window size have not changed, keep the same filter coefficients
 	//(no need to push every time)
-	float frac_kernel = kernel * 1.0f / upsample_factor;
-	m_filter.resize(kernel);
-	m_filter.PrepareForCpuAccess();
-	for(size_t i=0; i<kernel; i++)
+	if( (kernel != m_lastKernel) || (upsample_factor != m_lastUpsampleFactor) )
 	{
-		float frac = i*1.0f / upsample_factor;
-		m_filter[i] = sinc(frac, frac_kernel) * blackman(frac, frac_kernel);
+		m_lastKernel = kernel;
+		m_lastUpsampleFactor = upsample_factor;
+
+		float frac_kernel = kernel * 1.0f / upsample_factor;
+		m_filter.resize(kernel);
+		m_filter.PrepareForCpuAccess();
+		for(size_t i=0; i<kernel; i++)
+		{
+			float frac = i*1.0f / upsample_factor;
+			m_filter[i] = sinc(frac, frac_kernel) * blackman(frac, frac_kernel);
+		}
+		m_filter.MarkModifiedFromCpu();
 	}
-	m_filter.MarkModifiedFromCpu();
 
 	//Create the output and configure it
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_timescale = din->m_timescale / upsample_factor;
 	cap->Rename("UpsampleFilter.data");
+	cap->m_triggerPhase = din->m_triggerPhase + ( (window * din->m_timescale) / 2 );
 	size_t len = din->size();
 	size_t imax = len - window;
 	size_t outlen = imax*upsample_factor;
@@ -169,7 +184,6 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, [[maybe_unused]] s
 
 		const uint32_t compute_block_count = GetComputeBlockCount(len, 64);
 		m_computePipeline.Dispatch(cmdBuf, args,
-			upsample_factor,
 			min(compute_block_count, 32768u),
 			compute_block_count / 32768 + 1);
 	}

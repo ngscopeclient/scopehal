@@ -164,8 +164,9 @@ void Ethernet100BaseTXDecoder::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_p
 		//Make transfer helpers if this is the first time
 		if(!m_cmdPool)
 		{
-			m_transferQueue = g_vkQueueManager->GetQueueWithFlags(
-				vk::QueueFlagBits::eTransfer, "Ethernet100BaseTXDecoder.queue");
+			m_transferQueue = g_vkQueueManager->GetQueueFromPool(
+				QueueManager::QUEUE_POOL_TRANSFER,
+				"Ethernet100BaseTXDecoder.queue");
 
 			vk::CommandPoolCreateInfo poolInfo(
 				vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,

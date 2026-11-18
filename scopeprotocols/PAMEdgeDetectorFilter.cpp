@@ -216,7 +216,6 @@ void PAMEdgeDetectorFilter::Refresh(
 			cfg.len = len;
 			cfg.order = order;
 			cfg.inputPerThread = GetComputeBlockCount(len, numThreads);
-			cfg.outputPerThread = cfg.inputPerThread;
 
 			//Run the first pass
 			{

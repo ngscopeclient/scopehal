@@ -42,34 +42,13 @@ class StreamDescriptor;
 class InputDescriptor;
 class InputConstraint;
 
+#include "LogMessage.h"
+#include "LogMessageProvider.h"
 #include "FilterParameter.h"
 #include "Waveform.h"
 #include "Stream.h"
 #include "SerializableObject.h"
 #include "log.h"
-
-
-/**
-	@brief A Message to the user from a node in the signal flow graph
-	@ingroup core
-
-	A basic message containing a severity and content
-**/
-class FlowGraphNodeMessage
-{
-public:
-	FlowGraphNodeMessage(Severity severity, const std::string& title, const std::string& msg)
-	: m_severity(severity), m_title(title), m_message(msg) {}
-	Severity GetSeverity() const { return m_severity; }
-	const std::string& GetTitle() const {return m_title; }
-	const std::string& GetMessage() const {return m_message; }
-private:
-	Severity m_severity;
-	///@brief Short name to be shown in tooltips etc.
-	std::string m_title;
-	///@brief Elaborate explanation of the message
-	std::string m_message;
-};
 
 /**
 	@brief Abstract base class for a node in the signal flow graph.
@@ -77,7 +56,9 @@ private:
 
 	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters.
  */
-class FlowGraphNode : public SerializableObject
+class FlowGraphNode
+	: public SerializableObject
+	, public LogMessageProvider
 {
 public:
 	FlowGraphNode();
@@ -161,7 +142,10 @@ public:
 		CommandBufferTailCall	= 2,
 
 		//Node has essentially zero CPU-side compute, refresh just enqueues stuff
-		VulkanOnly				= 4
+		VulkanOnly				= 4,
+
+		//Node supports dynamic shader generation
+		DynamicShader			= 8
 	};
 
 	///@brief Returns a bitmask of ExecutionCapabilities fields
@@ -172,20 +156,6 @@ public:
 	// Filter evaluation
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) =0;
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Error detection and reporting
-public:
-
-	///@brief Checks if this graph has any messages
-	bool HasMessages() const
-	{ return not m_messages.empty(); }
-
-	///@brief Walking through any messages
-	const std::vector<FlowGraphNodeMessage>& GetMessages() const
-	{ return m_messages; }
-
-	const FlowGraphNodeMessage* GetMostSevereMessage() const;
 
 	//Input handling helpers
 protected:
@@ -263,38 +233,11 @@ public:
 
 protected:
 
-	///@brief Remove any messages left over from the last graph refresh
-	void ClearMessages()
-	{ m_messages.clear(); }
-
-	///@brief Attach a new message to the node
-	void AddMessage(const FlowGraphNodeMessage& msg)
-	{ m_messages.push_back(msg); }
-
-	///@brief Attach a new message to the node
-	void AddMessage(Severity severity, const std::string& title, const std::string& message)
-	{ AddMessage(FlowGraphNodeMessage(severity, title, message)); }
-
-	///@brief Add a new error message
-	void AddErrorMessage(const std::string& err)
-	{ AddErrorMessage("Unknown", std::string("• ") + err); }
-
-	/**
-		@brief Add a new error message with a title
-
-		The title replaces any previous title, if set
-	 */
-	void AddErrorMessage(const std::string& title, const std::string& err)
-	{ AddMessage(Severity::ERROR, title, err); }
-
 	///@brief Signal emitted when the set of parameters changes
 	sigc::signal<void()> m_parametersChangedSignal;
 
 	///@brief Signal emitted when the set of inputs changes
 	sigc::signal<void()> m_inputsChangedSignal;
-
-	//@brief All the messages the Node accumulates
-	std::vector<FlowGraphNodeMessage> m_messages;
 };
 
 #endif

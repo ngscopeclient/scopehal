@@ -51,6 +51,9 @@ public:
 	//Arbitrary header properties (human readable)
 	std::map<std::string, std::string> m_headers;
 
+	//Raw header bytes
+	std::vector<uint8_t> m_headerdata;
+
 	//Packet bytes
 	std::vector<uint8_t> m_data;
 
@@ -97,6 +100,10 @@ public:
 
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+
+	///@brief Transition helper until we deprecate the old header API to get the decoded text of the Nth header
+	virtual std::string GetDecodedField(Packet* pack, size_t i)
+	{ return pack->m_headers[GetHeaders()[i]]; }
 
 	/**
 		@brief Standard colors for protocol analyzer lines.

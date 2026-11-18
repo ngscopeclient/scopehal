@@ -56,6 +56,7 @@
 #include <set>
 #include <float.h>
 #include <shared_mutex>
+#include <random>
 
 #include <sigc++/sigc++.h>
 
@@ -227,6 +228,7 @@ void GetTimestampOfFile(const std::string& path, time_t& timestamp, int64_t& fs)
 
 std::string to_string_sci(double d);
 std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
+extern const char g_hex[17];
 
 void TransportStaticInit();
 void DriverStaticInit();
@@ -310,8 +312,11 @@ void CreateDirectory(const std::string& path);
 //Checksum helpers
 uint32_t CRC32(const uint8_t* bytes, size_t start, size_t end);
 uint32_t CRC32(const std::vector<uint8_t>& bytes);
+extern const uint32_t g_crc32Table[256];
 
 uint32_t ColorFromString(const std::string& str, unsigned int alpha = 255);
+
+void FillRandomWaveform(UniformAnalogWaveform* wfm, std::minstd_rand& rng, size_t size, float fmin=-1, float fmax=1);
 
 const char* ScopehalGetVersion();
 

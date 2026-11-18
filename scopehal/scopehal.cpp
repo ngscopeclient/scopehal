@@ -119,6 +119,9 @@
 #include "RSRTB2kVideoTrigger.h"
 #include "RSRTB2kWidthTrigger.h"
 
+#include <ShaderLang.h>
+#include <glslang/Public/ResourceLimits.h>
+
 #ifndef _WIN32
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -145,7 +148,7 @@ bool g_hasFMA = false;
 #include <mach-o/dyld.h>
 #endif
 
-static const uint32_t g_crc32Table[] =
+const uint32_t g_crc32Table[256] =
 {
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
 	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988, 0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91,
@@ -180,6 +183,8 @@ static const uint32_t g_crc32Table[] =
 	0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6,	0xbad03605, 0xcdd70693, 0x54de5729, 0x23d967bf,
 	0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
+
+const char g_hex[17] = "0123456789abcdef";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AcceleratorBuffer object enumeration, should probably be moved to its own file eventually
@@ -284,6 +289,9 @@ void DetectCPUFeatures()
 
 void ScopehalStaticCleanup()
 {
+	ShFinalize();
+	glslang::FinalizeProcess();
+	ScratchBufferManager::clear();
 	VulkanCleanup();
 }
 
@@ -296,10 +304,17 @@ void DriverStaticInit()
 	DetectCPUFeatures();
 	Unit::InitializeLocales();
 
+	glslang::InitializeProcess();
+	ShInitialize();
+	*GetResources() = *GetDefaultResources();
+	LogDebug("ESSL version string: %s\n", glslang::GetEsslVersionString());
+	LogDebug("GLSL version string: %s\n", glslang::GetGlslVersionString());
+
 	AddBERTDriverClass(AntikernelLabsTriggerCrossbar);
 	AddBERTDriverClass(MultiLaneBERT);
 
 	AddDriverClass(AgilentOscilloscope);
+	Oscilloscope::DoAddDriverClass("keysight", &AgilentOscilloscope::CreateInstance);	//alias
 	AddDriverClass(AntikernelLabsILA);
 	AddDriverClass(AntikernelLabsSerdesILA8b10b);
 	AddDriverClass(DemoOscilloscope);
@@ -808,6 +823,11 @@ string GetDirOfCurrentExecutable()
 
 void InitializeSearchPaths()
 {
+	static bool initialized = false;
+	if(initialized)
+		return;
+	initialized = true;
+
 	std::filesystem::path binRootDir;
 	//Search in the directory of the glscopeclient binary first
 #ifdef _WIN32
@@ -1147,4 +1167,24 @@ bool OnMemoryPressure(MemoryPressureLevel level, MemoryPressureType type, size_t
 	}
 
 	return moreFreed;
+}
+
+/**
+	@brief Fills a waveform with random content, uniformly distributed from fmin to fmax (mostly used for testing)
+ */
+void FillRandomWaveform(UniformAnalogWaveform* wfm, minstd_rand& rng, size_t size, float fmin, float fmax)
+{
+	auto rdist = uniform_real_distribution<float>(fmin, fmax);
+
+	wfm->PrepareForCpuAccess();
+	wfm->Resize(size);
+
+	for(size_t i=0; i<size; i++)
+		wfm->m_samples[i] = rdist(rng);
+
+	wfm->MarkModifiedFromCpu();
+
+	wfm->m_revision ++;
+	if(wfm->m_timescale == 0)
+		wfm->m_timescale = 1000;
 }

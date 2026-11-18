@@ -73,6 +73,7 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten) override;
 	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
 	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
 	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
@@ -184,9 +185,6 @@ protected:
 
 private:
 
-	///@brief Map of sample rates to maximum on-screen record length
-	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
-
 	///@brief Preamble of a waveform
 	struct WaveformPreamble
 	{
@@ -213,6 +211,30 @@ private:
 		std::vector<uint8_t> &data, WaveformPreamble &preamble,
 		size_t chan_start);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
+
+	enum FirmwareType
+	{
+		//Agilent or very old Keysight
+		FIRMWARE_OLD,
+
+		//keysight scope with infiniium 10.x or later
+		FIRMWARE_INFINIIUM_10
+	} m_ftype;
+
+	//If true, this is a simulator and a bunch of commands related to triggering and frontend config are unavailable
+	bool m_isSimulator;
+
+	///@brief Compute pipeline for converting raw ADC codes to float32 samples
+	std::unique_ptr<ComputePipeline> m_conversion16BitPipeline;
+
+	///@brief Scratch buffer for raw ADC samples
+	AcceleratorBuffer<uint8_t> m_rawSampleData;
+
+	///@brief Max sample rate advertised by the scope
+	uint64_t m_maxSampleRate;
+
+	///@brief Max memory depth advertised by the scope
+	uint64_t m_maxMemoryDepth;
 
 public:
 	static std::string GetDriverNameInternal();

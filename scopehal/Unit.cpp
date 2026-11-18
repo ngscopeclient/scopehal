@@ -309,30 +309,30 @@ void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix) c
 		scaleFactor = 1e-3;
 		prefix = "k";
 	}
-	else if(num < 1)
+	else if(num < 1e-12)
 	{
-		scaleFactor = 1e3;
-		prefix = "m";
-	}
-	else if(num < 1e-6)
-	{
-		scaleFactor = 1e6;
-		prefix = "μ";
+		scaleFactor = 1e15;
+		prefix = "f";
 	}
 	else if(num < 1e-9)
-	{
-		scaleFactor = 1e9;
-		prefix = "n";
-	}
-	else if(num < 1e-12)
 	{
 		scaleFactor = 1e12;
 		prefix = "p";
 	}
-	else if(num < 1e-15)
+	else if(num < 1e-6)
 	{
-		scaleFactor = 1e15;
-		prefix = "f";
+		scaleFactor = 1e9;
+		prefix = "n";
+	}
+	else if(num < 1e-3)
+	{
+		scaleFactor = 1e6;
+		prefix = "μ";
+	}
+	else if(num < 1)
+	{
+		scaleFactor = 1e3;
+		prefix = "m";
 	}
 }
 

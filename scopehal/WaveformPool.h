@@ -82,6 +82,15 @@ public:
 	}
 
 	/**
+		@brief Returns the number of waveforms available in the pool
+	 */
+	size_t size()
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+		return m_waveforms.size();
+	}
+
+	/**
 		@brief Attempts to get a waveform from the pool.
 
 		@return The waveform, if one is available. Returns nullptr if the pool is empty.

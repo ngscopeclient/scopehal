@@ -47,7 +47,6 @@ RGBLEDDecoder::RGBLEDDecoder(const string& color) : PacketDecoder(color, CAT_SER
 	, m_type(m_parameters["LED Type"])
 	, m_displayscale(m_parameters["Brightness Scale"])
 {
-	AddProtocolStream("data");
 	CreateInput<InputConstraintStreamType>("din", Stream::STREAM_TYPE_DIGITAL);
 
 	m_type = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));

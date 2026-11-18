@@ -98,6 +98,8 @@ public:
 
 	virtual std::vector<std::string> GetHeaders() override;
 
+	virtual std::string GetDecodedField(Packet* pack, size_t i) override;
+
 protected:
 	void BytesToFrames(
 		std::vector<uint8_t>& bytes,
@@ -115,7 +117,9 @@ protected:
 		uint64_t* ends,
 		size_t len,
 		EthernetWaveform* cap,
-		bool suppressedPreambleAndFCS = false);
+		bool suppressedPreambleAndFCS = false,
+		std::optional<uint32_t> offloadCRC = {}
+		);
 
 	void BytesToFramesUnitTimescale(
 		uint8_t* bytes,
@@ -123,7 +127,12 @@ protected:
 		uint64_t* ends,
 		size_t len,
 		EthernetWaveform* cap,
-		bool suppressedPreambleAndFCS = false);
+		bool suppressedPreambleAndFCS = false,
+		std::optional<uint32_t> offloadCRC = {});
+
+	std::vector<std::string> m_headers;
+
+	AcceleratorBuffer<uint32_t> m_crcTable;
 };
 
 #endif

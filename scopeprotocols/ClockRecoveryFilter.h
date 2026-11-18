@@ -67,8 +67,11 @@ public:
 	AcceleratorBuffer<int64_t>& GetZeroCrossings()
 	{ return m_detector.GetResults(); }
 
-	float GetThreshold()
-	{ return m_threshold.GetFloatVal(); }
+	FilterParameter& GetThreshold()
+	{ return m_threshold; }
+
+	FilterParameter& GetBaudRate()
+	{ return m_baudRate; }
 
 protected:
 	void FillSquarewaveGeneric(SparseDigitalWaveform& cap);
@@ -141,6 +144,9 @@ protected:
 			Final edge position
 	 */
 	AcceleratorBuffer<int64_t> m_secondPassState;
+
+	///@brief Output buffer for CPU edge detection
+	AcceleratorBuffer<int64_t> m_vedges;
 
 	///@brief Number of edges found last PLL iteration
 	size_t m_lastIterationOutputCount;

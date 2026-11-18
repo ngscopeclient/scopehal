@@ -251,6 +251,8 @@ protected:
 	AcceleratorBuffer<int64_t>* m_clockEdgesMuxed;
 	AcceleratorBuffer<int64_t> m_normalizeMaxBuf;
 
+	std::shared_ptr<ComputePipeline> m_scratchZeroComputePipeline;
+	std::shared_ptr<ComputePipeline> m_eyeIntegrateComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeNormalizeReduceComputePipeline;
 	std::shared_ptr<ComputePipeline> m_eyeNormalizeScaleComputePipeline;

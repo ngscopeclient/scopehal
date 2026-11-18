@@ -86,7 +86,7 @@ Oscilloscope::~Oscilloscope()
 void Oscilloscope::InitVulkanQueue(const char* debugName)
 {
 	string name = string(debugName) + ".queue";
-	m_queue = g_vkQueueManager->GetComputeQueue(name);
+	m_queue = g_vkQueueManager->GetQueueFromPool(QueueManager::QUEUE_POOL_DRIVER, name);
 
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -171,6 +171,16 @@ bool Oscilloscope::WaitForTrigger(int timeout)
 	}
 
 	return false;
+}
+
+bool Oscilloscope::HasAutoTrigger()
+{
+	return false;
+}
+
+void Oscilloscope::StartAutoTrigger()
+{
+	//nothing here
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -918,9 +928,20 @@ void Oscilloscope::ChannelsDownloadStarted()
 		if (chan == nullptr)
 			continue;
 
-		chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_WAITING;
-		chan->m_downloadProgress = 0.0;
-		chan->m_downloadStartTime = GetTime();
+		if(chan->IsEnabled())
+		{
+			chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_WAITING;
+			chan->m_downloadProgress = 0.0;
+			chan->m_downloadStartTime = GetTime();
+		}
+		else
+		{
+			chan->m_downloadState = InstrumentChannel::DownloadState::DOWNLOAD_NONE;
+			chan->m_downloadProgress = 0.0;
+			// Do not update the downloadStartTime if the channel is not enabled
+		}
+
+
 	}
 }
 

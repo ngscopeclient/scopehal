@@ -31,7 +31,6 @@
 #pragma shader_stage(compute)
 
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_EXT_shader_atomic_int64 : require
 
 layout(std430, binding=0) restrict readonly buffer buf_clockEdges
 {
@@ -45,7 +44,7 @@ layout(std430, binding=1) restrict readonly buffer buf_waveform
 
 layout(std430, binding=2) buffer buf_accum
 {
-	int64_t accum[];
+	uint accum[];
 };
 
 layout(std430, binding=3) restrict readonly buffer buf_index
@@ -152,7 +151,7 @@ void main()
 
 		//Calculate how much of the pixel's intensity to put in each row
 		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
-		int64_t bin2 = int64_t(yfrac * 64.0);
+		uint bin2 = uint(yfrac * 64.0);
 		uint pixidx = y1*mwidth + pixel_x_round;
 
 		//Plot each point (this only draws the right half of the eye, we copy to the left later)

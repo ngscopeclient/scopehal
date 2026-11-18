@@ -72,7 +72,6 @@ layout(std430, push_constant) uniform constants
 	uint len;
 	uint order;
 	uint inputPerThread;
-	uint outputPerThread;
 };
 
 layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
@@ -90,14 +89,14 @@ void main()
 	//Find starting sample index
 	uint writebase = 0;
 	for(uint i=0; i<gl_GlobalInvocationID.x; i++)
-		writebase += min(idxIn[i], outputPerThread);
+		writebase += min(idxIn[i], inputPerThread);
 
 	//Find number of samples to copy
 	uint numSamples = idxIn[gl_GlobalInvocationID.x];
 
 	//Clamp invalid size values from previous shader (should never happen but just to be safe)
-	if(numSamples >= outputPerThread)
-		numSamples = outputPerThread;
+	if(numSamples >= inputPerThread)
+		numSamples = inputPerThread;
 
 	//Actually do the copy
 	for(uint i=0; i<numSamples; i++)

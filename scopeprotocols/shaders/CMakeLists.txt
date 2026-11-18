@@ -73,6 +73,7 @@ add_compute_shaders(
 		FillSquarewaveAndDurations.glsl
 		FIRFilter.glsl
 		FrequencyMeasurement.glsl
+		IntegrateUint32ToUint64.glsl
 		InvertFilter.glsl
 		InvertFilterDigital.glsl
 		IQDemuxFilter.glsl
@@ -111,6 +112,8 @@ add_compute_shaders(
 		VectorFrequency.glsl
 		VectorPhase.glsl
 		WaterfallFilter.glsl
+		ZeroFillFloat.glsl
+		ZeroFillUint32.glsl
 	)
 
 add_dependencies(scopeprotocols protocolshaders)

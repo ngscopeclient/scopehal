@@ -288,10 +288,10 @@ void CSVImportFilter::OnFileNameChanged()
 					{
 						//TODO: use fastfloat lib here
 						#ifdef __APPLE__
-							timestamps.push_back(FS_PER_SECOND * strtod(pline+i, nullptr));
+							timestamps.push_back(FS_PER_SECOND * strtod(pline + fieldstart, nullptr));
 						#else
 							double tmp;
-							from_chars(pline+fieldstart, pline+i, tmp, std::chars_format::general);
+							from_chars(pline + fieldstart, pline + i, tmp, std::chars_format::general);
 							timestamps.push_back(FS_PER_SECOND * tmp);
 						#endif
 					}

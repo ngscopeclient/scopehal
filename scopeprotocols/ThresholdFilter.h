@@ -52,6 +52,12 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(ThresholdFilter)
 
+	FilterParameter& GetThreshold()
+	{ return m_threshold; }
+
+	FilterParameter& GetHysteresis()
+	{ return m_hysteresis; }
+
 protected:
 	FilterParameter& m_threshold;
 	FilterParameter& m_hysteresis;

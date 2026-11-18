@@ -119,10 +119,9 @@ void main()
 		state = (state << 1) | next;
 
 		//Zero out error flags for beginning of the output
-		if( (next == uint(din[i])) || (i < 31) )
+		if( (next == uint(din[i])) || (i < PRBS_BITS) )
 			dout[i] = uint8_t(0);
 		else
 			dout[i] = uint8_t(1);
 	}
-
 }

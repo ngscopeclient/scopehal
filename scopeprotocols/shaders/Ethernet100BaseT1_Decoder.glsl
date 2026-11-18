@@ -33,6 +33,8 @@
 #extension GL_EXT_shader_8bit_storage : require
 #extension GL_ARB_gpu_shader_int64 : require
 
+#extension GL_EXT_debug_printf : enable
+
 layout(std430, binding=0) restrict readonly buffer buf_dinI
 {
 	int8_t pointsI[];
@@ -53,7 +55,7 @@ layout(std430, binding=3) restrict readonly buffer buf_packetScramblers
 	uint64_t packetScramblers[];
 };
 
-layout(std430, binding=4) restrict writeonly buffer buf_bytes
+layout(std430, binding=4) restrict buffer buf_bytes
 {
 	uint8_t bytes[];
 };
@@ -78,6 +80,16 @@ layout(std430, binding=8) restrict readonly buffer buf_durationsIn
 	int64_t durationsIn[];
 };
 
+layout(std430, binding=9) restrict readonly buffer buf_crcTable
+{
+	uint crcTable[];
+};
+
+layout(std430, binding=10) restrict writeonly buffer buf_crcs
+{
+	uint crcs[];
+};
+
 layout(std430, push_constant) uniform constants
 {
 	uint npackets;
@@ -94,6 +106,8 @@ layout(local_size_x=32, local_size_y=1, local_size_z=1) in;
 #define STATE_PACKET 3
 #define STATE_ESD_1 4
 #define STATE_ESD_2 5
+
+void CalculateCRC(uint nthread, uint ioutBase, uint iout);
 
 void main()
 {
@@ -276,6 +290,7 @@ void main()
 				if( (ci == 1) && (cq == 1) )
 				{
 					starts[ioutBase] = int64_t(iout - 1);
+					CalculateCRC(nthread, ioutBase, iout);
 					return;
 				}
 
@@ -284,6 +299,7 @@ void main()
 				else if( (ci == -1) && (cq == -1) )
 				{
 					starts[ioutBase] = int64_t(iout - 1);
+					CalculateCRC(nthread, ioutBase, iout);
 					return;
 				}
 
@@ -298,4 +314,36 @@ void main()
 				break;
 		}
 	}
+}
+
+void CalculateCRC(uint nthread, uint ioutBase, uint iout)
+{
+	uint len = iout;
+	if(len < 4)
+		return;
+
+	uint end = len - 4;
+
+	uint crc = 0xffffffff;
+	bool sawSFD = false;
+	for(uint i=0; i<end; i++)
+	{
+		uint b = uint(bytes[ioutBase + i]);
+
+		//Look for preamble and SFD but don't CRC it
+		if(!sawSFD)
+		{
+			if(b == 0xd5)
+				sawSFD = true;
+			continue;
+		}
+
+		//If we get here we're in the frame payload, CRC it
+		crc = crcTable[ (crc & 0xff) ^ b ] ^ (crc >> 8);
+	}
+
+	//TODO: bswap it
+	crc = ~crc;
+
+	crcs[nthread] = crc;
 }

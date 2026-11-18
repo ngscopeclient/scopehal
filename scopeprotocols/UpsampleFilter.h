@@ -62,6 +62,9 @@ protected:
 	AcceleratorBuffer<float> m_filter;
 
 	ComputePipeline m_computePipeline;
+
+	size_t m_lastKernel;
+	size_t m_lastUpsampleFactor;
 };
 
 #endif

@@ -36,6 +36,12 @@
 #ifndef VulkanFFTPlan_h
 #define VulkanFFTPlan_h
 
+//glslang/Include/visibility.h does not correctly handle multiple includes
+//so work around that
+#ifdef GLSLANG_EXPORT_FOR_TESTS
+#undef GLSLANG_EXPORT_FOR_TESTS
+#endif
+
 //Lots of warnings here, disable them
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"

@@ -182,10 +182,12 @@ void SCPITransport::RateLimitingWait()
  */
 bool SCPITransport::FlushCommandQueue()
 {
+	lock_guard<recursive_mutex> lock(m_netMutex);
+
 	//Grab the queue, then immediately release the mutex so we can do more queued sends
 	list<string> tmp;
 	{
-		lock_guard<mutex> lock(m_queueMutex);
+		lock_guard<mutex> lock2(m_queueMutex);
 		tmp = std::move(m_txQueue);
 		m_txQueue.clear();
 	}
@@ -193,7 +195,6 @@ bool SCPITransport::FlushCommandQueue()
 	if(tmp.size())
 		LogTrace("%zu commands being flushed\n", tmp.size());
 
-	lock_guard<recursive_mutex> lock(m_netMutex);
 	for(auto& str : tmp)
 	{
 		if(m_rateLimitingEnabled)

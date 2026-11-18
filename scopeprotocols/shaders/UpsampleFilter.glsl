@@ -52,30 +52,39 @@ layout(std430, push_constant) uniform constants
 	uint kernel;
 };
 
-layout(local_size_x=1, local_size_y=64, local_size_z=1) in;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+shared float s_kernel[128];
 
 void main()
 {
-	uint i = (gl_GlobalInvocationID.z * gl_NumWorkGroups.y * gl_WorkGroupSize.y) + gl_GlobalInvocationID.y;
+	//Fetch the filter kernel into shared memory at the start of the shader to save memory bandwidth performance
+	for(uint j=gl_LocalInvocationID.x; j < kernel; j += gl_WorkGroupSize.x)
+		s_kernel[j] = fkernel[j];
+	barrier();
 
+	//Output bounds check only after shared memory cache is hot
+	uint i = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
 	if(i >= imax)
-		return;
-	if(gl_GlobalInvocationID.x >= upsample_factor)
 		return;
 
 	uint offset = i*upsample_factor;
 
-	uint start = 0;
-	uint sstart = 0;
-	if(gl_GlobalInvocationID.x > 0)
+	for(uint j = 0; j < upsample_factor; j++)
 	{
-		sstart = 1;
-		start = upsample_factor - gl_GlobalInvocationID.x;
+		uint start = 0;
+		uint sstart = 0;
+
+		if(j > 0)
+		{
+			sstart = 1;
+			start = upsample_factor - j;
+		}
+
+		float f = 0;
+		for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
+			f += s_kernel[k] * din[i + sstart];
+
+		dout[offset + j] = f;
 	}
-
-	float f = 0;
-	for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
-		f += fkernel[k] * din[i + sstart];
-
-	dout[offset + gl_GlobalInvocationID.x] = f;
 }

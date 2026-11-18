@@ -105,25 +105,53 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	if(!csock)
 		LogFatal("ThunderScopeOscilloscope expects a SCPITwinLanTransport\n");
 
-	//Request entry to credit-based flow control mode rather than lock-step mode
-	const uint8_t r = 'C';
+	//Request entry to credit-based flow control mode rather than lock-step mode, using tags
+	const uint8_t r = 'T';
 	m_transport->SendRawData(1, &r);
 
-	//set initial bandwidth on all channels to full
+	//Load initial configuration from TS.NET
 	m_bandwidthLimits.resize(4);
 	for(size_t i=0; i<4; i++)
-		SetChannelBandwidthLimit(i, 0);
+	{
+		//Get initial bandwidth limiters
+		auto reply = m_transport->SendCommandQueuedWithReply(string(":") + m_channels[i]->GetHwname() + ":BAND?");
+		if(reply == "FULL")
+			m_bandwidthLimits[i] = 0;
+		else
+		{
+			uint32_t mhz;
+			sscanf(reply.c_str(), "%uM", &mhz);
+			m_bandwidthLimits[i] = mhz;
+		}
 
-	//Set all channels off by default
-	for(size_t i=0; i<4; i++)
-		DisableChannel(i);
+		//Get channel state
+		reply = m_transport->SendCommandQueuedWithReply(string(":") + m_channels[i]->GetHwname() + ":STATE?");
+		if(reply == "ON")
+			m_channelsEnabled[i] = true;
+		else
+			m_channelsEnabled[i] = false;
 
-	//Set initial memory configuration: 1M point depth @ 1 Gsps
+		//TODO: coupling
+
+		//TODO: termination
+
+		//TODO: offset
+
+		//TODO: range
+	}
+	RefreshSampleRate();
+
+	//Load timebase config
 	//This must happen before the trigger is configured, since trigger validation depends on knowing memory depth
-	SetSampleRate(1000000000L);
-	SetSampleDepth(1000000);
+	auto reply = m_transport->SendCommandQueuedWithReply("ACQ:DEPTH?");
+	m_mdepth = stoi(reply);
+
+	//TODO: ADC mode
+
+	//TODO: refclk mode
 
 	//Configure the trigger
+	//TODO: load from scope
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
@@ -331,7 +359,7 @@ Oscilloscope::TriggerMode ThunderScopeOscilloscope::PollTrigger()
 		#endif
 
 		//Do we have old stale waveforms to drop still in the socket buffer? Throw it out
-		if(m_dropUntilSeq > m_lastSeq)
+		if( (m_dropUntilSeq > m_lastSeq) && (m_lastSeq != 0) )
 		{
 			LogTrace("Dropping until sequence %u, last received sequence was %u. Need to drop this waveform\n",
 				(unsigned int)m_dropUntilSeq, (unsigned int)m_lastSeq);
@@ -358,41 +386,65 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		nvtx3::scoped_range range("ThunderScopeOscilloscope::DoAcquireData");
 	#endif
 
-	//Read Version No.
-	uint8_t version;
-	if(!m_transport->ReadRawData(sizeof(version), reinterpret_cast<uint8_t*>(&version)))
+	//Read the tag (expect DATA then length as a uint32)
+	uint32_t taglen[2];
+	if(!m_transport->ReadRawData(sizeof(taglen), reinterpret_cast<uint8_t*>(&taglen)))
 		return false;
 
-	//Read the sequence number of the current waveform
-	if(!m_transport->ReadRawData(sizeof(m_lastSeq), reinterpret_cast<uint8_t*>(&m_lastSeq)))
+	//Expect 0x41544144 "DATA"
+	uint32_t tag = taglen[0];
+	uint32_t datalen = taglen[1];
+	if(tag != 0x41544144)
+	{
+		LogDebug("Discarding %u bytes of data with unrecognized tag %u\n", datalen, tag);
+
+		//It's something else. Discard the payload
+		uint8_t* garbage = new uint8_t[datalen];
+		if(!m_transport->ReadRawData(datalen, garbage))
+			return false;
+		LogDebug("got garbage\n");
+		delete[] garbage;
 		return false;
-	//LogTrace("Got waveform with sequence %u\n", m_lastSeq);
+	}
+
+	/*
+		Read waveform headers in one block to make less syscalls
+
+		uint8		version
+		uint32		seq
+		uint16		numChannels
+		uint64		fs_per_sample
+		int64		trigger_fs
+		float64		wfm_per_sec
+	 */
+	uint8_t headers[31];
+	if(!m_transport->ReadRawData(sizeof(headers), headers))
+		return false;
+
+	//Unpack it
+	uint8_t version;
+	uint16_t numChannels;
+	uint64_t fs_per_sample;	//Normally equal to m_srate.
+							//Mut may be different if a sample rate change is in flight and hasn't committed
+							//at the scope side yet
+	int64_t trigger_fs;
+	double wfms_s;
+	memcpy(&version, &headers[0], 1);
+	memcpy(&m_lastSeq, &headers[1], 4);
+	memcpy(&numChannels, &headers[5], 2);
+	memcpy(&fs_per_sample, &headers[7], 8);
+	memcpy(&trigger_fs, &headers[15], 8);
+	memcpy(&wfms_s, &headers[23], 8);
 
 	//Acknowledge receipt of this waveform
+	//LogTrace("Got waveform with sequence %u\n", m_lastSeq);
 	m_transport->SendRawData(4, reinterpret_cast<uint8_t*>(&m_lastSeq));
-
 	if(!keep)
 		LogTrace("Dropping waveform %u\n",m_lastSeq);
 	else
 	{
 		//LogTrace("Keeping waveform %u\n",m_lastSeq);
 	}
-
-	//Read the number of channels in the current waveform
-	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), reinterpret_cast<uint8_t*>(&numChannels)))
-		return false;
-
-	//Get the sample interval.
-	//May be different from m_srate if we changed the rate after the trigger was armed
-	uint64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), reinterpret_cast<uint8_t*>(&fs_per_sample)))
-		return false;
-
-	//Get the de-facto trigger position.
-	int64_t trigger_fs;
-	if(!m_transport->ReadRawData(sizeof(trigger_fs), reinterpret_cast<uint8_t*>(&trigger_fs)))
-		return false;
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
@@ -403,11 +455,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		}
 	}
 
-	//Get the de-facto hardware capture rate.
-	double wfms_s;
-	if(!m_transport->ReadRawData(sizeof(wfms_s), reinterpret_cast<uint8_t*>(&wfms_s)))
-		return false;
-
+	//Update capture rate performance counters
 	if(keep)
 		m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
 
@@ -415,7 +463,14 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 	uint8_t chnum;
 	uint8_t dataType;
 	uint64_t memdepth;
-	float config[3];
+	uint8_t channelHeader[9];
+
+	uint8_t analogHeader[14];
+	float 	scale;
+	float 	offset;
+	float 	trigphase;
+	bool	clipping;
+
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
@@ -429,11 +484,12 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	for(size_t i=0; i<numChannels; i++)
 	{
+		if(!m_transport->ReadRawData(sizeof(channelHeader), channelHeader))
+			return false;
+
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), reinterpret_cast<uint8_t*>(&chnum)))
-			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), reinterpret_cast<uint8_t*>(&memdepth)))
-			return false;
+		memcpy(&chnum, &channelHeader[0], 1);
+		memcpy(&memdepth, &channelHeader[1], 8);
 
 		//Grab the next free buffer
 		auto& abuf = m_analogRawWaveformBuffers[m_nextWaveformWriteBuffer];
@@ -451,22 +507,26 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 		{
 			auto buf = abuf->GetCpuPointer();
 
-			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_transport->ReadRawData(sizeof(config), reinterpret_cast<uint8_t*>(&config)))
-				return false;
+			/*
+				Read channel headers in one block to make less syscalls
+				Scale and offset are sent in the header since they might have changed since the capture began
 
-			float scale = config[0];
-			float offset = config[1];
-			float trigphase = config[2];
+				float32	scale
+				float32	offset
+				float32	trigphase
+				bool	clipping
+				uint	dataType
+			 */
+			if(!m_transport->ReadRawData(sizeof(analogHeader), analogHeader))
+				return false;
+			memcpy(&scale, &analogHeader[0], 4);
+			memcpy(&offset, &analogHeader[4], 4);
+			memcpy(&trigphase, &analogHeader[8], 4);
+			memcpy(&clipping, &analogHeader[12], 1);
+			memcpy(&dataType, &analogHeader[13], 1);
+
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
-
-			bool clipping;
-			if(!m_transport->ReadRawData(sizeof(clipping), reinterpret_cast<uint8_t*>(&clipping)))
-				return false;
-
-			if(!m_transport->ReadRawData(sizeof(dataType), reinterpret_cast<uint8_t*>(&dataType)))
-				return false;
 
 			//TODO: stream timestamp from the server
 			uint32_t depth = memdepth * sizeof(int8_t);
@@ -496,7 +556,7 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 			//Clear out any previously pending waveforms before we queue up this one
 			if(i == 0)
-				PushPendingWaveformsIfReady();
+				FlushAllPendingWaveforms();
 
 			m_wipWaveforms[GetOscilloscopeChannel(chnum)] = cap;
 
@@ -575,13 +635,23 @@ bool ThunderScopeOscilloscope::DoAcquireData(bool keep)
 
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)
+	{
 		m_triggerArmed = false;
+
+		//Ask the server what the last waveform it captured was
+		m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
+		if(m_lastSeq != 0)
+		{
+			LogTrace("Trigger stopped after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
+				(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+		}
+	}
 
 	return true;
 }
 
 /**
-	@brief Wait for waveform conversion to finish, then push it to the pending waveforms buffer
+	@brief Wait up to 1ms for waveform conversion to finish, then push it to the pending waveforms buffer
  */
 void ThunderScopeOscilloscope::PushPendingWaveformsIfReady()
 {
@@ -632,8 +702,6 @@ void ThunderScopeOscilloscope::PushPendingWaveformsIfReady()
 
 void ThunderScopeOscilloscope::Start()
 {
-	m_triggerArmed = true; //FIXME
-
 	m_transport->SendCommandQueued("NORMAL");
 	m_transport->SendCommandQueued("RUN");
 
@@ -662,19 +730,78 @@ void ThunderScopeOscilloscope::Stop()
 
 void ThunderScopeOscilloscope::StartSingleTrigger()
 {
+	//Ask the server what the last waveform it sent was
+	m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
+	LogTrace("Starting single trigger after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
+		(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
+
+	//If we were in normal trigger mode, stop it
+	if(m_triggerArmed)
+		Stop();
+
 	RemoteBridgeOscilloscope::StartSingleTrigger();
+	ResetPerCaptureDiagnostics();
+}
+
+bool ThunderScopeOscilloscope::HasAutoTrigger()
+{
+	return true;
+}
+
+void ThunderScopeOscilloscope::StartAutoTrigger()
+{
+	m_transport->SendCommandQueued("AUTO");
+	m_transport->SendCommandQueued("RUN");
+
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+
 	ResetPerCaptureDiagnostics();
 }
 
 void ThunderScopeOscilloscope::ForceTrigger()
 {
-	m_transport->SendCommandQueued("SINGLE");
-	m_transport->SendCommandQueued("FORCE");
+	if(!m_triggerArmed)
+	{
+		//Ask the server what the last waveform it captured was
+		m_dropUntilSeq = stoul(Trim(m_transport->SendCommandQueuedWithReply("SEQNUM?")));
+		if( (m_dropUntilSeq > m_lastSeq) && (m_lastSeq != 0) )
+		{
+			LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. Need to drop %u stale waveforms already in flight\n",
+				(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq, (unsigned int)(m_dropUntilSeq - m_lastSeq));
 
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
+			//Actually drop them here
+			while(m_dropUntilSeq > m_lastSeq)
+				DoAcquireData(false);
+		}
+		else
+		{
+			LogTrace("Starting forced trigger after processing waveform %u. Last sequence number sent by scope was %u. No action needed.\n",
+				(unsigned int)m_lastSeq, (unsigned int)m_dropUntilSeq);
+		}
+	}
+
+	//If the trigger is currently armed, don't change the current trigger mode and just force it
+	if(m_triggerArmed)
+		m_transport->SendCommandQueued("FORCE");
+
+	//Otherwise, do a forced single shot trigger
+	else
+	{
+		m_transport->SendCommandQueued("SINGLE");
+		m_transport->SendCommandQueued("FORCE");
+
+		m_triggerArmed = true;
+		m_triggerOneShot = true;
+	}
 
 	ResetPerCaptureDiagnostics();
+}
+
+bool ThunderScopeOscilloscope::PeekTriggerArmed()
+{
+	//TODO: round trip sync?
+	return m_triggerArmed;
 }
 
 void ThunderScopeOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)

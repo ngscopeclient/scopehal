@@ -69,6 +69,9 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(UARTDecoder)
 
+	FilterParameter& GetBaud()
+	{ return m_baud; }
+
 protected:
 	void FinishPacket(Packet* pack);
 

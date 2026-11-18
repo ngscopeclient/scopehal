@@ -44,7 +44,6 @@ public:
 	uint32_t len;
 	uint32_t order;
 	uint32_t inputPerThread;
-	uint32_t outputPerThread;
 };
 
 class PAMEdgeDetectorMergeConstants

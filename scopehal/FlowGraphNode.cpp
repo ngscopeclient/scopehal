@@ -69,7 +69,8 @@ void FlowGraphNode::DetachInputs()
 	for(auto& c : m_inputs)
 	{
 		auto& sourceChan = c->m_sourceStream.m_channel;
-		sourceChan->RemoveSink(c->m_sourceStream.m_stream, this);
+		if(sourceChan)
+			sourceChan->RemoveSink(c->m_sourceStream.m_stream, this);
 		sourceChan = nullptr;
 	}
 }
@@ -411,18 +412,3 @@ void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
 	}
 }
 
-const FlowGraphNodeMessage* FlowGraphNode::GetMostSevereMessage() const
-{
-	if(!HasMessages())
-		return nullptr;
-
-	const FlowGraphNodeMessage* most_severe = &GetMessages().front();
-	for(const FlowGraphNodeMessage& msg : GetMessages())
-	{
-		if(msg.GetSeverity() < most_severe->GetSeverity())
-		{
-			most_severe = &msg;
-		}
-	}
-	return most_severe;
-}

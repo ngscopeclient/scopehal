@@ -118,8 +118,12 @@ void TIEMeasurement::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 	//it's already been edge detected. Use those edges instead!
 	float threshold = m_threshold.GetFloatVal();
 	auto pcdr = dynamic_cast<ClockRecoveryFilter*>(GetInput(1).m_channel);
-	if(pcdr && (fabs(pcdr->GetThreshold() - threshold) < 0.01) && (pcdr->GetInput(0) == GetInput(0)) && uaclk)
+	if(pcdr &&
+		(fabs(pcdr->GetThreshold().GetFloatVal() - threshold) < 0.01) &&
+		(pcdr->GetInput(0) == GetInput(0)) && uaclk)
+	{
 		m_clockEdgesMuxed = &pcdr->GetZeroCrossings();
+	}
 
 	//Normal fast path: GPU edge detection on uniform input
 	else if(uaclk)

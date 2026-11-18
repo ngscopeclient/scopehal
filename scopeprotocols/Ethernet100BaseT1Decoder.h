@@ -109,6 +109,8 @@ protected:
 	AcceleratorBuffer<int8_t> m_pointsI;
 	AcceleratorBuffer<int8_t> m_pointsQ;
 
+	AcceleratorBuffer<uint32_t> m_crcs;
+
 	std::shared_ptr<ComputePipeline> m_pam3DecodeComputePipeline;
 	std::shared_ptr<ComputePipeline> m_descrambleComputePipeline;
 	std::shared_ptr<ComputePipeline> m_decodeComputePipeline;

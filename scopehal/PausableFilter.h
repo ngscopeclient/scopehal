@@ -58,9 +58,9 @@ public:
 
 	bool ShouldRefresh();
 
-	void Run();
-	void Single();
-	void Stop();
+	virtual void Run();
+	virtual void Single();
+	virtual void Stop();
 
 protected:
 	bool m_running;
